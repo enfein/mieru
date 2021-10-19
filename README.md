@@ -332,6 +332,7 @@ mieru 不使用 socks5 用户名和密码进行身份验证。
 客户端软件 mieru 的配置文件同样是一个二进制文件。它在不同操作系统中存储的位置如下表所示
 
 | Operating System | Configuration File Path |
+| :----: | :----: |
 | Linux | /home/USERNAME/.config/mieru/client.conf.pb |
 | Mac OS | /Users/USERNAME/Library/Application Support/mieru/client.conf.pb |
 | Windows | C:\Users\USERNAME\AppData\Roaming\mieru\client.conf.pb |
@@ -355,6 +356,7 @@ sudo journalctl -u mita --no-pager
 客户端 mieru 的日志存放位置如下表所示
 
 | Operating System | Configuration File Path |
+| :----: | :----: |
 | Linux | /home/USERNAME/.cache/mieru/ |
 | Mac OS | /Users/USERNAME/Library/Caches/mieru/ |
 | Windows | C:\Users\USERNAME\AppData\Local\mieru\ |
