@@ -30,7 +30,7 @@ mieru 代理软件由称为 mieru【見える】的客户端软件和称为 mita
 **【1】下载 mita 安装包**
 
 ```sh
-curl -L -O https://github.com/enfein/mieru/releases/download/v1.0.0/mieru_1.0.0_amd64.deb
+curl -L -O https://github.com/enfein/mieru/releases/download/v1.0.0/mita_1.0.0_amd64.deb
 ```
 
 **【2】安装 mita 软件包**
@@ -217,8 +217,7 @@ curl -L -O https://github.com/enfein/mieru/releases/download/v1.0.0/mieru_1.0.0_
 如果你的客户端操作系统是 Debian/Ubuntu 系列 Linux 发行版，可以使用下面的指令下载和安装 mieru。
 
 ```sh
-# TODO: 更换下载链接的地址
-curl -O https://github.com/enfein/mieru/mieru_1.0.0_amd64.deb
+curl -L -O https://github.com/enfein/mieru/releases/download/v1.0.0/mieru_1.0.0_amd64.deb
 
 sudo dpkg -i mieru_1.0.0_amd64.deb
 ```
