@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+/usr/sbin/useradd --no-create-home --user-group mita
+
+mkdir -p /etc/mita
+chmod 775 /etc/mita
+
+systemctl daemon-reload
+
+# Server daemon will run with the system.
+systemctl enable mita.service

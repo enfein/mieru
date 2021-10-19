@@ -1,0 +1,25 @@
+{
+    "profiles": [
+        {
+            "profileName": "new",
+            "user": {
+                "name": "user3",
+                "hashedPassword": "JP98s73StI"
+            },
+            "servers": [
+                {
+                    "domainName": "example.com",
+                    "portBindings": [
+                        {
+                            "port": 6000,
+                            "protocol": "UDP"
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "activeProfile": "new",
+    "rpcPort": 1989,
+    "socks5Port": 1080
+}

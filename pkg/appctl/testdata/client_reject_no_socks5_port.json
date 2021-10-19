@@ -1,0 +1,24 @@
+{
+    "profiles": [
+        {
+            "profileName": "default",
+            "user": {
+                "name": "user1",
+                "password": "fa7206ed2a94"
+            },
+            "servers": [
+                {
+                    "ipAddress": "1.1.1.1",
+                    "portBindings": [
+                        {
+                            "port": 4000,
+                            "protocol": "UDP"
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "activeProfile": "default",
+    "rpcPort": 1989
+}

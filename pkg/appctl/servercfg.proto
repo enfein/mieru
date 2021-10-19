@@ -1,0 +1,53 @@
+// Copyright (C) 2021  mieru authors
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+syntax = "proto3";
+
+package appctl;
+
+import "empty.proto";
+import "endpoint.proto";
+import "logging.proto";
+import "user.proto";
+
+option go_package = "github.com/enfein/mieru/pkg/appctl/appctlpb";
+
+message ServerAdvancedSettings {
+    // Allow using socks5 to access resources served in localhost.
+    // This option should be set to false unless required due to testing purpose.
+    bool allowLocalDestination = 1;
+}
+
+message ServerConfig {
+    // Server's port-protocol bindings.
+    repeated PortBinding portBindings = 1;
+
+    // A list of registered users.
+    repeated User users = 2;
+
+    ServerAdvancedSettings advancedSettings = 3;
+
+    // Server logging level.
+    LoggingLevel loggingLevel = 4;
+
+}
+
+service ServerConfigService {
+    // Fetch the server config.
+    rpc GetConfig(Empty) returns (ServerConfig);
+
+    // Update server config.
+    rpc SetConfig(ServerConfig) returns (ServerConfig);
+}

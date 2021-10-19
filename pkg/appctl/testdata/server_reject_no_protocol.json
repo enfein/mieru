@@ -1,0 +1,13 @@
+{
+    "portBindings": [
+        {
+            "port": 8000
+        }
+    ],
+    "users": [
+        {
+            "name": "user1",
+            "password": "fa7206ed2a94"
+        }
+    ]
+}

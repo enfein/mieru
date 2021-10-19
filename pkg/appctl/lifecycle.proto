@@ -1,0 +1,71 @@
+// Copyright (C) 2021  mieru authors
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+syntax = "proto3";
+
+package appctl;
+
+import "debug.proto";
+import "empty.proto";
+
+option go_package = "github.com/enfein/mieru/pkg/appctl/appctlpb";
+
+enum AppStatus {
+    UNKNOWN = 0;
+
+    // RPC service is available, but proxy is not started.
+    IDLE = 1;
+
+    // Proxy is starting.
+    STARTING = 2;
+
+    // Proxy is running.
+    RUNNING = 3;
+
+    // Proxy is being stopped.
+    STOPPING = 4;
+}
+
+message AppStatusMsg {
+    AppStatus status = 1;
+}
+
+service ClientLifecycleService {
+    // Fetch client application status.
+    rpc GetStatus(Empty) returns (AppStatusMsg);
+
+    // Quit client daemon.
+    rpc Exit(Empty) returns (Empty);
+
+    // Generate a thread dump of client daemon.
+    rpc GetThreadDump(Empty) returns (ThreadDump);
+}
+
+service ServerLifecycleService {
+    // Fetch server application status.
+    rpc GetStatus(Empty) returns (AppStatusMsg);
+
+    // Start proxy in server application.
+    rpc Start(Empty) returns (Empty);
+
+    // Stop proxy in server application.
+    rpc Stop(Empty) returns (Empty);
+
+    // Quit server daemon.
+    rpc Exit(Empty) returns (Empty);
+
+    // Generate a thread dump of server daemon.
+    rpc GetThreadDump(Empty) returns (ThreadDump);
+}

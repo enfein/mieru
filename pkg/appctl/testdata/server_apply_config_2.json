@@ -1,0 +1,19 @@
+{
+    "portBindings": [
+        {
+            "port": 9000,
+            "protocol": "UDP"
+        }
+    ],
+    "users": [
+        {
+            "name": "user1",
+            "password": "21e2e8ef4f08"
+        },
+        {
+            "name": "user2",
+            "password": "c30ce98ebe45"
+        }
+    ],
+    "loggingLevel": "INFO"
+}

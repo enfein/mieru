@@ -1,0 +1,18 @@
+{
+    "portBindings": [
+        {
+            "port": 3128,
+            "protocol": "UDP"
+        }
+    ],
+    "users": [
+        {
+            "name": "testuser",
+            "password": "19890604"
+        }
+    ],
+    "advancedSettings": {
+        "allowLocalDestination": true
+    },
+    "loggingLevel": "DEBUG"
+}

@@ -1,0 +1,15 @@
+{
+    "portBindings": [
+        {
+            "port": -1,
+            "protocol": "UDP"
+        }
+    ],
+    "users": [
+        {
+            "name": "<username@example.com>",
+            "password": "<your-password>"
+        }
+    ],
+    "loggingLevel": "INFO"
+}

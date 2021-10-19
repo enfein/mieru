@@ -1,0 +1,14 @@
+# binary output
+/build/package/mieru/debian/usr/bin/
+/build/package/mita/debian/usr/bin/
+/mieru
+/mita
+/release
+/tools/build/**
+!/tools/build/README.md
+
+*.exe
+*.dll
+*.so
+*.dylib
+*.deb

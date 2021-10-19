@@ -1,0 +1,44 @@
+{
+    "profiles": [
+        {
+            "profileName": "default",
+            "user": {
+                "name": "user2",
+                "password": "21e2e8ef4f08"
+            },
+            "servers": [
+                {
+                    "ipAddress": "2.2.2.2",
+                    "portBindings": [
+                        {
+                            "port": 5000,
+                            "protocol": "UDP"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "profileName": "new",
+            "user": {
+                "name": "user3",
+                "password": "c30ce98ebe45"
+            },
+            "servers": [
+                {
+                    "domainName": "mieru.org",
+                    "portBindings": [
+                        {
+                            "port": 6000,
+                            "protocol": "UDP"
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "activeProfile": "new",
+    "rpcPort": 1999,
+    "socks5Port": 1090,
+    "loggingLevel": "INFO"
+}

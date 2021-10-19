@@ -1,0 +1,8 @@
+Package: mieru
+Version: 1.0.0
+Section: net
+Priority: optional
+Architecture: amd64
+Depends: bash
+Maintainer: Mieru Authors
+Description: Mieru proxy client

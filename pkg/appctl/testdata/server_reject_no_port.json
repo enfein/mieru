@@ -1,0 +1,13 @@
+{
+    "portBindings": [
+        {
+            "protocol": "UDP"
+        }
+    ],
+    "users": [
+        {
+            "name": "user1",
+            "password": "fa7206ed2a94"
+        }
+    ]
+}
