@@ -30,13 +30,13 @@ mieru 代理软件由称为 mieru【見える】的客户端软件和称为 mita
 **【1】下载 mita 安装包**
 
 ```sh
-curl -L -O https://github.com/enfein/mieru/releases/download/v1.0.0/mita_1.0.0_amd64.deb
+curl -L -O https://github.com/enfein/mieru/releases/download/v1.0.1/mita_1.0.1_amd64.deb
 ```
 
 **【2】安装 mita 软件包**
 
 ```sh
-sudo dpkg -i mita_1.0.0_amd64.deb
+sudo dpkg -i mita_1.0.1_amd64.deb
 ```
 
 **【3】赋予当前用户操作 mita 的权限，需要重启服务器使此设置生效**
@@ -197,17 +197,17 @@ mieru 客户端软件支持 Windows，Mac OS 和 Linux 系统。用户可以在 
 
 ```powershell
 # Windows PowerShell
-Invoke-WebRequest https://github.com/enfein/mieru/releases/download/v1.0.0/mieru_1.0.0_windows_amd64.zip -OutFile mieru_1.0.0_windows_amd64.zip
+Invoke-WebRequest https://github.com/enfein/mieru/releases/download/v1.0.1/mieru_1.0.1_windows_amd64.zip -OutFile mieru_1.0.1_windows_amd64.zip
 ```
 
 ```sh
 # Mac OS
-curl -L -O https://github.com/enfein/mieru/releases/download/v1.0.0/mieru_1.0.0_darwin_amd64.tar.gz
+curl -L -O https://github.com/enfein/mieru/releases/download/v1.0.1/mieru_1.0.1_darwin_amd64.tar.gz
 ```
 
 ```sh
 # Linux
-curl -L -O https://github.com/enfein/mieru/releases/download/v1.0.0/mieru_1.0.0_linux_amd64.tar.gz
+curl -L -O https://github.com/enfein/mieru/releases/download/v1.0.1/mieru_1.0.1_linux_amd64.tar.gz
 ```
 
 解压缩之后，就可以得到可执行文件 `mieru` 或 `mieru.exe`。
@@ -217,9 +217,9 @@ curl -L -O https://github.com/enfein/mieru/releases/download/v1.0.0/mieru_1.0.0_
 如果你的客户端操作系统是 Debian/Ubuntu 系列 Linux 发行版，可以使用下面的指令下载和安装 mieru。
 
 ```sh
-curl -L -O https://github.com/enfein/mieru/releases/download/v1.0.0/mieru_1.0.0_amd64.deb
+curl -L -O https://github.com/enfein/mieru/releases/download/v1.0.1/mieru_1.0.1_amd64.deb
 
-sudo dpkg -i mieru_1.0.0_amd64.deb
+sudo dpkg -i mieru_1.0.1_amd64.deb
 ```
 
 **【可选】将 mieru 可执行文件移动或添加至系统路径 PATH**
