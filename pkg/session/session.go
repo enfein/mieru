@@ -1106,11 +1106,11 @@ func (l *Listener) notifyReadError(err error) {
 // ListenWithOptions listens for incoming KCP packets addressed to the local address laddr
 // on the network "udp" with packet encryption.
 func ListenWithOptions(laddr string, users map[string]*appctlpb.User) (*Listener, error) {
-	udpAddr, err := net.ResolveUDPAddr("udp", laddr)
+	listenAddr, err := net.ResolveUDPAddr("udp", laddr)
 	if err != nil {
 		return nil, fmt.Errorf("net.ResolveUDPAddr() failed: %w", err)
 	}
-	conn, err := net.ListenUDP("udp", udpAddr)
+	conn, err := net.ListenUDP("udp", listenAddr)
 	if err != nil {
 		return nil, fmt.Errorf("net.ListenUDP() failed: %w", err)
 	}
@@ -1118,21 +1118,28 @@ func ListenWithOptions(laddr string, users map[string]*appctlpb.User) (*Listener
 	return serveConn(users, conn, true)
 }
 
-// DialWithOptions connects to the remote address "raddr" on the network "udp" with packet encryption.
-//
-// 'block' is the block encryption algorithm to encrypt packets.
-func DialWithOptions(ctx context.Context, network, raddr string, block cipher.BlockCipher) (*UDPSession, error) {
+// DialWithOptions connects to the remote address "raddr" on the network "udp"
+// with packet encryption. If "laddr" is empty, an automatic address is used.
+// "block" is the block encryption algorithm to encrypt packets.
+func DialWithOptions(ctx context.Context, network, laddr, raddr string, block cipher.BlockCipher) (*UDPSession, error) {
 	switch network {
 	case "udp", "udp4", "udp6":
 	default:
 		return nil, fmt.Errorf("network %s not supported by KCP", network)
 	}
 
-	udpaddr, err := net.ResolveUDPAddr("udp", raddr)
+	udpRemoteAddr, err := net.ResolveUDPAddr("udp", raddr)
 	if err != nil {
 		return nil, fmt.Errorf("net.ResolveUDPAddr() failed: %w", err)
 	}
-	conn, err := net.ListenUDP(network, nil)
+	var udpLocalAddr *net.UDPAddr
+	if laddr != "" {
+		udpLocalAddr, err = net.ResolveUDPAddr("udp", laddr)
+		if err != nil {
+			return nil, fmt.Errorf("net.ResolveUDPAddr() failed: %w", err)
+		}
+	}
+	conn, err := net.ListenUDP(network, udpLocalAddr)
 	if err != nil {
 		return nil, fmt.Errorf("net.ListenUDP() failed: %w", err)
 	}
@@ -1141,11 +1148,11 @@ func DialWithOptions(ctx context.Context, network, raddr string, block cipher.Bl
 	if err = binary.Read(crand.Reader, binary.LittleEndian, &convid); err != nil {
 		return nil, fmt.Errorf("binary.Read() failed: %w", err)
 	}
-	return newUDPSession(convid, nil, conn, true, udpaddr, block), nil
+	return newUDPSession(convid, nil, conn, true, udpRemoteAddr, block), nil
 }
 
-func DialWithOptionsReturnConn(ctx context.Context, network, raddr string, block cipher.BlockCipher) (net.Conn, error) {
-	return DialWithOptions(ctx, network, raddr, block)
+func DialWithOptionsReturnConn(ctx context.Context, network, laddr, raddr string, block cipher.BlockCipher) (net.Conn, error) {
+	return DialWithOptions(ctx, network, laddr, raddr, block)
 }
 
 // Try to decrypt the data with all possible keys generated from the password.

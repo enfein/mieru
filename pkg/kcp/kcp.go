@@ -340,7 +340,7 @@ func (kcp *KCP) Input(data []byte, ackNoDelay bool) error {
 				randNum := mrand.Float64() * 100
 				if randNum < float64(rate) {
 					atomic.AddUint64(&testOnlySegmentDropCount, 1)
-					log.Debugf("TestOnly %d KCP segments have been dropped", testOnlySegmentDropCount)
+					log.Debugf("**TEST ONLY** %d KCP segments have been dropped", testOnlySegmentDropCount)
 					shouldDrop = true
 				}
 			}
@@ -1199,8 +1199,8 @@ func (kcp *KCP) receiveWindowSize() uint16 {
 // removeFront removes front n elements from the given segment buf / queue.
 func (kcp *KCP) removeFront(q []segment, n int) []segment {
 	if n > cap(q)/2 {
-		newn := copy(q, q[n:])
-		return q[:newn]
+		n2 := copy(q, q[n:])
+		return q[:n2]
 	}
 	return q[n:]
 }

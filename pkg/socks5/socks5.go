@@ -69,7 +69,7 @@ type Config struct {
 
 	// A function to dial to a proxy to forward all the requests.
 	// Must be set if proxy is used.
-	ProxyDial func(ctx context.Context, proxyNetwork, proxyAddr string, block cipher.BlockCipher) (net.Conn, error)
+	ProxyDial func(ctx context.Context, proxyNetwork, localAddr, proxyAddr string, block cipher.BlockCipher) (net.Conn, error)
 }
 
 // Server is reponsible for accepting connections and handling
@@ -181,7 +181,7 @@ func (s *Server) ServeConn(conn net.Conn) error {
 		if err != nil {
 			return fmt.Errorf("cipher.BlockCipherFromPassword() failed: %w", err)
 		}
-		proxyConn, err := s.config.ProxyDial(ctx, s.config.ProxyNetworkType, s.config.ProxyAddress, block)
+		proxyConn, err := s.config.ProxyDial(ctx, s.config.ProxyNetworkType, "", s.config.ProxyAddress, block)
 		if err != nil {
 			return fmt.Errorf("ProxyDial(%q, %q) failed: %w", s.config.ProxyNetworkType, s.config.ProxyAddress, err)
 		}

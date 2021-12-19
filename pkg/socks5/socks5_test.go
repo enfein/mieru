@@ -9,8 +9,8 @@ import (
 	"time"
 )
 
-func TestSOCKS5_Connect(t *testing.T) {
-	// Create a local listener
+func TestSOCKS5Connect(t *testing.T) {
+	// Create a local listener.
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -50,14 +50,14 @@ func TestSOCKS5_Connect(t *testing.T) {
 
 	// Start listening
 	go func() {
-		if err := serv.ListenAndServe("tcp", "127.0.0.1:12365"); err != nil {
+		if err := serv.ListenAndServe("tcp", "127.0.0.1:12345"); err != nil {
 			t.Fatalf("err: %v", err)
 		}
 	}()
 	time.Sleep(10 * time.Millisecond)
 
 	// Get a local conn
-	conn, err := net.Dial("tcp", "127.0.0.1:12365")
+	conn, err := net.Dial("tcp", "127.0.0.1:12345")
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}

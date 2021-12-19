@@ -14,7 +14,7 @@ import (
 )
 
 var httpTestServer = func() *http.Server {
-	httpTestPort := 12345
+	httpTestPort := 12300
 	s := &http.Server{
 		Addr: ":" + strconv.Itoa(httpTestPort),
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -77,7 +77,7 @@ func newTestSocksServer(port int, withAuth bool) {
 }
 
 func TestSocks5Anonymous(t *testing.T) {
-	port := 12346
+	port := 12301
 	newTestSocksServer(port, false)
 	dialSocksProxy := Dial(fmt.Sprintf("socks5://127.0.0.1:%d?timeout=5s", port))
 	tr := &http.Transport{Dial: dialSocksProxy}
@@ -97,7 +97,7 @@ func TestSocks5Anonymous(t *testing.T) {
 }
 
 func TestSocks5Auth(t *testing.T) {
-	port := 12347
+	port := 12302
 	newTestSocksServer(port, true)
 	dialSocksProxy := Dial(fmt.Sprintf("socks5://test_user:test_pass@127.0.0.1:%d?timeout=5s", port))
 	tr := &http.Transport{Dial: dialSocksProxy}
