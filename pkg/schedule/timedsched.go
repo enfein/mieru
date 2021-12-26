@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// System is the library level timed-scheduler.
+// System is a global timed scheduler.
 var System *TimedSched = NewTimedSched(runtime.NumCPU())
 
 type timedFunc struct {

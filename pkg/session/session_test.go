@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	mrand "math/rand"
-	"regexp"
 	"sync"
 	"testing"
 	"time"
@@ -31,92 +30,45 @@ import (
 	"github.com/enfein/mieru/pkg/session"
 )
 
-func rot13(in []byte) ([]byte, error) {
-	if len(in) == 0 {
-		return nil, fmt.Errorf("input is empty")
-	}
-	match, err := regexp.MatchString("[A-Za-z]+", string(in))
-	if err != nil {
-		return nil, fmt.Errorf("regexp.MatchString() failed: %v", err)
-	}
-	if !match {
-		return nil, fmt.Errorf("input format is invalid")
-	}
-	out := make([]byte, len(in))
-	for i := 0; i < len(in); i++ {
-		if (in[i] >= 65 && in[i] <= 77) || (in[i] >= 97 && in[i] <= 109) {
-			out[i] = in[i] + 13
-		} else if (in[i] >= 78 && in[i] <= 90) || (in[i] >= 110 && in[i] <= 122) {
-			out[i] = in[i] - 13
-		}
-	}
-	return out, nil
-}
-
-func serveConn(t *testing.T, conn *session.UDPSession) error {
-	defer conn.Close()
-	buf := make([]byte, kcp.MaxBufSize)
-	for {
-		n, err := conn.Read(buf)
-		if err != nil {
-			return fmt.Errorf("Read() failed: %v", err)
-		}
-		if n == 0 {
-			continue
-		}
-		out, err := rot13(buf[:n])
-		if err != nil {
-			return fmt.Errorf("rot13() failed: %v", err)
-		}
-		if _, err = conn.Write(out); err != nil {
-			return fmt.Errorf("Write() failed: %v", err)
-		}
-	}
-}
+const (
+	serverAddr string = "127.0.0.1:12315"
+	timeLayout string = "15:04:05.00"
+)
 
 func runClient(t *testing.T, laddr string, username, password []byte) error {
 	hashedPassword := cipher.HashPassword(password, username)
 	block, err := cipher.BlockCipherFromPassword(hashedPassword)
 	if err != nil {
-		return fmt.Errorf("cipher.BlockCipherFromPassword() failed: %v", err)
+		return fmt.Errorf("cipher.BlockCipherFromPassword() failed: %w", err)
 	}
-	sess, err := session.DialWithOptions(context.Background(), "udp", laddr, "127.0.0.1:12315", block)
+	sess, err := session.DialWithOptions(context.Background(), "udp", laddr, serverAddr, block)
 	if err != nil {
-		return fmt.Errorf("session.DialWithOptions() failed: %v", err)
+		return fmt.Errorf("session.DialWithOptions() failed: %w", err)
 	}
 	defer sess.Close()
+	t.Logf("[%s] client is running on %v", time.Now().Format(timeLayout), laddr)
 
-	data := make([]byte, 1024)
 	respBuf := make([]byte, kcp.MaxBufSize)
-	mrand.Seed(time.Now().UnixNano())
-
-	for i := 0; i < 50; i++ {
-		sleepMillis := 500 + mrand.Intn(500)
+	for i := 0; i < 100; i++ {
+		sleepMillis := 100 + mrand.Intn(100)
 		time.Sleep(time.Duration(sleepMillis) * time.Millisecond)
 
-		// Generate random data.
-		for j := 0; j < 1024; j++ {
-			p := mrand.Float32()
-			if p <= 0.5 {
-				data[j] = byte(mrand.Int31n(26) + 65)
-			} else {
-				data[j] = byte(mrand.Int31n(26) + 97)
-			}
-		}
+		data := session.TestHelperGenRot13Input(1024)
 
 		// Send data to server.
 		if _, err = sess.Write(data); err != nil {
-			return fmt.Errorf("Write() failed: %v", err)
+			return fmt.Errorf("Write() failed: %w", err)
 		}
+		sess.SetReadDeadline(time.Now().Add(60 * time.Second))
 
 		// Get and verify server response.
 		size, err := sess.Read(respBuf)
 		if err != nil {
-			return fmt.Errorf("Read() failed: %v", err)
+			return fmt.Errorf("Read() failed: %w", err)
 		}
-		revert, err := rot13(respBuf[:size])
+		revert, err := session.TestHelperRot13(respBuf[:size])
 		if err != nil {
-			return fmt.Errorf("rot13() failed: %v", err)
+			return fmt.Errorf("session.TestHelperRot13() failed: %w", err)
 		}
 		if !bytes.Equal(data, revert) {
 			return fmt.Errorf("verification failed")
@@ -148,7 +100,7 @@ func TestKCPSessions(t *testing.T) {
 			Password: "20200630",
 		},
 	}
-	party, err := session.ListenWithOptions("127.0.0.1:12315", users)
+	party, err := session.ListenWithOptions(serverAddr, users)
 	if err != nil {
 		t.Fatalf("session.ListenWithOptions() failed: %v", err)
 	}
@@ -157,12 +109,12 @@ func TestKCPSessions(t *testing.T) {
 		for {
 			s, err := party.AcceptKCP()
 			if err != nil {
-				t.Errorf("AcceptKCP() failed: %v", err)
+				return
 			} else {
-				t.Logf("accepting new connection from %v", s.RemoteAddr())
+				t.Logf("[%s] accepting new connection from %v", time.Now().Format(timeLayout), s.RemoteAddr())
 				go func() {
-					if err = serveConn(t, s); err != nil {
-						t.Errorf("serveConn() failed: %v", err)
+					if err = session.TestHelperServeConn(s); err != nil {
+						return
 					}
 				}()
 			}
@@ -174,15 +126,18 @@ func TestKCPSessions(t *testing.T) {
 	wg.Add(2)
 	go func() {
 		if err := runClient(t, "127.0.0.1:12316", []byte("jiangzemin"), []byte("20001027")); err != nil {
-			t.Errorf("jiangzemin failed: %v", err)
+			t.Errorf("[%s] jiangzemin failed: %v", time.Now().Format(timeLayout), err)
 		}
 		wg.Done()
 	}()
 	go func() {
 		if err := runClient(t, "127.0.0.1:12317", []byte("xijinping"), []byte("20200630")); err != nil {
-			t.Errorf("xijinping failed: %v", err)
+			t.Errorf("[%s] xijinping failed: %v", time.Now().Format(timeLayout), err)
 		}
 		wg.Done()
 	}()
 	wg.Wait()
+
+	party.Close()
+	time.Sleep(100 * time.Millisecond) // Wait for resources to be released.
 }

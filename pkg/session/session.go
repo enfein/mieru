@@ -24,6 +24,8 @@ import (
 	"github.com/enfein/mieru/pkg/kcp"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
+	"github.com/enfein/mieru/pkg/recording"
+	"github.com/enfein/mieru/pkg/replay"
 	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/schedule"
 	"github.com/enfein/mieru/pkg/stderror"
@@ -61,6 +63,8 @@ type (
 
 	// UDPSession defines a KCP session implemented by UDP.
 	UDPSession struct {
+		mu sync.Mutex
+
 		conn    net.PacketConn     // the underlying packet connection
 		ownConn bool               // true if we created conn internally, false if provided by caller
 		kcp     *kcp.KCP           // KCP ARQ protocol
@@ -103,10 +107,11 @@ type (
 		// txqueue is another queue outside KCP to do additional processing before sending packets on wire.
 		txqueue []ipv4.Message
 
+		recordingEnabled bool
+		recordedPackets  recording.Records
+
 		xconn           batchConn
 		xconnWriteError error
-
-		mu sync.Mutex
 	}
 
 	setReadBuffer interface {
@@ -138,6 +143,8 @@ func newUDPSession(conv uint32, l *Listener, conn net.PacketConn, ownConn bool,
 	sess.block = block
 	sess.idleDuration = maxIdleDuration
 	sess.recvbuf = make([]byte, kcp.MaxBufSize)
+	sess.recordingEnabled = false
+	sess.recordedPackets = recording.NewRecords()
 
 	// cast to writebatch conn
 	if _, ok := conn.(*net.UDPConn); ok {
@@ -608,6 +615,7 @@ func (s *UDPSession) readLoop() {
 	for {
 		if n, addr, err := s.conn.ReadFrom(buf); err == nil {
 			// Make sure the packet is from the same source.
+			// This can prevent replay attack.
 			if src == "" {
 				// Set source address from the first read.
 				src = addr.String()
@@ -628,6 +636,10 @@ func (s *UDPSession) packetInput(data []byte) {
 	if log.IsLevelEnabled(log.TraceLevel) {
 		log.Tracef("UDPSession %v: read %d bytes", s.LocalAddr(), len(data))
 	}
+	if s.recordingEnabled {
+		s.recordedPackets.Append(data, recording.Ingress)
+	}
+
 	decrypted := false
 	var err error
 	if len(data) >= kcp.OuterHeaderSize {
@@ -646,7 +658,7 @@ func (s *UDPSession) packetInput(data []byte) {
 	}
 }
 
-// Input packet to KCP.
+// Input decrypted packet to KCP.
 func (s *UDPSession) inputToKCP(data []byte) {
 	var kcpInErrors uint64
 
@@ -715,12 +727,13 @@ func (s *UDPSession) tx(txqueue []ipv4.Message) {
 // steps:
 // 1. Encryption
 // 2. TxQueue
+// 3. Record output if enabled
 func (s *UDPSession) outputCallback(buf []byte) {
 	if log.IsLevelEnabled(log.TraceLevel) {
 		log.Tracef("UDPSession %v: starting output %d bytes", s.LocalAddr(), len(buf))
 	}
 
-	// encryption
+	// Encryption
 	var encrypted []byte
 	var err error
 	encrypted, err = s.block.Encrypt(buf)
@@ -731,7 +744,7 @@ func (s *UDPSession) outputCallback(buf []byte) {
 		return
 	}
 
-	// TxQueue
+	// TxQueue and record output
 	var msg ipv4.Message
 	for i := 0; i < s.dup+1; i++ {
 		bts := kcp.PktCachePool.Get().([]byte)[:len(encrypted)]
@@ -739,6 +752,9 @@ func (s *UDPSession) outputCallback(buf []byte) {
 		msg.Buffers = [][]byte{bts}
 		msg.Addr = s.remote
 		s.txqueue = append(s.txqueue, msg)
+		if s.recordingEnabled {
+			s.recordedPackets.Append(bts, recording.Egress)
+		}
 	}
 }
 
@@ -825,6 +841,18 @@ func (s *UDPSession) notifyWriteError(err error) {
 		s.socketWriteError.Store(err)
 		close(s.chSocketWriteError)
 	})
+}
+
+func (s *UDPSession) startRecording() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.recordingEnabled = true
+}
+
+func (s *UDPSession) stopRecording() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.recordingEnabled = false
 }
 
 type (
@@ -980,23 +1008,24 @@ func (l *Listener) readLoop() {
 }
 
 // Process raw input packet.
-func (l *Listener) packetInput(data []byte, addr net.Addr) {
+func (l *Listener) packetInput(raw []byte, addr net.Addr) {
 	if log.IsLevelEnabled(log.TraceLevel) {
-		log.Tracef("Listener %v: read %d bytes from %s %s", l.Addr(), len(data), addr.Network(), addr.String())
+		log.Tracef("Listener %v: read %d bytes from %s %s", l.Addr(), len(raw), addr.Network(), addr.String())
 	}
 
 	decrypted := false
+	var data []byte
 	var block cipher.BlockCipher
 	var err error
 	l.sessionLock.RLock()
 	s, isKnownSession := l.sessions[addr.String()]
 	l.sessionLock.RUnlock()
 
-	if len(data) >= kcp.OuterHeaderSize {
+	if len(raw) >= kcp.OuterHeaderSize {
 		if isKnownSession {
 			// If this session is known to listener, directly use the cipher block to decrypt.
 			block = s.block
-			data, err = s.block.Decrypt(data)
+			data, err = s.block.Decrypt(raw)
 			atomic.AddUint64(&metrics.ServerDirectDecrypt, 1)
 			if err == nil {
 				decrypted = true
@@ -1018,7 +1047,7 @@ func (l *Listener) packetInput(data []byte, addr net.Addr) {
 				if len(password) == 0 {
 					password = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
 				}
-				block, data, err = tryDecrypt(data, password)
+				block, data, err = tryDecrypt(raw, password)
 				if err == nil {
 					decrypted = true
 					break
@@ -1032,9 +1061,15 @@ func (l *Listener) packetInput(data []byte, addr net.Addr) {
 		conv = binary.LittleEndian.Uint32(data)
 		sn = binary.LittleEndian.Uint32(data[kcp.IKCP_SN_OFFSET:])
 
-		// This is an existing connection.
 		connWithSameAddr := false
+
+		// This is an existing connection.
 		if isKnownSession {
+			// For an already established session, we need to put every packet into the replay cache.
+			// Since AEAD is used, only the packet prefix is added to the replay cache.
+			if replay.Cache.IsDuplicate(raw[:kcp.OuterHeaderSize]) {
+				atomic.AddUint64(&metrics.ReplayKnownSession, 1)
+			}
 			if conv == s.kcp.ConversationID() {
 				s.inputToKCP(data)
 			} else if sn == 0 {
@@ -1054,6 +1089,14 @@ func (l *Listener) packetInput(data []byte, addr net.Addr) {
 		if s == nil || connWithSameAddr {
 			// Do not let the new sessions overwhelm accept queue.
 			if len(l.chAccepts) < cap(l.chAccepts) {
+				if replay.Cache.IsDuplicate(raw[:kcp.OuterHeaderSize]) && s == nil {
+					// Found a replay attack. Don't establish the connection.
+					atomic.AddUint64(&metrics.ReplayNewSession, 1)
+					if log.IsLevelEnabled(log.DebugLevel) {
+						log.Debugf("found possible replay attack from %v", addr)
+					}
+					return
+				}
 				s = newUDPSession(conv, l, l.conn, false, addr, block)
 				s.inputToKCP(data)
 				l.sessionLock.Lock()

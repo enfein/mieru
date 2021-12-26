@@ -23,10 +23,6 @@ import (
 
 var once sync.Once
 
-func init() {
-	InitSeed()
-}
-
 // InitSeed initializes the random seed.
 func InitSeed() {
 	once.Do(func() {

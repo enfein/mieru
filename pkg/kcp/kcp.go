@@ -1,6 +1,7 @@
 package kcp
 
 import (
+	crand "crypto/rand"
 	"fmt"
 	mrand "math/rand"
 	"strconv"
@@ -597,7 +598,7 @@ func (kcp *KCP) Output(ackOnly bool) uint32 {
 				decode16u(lastSegPtr[IKCP_TOTAL_LEN_OFFSET:], &segTotalLen)
 				paddingSize = rng.Intn(minInt(4*(int(segTotalLen)+IKCP_OVERHEAD), remainingSpace))
 				if paddingSize > 0 {
-					mrand.Read(lastSegPtr[IKCP_OVERHEAD+int(segTotalLen) : IKCP_OVERHEAD+int(segTotalLen)+paddingSize])
+					crand.Read(lastSegPtr[IKCP_OVERHEAD+int(segTotalLen) : IKCP_OVERHEAD+int(segTotalLen)+paddingSize])
 					segTotalLen += uint16(paddingSize)
 					encode16u(lastSegPtr[IKCP_TOTAL_LEN_OFFSET:], segTotalLen)
 					ptr = ptr[paddingSize:]

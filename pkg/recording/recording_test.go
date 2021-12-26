@@ -13,22 +13,33 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Binary mita is the server of mieru proxy.
-package main
+package recording_test
 
 import (
-	"github.com/enfein/mieru/pkg/appctl"
-	"github.com/enfein/mieru/pkg/cli"
-	"github.com/enfein/mieru/pkg/log"
-	"github.com/enfein/mieru/pkg/rng"
+	"bytes"
+	"testing"
+
+	"github.com/enfein/mieru/pkg/recording"
 )
 
-func main() {
-	appctl.SetAppType(appctl.SERVER_APP)
-	rng.InitSeed()
-	cli.RegisterServerCommands()
-	err := cli.ParseAndExecute()
-	if err != nil {
-		log.Fatalf("%v", err)
+func TestRecords(t *testing.T) {
+	records := recording.NewRecords()
+	data := []byte{0x01, 0x02}
+	records.Append(data, recording.Egress)
+
+	if records.Size() != 1 {
+		t.Errorf("records.Size() = %d, want %d", records.Size(), 1)
+	}
+	all := records.Export()
+	if !bytes.Equal(all[0].Data(), data) {
+		t.Errorf("recorded data do not equal to original data")
+	}
+	if all[0].Direction() != recording.Egress {
+		t.Errorf("Direction() = %v, want %v", all[0].Direction(), recording.Egress)
+	}
+
+	records.Clear()
+	if records.Size() != 0 {
+		t.Errorf("records.Size() = %d, want %d", records.Size(), 0)
 	}
 }

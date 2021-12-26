@@ -58,6 +58,10 @@ var (
 	BytesReceived uint64 // bytes received to upper level
 	PaddingSent   uint64 // bytes sent for padding purpose
 
+	// Replay protection
+	ReplayKnownSession uint64 // replay packets sent from a known session
+	ReplayNewSession   uint64 // replay packets sent from a new session
+
 	// Errors
 	UDPInErrors      uint64 // UDP read errors reported from net.PacketConn
 	KCPInErrors      uint64 // packet input errors reported from KCP
@@ -119,6 +123,7 @@ func logMetrics() {
 			LogKCPSegments()
 			LogUDPBytes()
 			LogKCPBytes()
+			LogReplay()
 			LogErrors()
 		case <-done:
 			return
@@ -176,6 +181,13 @@ func LogKCPBytes() {
 		"BytesReceived": BytesReceived,
 		"PaddingSent":   PaddingSent,
 	}).Infof("[metrics - KCP bytes]")
+}
+
+func LogReplay() {
+	log.WithFields(log.Fields{
+		"ReplayKnownSession": ReplayKnownSession,
+		"ReplayNewSession":   ReplayNewSession,
+	}).Infof("[metrics - replay protection]")
 }
 
 func LogErrors() {

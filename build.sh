@@ -103,12 +103,12 @@ for os in ${SUPPORTED_OS[@]}; do
     mkdir -p release/${os}
     env GOOS=${os} GOARCH=amd64 go build -ldflags="-s -w" -o release/${os}/mieru${ext} cmd/mieru/mieru.go
     cd release/${os}
-    sha256sum mieru${ext} > mieru${ext}.sha256.txt
+    sha256sum mieru${ext} > mieru_${version}_${os}${ext}.sha256.txt
     if [[ "${os}" == "windows" ]]; then
-        zip -r mieru_${version}_${os}_amd64.zip mieru${ext} mieru${ext}.sha256.txt
+        zip -r mieru_${version}_${os}_amd64.zip mieru${ext}
         mv mieru_${version}_${os}_amd64.zip ..
     else
-        tar -zcvf mieru_${version}_${os}_amd64.tar.gz mieru${ext} mieru${ext}.sha256.txt
+        tar -zcvf mieru_${version}_${os}_amd64.tar.gz mieru${ext}
         mv mieru_${version}_${os}_amd64.tar.gz ..
     fi
     cd "$ROOT"
@@ -117,8 +117,8 @@ done
 # Build the server binary for linux.
 env GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o release/linux/mita cmd/mita/mita.go
 cd release/linux
-sha256sum mita > mita.sha256.txt
-tar -zcvf mita_${version}_linux_amd64.tar.gz mita mita.sha256.txt
+sha256sum mita > mita_${version}_linux.sha256.txt
+tar -zcvf mita_${version}_linux_amd64.tar.gz mita
 mv mita_${version}_linux_amd64.tar.gz ..
 cd "$ROOT"
 

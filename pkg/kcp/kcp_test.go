@@ -77,6 +77,7 @@ func TestKCPSendRecv(t *testing.T) {
 	}
 
 	c1, c2, k1, k2 := newKCPPipe(t)
+	time.Sleep(1 * time.Second)
 
 	// Input received packets at endpoint 1.
 	go func() {
@@ -126,10 +127,13 @@ func TestKCPSendRecv(t *testing.T) {
 		}
 	}()
 
+	time.Sleep(1 * time.Second)
+
 	for i := 0; i < maxPayloadSize; i++ {
 		mu1.Lock()
 		k1.Send(traffic[i])
 		mu1.Unlock()
+		time.Sleep(5 * time.Millisecond)
 
 		recvBuf := make([]byte, kcp.MaxBufSize)
 		for {
@@ -140,7 +144,7 @@ func TestKCPSendRecv(t *testing.T) {
 				if err != stderror.ErrNoEnoughData {
 					t.Fatalf("error receive data in round %d: %v", i, err)
 				} else {
-					time.Sleep(10 * time.Millisecond)
+					time.Sleep(5 * time.Millisecond)
 				}
 			} else {
 				if n != i+1 {

@@ -84,7 +84,7 @@ sleep 1
 ./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
   -local_proxy_host=127.0.0.1 -local_proxy_port=1080 \
   -test_case=new_conn -interval=1000 \
-  -num_request=1000
+  -num_request=1500
 if [ "$?" -ne "0" ]; then
     print_mieru_client_log
     print_mieru_client_thread_dump
