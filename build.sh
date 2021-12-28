@@ -35,7 +35,7 @@ has_command() {
 # - build/package/mieru/debian/DEBIAN/control
 # - build/package/mita/debian/DEBIAN/control
 # - all references under docs directory
-version="1.0.1"
+version="1.1.0"
 
 set -e
 

@@ -9,7 +9,7 @@
 **【1】下载 mita 安装包**
 
 ```sh
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.0.1/mita_1.0.1_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.1.0/mita_1.1.0_amd64.deb
 ```
 
 如果上述链接被墙，请翻墙后使用浏览器从 GitHub Releases 页面下载安装包。
@@ -17,7 +17,7 @@ curl -LSO https://github.com/enfein/mieru/releases/download/v1.0.1/mita_1.0.1_am
 **【2】安装 mita 软件包**
 
 ```sh
-sudo dpkg -i mita_1.0.1_amd64.deb
+sudo dpkg -i mita_1.1.0_amd64.deb
 ```
 
 **【3】赋予当前用户操作 mita 的权限，需要重启服务器使此设置生效**
