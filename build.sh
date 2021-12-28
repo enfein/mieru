@@ -34,7 +34,7 @@ has_command() {
 # If this version is changed, also change the version in
 # - build/package/mieru/debian/DEBIAN/control
 # - build/package/mita/debian/DEBIAN/control
-# - all references in README.md
+# - all references under docs directory
 version="1.0.1"
 
 set -e
