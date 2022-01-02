@@ -8,7 +8,7 @@
 
 | Operating System | Configuration File Path |
 | :----: | :----: |
-| Linux | /home/USERNAME/.config/mieru/client.conf.pb |
+| Linux | /home/$USER/.config/mieru/client.conf.pb |
 | Mac OS | /Users/USERNAME/Library/Application Support/mieru/client.conf.pb |
 | Windows | C:\Users\USERNAME\AppData\Roaming\mieru\client.conf.pb |
 
@@ -32,7 +32,7 @@ sudo journalctl -u mita --no-pager
 
 | Operating System | Configuration File Path |
 | :----: | :----: |
-| Linux | /home/USERNAME/.cache/mieru/ |
+| Linux | /home/$USER/.config/.cache/mieru/ |
 | Mac OS | /Users/USERNAME/Library/Caches/mieru/ |
 | Windows | C:\Users\USERNAME\AppData\Local\mieru\ |
 
