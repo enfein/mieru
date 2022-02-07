@@ -2,3 +2,7 @@
 set -e
 
 systemctl stop mita.service
+
+################################################################################
+# Developer note: sync this file with build/package/mita/rpm/mita.spec
+################################################################################

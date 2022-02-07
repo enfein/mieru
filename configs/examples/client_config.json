@@ -1,0 +1,27 @@
+{
+    "profiles": [
+        {
+            "profileName": "default",
+            "user": {
+                "name": "baozi",
+                "password": "shilishanlubuhuanjian"
+            },
+            "servers": [
+                {
+                    "ipAddress": "12.34.56.78",
+                    "domainName": "",
+                    "portBindings": [
+                        {
+                            "port": 2022,
+                            "protocol": "UDP"
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "activeProfile": "default",
+    "rpcPort": 8964,
+    "socks5Port": 1080,
+    "loggingLevel": "INFO"
+}

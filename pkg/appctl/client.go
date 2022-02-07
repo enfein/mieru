@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"runtime"
 	"sort"
@@ -148,6 +149,9 @@ func NewClientLifecycleRPCClient(ctx context.Context) (pb.ClientLifecycleService
 	if err != nil {
 		return nil, fmt.Errorf("LoadClientConfig() failed: %w", err)
 	}
+	if proto.Equal(config, &pb.ClientConfig{}) {
+		return nil, fmt.Errorf(stderror.ClientConfigIsEmpty)
+	}
 	if config.GetRpcPort() < 1 || config.GetRpcPort() > 65535 {
 		return nil, fmt.Errorf("RPC port number %d is invalid", config.GetRpcPort())
 	}
@@ -209,7 +213,7 @@ func LoadClientConfig() (*pb.ClientConfig, error) {
 
 	b, err := ioutil.ReadAll(f)
 	if err != nil {
-		return nil, fmt.Errorf("ReadFile(%q) failed: %w", fileName, err)
+		return nil, fmt.Errorf("ReadAll() failed: %w", err)
 	}
 
 	c := &pb.ClientConfig{}
@@ -314,9 +318,10 @@ func DeleteClientConfigProfile(profileName string) error {
 // 2.3. user has either a password or a hashed password
 // 2.4. it has exactly 1 server
 // 2.5. either the server's IP address or the server's domain name is available
-// 2.6. the server has exactly 1 port binding
-// 2.7. port number is valid
-// 2.8. protocol is valid
+// 2.6. if set, server's IP address is parsible
+// 2.7. the server has exactly 1 port binding
+// 2.8. port number is valid
+// 2.9. protocol is valid
 func ValidateClientConfigPatch(patch *pb.ClientConfig) error {
 	for _, profile := range patch.GetProfiles() {
 		name := profile.GetProfileName()
@@ -340,6 +345,9 @@ func ValidateClientConfigPatch(patch *pb.ClientConfig) error {
 		for _, server := range servers {
 			if server.GetIpAddress() == "" && server.GetDomainName() == "" {
 				return fmt.Errorf("neither server IP address nor domain name is set")
+			}
+			if server.GetIpAddress() != "" && net.ParseIP(server.GetIpAddress()) == nil {
+				return fmt.Errorf("failed to parse IP address %q", server.GetIpAddress())
 			}
 			portBindings := server.GetPortBindings()
 			if len(portBindings) == 0 {

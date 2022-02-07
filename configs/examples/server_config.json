@@ -1,0 +1,19 @@
+{
+    "portBindings": [
+        {
+            "port": 2022,
+            "protocol": "UDP"
+        }
+    ],
+    "users": [
+        {
+            "name": "baozi",
+            "password": "shilishanlubuhuanjian"
+        },
+        {
+            "name": "zhanggaoli",
+            "password": "xihuanwanwangqiu"
+        }
+    ],
+    "loggingLevel": "INFO"
+}

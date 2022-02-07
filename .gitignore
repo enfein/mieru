@@ -1,6 +1,11 @@
 # binary output
 /build/package/mieru/debian/usr/bin/
+/build/package/mieru/rpm/**
+!/build/package/mieru/rpm/mieru.spec
 /build/package/mita/debian/usr/bin/
+/build/package/mita/rpm/**
+!/build/package/mita/rpm/mita.service
+!/build/package/mita/rpm/mita.spec
 /mieru
 /mita
 /release

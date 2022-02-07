@@ -15,19 +15,14 @@
 
 # Assume this file is executed with `docker build -f` from the root dir of mieru project.
 
-FROM golang:1.15-buster
+FROM ubuntu:20.04
 
 WORKDIR /test
 
-# Copy golang source files into container.
+# Copy golang source and binary files into container.
 COPY . .
 
 # Create mita user and server config directory.
 RUN /usr/sbin/useradd --no-create-home --user-group mita && mkdir -p /etc/mita
-
-RUN go build -ldflags="-X 'github.com/enfein/mieru/pkg/kcp.TestOnlySegmentDropRate=10'" cmd/mieru/mieru.go && \
-    go build -ldflags="-X 'github.com/enfein/mieru/pkg/kcp.TestOnlySegmentDropRate=10'" cmd/mita/mita.go && \
-    go build test/cmd/sockshttpclient/sockshttpclient.go && \
-    go build test/cmd/httpserver/httpserver.go
 
 CMD ["/test/test/deploy/httptest/test.sh"]

@@ -78,6 +78,8 @@ func TestClientApplyReject(t *testing.T) {
 		"testdata/client_reject_no_server_addr.json",
 		"testdata/client_reject_no_socks5_port.json",
 		"testdata/client_reject_no_user_name.json",
+		"testdata/client_reject_wrong_ipv4_address.json",
+		"testdata/client_reject_wrong_ipv6_address.json",
 	}
 	for _, c := range cases {
 		t.Run(c, func(t *testing.T) {

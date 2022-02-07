@@ -30,12 +30,28 @@ import (
 	"github.com/enfein/mieru/pkg/session"
 )
 
-const (
-	serverAddr string = "127.0.0.1:12315"
-	timeLayout string = "15:04:05.00"
-)
+const timeLayout string = "15:04:05.00"
 
-func runClient(t *testing.T, laddr string, username, password []byte) error {
+var users = map[string]*appctlpb.User{
+	"dengxiaoping": {
+		Name:     "dengxiaoping",
+		Password: "19890604",
+	},
+	"jiangzemin": {
+		Name:     "jiangzemin",
+		Password: "20001027",
+	},
+	"hujintao": {
+		Name:     "hujintao",
+		Password: "20080512",
+	},
+	"xijinping": {
+		Name:     "xijinping",
+		Password: "20200630",
+	},
+}
+
+func runClient(t *testing.T, laddr, serverAddr string, username, password []byte) error {
 	hashedPassword := cipher.HashPassword(password, username)
 	block, err := cipher.BlockCipherFromPassword(hashedPassword)
 	if err != nil {
@@ -77,30 +93,12 @@ func runClient(t *testing.T, laddr string, username, password []byte) error {
 	return nil
 }
 
-// TestKCPSessions creates one listener and four clients. Each client sends
+// TestKCPSessionsIPv4 creates one listener and four clients. Each client sends
 // some data (in format [A-Za-z]+) to the listener. The listener returns the
 // ROT13 (rotate by 13 places) of the data back to the client.
-func TestKCPSessions(t *testing.T) {
+func TestKCPSessionsIPv4(t *testing.T) {
 	kcp.TestOnlySegmentDropRate = "5"
-	users := map[string]*appctlpb.User{
-		"dengxiaoping": {
-			Name:     "dengxiaoping",
-			Password: "19890604",
-		},
-		"jiangzemin": {
-			Name:     "jiangzemin",
-			Password: "20001027",
-		},
-		"hujintao": {
-			Name:     "hujintao",
-			Password: "20080512",
-		},
-		"xijinping": {
-			Name:     "xijinping",
-			Password: "20200630",
-		},
-	}
-	party, err := session.ListenWithOptions(serverAddr, users)
+	party, err := session.ListenWithOptions("127.0.0.1:12315", users)
 	if err != nil {
 		t.Fatalf("session.ListenWithOptions() failed: %v", err)
 	}
@@ -125,13 +123,58 @@ func TestKCPSessions(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
-		if err := runClient(t, "127.0.0.1:12316", []byte("jiangzemin"), []byte("20001027")); err != nil {
+		if err := runClient(t, "127.0.0.1:12316", "127.0.0.1:12315", []byte("jiangzemin"), []byte("20001027")); err != nil {
 			t.Errorf("[%s] jiangzemin failed: %v", time.Now().Format(timeLayout), err)
 		}
 		wg.Done()
 	}()
 	go func() {
-		if err := runClient(t, "127.0.0.1:12317", []byte("xijinping"), []byte("20200630")); err != nil {
+		if err := runClient(t, "127.0.0.1:12317", "127.0.0.1:12315", []byte("xijinping"), []byte("20200630")); err != nil {
+			t.Errorf("[%s] xijinping failed: %v", time.Now().Format(timeLayout), err)
+		}
+		wg.Done()
+	}()
+	wg.Wait()
+
+	party.Close()
+	time.Sleep(100 * time.Millisecond) // Wait for resources to be released.
+}
+
+// TestKCPSessionsIPv6 is similar to TestKCPSessionsIPv4 but running in IPv6.
+func TestKCPSessionsIPv6(t *testing.T) {
+	kcp.TestOnlySegmentDropRate = "5"
+	party, err := session.ListenWithOptions("[::1]:12318", users)
+	if err != nil {
+		t.Fatalf("session.ListenWithOptions() failed: %v", err)
+	}
+
+	go func() {
+		for {
+			s, err := party.AcceptKCP()
+			if err != nil {
+				return
+			} else {
+				t.Logf("[%s] accepting new connection from %v", time.Now().Format(timeLayout), s.RemoteAddr())
+				go func() {
+					if err = session.TestHelperServeConn(s); err != nil {
+						return
+					}
+				}()
+			}
+		}
+	}()
+	time.Sleep(1 * time.Second)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		if err := runClient(t, "[::1]:12319", "[::1]:12318", []byte("jiangzemin"), []byte("20001027")); err != nil {
+			t.Errorf("[%s] jiangzemin failed: %v", time.Now().Format(timeLayout), err)
+		}
+		wg.Done()
+	}()
+	go func() {
+		if err := runClient(t, "[::1]:12320", "[::1]:12318", []byte("xijinping"), []byte("20200630")); err != nil {
 			t.Errorf("[%s] xijinping failed: %v", time.Now().Format(timeLayout), err)
 		}
 		wg.Done()

@@ -31,6 +31,7 @@ import (
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
+	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/session"
 	"github.com/enfein/mieru/pkg/socks5"
 	"github.com/enfein/mieru/pkg/stderror"
@@ -245,7 +246,7 @@ var serverRunFunc = func(s []string) error {
 
 		// Run the egress socks5 server in the background.
 		go func() {
-			socks5Addr := "0.0.0.0:" + strconv.Itoa(int(config.GetPortBindings()[0].GetPort()))
+			socks5Addr := netutil.MaybeDecorateIPv6(netutil.AllIPAddr()) + ":" + strconv.Itoa(int(config.GetPortBindings()[0].GetPort()))
 			l, err := session.ListenWithOptions(socks5Addr, appctl.UserListToMap(config.GetUsers()))
 			if err != nil {
 				log.Fatalf("net.Listen(%q, %q) failed: %v", "tcp", socks5Addr, err)

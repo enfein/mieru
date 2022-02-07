@@ -8,7 +8,7 @@
             },
             "servers": [
                 {
-                    "ipAddress": "2.2.2.2",
+                    "ipAddress": "2001:db8::88",
                     "portBindings": [
                         {
                             "port": 5000,

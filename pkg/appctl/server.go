@@ -26,10 +26,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	pb "github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
+	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/session"
 	"github.com/enfein/mieru/pkg/socks5"
 	"github.com/enfein/mieru/pkg/stderror"
@@ -105,7 +105,7 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 		return &pb.Empty{}, fmt.Errorf("LoadServerConfig() failed: %w", err)
 	}
 	loggingLevel := config.GetLoggingLevel().String()
-	if loggingLevel != appctlpb.LoggingLevel_DEFAULT.String() {
+	if loggingLevel != pb.LoggingLevel_DEFAULT.String() {
 		log.SetLevel(loggingLevel)
 	}
 	if err = ValidateFullServerConfig(config); err != nil {
@@ -126,11 +126,11 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 	}
 	SetServerSocks5ServerRef(socks5Server)
 	ServerSocks5ServerStarted = make(chan struct{})
-	SetAppStatus(appctlpb.AppStatus_STARTING)
+	SetAppStatus(pb.AppStatus_STARTING)
 
 	// Run the egress socks5 server in the background.
 	go func() {
-		socks5Addr := "0.0.0.0:" + strconv.Itoa(int(config.GetPortBindings()[0].GetPort()))
+		socks5Addr := netutil.MaybeDecorateIPv6(netutil.AllIPAddr()) + ":" + strconv.Itoa(int(config.GetPortBindings()[0].GetPort()))
 		l, err := session.ListenWithOptions(socks5Addr, UserListToMap(config.GetUsers()))
 		if err != nil {
 			log.Fatalf("net.Listen(%q, %q) failed: %v", "tcp", socks5Addr, err)
@@ -145,7 +145,7 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 	<-ServerSocks5ServerStarted
 	metrics.EnableLogging()
 
-	SetAppStatus(appctlpb.AppStatus_RUNNING)
+	SetAppStatus(pb.AppStatus_RUNNING)
 	log.Infof("completed start request from RPC caller")
 	return &pb.Empty{}, nil
 }
@@ -223,7 +223,7 @@ func NewServerLifecycleRPCClient() (pb.ServerLifecycleServiceClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("grpc.DialContext() failed: %w", err)
 	}
-	return appctlpb.NewServerLifecycleServiceClient(conn), nil
+	return pb.NewServerLifecycleServiceClient(conn), nil
 }
 
 // serverConfigService implements ServerConfigService defined in servercfg.proto.

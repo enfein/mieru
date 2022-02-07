@@ -18,6 +18,7 @@ package cli
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"os/exec"
@@ -30,6 +31,7 @@ import (
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
+	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/session"
 	"github.com/enfein/mieru/pkg/socks5"
 	"github.com/enfein/mieru/pkg/stderror"
@@ -262,7 +264,7 @@ var clientRunFunc = func(s []string) error {
 		UseProxy:         true,
 		ProxyPassword:    hashedPassword,
 		ProxyNetworkType: "udp",
-		ProxyAddress:     proxyHost + ":" + strconv.Itoa(int(proxyPort)),
+		ProxyAddress:     netutil.MaybeDecorateIPv6(proxyHost) + ":" + strconv.Itoa(int(proxyPort)),
 		ProxyDial:        session.DialWithOptionsReturnConn,
 	}
 	socks5Server, err := socks5.New(socks5Config)
@@ -273,7 +275,7 @@ var clientRunFunc = func(s []string) error {
 
 	// Run the local socks5 server in the background.
 	go func() {
-		socks5Addr := "0.0.0.0:" + strconv.Itoa(int(config.GetSocks5Port()))
+		socks5Addr := netutil.MaybeDecorateIPv6(netutil.AllIPAddr()) + ":" + strconv.Itoa(int(config.GetSocks5Port()))
 		l, err := net.Listen("tcp", socks5Addr)
 		if err != nil {
 			log.Fatalf("listen on socks5 address tcp %q failed: %v", socks5Addr, err)
@@ -319,6 +321,9 @@ var clientStatusFunc = func(s []string) error {
 		if stderror.IsConnRefused(err) {
 			// This is the most common reason, no need to show more details.
 			return fmt.Errorf(stderror.ClientNotRunning)
+		} else if errors.Is(err, stderror.ErrFileNotExist) {
+			// Ask the user to create a client config.
+			return fmt.Errorf(stderror.ClientConfigNotExist + ", please create one with \"mieru apply config <FILE>\" command")
 		} else {
 			return fmt.Errorf(stderror.ClientNotRunningErr, err)
 		}

@@ -8,7 +8,7 @@
 
 | Operating System | Configuration File Path |
 | :----: | :----: |
-| Linux | /home/USERNAME/.config/mieru/client.conf.pb |
+| Linux | $HOME/.config/mieru/client.conf.pb |
 | Mac OS | /Users/USERNAME/Library/Application Support/mieru/client.conf.pb |
 | Windows | C:\Users\USERNAME\AppData\Roaming\mieru\client.conf.pb |
 
@@ -32,11 +32,11 @@ sudo journalctl -u mita --no-pager
 
 | Operating System | Configuration File Path |
 | :----: | :----: |
-| Linux | /home/USERNAME/.cache/mieru/ |
+| Linux | $HOME/.cache/mieru/ or $XDG_CACHE_HOME/mieru/ |
 | Mac OS | /Users/USERNAME/Library/Caches/mieru/ |
 | Windows | C:\Users\USERNAME\AppData\Local\mieru\ |
 
-每个日志文件的格式为 `yyyyMMdd_HHmm_PID.log`，其中 `yyyyMMdd_HHmm` 是 mieru 进程启动的时间。每次重启 mieru 会生成一个新的日志文件。当日志文件的数量太多时，旧的文件会被自动删除。
+每个日志文件的格式为 `yyyyMMdd_HHmm_PID.log`，其中 `yyyyMMdd_HHmm` 是 mieru 进程启动的时间，`PID` 是进程号码。每次重启 mieru 会生成一个新的日志文件。当日志文件的数量太多时，旧的文件会被自动删除。
 
 ## 打开和关闭调试日志
 

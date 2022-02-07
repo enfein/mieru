@@ -2,14 +2,18 @@
 
 我们建议有经济实力的用户选择亚马逊和微软等国外大型云服务提供商，一般不会被封锁 IP。请勿使用国内公司或来路不明的云计算服务。代理服务器占用的 CPU 和内存资源很少，最终网络速度主要取决于服务器的网速和线路质量。
 
-代理服务器软件 mita 需要运行在 Linux 系统中。我们提供了 debian 安装包，便于用户在 Debian/Ubuntu 系列发行版中安装 mita。
+代理服务器软件 mita 需要运行在 Linux 系统中。我们提供了 debian 和 RPM 安装包，便于用户在 Debian / Ubuntu 和 Fedora / CentOS / Red Hat Enterprise Linux 系列发行版中安装 mita。
 
 在安装和配置开始之前，先通过 SSH 连接到服务器，再执行下面的指令。
 
 **【1】下载 mita 安装包**
 
 ```sh
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.1.0/mita_1.1.0_amd64.deb
+# Debian / Ubuntu
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.2.0/mita_1.2.0_amd64.deb
+
+# Fedora / CentOS / Red Hat Enterprise Linux
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.2.0/mita-1.2.0-1.x86_64.rpm
 ```
 
 如果上述链接被墙，请翻墙后使用浏览器从 GitHub Releases 页面下载安装包。
@@ -17,7 +21,11 @@ curl -LSO https://github.com/enfein/mieru/releases/download/v1.1.0/mita_1.1.0_am
 **【2】安装 mita 软件包**
 
 ```sh
-sudo dpkg -i mita_1.1.0_amd64.deb
+# Debian / Ubuntu
+sudo dpkg -i mita_1.2.0_amd64.deb
+
+# Fedora / CentOS / Red Hat Enterprise Linux
+sudo rpm -Uvh --force mita-1.2.0-1.x86_64.rpm
 ```
 
 **【3】赋予当前用户操作 mita 的权限，需要重启服务器使此设置生效**
@@ -101,6 +109,8 @@ mita apply config <FILE>
     ],
 ```
 
+我们在 `configs/examples/server_config.json` 提供了配置文件的一个例子，仅供参考。
+
 假设在服务器上，这个配置文件的文件名是 `server_config.json`，在文件修改完成之后，请调用指令 `mita apply config server_config.json` 写入该配置。
 
 如果配置有误，mita 会打印出现的问题。请根据提示修改配置文件，重新运行 `mita apply config <FILE>` 指令写入修正后的配置。
@@ -143,10 +153,17 @@ mita stop
 
 客户端和代理服务器软件会根据用户名、密码和系统时间，分别计算密钥。只有当客户端和服务器的密钥相同时，服务器才能解密和响应客户端的请求。这要求客户端和服务器的系统时间不能有很大的差别。
 
-为了保证服务器系统时间是精确的，我们建议用户安装 NTP 网络时间服务。在 Debian/Ubuntu 系列发行版中，安装 NTP 只需要一行指令
+为了保证服务器系统时间是精确的，我们建议用户安装 NTP 网络时间服务。在许多 Linux 发行版中，安装 NTP 只需要一行指令
 
 ```sh
+# Debian / Ubuntu
 sudo apt-get install ntp
+
+# Fedora
+sudo dnf install ntp
+
+# CentOS / Red Hat Enterprise Linux
+sudo yum install ntp
 ```
 
 **【可选】关闭 ICMP Destination Unreachable 消息**

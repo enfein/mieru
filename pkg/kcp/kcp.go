@@ -5,7 +5,6 @@ import (
 	"fmt"
 	mrand "math/rand"
 	"strconv"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/rng"
+	"github.com/enfein/mieru/pkg/slicepool"
 	"github.com/enfein/mieru/pkg/stderror"
 )
 
@@ -63,7 +63,7 @@ const (
 var (
 	// PktCachePool is a system-wide packet buffer shared among sending, receiving to mitigate
 	// high-frequency memory allocation for packets.
-	PktCachePool sync.Pool
+	PktCachePool slicepool.SlicePool
 
 	// For testing purpose only, drop some percentage of input segments.
 	// If set, this value must be parsible to int and in range of [0, 100).
@@ -77,9 +77,7 @@ var (
 )
 
 func init() {
-	PktCachePool.New = func() interface{} {
-		return make([]byte, MaxBufSize)
-	}
+	PktCachePool = slicepool.NewSlicePool(MaxBufSize)
 }
 
 // currentMs returns current elapsed monotonic milliseconds since program startup.
@@ -1007,7 +1005,7 @@ func (kcp *KCP) SetStreamMode(mode bool) {
 
 // newSegment creates a KCP segment.
 func (kcp *KCP) newSegment(size int) (seg segment) {
-	seg.data = PktCachePool.Get().([]byte)[:size]
+	seg.data = PktCachePool.Get()[:size]
 	return
 }
 
@@ -1157,7 +1155,7 @@ func (kcp *KCP) processReceivedData(newseg segment) bool {
 
 	// Insert the segment only when it is not repeated.
 	if !repeat {
-		dataCopy := PktCachePool.Get().([]byte)[:len(newseg.data)]
+		dataCopy := PktCachePool.Get()[:len(newseg.data)]
 		copy(dataCopy, newseg.data)
 		newseg.data = dataCopy
 

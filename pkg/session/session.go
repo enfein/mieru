@@ -45,7 +45,7 @@ const (
 	netConnReadTimeout = 10 * time.Second
 
 	// Maximum idle duration before the session is auto closed.
-	maxIdleDuration = 60 * time.Second
+	maxIdleDuration = 120 * time.Second
 
 	// Maximum duration before a keepalive packet is sent.
 	maxHeartbeatDuration = 30 * time.Second
@@ -55,12 +55,6 @@ const (
 var zeroTime = time.Time{}
 
 type (
-	// batchConn defines an interface that reads and writes multiple IPv4 packets.
-	batchConn interface {
-		WriteBatch(ms []ipv4.Message, flags int) (int, error)
-		ReadBatch(ms []ipv4.Message, flags int) (int, error)
-	}
-
 	// UDPSession defines a KCP session implemented by UDP.
 	UDPSession struct {
 		mu sync.Mutex
@@ -105,13 +99,16 @@ type (
 		socketWriteErrorOnce sync.Once
 
 		// txqueue is another queue outside KCP to do additional processing before sending packets on wire.
-		txqueue []ipv4.Message
+		txqueue []ipMessage
 
 		recordingEnabled bool
 		recordedPackets  recording.Records
+	}
 
-		xconn           batchConn
-		xconnWriteError error
+	// ipMessage is a simplified ipv4.Message or ipv6.Message.
+	ipMessage struct {
+		buffer []byte
+		addr   net.Addr
 	}
 
 	setReadBuffer interface {
@@ -120,10 +117,6 @@ type (
 
 	setWriteBuffer interface {
 		SetWriteBuffer(bytes int) error
-	}
-
-	setDSCP interface {
-		SetDSCP(int) error
 	}
 )
 
@@ -146,9 +139,8 @@ func newUDPSession(conv uint32, l *Listener, conn net.PacketConn, ownConn bool,
 	sess.recordingEnabled = false
 	sess.recordedPackets = recording.NewRecords()
 
-	// cast to writebatch conn
 	if _, ok := conn.(*net.UDPConn); ok {
-		addr, err := net.ResolveUDPAddr("udp", conn.LocalAddr().String())
+		_, err := net.ResolveUDPAddr("udp", conn.LocalAddr().String())
 		if err == nil {
 			if sess.IsClient() {
 				if log.IsLevelEnabled(log.DebugLevel) {
@@ -158,11 +150,6 @@ func newUDPSession(conv uint32, l *Listener, conn net.PacketConn, ownConn bool,
 				if log.IsLevelEnabled(log.DebugLevel) {
 					log.Debugf("creating new server UDP session [%v - %v]", conn.LocalAddr(), remote)
 				}
-			}
-			if addr.IP.To4() != nil {
-				sess.xconn = ipv4.NewPacketConn(conn)
-			} else {
-				sess.xconn = ipv6.NewPacketConn(conn)
 			}
 		}
 	}
@@ -524,20 +511,12 @@ func (s *UDPSession) SetNoDelay(nodelay, interval, resend uint32, nc bool) {
 
 // SetDSCP sets the 6bit DSCP field in IPv4 header, or 8bit Traffic Class in IPv6 header.
 //
-// if the underlying connection has implemented `func SetDSCP(int) error`, SetDSCP() will invoke
-// this function instead.
-//
 // It has no effect if it's accepted from Listener.
 func (s *UDPSession) SetDSCP(dscp int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.IsServer() {
 		return stderror.ErrInvalidOperation
-	}
-
-	// interface enabled
-	if ts, ok := s.conn.(setDSCP); ok {
-		return ts.SetDSCP(dscp)
 	}
 
 	if nc, ok := s.conn.(net.Conn); ok {
@@ -696,8 +675,8 @@ func (s *UDPSession) uncork() {
 		s.tx(s.txqueue)
 		// Recycle segments in txqueue.
 		for k := range s.txqueue {
-			kcp.PktCachePool.Put(s.txqueue[k].Buffers[0])
-			s.txqueue[k].Buffers = nil
+			kcp.PktCachePool.Put(s.txqueue[k].buffer)
+			s.txqueue[k].buffer = nil
 		}
 		s.txqueue = s.txqueue[:0]
 	}
@@ -707,11 +686,11 @@ func (s *UDPSession) uncork() {
 }
 
 // Sends all the packets in txqueue to the remote.
-func (s *UDPSession) tx(txqueue []ipv4.Message) {
+func (s *UDPSession) tx(txqueue []ipMessage) {
 	nbytes := 0
 	npkts := 0
 	for k := range txqueue {
-		if n, err := s.conn.WriteTo(txqueue[k].Buffers[0], txqueue[k].Addr); err == nil {
+		if n, err := s.conn.WriteTo(txqueue[k].buffer, txqueue[k].addr); err == nil {
 			nbytes += n
 			npkts++
 		} else {
@@ -745,12 +724,12 @@ func (s *UDPSession) outputCallback(buf []byte) {
 	}
 
 	// TxQueue and record output
-	var msg ipv4.Message
+	var msg ipMessage
 	for i := 0; i < s.dup+1; i++ {
-		bts := kcp.PktCachePool.Get().([]byte)[:len(encrypted)]
+		bts := kcp.PktCachePool.Get()[:len(encrypted)]
 		copy(bts, encrypted)
-		msg.Buffers = [][]byte{bts}
-		msg.Addr = s.remote
+		msg.buffer = bts
+		msg.addr = s.remote
 		s.txqueue = append(s.txqueue, msg)
 		if s.recordingEnabled {
 			s.recordedPackets.Append(bts, recording.Egress)
@@ -949,15 +928,7 @@ func (l *Listener) SetWriteBuffer(bytes int) error {
 }
 
 // SetDSCP sets the 6bit DSCP field in IPv4 header, or 8bit Traffic Class in IPv6 header.
-//
-// if the underlying connection has implemented `func SetDSCP(int) error`, SetDSCP() will invoke
-// this function instead.
 func (l *Listener) SetDSCP(dscp int) error {
-	// interface enabled
-	if ts, ok := l.conn.(setDSCP); ok {
-		return ts.SetDSCP(dscp)
-	}
-
 	if nc, ok := l.conn.(net.Conn); ok {
 		var succeed bool
 		if err := ipv4.NewConn(nc).SetTOS(dscp << 2); err == nil {

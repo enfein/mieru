@@ -1,0 +1,71 @@
+// Copyright (C) 2022  mieru authors
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+package netutil
+
+import (
+	"io/ioutil"
+	"net"
+	"runtime"
+	"strconv"
+	"strings"
+)
+
+// IsIPDualStack returns true if an IPv6 socket is able to send and receive
+// both IPv4 and IPv6 packets.
+//
+// This function only supports Linux. It always returns false if running other
+// operating systems.
+func IsIPDualStack() bool {
+	if runtime.GOOS == "linux" {
+		v, err := ioutil.ReadFile("/proc/sys/net/ipv6/bindv6only")
+		if err != nil {
+			return false
+		}
+		s := string(v)
+		s = strings.Trim(s, "\n")
+		i, err := strconv.Atoi(s)
+		if err != nil {
+			return false
+		}
+		if i == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// AllIPAddr returns a catch-all IP address to bind. If the machine supports
+// IP dual stack, "::" is returned. Otherwise "0.0.0.0" is returned.
+func AllIPAddr() string {
+	if IsIPDualStack() {
+		return "::"
+	}
+	return "0.0.0.0"
+}
+
+// MaybeDecorateIPv6 adds [ and ] before and after an IPv6 address. If the
+// input string is a IPv4 address or not a valid IP address (e.g. is a domain),
+// the same string is returned.
+func MaybeDecorateIPv6(addr string) string {
+	ip := net.ParseIP(addr)
+	if ip == nil {
+		return addr
+	}
+	if ip4 := ip.To4(); ip4 != nil {
+		return addr
+	}
+	return "[" + addr + "]"
+}
