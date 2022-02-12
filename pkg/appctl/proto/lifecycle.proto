@@ -51,6 +51,15 @@ service ClientLifecycleService {
 
     // Generate a thread dump of client daemon.
     rpc GetThreadDump(Empty) returns (ThreadDump);
+
+    // Start CPU profiling.
+    rpc StartCPUProfile(ProfileSavePath) returns (Empty);
+
+    // Stop CPU profiling.
+    rpc StopCPUProfile(Empty) returns (Empty);
+
+    // Generate a heap profile.
+    rpc GetHeapProfile(ProfileSavePath) returns (Empty);
 }
 
 service ServerLifecycleService {
@@ -68,4 +77,13 @@ service ServerLifecycleService {
 
     // Generate a thread dump of server daemon.
     rpc GetThreadDump(Empty) returns (ThreadDump);
+
+    // Start CPU profiling.
+    rpc StartCPUProfile(ProfileSavePath) returns (Empty);
+
+    // Stop CPU profiling.
+    rpc StopCPUProfile(Empty) returns (Empty);
+
+    // Generate a heap profile.
+    rpc GetHeapProfile(ProfileSavePath) returns (Empty);
 }

@@ -28,7 +28,7 @@ func TestDefaultNonceSize(t *testing.T) {
 	if _, err := crand.Read(key); err != nil {
 		t.Fatalf("fail to generate key: %v", err)
 	}
-	c, err := NewAESGCMBlockCipher(key)
+	c, err := newAESGCMBlockCipher(key)
 	if err != nil {
 		t.Fatalf("create AES GCM block cipher: %v", err)
 	}
@@ -42,7 +42,7 @@ func TestDefaultOverhead(t *testing.T) {
 	if _, err := crand.Read(key); err != nil {
 		t.Fatalf("fail to generate key: %v", err)
 	}
-	c, err := NewAESGCMBlockCipher(key)
+	c, err := newAESGCMBlockCipher(key)
 	if err != nil {
 		t.Fatalf("create AES GCM block cipher: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestAESGCMBlockCipherEncryptDecrypt(t *testing.T) {
 		if _, err := crand.Read(key); err != nil {
 			t.Fatalf("fail to generate key: %v", err)
 		}
-		c, err := NewAESGCMBlockCipher(key)
+		c, err := newAESGCMBlockCipher(key)
 		if err != nil {
 			t.Errorf("create AES GCM block cipher: %v", err)
 		}

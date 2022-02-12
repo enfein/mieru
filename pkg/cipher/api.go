@@ -17,9 +17,22 @@ package cipher
 
 import (
 	"crypto/sha256"
-	"fmt"
-	"time"
 )
+
+const (
+	DefaultNonceSize = 12 // 12 bytes
+	DefaultOverhead  = 16 // 16 bytes
+	DefaultKeyLen    = 32 // 256 bits
+)
+
+// BlockCipher is an interface of block encryption and decryption.
+type BlockCipher interface {
+	// Encrypt method adds the nonce in the dst, then encryptes the src.
+	Encrypt(plaintext []byte) ([]byte, error)
+
+	// Decrypt method removes the nonce in the src, then decryptes the src.
+	Decrypt(ciphertext []byte) ([]byte, error)
+}
 
 // HashPassword generates a hashed password from
 // the raw password and a unique value that decorates the password.
@@ -33,40 +46,15 @@ func HashPassword(rawPassword, uniqueValue []byte) []byte {
 // BlockCipherFromPassword creates a BlockCipher object from the password
 // with the default settings.
 func BlockCipherFromPassword(password []byte) (BlockCipher, error) {
-	keygen := PBKDF2Gen{
-		Salt: SaltFromTime(time.Now())[1],
-		Iter: DefaultIter,
-	}
-	cipherKey, err := keygen.NewKey(password, DefaultKeyLen)
+	cipherList, err := getBlockCipherList(password)
 	if err != nil {
-		return nil, fmt.Errorf("NewKey() failed: %w", err)
+		return nil, err
 	}
-	blockCipher, err := NewAESGCMBlockCipher(cipherKey)
-	if err != nil {
-		return nil, fmt.Errorf("NewAESGCMBlockCipher() failed: %w", err)
-	}
-	return blockCipher, nil
+	return cipherList[1], nil
 }
 
 // BlockCipherListFromPassword creates three BlockCipher objects using different salts
 // from the password with the default settings.
 func BlockCipherListFromPassword(password []byte) ([]BlockCipher, error) {
-	salts := SaltFromTime(time.Now())
-	blockCiphers := make([]BlockCipher, 0, 3)
-	for i := 0; i < 3; i++ {
-		keygen := PBKDF2Gen{
-			Salt: salts[i],
-			Iter: DefaultIter,
-		}
-		cipherKey, err := keygen.NewKey(password, DefaultKeyLen)
-		if err != nil {
-			return nil, fmt.Errorf("NewKey() failed: %w", err)
-		}
-		blockCipher, err := NewAESGCMBlockCipher(cipherKey)
-		if err != nil {
-			return nil, fmt.Errorf("NewAESGCMBlockCipher() failed: %w", err)
-		}
-		blockCiphers = append(blockCiphers, blockCipher)
-	}
-	return blockCiphers, nil
+	return getBlockCipherList(password)
 }

@@ -24,31 +24,25 @@ import (
 )
 
 const (
-	// DefaultIter is the default number of iterations to generate the key.
-	DefaultIter = 4096
+	// defaultIter is the default number of iterations to generate the key.
+	defaultIter = 4096
 
 	// refreshInterval is the amount of time when the salt used to generate cipher block is changed.
 	refreshInterval = 5 * time.Minute
 )
 
-// KeyGenerator is a collection of methods supported by a key generator.
-type KeyGenerator interface {
-	// NewKey creates a new key which is derived from a password.
-	NewKey(password []byte, keyLen int) ([]byte, error)
-}
-
-// PBKDF2Gen implements KeyGenerator with PBKDF2 algorithm.
-type PBKDF2Gen struct {
+// pbkdf2Gen implements KeyGenerator with PBKDF2 algorithm.
+type pbkdf2Gen struct {
 	Salt []byte
 	Iter int
 }
 
-func (g *PBKDF2Gen) NewKey(password []byte, keyLen int) ([]byte, error) {
+func (g *pbkdf2Gen) NewKey(password []byte, keyLen int) ([]byte, error) {
 	return pbkdf2.Key(password, g.Salt, g.Iter, keyLen, sha256.New), nil
 }
 
-// SaltFromTime generate three salts (each 32 bytes) based on the time.
-func SaltFromTime(t time.Time) [][]byte {
+// saltFromTime generate three salts (each 32 bytes) based on the time.
+func saltFromTime(t time.Time) [][]byte {
 	var times []time.Time
 	rounded := t.Round(refreshInterval)
 	times = append(times, rounded.Add(-refreshInterval))

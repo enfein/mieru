@@ -79,18 +79,18 @@ fi
 # If the system already have protoc or protoc-gen-go in PATH, use the original one.
 export PATH=$PATH:"$ROOT/tools/build"
 
-protoc -I="$ROOT/pkg/appctl" \
+protoc -I="$ROOT/pkg/appctl/proto" \
     --go_out="$ROOT/pkg/appctl" --go_opt=module="github.com/enfein/mieru/pkg/appctl" \
     --go-grpc_out="$ROOT/pkg/appctl" --go-grpc_opt=module="github.com/enfein/mieru/pkg/appctl" \
     --proto_path="$ROOT/pkg" \
-    "$ROOT/pkg/appctl/clientcfg.proto" \
-    "$ROOT/pkg/appctl/debug.proto" \
-    "$ROOT/pkg/appctl/empty.proto" \
-    "$ROOT/pkg/appctl/endpoint.proto" \
-    "$ROOT/pkg/appctl/lifecycle.proto" \
-    "$ROOT/pkg/appctl/logging.proto" \
-    "$ROOT/pkg/appctl/servercfg.proto" \
-    "$ROOT/pkg/appctl/user.proto"
+    "$ROOT/pkg/appctl/proto/clientcfg.proto" \
+    "$ROOT/pkg/appctl/proto/debug.proto" \
+    "$ROOT/pkg/appctl/proto/empty.proto" \
+    "$ROOT/pkg/appctl/proto/endpoint.proto" \
+    "$ROOT/pkg/appctl/proto/lifecycle.proto" \
+    "$ROOT/pkg/appctl/proto/logging.proto" \
+    "$ROOT/pkg/appctl/proto/servercfg.proto" \
+    "$ROOT/pkg/appctl/proto/user.proto"
 
 CGO_ENABLED=0 go build -v ./...
 CGO_ENABLED=0 go test -test.v -timeout=2m0s ./...

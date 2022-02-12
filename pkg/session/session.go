@@ -1,10 +1,3 @@
-// Package kcp-go is a Reliable-UDP library for golang.
-//
-// This library intents to provide a smooth, resilient, ordered,
-// error-checked and anonymous delivery of streams over UDP packets.
-//
-// The interfaces of this package aims to be compatible with
-// net.Conn in standard library, but offers powerful features for advanced users.
 package session
 
 import (
@@ -1173,24 +1166,9 @@ func DialWithOptionsReturnConn(ctx context.Context, network, laddr, raddr string
 // Use CRC to validate if decryption is successful.
 // If successful, returns the block cipher as well as the decrypted results.
 func tryDecrypt(data, password []byte) (cipher.BlockCipher, []byte, error) {
-	salts := cipher.SaltFromTime(time.Now())
-	var blocks []cipher.BlockCipher
-	for _, salt := range salts {
-		keygen := cipher.PBKDF2Gen{
-			Salt: salt,
-			Iter: cipher.DefaultIter,
-		}
-		key, err := keygen.NewKey(password, cipher.DefaultKeyLen)
-		if err != nil {
-			log.Errorf("failed to generate key: %v", err)
-			continue
-		}
-		block, err := cipher.NewAESGCMBlockCipher(key)
-		if err != nil {
-			log.Errorf("failed to create AES GCM block cipher: %v", err)
-			continue
-		}
-		blocks = append(blocks, block)
+	blocks, err := cipher.BlockCipherListFromPassword(password)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cipher.BlockCipherListFromPassword() failed: %w", err)
 	}
 
 	for _, block := range blocks {

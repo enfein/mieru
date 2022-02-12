@@ -19,10 +19,12 @@ FROM ubuntu:20.04
 
 WORKDIR /test
 
-# Copy golang source and binary files into container.
-COPY . .
+# Copy binaries, data and test script into the container.
+COPY mieru mita sockshttpclient httpserver \
+    test/deploy/httptest/client.json test/deploy/httptest/server.json \
+    test/deploy/httptest/test.sh /test/
 
 # Create mita user and server config directory.
 RUN /usr/sbin/useradd --no-create-home --user-group mita && mkdir -p /etc/mita
 
-CMD ["/test/test/deploy/httptest/test.sh"]
+CMD ["/test/test.sh"]

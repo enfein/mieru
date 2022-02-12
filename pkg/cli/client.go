@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
+	"runtime/pprof"
 	"strconv"
 	"sync"
 	"time"
@@ -80,9 +81,9 @@ func RegisterClientCommands() {
 		[]string{"", "apply", "config"},
 		func(s []string) error {
 			if len(s) < 4 {
-				return fmt.Errorf("Usage: mieru apply config <FILE>. No config file is provided.")
+				return fmt.Errorf("usage: mieru apply config <FILE>. no config file is provided")
 			} else if len(s) > 4 {
-				return fmt.Errorf("Usage: mieru apply config <FILE>. More than 1 config file is provided.")
+				return fmt.Errorf("usage: mieru apply config <FILE>. more than 1 config file is provided")
 			}
 			return nil
 		},
@@ -99,9 +100,9 @@ func RegisterClientCommands() {
 		[]string{"", "delete", "profile"},
 		func(s []string) error {
 			if len(s) < 4 {
-				return fmt.Errorf("Usage: mieru delete profile <PROFILE_NAME>. No profile is provided.")
+				return fmt.Errorf("usage: mieru delete profile <PROFILE_NAME>. no profile is provided")
 			} else if len(s) > 4 {
-				return fmt.Errorf("Usage: mieru delete profile <PROFILE_NAME>. More than 1 profile is provided.")
+				return fmt.Errorf("usage: mieru delete profile <PROFILE_NAME>. more than 1 profile is provided")
 			}
 			return nil
 		},
@@ -114,6 +115,37 @@ func RegisterClientCommands() {
 		},
 		clientGetThreadDumpFunc,
 	)
+	RegisterCallback(
+		[]string{"", "get", "heap-profile"},
+		func(s []string) error {
+			if len(s) < 4 {
+				return fmt.Errorf("usage: mieru get heap-profile <FILE>. no file save path is provided")
+			} else if len(s) > 4 {
+				return fmt.Errorf("usage: mieru get heap-profile <FILE>. more than 1 file save path is provided")
+			}
+			return nil
+		},
+		clientGetHeapProfileFunc,
+	)
+	RegisterCallback(
+		[]string{"", "profile", "cpu", "start"},
+		func(s []string) error {
+			if len(s) < 5 {
+				return fmt.Errorf("usage: mieru profile cpu start <FILE>. no file save path is provided")
+			} else if len(s) > 5 {
+				return fmt.Errorf("usage: mieru profile cpu start <FILE>. more than 1 file save path is provided")
+			}
+			return nil
+		},
+		clientStartCPUProfileFunc,
+	)
+	RegisterCallback(
+		[]string{"", "profile", "cpu", "stop"},
+		func(s []string) error {
+			return unexpectedArgsError(s, 4)
+		},
+		clientStopCPUProfileFunc,
+	)
 }
 
 var clientHelpFunc = func(s []string) error {
@@ -125,7 +157,6 @@ var clientHelpFunc = func(s []string) error {
 	applyConfigCmd := fmt.Sprintf(format, "apply config <FILE>", "Apply client configuration from JSON file")
 	describeConfigCmd := fmt.Sprintf(format, "describe config", "Show current client configuration")
 	deleteProfileCmd := fmt.Sprintf(format, "delete profile <PROFILE_NAME>", "Delete a client configuration profile")
-	getThreadDumpCmd := fmt.Sprintf(format, "get thread-dump", "Take client daemon thread dump")
 	log.Infof("Usage: %s <COMMAND> [<ARGS>]", binaryName)
 	log.Infof("")
 	log.Infof("Commands:")
@@ -136,7 +167,6 @@ var clientHelpFunc = func(s []string) error {
 	log.Infof("%s", applyConfigCmd)
 	log.Infof("%s", describeConfigCmd)
 	log.Infof("%s", deleteProfileCmd)
-	log.Infof("%s", getThreadDumpCmd)
 	return nil
 }
 
@@ -293,13 +323,17 @@ var clientRunFunc = func(s []string) error {
 
 	appctl.SetAppStatus(appctlpb.AppStatus_RUNNING)
 	wg.Wait()
+
+	// Stop CPU profiling, if previously started.
+	pprof.StopCPUProfile()
+
 	log.Infof("mieru client exit now")
 	return nil
 }
 
 var clientStopFunc = func(s []string) error {
 	if err := appctl.IsClientDaemonRunning(context.Background()); err != nil {
-		log.Infof("mieru client is not running")
+		log.Infof(stderror.ClientNotRunning)
 		return nil
 	}
 
@@ -382,5 +416,59 @@ var clientGetThreadDumpFunc = func(s []string) error {
 		return fmt.Errorf(stderror.GetThreadDumpFailedErr, err)
 	}
 	log.Infof("%s", dump.GetThreadDump())
+	return nil
+}
+
+var clientGetHeapProfileFunc = func(s []string) error {
+	if err := appctl.IsClientDaemonRunning(context.Background()); err != nil {
+		log.Infof(stderror.ClientNotRunning)
+		return nil
+	}
+
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout())
+	defer cancelFunc()
+	client, err := appctl.NewClientLifecycleRPCClient(timedctx)
+	if err != nil {
+		return fmt.Errorf(stderror.CreateClientLifecycleRPCClientFailedErr, err)
+	}
+	if _, err := client.GetHeapProfile(timedctx, &appctlpb.ProfileSavePath{FilePath: s[3]}); err != nil {
+		return fmt.Errorf(stderror.GetHeapProfileFailedErr, err)
+	}
+	log.Infof("heap profile is saved to %q", s[3])
+	return nil
+}
+
+var clientStartCPUProfileFunc = func(s []string) error {
+	if err := appctl.IsClientDaemonRunning(context.Background()); err != nil {
+		log.Infof(stderror.ClientNotRunning)
+		return nil
+	}
+
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout())
+	defer cancelFunc()
+	client, err := appctl.NewClientLifecycleRPCClient(timedctx)
+	if err != nil {
+		return fmt.Errorf(stderror.CreateClientLifecycleRPCClientFailedErr, err)
+	}
+	if _, err := client.StartCPUProfile(timedctx, &appctlpb.ProfileSavePath{FilePath: s[4]}); err != nil {
+		return fmt.Errorf(stderror.StartCPUProfileFailedErr, err)
+	}
+	log.Infof("CPU profile will be saved to %q", s[4])
+	return nil
+}
+
+var clientStopCPUProfileFunc = func(s []string) error {
+	if err := appctl.IsClientDaemonRunning(context.Background()); err != nil {
+		log.Infof(stderror.ClientNotRunning)
+		return nil
+	}
+
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout())
+	defer cancelFunc()
+	client, err := appctl.NewClientLifecycleRPCClient(timedctx)
+	if err != nil {
+		return fmt.Errorf(stderror.CreateClientLifecycleRPCClientFailedErr, err)
+	}
+	client.StopCPUProfile(timedctx, &appctlpb.Empty{})
 	return nil
 }

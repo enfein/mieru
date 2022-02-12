@@ -48,9 +48,9 @@ sleep 1
 sleep 1
 
 # Update mieru server config.
-./mita apply config test/deploy/httptest/server.json
+./mita apply config server.json
 if [[ "$?" -ne 0 ]]; then
-    echo "command 'mita apply config test/deploy/httptest/server.json' failed"
+    echo "command 'mita apply config server.json' failed"
     exit 1
 fi
 echo "mieru server config:"
@@ -62,11 +62,12 @@ if [[ "$?" -ne 0 ]]; then
     echo "command 'mita start' failed"
     exit 1
 fi
+./mita profile cpu start /test/mita.cpu.gz
 
 # Update mieru client config.
-./mieru apply config test/deploy/httptest/client.json
+./mieru apply config client.json
 if [[ "$?" -ne 0 ]]; then
-    echo "command 'mieru apply config test/deploy/httptest/client.json' failed"
+    echo "command 'mieru apply config client.json' failed"
     exit 1
 fi
 echo "mieru client config:"
@@ -78,6 +79,7 @@ if [[ "$?" -ne 0 ]]; then
     echo "command 'mieru start' failed"
     exit 1
 fi
+./mieru profile cpu start /test/mieru.cpu.gz
 
 # Start testing.
 sleep 1
@@ -92,6 +94,11 @@ if [ "$?" -ne "0" ]; then
     echo "Test failed."
     exit 1
 fi
+
+./mieru profile cpu stop
+./mita profile cpu stop
+./mieru get heap-profile /test/mieru.heap.gz
+./mita get heap-profile /test/mita.heap.gz
 
 print_mieru_client_log
 echo "Test is successful."

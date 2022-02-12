@@ -24,6 +24,12 @@ type ClientLifecycleServiceClient interface {
 	Exit(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 	// Generate a thread dump of client daemon.
 	GetThreadDump(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ThreadDump, error)
+	// Start CPU profiling.
+	StartCPUProfile(ctx context.Context, in *ProfileSavePath, opts ...grpc.CallOption) (*Empty, error)
+	// Stop CPU profiling.
+	StopCPUProfile(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
+	// Generate a heap profile.
+	GetHeapProfile(ctx context.Context, in *ProfileSavePath, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type clientLifecycleServiceClient struct {
@@ -61,6 +67,33 @@ func (c *clientLifecycleServiceClient) GetThreadDump(ctx context.Context, in *Em
 	return out, nil
 }
 
+func (c *clientLifecycleServiceClient) StartCPUProfile(ctx context.Context, in *ProfileSavePath, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/appctl.ClientLifecycleService/StartCPUProfile", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *clientLifecycleServiceClient) StopCPUProfile(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/appctl.ClientLifecycleService/StopCPUProfile", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *clientLifecycleServiceClient) GetHeapProfile(ctx context.Context, in *ProfileSavePath, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/appctl.ClientLifecycleService/GetHeapProfile", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ClientLifecycleServiceServer is the server API for ClientLifecycleService service.
 // All implementations must embed UnimplementedClientLifecycleServiceServer
 // for forward compatibility
@@ -71,6 +104,12 @@ type ClientLifecycleServiceServer interface {
 	Exit(context.Context, *Empty) (*Empty, error)
 	// Generate a thread dump of client daemon.
 	GetThreadDump(context.Context, *Empty) (*ThreadDump, error)
+	// Start CPU profiling.
+	StartCPUProfile(context.Context, *ProfileSavePath) (*Empty, error)
+	// Stop CPU profiling.
+	StopCPUProfile(context.Context, *Empty) (*Empty, error)
+	// Generate a heap profile.
+	GetHeapProfile(context.Context, *ProfileSavePath) (*Empty, error)
 	mustEmbedUnimplementedClientLifecycleServiceServer()
 }
 
@@ -86,6 +125,15 @@ func (UnimplementedClientLifecycleServiceServer) Exit(context.Context, *Empty) (
 }
 func (UnimplementedClientLifecycleServiceServer) GetThreadDump(context.Context, *Empty) (*ThreadDump, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetThreadDump not implemented")
+}
+func (UnimplementedClientLifecycleServiceServer) StartCPUProfile(context.Context, *ProfileSavePath) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StartCPUProfile not implemented")
+}
+func (UnimplementedClientLifecycleServiceServer) StopCPUProfile(context.Context, *Empty) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StopCPUProfile not implemented")
+}
+func (UnimplementedClientLifecycleServiceServer) GetHeapProfile(context.Context, *ProfileSavePath) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetHeapProfile not implemented")
 }
 func (UnimplementedClientLifecycleServiceServer) mustEmbedUnimplementedClientLifecycleServiceServer() {
 }
@@ -155,6 +203,60 @@ func _ClientLifecycleService_GetThreadDump_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ClientLifecycleService_StartCPUProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProfileSavePath)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClientLifecycleServiceServer).StartCPUProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/appctl.ClientLifecycleService/StartCPUProfile",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClientLifecycleServiceServer).StartCPUProfile(ctx, req.(*ProfileSavePath))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ClientLifecycleService_StopCPUProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClientLifecycleServiceServer).StopCPUProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/appctl.ClientLifecycleService/StopCPUProfile",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClientLifecycleServiceServer).StopCPUProfile(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ClientLifecycleService_GetHeapProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProfileSavePath)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClientLifecycleServiceServer).GetHeapProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/appctl.ClientLifecycleService/GetHeapProfile",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClientLifecycleServiceServer).GetHeapProfile(ctx, req.(*ProfileSavePath))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ClientLifecycleService_ServiceDesc is the grpc.ServiceDesc for ClientLifecycleService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -173,6 +275,18 @@ var ClientLifecycleService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetThreadDump",
 			Handler:    _ClientLifecycleService_GetThreadDump_Handler,
+		},
+		{
+			MethodName: "StartCPUProfile",
+			Handler:    _ClientLifecycleService_StartCPUProfile_Handler,
+		},
+		{
+			MethodName: "StopCPUProfile",
+			Handler:    _ClientLifecycleService_StopCPUProfile_Handler,
+		},
+		{
+			MethodName: "GetHeapProfile",
+			Handler:    _ClientLifecycleService_GetHeapProfile_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -193,6 +307,12 @@ type ServerLifecycleServiceClient interface {
 	Exit(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 	// Generate a thread dump of server daemon.
 	GetThreadDump(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ThreadDump, error)
+	// Start CPU profiling.
+	StartCPUProfile(ctx context.Context, in *ProfileSavePath, opts ...grpc.CallOption) (*Empty, error)
+	// Stop CPU profiling.
+	StopCPUProfile(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
+	// Generate a heap profile.
+	GetHeapProfile(ctx context.Context, in *ProfileSavePath, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type serverLifecycleServiceClient struct {
@@ -248,6 +368,33 @@ func (c *serverLifecycleServiceClient) GetThreadDump(ctx context.Context, in *Em
 	return out, nil
 }
 
+func (c *serverLifecycleServiceClient) StartCPUProfile(ctx context.Context, in *ProfileSavePath, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/appctl.ServerLifecycleService/StartCPUProfile", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *serverLifecycleServiceClient) StopCPUProfile(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/appctl.ServerLifecycleService/StopCPUProfile", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *serverLifecycleServiceClient) GetHeapProfile(ctx context.Context, in *ProfileSavePath, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/appctl.ServerLifecycleService/GetHeapProfile", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ServerLifecycleServiceServer is the server API for ServerLifecycleService service.
 // All implementations must embed UnimplementedServerLifecycleServiceServer
 // for forward compatibility
@@ -262,6 +409,12 @@ type ServerLifecycleServiceServer interface {
 	Exit(context.Context, *Empty) (*Empty, error)
 	// Generate a thread dump of server daemon.
 	GetThreadDump(context.Context, *Empty) (*ThreadDump, error)
+	// Start CPU profiling.
+	StartCPUProfile(context.Context, *ProfileSavePath) (*Empty, error)
+	// Stop CPU profiling.
+	StopCPUProfile(context.Context, *Empty) (*Empty, error)
+	// Generate a heap profile.
+	GetHeapProfile(context.Context, *ProfileSavePath) (*Empty, error)
 	mustEmbedUnimplementedServerLifecycleServiceServer()
 }
 
@@ -283,6 +436,15 @@ func (UnimplementedServerLifecycleServiceServer) Exit(context.Context, *Empty) (
 }
 func (UnimplementedServerLifecycleServiceServer) GetThreadDump(context.Context, *Empty) (*ThreadDump, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetThreadDump not implemented")
+}
+func (UnimplementedServerLifecycleServiceServer) StartCPUProfile(context.Context, *ProfileSavePath) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StartCPUProfile not implemented")
+}
+func (UnimplementedServerLifecycleServiceServer) StopCPUProfile(context.Context, *Empty) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StopCPUProfile not implemented")
+}
+func (UnimplementedServerLifecycleServiceServer) GetHeapProfile(context.Context, *ProfileSavePath) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetHeapProfile not implemented")
 }
 func (UnimplementedServerLifecycleServiceServer) mustEmbedUnimplementedServerLifecycleServiceServer() {
 }
@@ -388,6 +550,60 @@ func _ServerLifecycleService_GetThreadDump_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ServerLifecycleService_StartCPUProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProfileSavePath)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerLifecycleServiceServer).StartCPUProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/appctl.ServerLifecycleService/StartCPUProfile",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerLifecycleServiceServer).StartCPUProfile(ctx, req.(*ProfileSavePath))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ServerLifecycleService_StopCPUProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerLifecycleServiceServer).StopCPUProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/appctl.ServerLifecycleService/StopCPUProfile",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerLifecycleServiceServer).StopCPUProfile(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ServerLifecycleService_GetHeapProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProfileSavePath)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerLifecycleServiceServer).GetHeapProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/appctl.ServerLifecycleService/GetHeapProfile",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerLifecycleServiceServer).GetHeapProfile(ctx, req.(*ProfileSavePath))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ServerLifecycleService_ServiceDesc is the grpc.ServiceDesc for ServerLifecycleService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -414,6 +630,18 @@ var ServerLifecycleService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetThreadDump",
 			Handler:    _ServerLifecycleService_GetThreadDump_Handler,
+		},
+		{
+			MethodName: "StartCPUProfile",
+			Handler:    _ServerLifecycleService_StartCPUProfile_Handler,
+		},
+		{
+			MethodName: "StopCPUProfile",
+			Handler:    _ServerLifecycleService_StopCPUProfile_Handler,
+		},
+		{
+			MethodName: "GetHeapProfile",
+			Handler:    _ServerLifecycleService_GetHeapProfile_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

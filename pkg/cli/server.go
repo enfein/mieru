@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"os/user"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 	"sync"
@@ -80,9 +81,9 @@ func RegisterServerCommands() {
 		[]string{"", "apply", "config"},
 		func(s []string) error {
 			if len(s) < 4 {
-				return fmt.Errorf("Usage: mita apply config <FILE>. No config file is provided.")
+				return fmt.Errorf("usage: mita apply config <FILE>. no config file is provided")
 			} else if len(s) > 4 {
-				return fmt.Errorf("Usage: mita apply config <FILE>. More than 1 config file is provided.")
+				return fmt.Errorf("usage: mita apply config <FILE>. more than 1 config file is provided")
 			}
 			return nil
 		},
@@ -99,7 +100,7 @@ func RegisterServerCommands() {
 		[]string{"", "delete", "user"},
 		func(s []string) error {
 			if len(s) < 4 {
-				return fmt.Errorf("Usage: mita delete user <USER_NAME>. No user is provided.")
+				return fmt.Errorf("usage: mita delete user <USER_NAME>. no user is provided")
 			}
 			return nil
 		},
@@ -112,6 +113,37 @@ func RegisterServerCommands() {
 		},
 		serverGetThreadDumpFunc,
 	)
+	RegisterCallback(
+		[]string{"", "get", "heap-profile"},
+		func(s []string) error {
+			if len(s) < 4 {
+				return fmt.Errorf("usage: mita get heap-profile <FILE>. no file save path is provided")
+			} else if len(s) > 4 {
+				return fmt.Errorf("usage: mita get heap-profile <FILE>. more than 1 file save path is provided")
+			}
+			return nil
+		},
+		serverGetHeapProfileFunc,
+	)
+	RegisterCallback(
+		[]string{"", "profile", "cpu", "start"},
+		func(s []string) error {
+			if len(s) < 5 {
+				return fmt.Errorf("usage: mita profile cpu start <FILE>. no file save path is provided")
+			} else if len(s) > 5 {
+				return fmt.Errorf("usage: mita profile cpu start <FILE>. more than 1 file save path is provided")
+			}
+			return nil
+		},
+		serverStartCPUProfileFunc,
+	)
+	RegisterCallback(
+		[]string{"", "profile", "cpu", "stop"},
+		func(s []string) error {
+			return unexpectedArgsError(s, 4)
+		},
+		serverStopCPUProfileFunc,
+	)
 }
 
 var serverHelpFunc = func(s []string) error {
@@ -123,7 +155,6 @@ var serverHelpFunc = func(s []string) error {
 	applyConfigCmd := fmt.Sprintf(format, "apply config <FILE>", "Apply server configuration from JSON file")
 	describeConfigCmd := fmt.Sprintf(format, "describe config", "Show current server configuration")
 	deleteUserCmd := fmt.Sprintf(format, "delete user <USER_NAME>", "Delete users from server configuration")
-	getThreadDumpCmd := fmt.Sprintf(format, "get thread-dump", "Take server daemon thread dump")
 	log.Infof("Usage: %s <COMMAND> [<ARGS>]", binaryName)
 	log.Infof("")
 	log.Infof("Commands:")
@@ -134,7 +165,6 @@ var serverHelpFunc = func(s []string) error {
 	log.Infof("%s", applyConfigCmd)
 	log.Infof("%s", describeConfigCmd)
 	log.Infof("%s", deleteUserCmd)
-	log.Infof("%s", getThreadDumpCmd)
 	return nil
 }
 
@@ -267,6 +297,10 @@ var serverRunFunc = func(s []string) error {
 	}
 
 	rpcTasks.Wait()
+
+	// Stop CPU profiling, if previously started.
+	pprof.StopCPUProfile()
+
 	log.Infof("mieru server daemon exit now")
 	return nil
 }
@@ -448,6 +482,69 @@ var serverGetThreadDumpFunc = func(s []string) error {
 		return fmt.Errorf(stderror.GetThreadDumpFailedErr, err)
 	}
 	log.Infof("%s", dump.GetThreadDump())
+	return nil
+}
+
+var serverGetHeapProfileFunc = func(s []string) error {
+	appStatus, err := appctl.GetServerStatusWithRPC(context.Background())
+	if err != nil {
+		return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
+	}
+	if err := appctl.IsServerDaemonRunning(appStatus); err != nil {
+		return fmt.Errorf(stderror.ServerNotRunningErr, err)
+	}
+
+	client, err := appctl.NewServerLifecycleRPCClient()
+	if err != nil {
+		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
+	}
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout())
+	defer cancelFunc()
+	if _, err := client.GetHeapProfile(timedctx, &appctlpb.ProfileSavePath{FilePath: s[3]}); err != nil {
+		return fmt.Errorf(stderror.GetHeapProfileFailedErr, err)
+	}
+	log.Infof("heap profile is saved to %q", s[3])
+	return nil
+}
+
+var serverStartCPUProfileFunc = func(s []string) error {
+	appStatus, err := appctl.GetServerStatusWithRPC(context.Background())
+	if err != nil {
+		return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
+	}
+	if err := appctl.IsServerDaemonRunning(appStatus); err != nil {
+		return fmt.Errorf(stderror.ServerNotRunningErr, err)
+	}
+
+	client, err := appctl.NewServerLifecycleRPCClient()
+	if err != nil {
+		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
+	}
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout())
+	defer cancelFunc()
+	if _, err := client.StartCPUProfile(timedctx, &appctlpb.ProfileSavePath{FilePath: s[4]}); err != nil {
+		return fmt.Errorf(stderror.StartCPUProfileFailedErr, err)
+	}
+	log.Infof("CPU profile will be saved to %q", s[4])
+	return nil
+}
+
+var serverStopCPUProfileFunc = func(s []string) error {
+	appStatus, err := appctl.GetServerStatusWithRPC(context.Background())
+	if err != nil {
+		return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
+	}
+	if err := appctl.IsServerDaemonRunning(appStatus); err != nil {
+		return fmt.Errorf(stderror.ServerNotRunningErr, err)
+	}
+
+	client, err := appctl.NewServerLifecycleRPCClient()
+	if err != nil {
+		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
+	}
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout())
+	defer cancelFunc()
+	client.StopCPUProfile(timedctx, &appctlpb.Empty{})
 	return nil
 }
 

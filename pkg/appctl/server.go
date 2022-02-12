@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"runtime"
 	"sort"
 	"strconv"
 	"sync"
@@ -197,16 +196,22 @@ func (s *serverLifecycleService) Exit(ctx context.Context, req *pb.Empty) (*pb.E
 }
 
 func (s *serverLifecycleService) GetThreadDump(ctx context.Context, req *pb.Empty) (*pb.ThreadDump, error) {
-	buf := make([]byte, 4096)
-	for {
-		n := runtime.Stack(buf, true)
-		if n < len(buf) {
-			buf = buf[:n]
-			break
-		}
-		buf = make([]byte, 2*len(buf))
-	}
-	return &pb.ThreadDump{ThreadDump: string(buf)}, nil
+	return &pb.ThreadDump{ThreadDump: string(getThreadDump())}, nil
+}
+
+func (s *serverLifecycleService) StartCPUProfile(ctx context.Context, req *pb.ProfileSavePath) (*pb.Empty, error) {
+	err := startCPUProfile(req.GetFilePath())
+	return &pb.Empty{}, err
+}
+
+func (s *serverLifecycleService) StopCPUProfile(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
+	stopCPUProfile()
+	return &pb.Empty{}, nil
+}
+
+func (s *serverLifecycleService) GetHeapProfile(ctx context.Context, req *pb.ProfileSavePath) (*pb.Empty, error) {
+	err := getHeapProfile(req.GetFilePath())
+	return &pb.Empty{}, err
 }
 
 // NewServerLifecycleService creates a new ServerLifecycleService RPC server.

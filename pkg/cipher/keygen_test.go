@@ -23,7 +23,7 @@ import (
 )
 
 func TestSaltFromTimeSize(t *testing.T) {
-	salts := SaltFromTime(time.Now())
+	salts := saltFromTime(time.Now())
 	if len(salts) != 3 {
 		t.Errorf("got %d []byte; want 3", len(salts))
 	}
@@ -54,9 +54,9 @@ func TestSaltFromTimeCoverage(t *testing.T) {
 			t.Fatalf("failed to parse time duration")
 		}
 
-		curr := SaltFromTime(time.Now())
-		prev := SaltFromTime(time.Now().Add(backward))
-		next := SaltFromTime(time.Now().Add(forward))
+		curr := saltFromTime(time.Now())
+		prev := saltFromTime(time.Now().Add(backward))
+		next := saltFromTime(time.Now().Add(forward))
 		if !hasOverlap(prev, curr) && !hasOverlap(curr, next) {
 			noOverlap += 1
 		}

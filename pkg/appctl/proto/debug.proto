@@ -22,3 +22,7 @@ option go_package = "github.com/enfein/mieru/pkg/appctl/appctlpb";
 message ThreadDump {
     string threadDump = 1;
 }
+
+message ProfileSavePath {
+    string filePath = 1;
+}

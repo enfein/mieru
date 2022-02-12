@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// cipher provides functions to encrpyt and decrypt a block of data.
 package cipher
 
 import (
@@ -23,28 +22,13 @@ import (
 	"fmt"
 )
 
-const (
-	DefaultNonceSize = 12 // 12 bytes
-	DefaultOverhead  = 16 // 16 bytes
-	DefaultKeyLen    = 32 // 256 bits
-)
-
-// BlockCipher is an interface of block encryption and decryption.
-type BlockCipher interface {
-	// Encrypt method adds the nonce in the dst, then encryptes the src.
-	Encrypt(plaintext []byte) ([]byte, error)
-
-	// Decrypt method removes the nonce in the src, then decryptes the src.
-	Decrypt(ciphertext []byte) ([]byte, error)
-}
-
 // AESGCMBlockCipher implements BlockCipher interface with AES-GCM algorithm.
 type AESGCMBlockCipher struct {
 	aead cipher.AEAD
 }
 
-// NewAESGCMBlockCipher creates a new cipher with the supplied key.
-func NewAESGCMBlockCipher(key []byte) (*AESGCMBlockCipher, error) {
+// newAESGCMBlockCipher creates a new cipher with the supplied key.
+func newAESGCMBlockCipher(key []byte) (*AESGCMBlockCipher, error) {
 	if err := validateKeySize(key); err != nil {
 		return nil, err
 	}
