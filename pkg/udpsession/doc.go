@@ -7,4 +7,4 @@
 //
 // The interfaces of this package aims to be compatible with
 // net.Conn in standard library, but offers powerful features for advanced users.
-package session
+package udpsession

@@ -33,9 +33,9 @@ import (
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/netutil"
-	"github.com/enfein/mieru/pkg/session"
 	"github.com/enfein/mieru/pkg/socks5"
 	"github.com/enfein/mieru/pkg/stderror"
+	"github.com/enfein/mieru/pkg/udpsession"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 )
@@ -295,7 +295,7 @@ var clientRunFunc = func(s []string) error {
 		ProxyPassword:    hashedPassword,
 		ProxyNetworkType: "udp",
 		ProxyAddress:     netutil.MaybeDecorateIPv6(proxyHost) + ":" + strconv.Itoa(int(proxyPort)),
-		ProxyDial:        session.DialWithOptionsReturnConn,
+		ProxyDial:        udpsession.DialWithOptionsReturnConn,
 	}
 	socks5Server, err := socks5.New(socks5Config)
 	if err != nil {

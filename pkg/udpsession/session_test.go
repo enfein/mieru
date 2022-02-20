@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package session_test
+package udpsession_test
 
 import (
 	"bytes"
@@ -27,7 +27,7 @@ import (
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/kcp"
-	"github.com/enfein/mieru/pkg/session"
+	"github.com/enfein/mieru/pkg/udpsession"
 )
 
 const timeLayout string = "15:04:05.00"
@@ -57,9 +57,9 @@ func runClient(t *testing.T, laddr, serverAddr string, username, password []byte
 	if err != nil {
 		return fmt.Errorf("cipher.BlockCipherFromPassword() failed: %w", err)
 	}
-	sess, err := session.DialWithOptions(context.Background(), "udp", laddr, serverAddr, block)
+	sess, err := udpsession.DialWithOptions(context.Background(), "udp", laddr, serverAddr, block)
 	if err != nil {
-		return fmt.Errorf("session.DialWithOptions() failed: %w", err)
+		return fmt.Errorf("udpsession.DialWithOptions() failed: %w", err)
 	}
 	defer sess.Close()
 	t.Logf("[%s] client is running on %v", time.Now().Format(timeLayout), laddr)
@@ -69,7 +69,7 @@ func runClient(t *testing.T, laddr, serverAddr string, username, password []byte
 		sleepMillis := 100 + mrand.Intn(100)
 		time.Sleep(time.Duration(sleepMillis) * time.Millisecond)
 
-		data := session.TestHelperGenRot13Input(1024)
+		data := udpsession.TestHelperGenRot13Input(1024)
 
 		// Send data to server.
 		if _, err = sess.Write(data); err != nil {
@@ -82,9 +82,9 @@ func runClient(t *testing.T, laddr, serverAddr string, username, password []byte
 		if err != nil {
 			return fmt.Errorf("Read() failed: %w", err)
 		}
-		revert, err := session.TestHelperRot13(respBuf[:size])
+		revert, err := udpsession.TestHelperRot13(respBuf[:size])
 		if err != nil {
-			return fmt.Errorf("session.TestHelperRot13() failed: %w", err)
+			return fmt.Errorf("udpsession.TestHelperRot13() failed: %w", err)
 		}
 		if !bytes.Equal(data, revert) {
 			return fmt.Errorf("verification failed")
@@ -98,9 +98,9 @@ func runClient(t *testing.T, laddr, serverAddr string, username, password []byte
 // ROT13 (rotate by 13 places) of the data back to the client.
 func TestKCPSessionsIPv4(t *testing.T) {
 	kcp.TestOnlySegmentDropRate = "5"
-	party, err := session.ListenWithOptions("127.0.0.1:12315", users)
+	party, err := udpsession.ListenWithOptions("127.0.0.1:12315", users)
 	if err != nil {
-		t.Fatalf("session.ListenWithOptions() failed: %v", err)
+		t.Fatalf("udpsession.ListenWithOptions() failed: %v", err)
 	}
 
 	go func() {
@@ -111,7 +111,7 @@ func TestKCPSessionsIPv4(t *testing.T) {
 			} else {
 				t.Logf("[%s] accepting new connection from %v", time.Now().Format(timeLayout), s.RemoteAddr())
 				go func() {
-					if err = session.TestHelperServeConn(s); err != nil {
+					if err = udpsession.TestHelperServeConn(s); err != nil {
 						return
 					}
 				}()
@@ -143,9 +143,9 @@ func TestKCPSessionsIPv4(t *testing.T) {
 // TestKCPSessionsIPv6 is similar to TestKCPSessionsIPv4 but running in IPv6.
 func TestKCPSessionsIPv6(t *testing.T) {
 	kcp.TestOnlySegmentDropRate = "5"
-	party, err := session.ListenWithOptions("[::1]:12318", users)
+	party, err := udpsession.ListenWithOptions("[::1]:12318", users)
 	if err != nil {
-		t.Fatalf("session.ListenWithOptions() failed: %v", err)
+		t.Fatalf("udpsession.ListenWithOptions() failed: %v", err)
 	}
 
 	go func() {
@@ -156,7 +156,7 @@ func TestKCPSessionsIPv6(t *testing.T) {
 			} else {
 				t.Logf("[%s] accepting new connection from %v", time.Now().Format(timeLayout), s.RemoteAddr())
 				go func() {
-					if err = session.TestHelperServeConn(s); err != nil {
+					if err = udpsession.TestHelperServeConn(s); err != nil {
 						return
 					}
 				}()
