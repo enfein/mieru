@@ -261,37 +261,46 @@ var serverRunFunc = func(s []string) error {
 	if err = appctl.ValidateFullServerConfig(config); err == nil {
 		appctl.SetAppStatus(appctlpb.AppStatus_STARTING)
 
-		// Create the egress socks5 server.
-		socks5Config := &socks5.Config{
-			AllowLocalDestination: config.GetAdvancedSettings().GetAllowLocalDestination(),
-		}
-		socks5Server, err := socks5.New(socks5Config)
-		if err != nil {
-			return fmt.Errorf(stderror.CreateSocks5ServerFailedErr, err)
-		}
-		appctl.SetClientSocks5ServerRef(socks5Server)
-
+		n := len(config.GetPortBindings())
 		var proxyTasks sync.WaitGroup
-		proxyTasks.Add(1)
+		var initProxyTasks sync.WaitGroup
+		proxyTasks.Add(n)
+		initProxyTasks.Add(n)
 
-		// Run the egress socks5 server in the background.
-		go func() {
-			socks5Addr := netutil.MaybeDecorateIPv6(netutil.AllIPAddr()) + ":" + strconv.Itoa(int(config.GetPortBindings()[0].GetPort()))
-			l, err := udpsession.ListenWithOptions(socks5Addr, appctl.UserListToMap(config.GetUsers()))
+		for i := 0; i < n; i++ {
+			// Create the egress socks5 server.
+			socks5Config := &socks5.Config{
+				AllowLocalDestination: config.GetAdvancedSettings().GetAllowLocalDestination(),
+			}
+			socks5Server, err := socks5.New(socks5Config)
 			if err != nil {
-				log.Fatalf("udpsession.ListenWithOptions(%q) failed: %v", socks5Addr, err)
+				return fmt.Errorf(stderror.CreateSocks5ServerFailedErr, err)
 			}
-			close(appctl.ServerSocks5ServerStarted)
-			log.Infof("mieru server daemon socks5 server is running")
-			if err = socks5Server.Serve(l); err != nil {
-				log.Fatalf("run socks5 server failed: %v", err)
+			protocol := config.GetPortBindings()[i].GetProtocol().String()
+			port := config.GetPortBindings()[i].GetPort()
+			if err := appctl.GetSocks5ServerGroup().Add(protocol, int(port), socks5Server); err != nil {
+				return fmt.Errorf(stderror.AddSocks5ServerToGroupFailedErr, err)
 			}
-			log.Infof("mieru server daemon socks5 server is stopped")
-			proxyTasks.Done()
-		}()
-		<-appctl.ServerSocks5ServerStarted
-		metrics.EnableLogging()
 
+			// Run the egress socks5 server in the background.
+			go func() {
+				socks5Addr := netutil.MaybeDecorateIPv6(netutil.AllIPAddr()) + ":" + strconv.Itoa(int(port))
+				l, err := udpsession.ListenWithOptions(socks5Addr, appctl.UserListToMap(config.GetUsers()))
+				if err != nil {
+					log.Fatalf("udpsession.ListenWithOptions(%q) failed: %v", socks5Addr, err)
+				}
+				initProxyTasks.Done()
+				log.Infof("mieru server daemon socks5 server %q is running", socks5Addr)
+				if err = socks5Server.Serve(l); err != nil {
+					log.Fatalf("run socks5 server %q failed: %v", socks5Addr, err)
+				}
+				log.Infof("mieru server daemon socks5 server %q is stopped", socks5Addr)
+				proxyTasks.Done()
+			}()
+		}
+
+		initProxyTasks.Wait()
+		metrics.EnableLogging()
 		appctl.SetAppStatus(appctlpb.AppStatus_RUNNING)
 		proxyTasks.Wait()
 	}

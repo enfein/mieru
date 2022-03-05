@@ -6,12 +6,12 @@ mieru 客户端软件支持 Windows，Mac OS 和 Linux 系统。用户可以在 
 
 ```powershell
 # Windows PowerShell
-Invoke-WebRequest https://github.com/enfein/mieru/releases/download/v1.2.0/mieru_1.2.0_windows_amd64.zip -OutFile mieru_1.2.0_windows_amd64.zip
+Invoke-WebRequest https://github.com/enfein/mieru/releases/download/v1.3.0/mieru_1.3.0_windows_amd64.zip -OutFile mieru_1.3.0_windows_amd64.zip
 ```
 
 ```sh
 # Mac OS
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.2.0/mieru_1.2.0_darwin_amd64.tar.gz
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.3.0/mieru_1.3.0_darwin_amd64.tar.gz
 ```
 
 解压缩之后，就可以得到可执行文件 `mieru` 或 `mieru.exe`。
@@ -20,16 +20,16 @@ curl -LSO https://github.com/enfein/mieru/releases/download/v1.2.0/mieru_1.2.0_d
 
 ```sh
 # Debian / Ubuntu
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.2.0/mieru_1.2.0_amd64.deb
-sudo dpkg -i mieru_1.2.0_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.3.0/mieru_1.3.0_amd64.deb
+sudo dpkg -i mieru_1.3.0_amd64.deb
 
 # Fedora / CentOS / Red Hat Enterprise Linux
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.2.0/mieru-1.2.0-1.x86_64.rpm
-sudo rpm -Uvh --force mieru-1.2.0-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.3.0/mieru-1.3.0-1.x86_64.rpm
+sudo rpm -Uvh --force mieru-1.3.0-1.x86_64.rpm
 
 # Others
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.2.0/mieru_1.2.0_linux_amd64.tar.gz
-tar -zxvf mieru_1.2.0_linux_amd64.tar.gz
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.3.0/mieru_1.3.0_linux_amd64.tar.gz
+tar -zxvf mieru_1.3.0_linux_amd64.tar.gz
 ```
 
 **【可选】将 mieru 可执行文件移动或添加至系统路径 PATH**
@@ -95,6 +95,37 @@ mieru apply config <FILE>
 5. 在 `profiles` -> `servers` -> `portBindings` -> `port` 中填写 mita 监听的 UDP 端口号。这个端口号必须与代理服务器中的设置相同。
 6. 请为 `rpcPort` 属性指定一个从 1025 到 65535 之间的数值。**请确保防火墙允许使用该端口进行通信。**
 7. 请为 `socks5Port` 属性指定一个从 1025 到 65535 之间的数值。该端口不能与 `rpcPort` 相同。**请确保防火墙允许使用该端口进行通信。**
+
+如果你安装了多台代理服务器，或者一台服务器监听多个端口，可以把它们都添加到客户端设置中。此时，当发起新的连接时，mieru 会随机选取其中的一台服务器和一个端口。这种设置的示例如下
+
+```js
+            "servers": [
+                {
+                    "ipAddress": "1.1.1.1",
+                    "domainName": "",
+                    "portBindings": [
+                        {
+                            "port": 1110,
+                            "protocol": "UDP"
+                        },
+                        {
+                            "port": 1111,
+                            "protocol": "UDP"
+                        }
+                    ]
+                },
+                {
+                    "ipAddress": "2.2.2.2",
+                    "domainName": "",
+                    "portBindings": [
+                        {
+                            "port": 2222,
+                            "protocol": "UDP"
+                        }
+                    ]
+                }
+            ]
+```
 
 我们在 `configs/examples/client_config.json` 提供了配置文件的一个例子，仅供参考。
 

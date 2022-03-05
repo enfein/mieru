@@ -65,7 +65,6 @@ func TestApply2ServerConfig(t *testing.T) {
 
 func TestServerApplyReject(t *testing.T) {
 	cases := []string{
-		"testdata/server_reject_multiple_port_bindings.json",
 		"testdata/server_reject_no_password.json",
 		"testdata/server_reject_no_port.json",
 		"testdata/server_reject_no_protocol.json",

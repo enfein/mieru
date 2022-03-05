@@ -1,6 +1,6 @@
 # 服务器安装与配置
 
-我们建议有经济实力的用户选择亚马逊和微软等国外大型云服务提供商，一般不会被封锁 IP。请勿使用国内公司或来路不明的云计算服务。代理服务器占用的 CPU 和内存资源很少，最终网络速度主要取决于服务器的网速和线路质量。
+我们建议有经济实力的用户选择亚马逊和微软等国外大型云服务提供商，一般不会被封锁 IP。请勿使用国内公司或来路不明的云计算服务。代理服务器占用的 CPU 和内存资源很少，最终网络速度主要取决于服务器的网络带宽和线路质量。
 
 代理服务器软件 mita 需要运行在 Linux 系统中。我们提供了 debian 和 RPM 安装包，便于用户在 Debian / Ubuntu 和 Fedora / CentOS / Red Hat Enterprise Linux 系列发行版中安装 mita。
 
@@ -10,10 +10,10 @@
 
 ```sh
 # Debian / Ubuntu
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.2.0/mita_1.2.0_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.3.0/mita_1.3.0_amd64.deb
 
 # Fedora / CentOS / Red Hat Enterprise Linux
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.2.0/mita-1.2.0-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.3.0/mita-1.3.0-1.x86_64.rpm
 ```
 
 如果上述链接被墙，请翻墙后使用浏览器从 GitHub Releases 页面下载安装包。
@@ -22,10 +22,10 @@ curl -LSO https://github.com/enfein/mieru/releases/download/v1.2.0/mita-1.2.0-1.
 
 ```sh
 # Debian / Ubuntu
-sudo dpkg -i mita_1.2.0_amd64.deb
+sudo dpkg -i mita_1.3.0_amd64.deb
 
 # Fedora / CentOS / Red Hat Enterprise Linux
-sudo rpm -Uvh --force mita-1.2.0-1.x86_64.rpm
+sudo rpm -Uvh --force mita-1.3.0-1.x86_64.rpm
 ```
 
 **【3】赋予当前用户操作 mita 的权限，需要重启服务器使此设置生效**
@@ -94,7 +94,22 @@ mita apply config <FILE>
 2. 在 `users` -> `name` 属性中填写用户名。
 3. 在 `users` -> `password` 属性中填写该用户的密码。
 
-也可以创建多个不同的用户，例如
+除此之外，mita 可以监听多个不同的端口，例如
+
+```js
+    "portBindings": [
+        {
+            "port": 1111,
+            "protocol": "UDP"
+        },
+        {
+            "port": 2222,
+            "protocol": "UDP"
+        }
+    ],
+```
+
+如果你想把代理线路分享给别人使用，也可以创建多个不同的用户，例如
 
 ```js
     "users": [

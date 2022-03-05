@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func TestSOCKS5Connect(t *testing.T) {
+func TestSocks5Connect(t *testing.T) {
 	// Create a local listener.
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -104,5 +104,26 @@ func TestSOCKS5Connect(t *testing.T) {
 
 	if !bytes.Equal(out, expected) {
 		t.Fatalf("bad: %v", out)
+	}
+}
+
+func TestServerGroup(t *testing.T) {
+	c := &Config{}
+	s1, err := New(c)
+	if err != nil {
+		t.Fatalf("New() failed: %v", err)
+	}
+	g := NewGroup()
+	if err := g.Add("UDP", 12346, s1); err != nil {
+		t.Fatalf("Add() failed: %v", err)
+	}
+	if g.IsEmpty() {
+		t.Errorf("IsEmpty() = %v, want %v", true, false)
+	}
+	if err := g.CloseAndRemoveAll(); err != nil {
+		t.Fatalf("CloseAndRemoveAll() failed: %v", err)
+	}
+	if !g.IsEmpty() {
+		t.Errorf("After CloseAndRemoveAll(), IsEmpty() = %v, want %v", false, true)
 	}
 }

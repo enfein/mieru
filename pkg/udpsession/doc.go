@@ -8,3 +8,5 @@
 // The interfaces of this package aims to be compatible with
 // net.Conn in standard library, but offers powerful features for advanced users.
 package udpsession
+
+// Testing port range: [12315, 12345).

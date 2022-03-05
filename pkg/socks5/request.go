@@ -175,14 +175,8 @@ func (s *Server) handleConnect(ctx context.Context, conn conn, req *Request) err
 	if s.config.NetworkType == "" {
 		s.config.NetworkType = "tcp"
 	}
-	dial := s.config.Dial
-	if dial == nil {
-		dial = func(ctx context.Context, network, addr string) (net.Conn, error) {
-			// Use default dial method if it is not specified.
-			return net.Dial(network, addr)
-		}
-	}
-	target, err := dial(ctx, s.config.NetworkType, req.realDestAddr.Address())
+	var d net.Dialer
+	target, err := d.DialContext(ctx, s.config.NetworkType, req.realDestAddr.Address())
 	if err != nil {
 		msg := err.Error()
 		resp := hostUnreachable

@@ -321,12 +321,12 @@ func DeleteClientConfigProfile(profileName string) error {
 // 2.1. profile name is not empty
 // 2.2. user name is not empty
 // 2.3. user has either a password or a hashed password
-// 2.4. it has exactly 1 server
-// 2.5. either the server's IP address or the server's domain name is available
-// 2.6. if set, server's IP address is parsible
-// 2.7. the server has exactly 1 port binding
-// 2.8. port number is valid
-// 2.9. protocol is valid
+// 2.4. it has at least 1 server, and for each server
+// 2.4.1. the server has either IP address or domain name
+// 2.4.2. if set, server's IP address is parsable
+// 2.4.3. the server has at least 1 port binding, and for each port binding
+// 2.4.3.1. port number is valid
+// 2.4.3.2. protocol is valid
 func ValidateClientConfigPatch(patch *pb.ClientConfig) error {
 	for _, profile := range patch.GetProfiles() {
 		name := profile.GetProfileName()
@@ -344,9 +344,6 @@ func ValidateClientConfigPatch(patch *pb.ClientConfig) error {
 		if len(servers) == 0 {
 			return fmt.Errorf("servers are not set")
 		}
-		if len(servers) != 1 {
-			return fmt.Errorf("want exactly 1 server, got %d", len(servers))
-		}
 		for _, server := range servers {
 			if server.GetIpAddress() == "" && server.GetDomainName() == "" {
 				return fmt.Errorf("neither server IP address nor domain name is set")
@@ -357,9 +354,6 @@ func ValidateClientConfigPatch(patch *pb.ClientConfig) error {
 			portBindings := server.GetPortBindings()
 			if len(portBindings) == 0 {
 				return fmt.Errorf("server port binding is not set")
-			}
-			if len(portBindings) != 1 {
-				return fmt.Errorf("want exactly 1 port binding, got %d", len(portBindings))
 			}
 			for _, binding := range portBindings {
 				if binding.GetPort() < 1 || binding.GetPort() > 65535 {

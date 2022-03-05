@@ -3,6 +3,14 @@
         {
             "port": 9000,
             "protocol": "UDP"
+        },
+        {
+            "port": 10000,
+            "protocol": "UDP"
+        },
+        {
+            "port": 11000,
+            "protocol": "UDP"
         }
     ],
     "users": [

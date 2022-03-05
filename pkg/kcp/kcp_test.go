@@ -31,12 +31,12 @@ import (
 func newKCPPipe(t *testing.T) (*net.UDPConn, *net.UDPConn, *kcp.KCP, *kcp.KCP) {
 	mrand.Seed(time.Now().UnixNano())
 	convId := uint32(mrand.Int31())
-	addr1, _ := net.ResolveUDPAddr("udp", "127.0.0.1:12306")
+	addr1, _ := net.ResolveUDPAddr("udp", "127.0.0.1:12305")
 	c1, err := net.ListenUDP("udp", addr1)
 	if err != nil {
 		t.Fatalf("net.ListenUDP() on %v failed: %v", addr1, err)
 	}
-	addr2, _ := net.ResolveUDPAddr("udp", "127.0.0.1:12307")
+	addr2, _ := net.ResolveUDPAddr("udp", "127.0.0.1:12306")
 	c2, err := net.ListenUDP("udp", addr2)
 	if err != nil {
 		t.Fatalf("net.ListenUDP() on %v failed: %v", addr2, err)

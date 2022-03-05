@@ -3,15 +3,27 @@
         {
             "profileName": "default",
             "user": {
-                "name": "testuser",
-                "password": "19890604"
+                "name": "baozi",
+                "password": "manlianpenfen"
             },
             "servers": [
                 {
                     "domainName": "localhost",
                     "portBindings": [
                         {
-                            "port": 3128,
+                            "port": 8964,
+                            "protocol": "UDP"
+                        },
+                        {
+                            "port": 9648,
+                            "protocol": "UDP"
+                        },
+                        {
+                            "port": 6489,
+                            "protocol": "UDP"
+                        },
+                        {
+                            "port": 4896,
                             "protocol": "UDP"
                         }
                     ]

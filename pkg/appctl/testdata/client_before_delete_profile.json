@@ -11,7 +11,24 @@
                     "ipAddress": "2.2.2.2",
                     "portBindings": [
                         {
+                            "port": 4000,
+                            "protocol": "UDP"
+                        },
+                        {
                             "port": 5000,
+                            "protocol": "UDP"
+                        }
+                    ]
+                },
+                {
+                    "ipAddress": "3.3.3.3",
+                    "portBindings": [
+                        {
+                            "port": 5000,
+                            "protocol": "UDP"
+                        },
+                        {
+                            "port": 6000,
                             "protocol": "UDP"
                         }
                     ]

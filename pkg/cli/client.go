@@ -265,19 +265,12 @@ var clientRunFunc = func(s []string) error {
 	}()
 	<-appctl.ClientRPCServerStarted
 
-	// Collect the following information: remote proxy address, password.
+	// Collect remote proxy addresses and password.
 	activeProfile, err := appctl.GetActiveProfileFromConfig(config, config.GetActiveProfile())
 	if err != nil {
 		return fmt.Errorf(stderror.ClientGetActiveProfileFailedErr, err)
 	}
-	serverInfo := activeProfile.GetServers()[0]
-	var proxyHost string
-	if serverInfo.GetDomainName() != "" {
-		proxyHost = serverInfo.GetDomainName()
-	} else {
-		proxyHost = serverInfo.GetIpAddress()
-	}
-	proxyPort := serverInfo.GetPortBindings()[0].GetPort()
+	proxyConfigs := make([]socks5.ProxyConfig, 0)
 	var hashedPassword []byte
 	user := activeProfile.GetUser()
 	if user.GetHashedPassword() != "" {
@@ -288,14 +281,28 @@ var clientRunFunc = func(s []string) error {
 	} else {
 		hashedPassword = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
 	}
+	for _, serverInfo := range activeProfile.GetServers() {
+		var proxyHost string
+		if serverInfo.GetDomainName() != "" {
+			proxyHost = serverInfo.GetDomainName()
+		} else {
+			proxyHost = serverInfo.GetIpAddress()
+		}
+		for _, bindingInfo := range serverInfo.GetPortBindings() {
+			proxyPort := bindingInfo.GetPort()
+			proxyConfigs = append(proxyConfigs, socks5.ProxyConfig{
+				NetworkType: "udp",
+				Address:     netutil.MaybeDecorateIPv6(proxyHost) + ":" + strconv.Itoa(int(proxyPort)),
+				Password:    hashedPassword,
+				Dial:        udpsession.DialWithOptionsReturnConn,
+			})
+		}
+	}
 
 	// Create the local socks5 server.
 	socks5Config := &socks5.Config{
-		UseProxy:         true,
-		ProxyPassword:    hashedPassword,
-		ProxyNetworkType: "udp",
-		ProxyAddress:     netutil.MaybeDecorateIPv6(proxyHost) + ":" + strconv.Itoa(int(proxyPort)),
-		ProxyDial:        udpsession.DialWithOptionsReturnConn,
+		UseProxy:  true,
+		ProxyConf: proxyConfigs,
 	}
 	socks5Server, err := socks5.New(socks5Config)
 	if err != nil {

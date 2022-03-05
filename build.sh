@@ -38,7 +38,7 @@ has_command() {
 # - build/package/mita/rpm/mita.spec
 # - docs/client-install.md
 # - docs/server-install.md
-version="1.2.0"
+version="1.3.0"
 
 set -e
 

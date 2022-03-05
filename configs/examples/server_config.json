@@ -1,6 +1,10 @@
 {
     "portBindings": [
         {
+            "port": 2012,
+            "protocol": "UDP"
+        },
+        {
             "port": 2022,
             "protocol": "UDP"
         }

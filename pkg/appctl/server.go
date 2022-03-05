@@ -43,9 +43,6 @@ var (
 	// ServerRPCServerStarted is closed when server RPC server is started.
 	ServerRPCServerStarted chan struct{} = make(chan struct{})
 
-	// ServerSocks5ServerStarted is closed when server socks5 server is started.
-	ServerSocks5ServerStarted chan struct{} = make(chan struct{})
-
 	// serverIOLock is required to load server config and store server config.
 	serverIOLock sync.Mutex
 
@@ -55,11 +52,8 @@ var (
 	// serverRPCServerRef holds a pointer to server RPC server.
 	serverRPCServerRef atomic.Value
 
-	// serverSocks5ServerRef holds a pointer to server socks5 server.
-	serverSocks5ServerRef atomic.Value
-
-	// nilServerSocks5Server is a place holder to clear serverSocks5ServerRef (because atomic.Value can't be set to nil).
-	nilServerSocks5Server = &socks5.Server{}
+	// socks5ServerGroup is a collection of server socks5 servers.
+	socks5ServerGroup = socks5.NewGroup()
 )
 
 func GetServerRPCServerRef() *grpc.Server {
@@ -74,16 +68,8 @@ func SetServerRPCServerRef(server *grpc.Server) {
 	serverRPCServerRef.Store(server)
 }
 
-func GetServerSocks5ServerRef() *socks5.Server {
-	s, ok := serverSocks5ServerRef.Load().(*socks5.Server)
-	if !ok || s == nilServerSocks5Server {
-		return nil
-	}
-	return s
-}
-
-func SetServerSocks5ServerRef(server *socks5.Server) {
-	serverSocks5ServerRef.Store(server)
+func GetSocks5ServerGroup() *socks5.ServerGroup {
+	return socks5ServerGroup
 }
 
 // serverLifecycleService implements ServerLifecycleService defined in lifecycle.proto.
@@ -110,40 +96,49 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 	if err = ValidateFullServerConfig(config); err != nil {
 		return &pb.Empty{}, fmt.Errorf("ValidateFullServerConfig() failed: %w", err)
 	}
-	if GetServerSocks5ServerRef() != nil {
-		log.Infof("socks5 server is already started")
+	if !GetSocks5ServerGroup().IsEmpty() {
+		log.Infof("socks5 server(s) already exist")
 		return &pb.Empty{}, nil
 	}
 
-	// Create the egress socks5 server.
-	socks5Config := &socks5.Config{
-		AllowLocalDestination: config.GetAdvancedSettings().GetAllowLocalDestination(),
-	}
-	socks5Server, err := socks5.New(socks5Config)
-	if err != nil {
-		return &pb.Empty{}, fmt.Errorf("failed to create socks5 server: %w", err)
-	}
-	SetServerSocks5ServerRef(socks5Server)
-	ServerSocks5ServerStarted = make(chan struct{})
+	n := len(config.GetPortBindings())
+	var initProxyTasks sync.WaitGroup
+	initProxyTasks.Add(n)
 	SetAppStatus(pb.AppStatus_STARTING)
 
-	// Run the egress socks5 server in the background.
-	go func() {
-		socks5Addr := netutil.MaybeDecorateIPv6(netutil.AllIPAddr()) + ":" + strconv.Itoa(int(config.GetPortBindings()[0].GetPort()))
-		l, err := udpsession.ListenWithOptions(socks5Addr, UserListToMap(config.GetUsers()))
+	for i := 0; i < n; i++ {
+		// Create the egress socks5 server.
+		socks5Config := &socks5.Config{
+			AllowLocalDestination: config.GetAdvancedSettings().GetAllowLocalDestination(),
+		}
+		socks5Server, err := socks5.New(socks5Config)
 		if err != nil {
-			log.Fatalf("udpsession.ListenWithOptions(%q) failed: %v", socks5Addr, err)
+			return &pb.Empty{}, fmt.Errorf(stderror.CreateSocks5ServerFailedErr, err)
 		}
-		close(ServerSocks5ServerStarted)
-		log.Infof("mieru server daemon socks5 server is running")
-		if err = socks5Server.Serve(l); err != nil {
-			log.Fatalf("run socks5 server failed: %v", err)
+		protocol := config.GetPortBindings()[i].GetProtocol().String()
+		port := config.GetPortBindings()[i].GetPort()
+		if err := GetSocks5ServerGroup().Add(protocol, int(port), socks5Server); err != nil {
+			return &pb.Empty{}, fmt.Errorf(stderror.AddSocks5ServerToGroupFailedErr, err)
 		}
-		log.Infof("mieru server daemon socks5 server is stopped")
-	}()
-	<-ServerSocks5ServerStarted
-	metrics.EnableLogging()
 
+		// Run the egress socks5 server in the background.
+		go func() {
+			socks5Addr := netutil.MaybeDecorateIPv6(netutil.AllIPAddr()) + ":" + strconv.Itoa(int(port))
+			l, err := udpsession.ListenWithOptions(socks5Addr, UserListToMap(config.GetUsers()))
+			if err != nil {
+				log.Fatalf("udpsession.ListenWithOptions(%q) failed: %v", socks5Addr, err)
+			}
+			initProxyTasks.Done()
+			log.Infof("mieru server daemon socks5 server %q is running", socks5Addr)
+			if err = socks5Server.Serve(l); err != nil {
+				log.Fatalf("run socks5 server %q failed: %v", socks5Addr, err)
+			}
+			log.Infof("mieru server daemon socks5 server %q is stopped", socks5Addr)
+		}()
+	}
+
+	initProxyTasks.Wait()
+	metrics.EnableLogging()
 	SetAppStatus(pb.AppStatus_RUNNING)
 	log.Infof("completed start request from RPC caller")
 	return &pb.Empty{}, nil
@@ -152,18 +147,14 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 func (s *serverLifecycleService) Stop(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
 	SetAppStatus(pb.AppStatus_STOPPING)
 	log.Infof("received stop request from RPC caller")
-	socks5Server := GetServerSocks5ServerRef()
-	if socks5Server != nil {
-		log.Infof("stopping socks5 server")
-		if err := socks5Server.Close(); err != nil {
-			if log.IsLevelEnabled(log.DebugLevel) {
-				log.Debugf("socks5 server Close() failed: %v", err)
-			}
+	if !GetSocks5ServerGroup().IsEmpty() {
+		log.Infof("stopping socks5 server(s)")
+		if err := GetSocks5ServerGroup().CloseAndRemoveAll(); err != nil {
+			log.Infof("socks5 server Close() failed: %v", err)
 		}
 	} else {
-		log.Infof("socks5 server reference not found")
+		log.Infof("active socks5 servers not found")
 	}
-	SetServerSocks5ServerRef(nilServerSocks5Server)
 	SetAppStatus(pb.AppStatus_IDLE)
 	log.Infof("completed stop request from RPC caller")
 	return &pb.Empty{}, nil
@@ -172,18 +163,16 @@ func (s *serverLifecycleService) Stop(ctx context.Context, req *pb.Empty) (*pb.E
 func (s *serverLifecycleService) Exit(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
 	SetAppStatus(pb.AppStatus_STOPPING)
 	log.Infof("received exit request from RPC caller")
-	socks5Server := GetServerSocks5ServerRef()
-	if socks5Server != nil {
-		log.Infof("stopping socks5 server")
-		if err := socks5Server.Close(); err != nil {
-			if log.IsLevelEnabled(log.DebugLevel) {
-				log.Debugf("socks5 server Close() failed: %v", err)
-			}
+	if !GetSocks5ServerGroup().IsEmpty() {
+		log.Infof("stopping socks5 server(s)")
+		if err := GetSocks5ServerGroup().CloseAndRemoveAll(); err != nil {
+			log.Infof("socks5 server Close() failed: %v", err)
 		}
 	} else {
-		log.Infof("socks5 server reference not found")
+		log.Infof("active socks5 servers not found")
 	}
-	SetServerSocks5ServerRef(nilServerSocks5Server)
+	SetAppStatus(pb.AppStatus_IDLE)
+
 	grpcServer := GetServerRPCServerRef()
 	if grpcServer != nil {
 		log.Infof("stopping RPC server")
@@ -454,14 +443,12 @@ func DeleteServerUsers(names []string) error {
 // ValidateServerConfigPatch validates a patch of server config.
 //
 // A server config patch must satisfy:
-// 1. it has 0 or more port binding
-// 2. for each port binding
-// 2.1. port number is valid
-// 2.2. protocol is valid
-// 3. it has 0 or more user
-// 4. for each user
-// 4.1. user name is not empty
-// 4.2. user has either a password or a hashed password
+// 1. for each port binding
+// 1.1. port number is valid
+// 1.2. protocol is valid
+// 2. for each user
+// 2.1. user name is not empty
+// 2.2. user has either a password or a hashed password
 func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 	for _, portBinding := range patch.GetPortBindings() {
 		port := portBinding.GetPort()
@@ -487,7 +474,9 @@ func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 // ValidateFullServerConfig validates the full server config.
 //
 // In addition to ValidateServerConfigPatch, it also validates:
-// 1. there is exactly 1 port binding
+// 1. there is at least 1 port binding
+//
+// It is not an error if no user is configured. However mieru won't be functional.
 func ValidateFullServerConfig(config *pb.ServerConfig) error {
 	if err := ValidateServerConfigPatch(config); err != nil {
 		return err
@@ -497,9 +486,6 @@ func ValidateFullServerConfig(config *pb.ServerConfig) error {
 	}
 	if len(config.GetPortBindings()) == 0 {
 		return fmt.Errorf("server port binding is not set")
-	}
-	if len(config.GetPortBindings()) > 1 {
-		return fmt.Errorf("want exactly 1 port binding, got %d", len(config.GetPortBindings()))
 	}
 	return nil
 }

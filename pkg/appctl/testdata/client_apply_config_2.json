@@ -13,6 +13,23 @@
                         {
                             "port": 5000,
                             "protocol": "UDP"
+                        },
+                        {
+                            "port": 5100,
+                            "protocol": "UDP"
+                        }
+                    ]
+                },
+                {
+                    "ipAddress": "2001:db8::99",
+                    "portBindings": [
+                        {
+                            "port": 5000,
+                            "protocol": "UDP"
+                        },
+                        {
+                            "port": 5100,
+                            "protocol": "UDP"
                         }
                     ]
                 }
