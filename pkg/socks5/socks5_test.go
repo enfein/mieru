@@ -13,22 +13,26 @@ func TestSocks5Connect(t *testing.T) {
 	// Create a local listener.
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		t.Fatalf("err: %v", err)
+		t.Fatalf("net.Listen() failed: %v", err)
 	}
 	go func() {
 		conn, err := l.Accept()
 		if err != nil {
-			t.Fatalf("err: %v", err)
+			t.Errorf("Accept() failed: %v", err)
+			return
 		}
 		defer conn.Close()
 
 		buf := make([]byte, 4)
 		if _, err := io.ReadAtLeast(conn, buf, 4); err != nil {
-			t.Fatalf("err: %v", err)
+			t.Errorf("io.ReadAtLeast() failed: %v", err)
+			return
 		}
 
-		if !bytes.Equal(buf, []byte("ping")) {
-			t.Fatalf("bad: %v", buf)
+		want := []byte("ping")
+		if !bytes.Equal(buf, want) {
+			t.Errorf("got %v, want %v", buf, want)
+			return
 		}
 		conn.Write([]byte("pong"))
 	}()
@@ -45,13 +49,14 @@ func TestSocks5Connect(t *testing.T) {
 	}
 	serv, err := New(conf)
 	if err != nil {
-		t.Fatalf("err: %v", err)
+		t.Fatalf("New() failed: %v", err)
 	}
 
 	// Start listening
 	go func() {
 		if err := serv.ListenAndServe("tcp", "127.0.0.1:12345"); err != nil {
-			t.Fatalf("err: %v", err)
+			t.Errorf("ListenAndServe() failed: %v", err)
+			return
 		}
 	}()
 	time.Sleep(10 * time.Millisecond)
@@ -59,7 +64,7 @@ func TestSocks5Connect(t *testing.T) {
 	// Get a local conn
 	conn, err := net.Dial("tcp", "127.0.0.1:12345")
 	if err != nil {
-		t.Fatalf("err: %v", err)
+		t.Fatalf("net.Dial() failed: %v", err)
 	}
 
 	// Connect, auth and connec to local
@@ -80,7 +85,7 @@ func TestSocks5Connect(t *testing.T) {
 	conn.Write(req.Bytes())
 
 	// Verify response
-	expected := []byte{
+	want := []byte{
 		socks5Version, UserPassAuth,
 		1, authSuccess,
 		5,
@@ -91,19 +96,19 @@ func TestSocks5Connect(t *testing.T) {
 		0, 0,
 		'p', 'o', 'n', 'g',
 	}
-	out := make([]byte, len(expected))
+	out := make([]byte, len(want))
 
 	conn.SetDeadline(time.Now().Add(time.Second))
 	if _, err := io.ReadAtLeast(conn, out, len(out)); err != nil {
-		t.Fatalf("err: %v", err)
+		t.Fatalf("io.ReadAtLeast() failed: %v", err)
 	}
 
 	// Ignore the port
 	out[12] = 0
 	out[13] = 0
 
-	if !bytes.Equal(out, expected) {
-		t.Fatalf("bad: %v", out)
+	if !bytes.Equal(out, want) {
+		t.Fatalf("got %v, want %v", out, want)
 	}
 }
 

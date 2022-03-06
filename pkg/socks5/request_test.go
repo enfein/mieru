@@ -25,22 +25,26 @@ func TestRequest_Connect(t *testing.T) {
 	// Create a local listener
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		t.Fatalf("err: %v", err)
+		t.Fatalf("net.Listen() failed: %v", err)
 	}
 	go func() {
 		conn, err := l.Accept()
 		if err != nil {
-			t.Fatalf("err: %v", err)
+			t.Errorf("Accept() failed: %v", err)
+			return
 		}
 		defer conn.Close()
 
 		buf := make([]byte, 4)
 		if _, err := io.ReadAtLeast(conn, buf, 4); err != nil {
-			t.Fatalf("err: %v", err)
+			t.Errorf("io.ReadAtLeast() failed: %v", err)
+			return
 		}
 
-		if !bytes.Equal(buf, []byte("ping")) {
-			t.Fatalf("bad: %v", buf)
+		want := []byte("ping")
+		if !bytes.Equal(buf, want) {
+			t.Errorf("got %v, want %v", buf, want)
+			return
 		}
 		conn.Write([]byte("pong"))
 	}()
@@ -68,16 +72,16 @@ func TestRequest_Connect(t *testing.T) {
 	resp := &MockConn{}
 	req, err := NewRequest(buf)
 	if err != nil {
-		t.Fatalf("err: %v", err)
+		t.Fatalf("NewRequest() failed: %v", err)
 	}
 
 	if err := s.handleRequest(req, resp); err != nil {
-		t.Fatalf("err: %v", err)
+		t.Fatalf("handleRequest() failed: %v", err)
 	}
 
 	// Verify response
 	out := resp.buf.Bytes()
-	expected := []byte{
+	want := []byte{
 		5,
 		0,
 		0,
@@ -91,8 +95,8 @@ func TestRequest_Connect(t *testing.T) {
 	out[8] = 0
 	out[9] = 0
 
-	if !bytes.Equal(out, expected) {
-		t.Fatalf("bad: %v %v", out, expected)
+	if !bytes.Equal(out, want) {
+		t.Fatalf("got %v, want %v", out, want)
 	}
 }
 
@@ -100,22 +104,26 @@ func TestRequest_Connect_RuleFail(t *testing.T) {
 	// Create a local listener
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		t.Fatalf("err: %v", err)
+		t.Fatalf("net.Listen() failed: %v", err)
 	}
 	go func() {
 		conn, err := l.Accept()
 		if err != nil {
-			t.Fatalf("err: %v", err)
+			t.Errorf("Accept() failed: %v", err)
+			return
 		}
 		defer conn.Close()
 
 		buf := make([]byte, 4)
 		if _, err := io.ReadAtLeast(conn, buf, 4); err != nil {
-			t.Fatalf("err: %v", err)
+			t.Errorf("io.ReadAtLeast() failed: %v", err)
+			return
 		}
 
-		if !bytes.Equal(buf, []byte("ping")) {
-			t.Fatalf("bad: %v", buf)
+		want := []byte("ping")
+		if !bytes.Equal(buf, want) {
+			t.Errorf("got %v, want %v", buf, want)
+			return
 		}
 		conn.Write([]byte("pong"))
 	}()
@@ -143,16 +151,16 @@ func TestRequest_Connect_RuleFail(t *testing.T) {
 	resp := &MockConn{}
 	req, err := NewRequest(buf)
 	if err != nil {
-		t.Fatalf("err: %v", err)
+		t.Fatalf("NewRequest() failed: %v", err)
 	}
 
 	if err := s.handleRequest(req, resp); !strings.Contains(err.Error(), "blocked by rules") {
-		t.Fatalf("err: %v", err)
+		t.Fatalf("handleRequest() failed: %v", err)
 	}
 
 	// Verify response
 	out := resp.buf.Bytes()
-	expected := []byte{
+	want := []byte{
 		5,
 		2,
 		0,
@@ -161,7 +169,7 @@ func TestRequest_Connect_RuleFail(t *testing.T) {
 		0, 0,
 	}
 
-	if !bytes.Equal(out, expected) {
-		t.Fatalf("bad: %v %v", out, expected)
+	if !bytes.Equal(out, want) {
+		t.Fatalf("got %v, want %v", out, want)
 	}
 }
