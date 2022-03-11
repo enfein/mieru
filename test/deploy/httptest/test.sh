@@ -85,13 +85,26 @@ fi
 sleep 1
 ./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
   -local_proxy_host=127.0.0.1 -local_proxy_port=1080 \
-  -test_case=new_conn -interval=1000 \
+  -test_case=new_conn -interval=500 \
   -num_request=1500
 if [ "$?" -ne "0" ]; then
     print_mieru_client_log
     print_mieru_client_thread_dump
     print_mieru_server_thread_dump
-    echo "Test failed."
+    echo "Test new_conn failed."
+    exit 1
+fi
+
+sleep 1
+./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
+  -local_proxy_host=127.0.0.1 -local_proxy_port=1080 \
+  -test_case=reuse_conn -interval=500 \
+  -num_request=1500
+if [ "$?" -ne "0" ]; then
+    print_mieru_client_log
+    print_mieru_client_thread_dump
+    print_mieru_server_thread_dump
+    echo "Test reuse_conn failed."
     exit 1
 fi
 
