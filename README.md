@@ -4,9 +4,11 @@ mieru【見える】是一款安全的、无流量特征、无法被主动探测
 
 mieru 代理软件由称为 mieru【見える】的客户端软件和称为 mita【見た】的代理服务器软件这两部分组成。
 
-## 原理
+## 原理和协议
 
 mieru 的翻墙原理与 shadowsocks / v2ray 等软件类似，在客户端和墙外的代理服务器之间建立一个加密的通道。GFW 不能破解加密传输的信息，无法判定你最终访问的网址，因此只能选择放行。
+
+有关 mieru 协议的讲解，请参阅 [mieru 代理协议](https://github.com/enfein/mieru/blob/main/docs/protocol.md)。
 
 ## 特性
 
