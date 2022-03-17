@@ -16,8 +16,8 @@
 package netutil
 
 import (
-	"io/ioutil"
 	"net"
+	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -30,7 +30,7 @@ import (
 // operating systems.
 func IsIPDualStack() bool {
 	if runtime.GOOS == "linux" {
-		v, err := ioutil.ReadFile("/proc/sys/net/ipv6/bindv6only")
+		v, err := os.ReadFile("/proc/sys/net/ipv6/bindv6only")
 		if err != nil {
 			return false
 		}

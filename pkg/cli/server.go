@@ -18,7 +18,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/user"
@@ -378,9 +377,9 @@ var serverApplyConfigFunc = func(s []string) error {
 	}
 
 	path := s[3]
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("ReadFile(%q) failed: %w", path, err)
+		return fmt.Errorf("os.ReadFile(%q) failed: %w", path, err)
 	}
 	patch := &appctlpb.ServerConfig{}
 	if err = appctl.Unmarshal(b, patch); err != nil {

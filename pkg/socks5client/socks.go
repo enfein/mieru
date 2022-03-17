@@ -9,10 +9,11 @@ A complete example using this package:
 	package main
 
 	import (
-		"h12.io/socks"
 		"fmt"
+		"io"
 		"net/http"
-		"io/ioutil"
+
+		"h12.io/socks"
 	)
 
 	func main() {
@@ -32,7 +33,7 @@ A complete example using this package:
 		if err != nil { return }
 		defer resp.Body.Close()
 
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil { return }
 		bodyText = string(body)
 		return

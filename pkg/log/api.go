@@ -18,7 +18,6 @@ package log
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"sort"
 	"strconv"
@@ -133,9 +132,9 @@ func RemoveOldClientLogFiles() error {
 	if err := prepareClientLogDir(); err != nil {
 		return fmt.Errorf("prepareClientLogDir() failed: %w", err)
 	}
-	entries, err := ioutil.ReadDir(cachedClientLogDir)
+	entries, err := os.ReadDir(cachedClientLogDir)
 	if err != nil {
-		return fmt.Errorf("ioutil.ReadDir(%q) failed: %w", cachedClientLogDir, err)
+		return fmt.Errorf("os.ReadDir(%q) failed: %w", cachedClientLogDir, err)
 	}
 	var logFiles []string
 	for _, entry := range entries {

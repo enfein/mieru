@@ -2,7 +2,7 @@ package socks5client
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"runtime"
@@ -87,7 +87,7 @@ func TestSocks5Anonymous(t *testing.T) {
 		panic(err)
 	}
 	defer resp.Body.Close()
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		panic(err)
 	}
@@ -107,7 +107,7 @@ func TestSocks5Auth(t *testing.T) {
 		panic(err)
 	}
 	defer resp.Body.Close()
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		panic(err)
 	}

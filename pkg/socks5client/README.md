@@ -31,7 +31,7 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 
@@ -50,7 +50,7 @@ func main() {
 	if resp.StatusCode != http.StatusOK {
 		log.Fatal(resp.StatusCode)
 	}
-	buf, err := ioutil.ReadAll(resp.Body)
+	buf, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Fatal(err)
 	}

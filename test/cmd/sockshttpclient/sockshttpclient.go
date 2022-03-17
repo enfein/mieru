@@ -23,7 +23,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"strconv"
@@ -124,7 +124,7 @@ func DoRequestWithExistingConn(conn net.Conn, seq int) {
 		log.Fatalf("server bug: SHA-1 check is not set")
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	defer resp.Body.Close()
 	if err != nil {
 		log.Fatalf("failed to read HTTP response: %v", err)

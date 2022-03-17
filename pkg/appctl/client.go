@@ -18,7 +18,7 @@ package appctl
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"os"
 	"sort"
@@ -216,9 +216,9 @@ func LoadClientConfig() (*pb.ClientConfig, error) {
 	}
 	defer f.Close()
 
-	b, err := ioutil.ReadAll(f)
+	b, err := io.ReadAll(f)
 	if err != nil {
-		return nil, fmt.Errorf("ReadAll() failed: %w", err)
+		return nil, fmt.Errorf("io.ReadAll() failed: %w", err)
 	}
 
 	c := &pb.ClientConfig{}
@@ -253,9 +253,9 @@ func StoreClientConfig(config *pb.ClientConfig) error {
 		return fmt.Errorf("proto.Marshal() failed: %w", err)
 	}
 
-	err = ioutil.WriteFile(fileName, b, 0660)
+	err = os.WriteFile(fileName, b, 0660)
 	if err != nil {
-		return fmt.Errorf("WriteFile(%q) failed: %w", fileName, err)
+		return fmt.Errorf("os.WriteFile(%q) failed: %w", fileName, err)
 	}
 
 	return nil
@@ -263,9 +263,9 @@ func StoreClientConfig(config *pb.ClientConfig) error {
 
 // ApplyJSONClientConfig applies user provided JSON client config from the given file.
 func ApplyJSONClientConfig(path string) error {
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("ReadFile(%q) failed: %w", path, err)
+		return fmt.Errorf("os.ReadFile(%q) failed: %w", path, err)
 	}
 	c := &pb.ClientConfig{}
 	if err = jsonUnmarshalOption.Unmarshal(b, c); err != nil {
