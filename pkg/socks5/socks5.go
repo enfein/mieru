@@ -142,20 +142,16 @@ func (s *Server) Serve(l net.Listener) error {
 		case conn := <-s.chAccept:
 			go s.ServeConn(conn)
 		case err := <-s.chAcceptErr:
-			log.Infof("encountered error when socks5 server accepts new connection: %v", err)
+			log.Errorf("encountered error when socks5 server accept new connection: %v", err)
 			log.Infof("closing socks5 server listener")
-			if err = s.listener.Close(); err != nil {
-				if log.IsLevelEnabled(log.DebugLevel) {
-					log.Debugf("listener %v Close() failed: %v", s.listener.Addr(), err)
-				}
+			if err := s.listener.Close(); err != nil {
+				log.Warnf("socks5 server listener %v Close() failed: %v", s.listener.Addr(), err)
 			}
-			return err
+			return err // the err from chAcceptErr
 		case <-s.die:
 			log.Infof("closing socks5 server listener")
 			if err := s.listener.Close(); err != nil {
-				if log.IsLevelEnabled(log.DebugLevel) {
-					log.Debugf("listener %v Close() failed: %v", s.listener.Addr(), err)
-				}
+				log.Warnf("socks5 server listener %v Close() failed: %v", s.listener.Addr(), err)
 			}
 			return nil
 		}
