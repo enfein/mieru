@@ -38,22 +38,17 @@ var (
 
 const (
 	// Data size in bytes.
-	smallDataSize  = 1024
-	medianDataSize = 64 * 1024
-	largeDataSize  = 1 * 1024 * 1024
+	smallDataSize = 64 * 1024
+	largeDataSize = 1 * 1024 * 1024
 
 	// Range of each category.
-	smallUpperRange  = 80
-	medianUpperRange = 95
-	largeUpperRange  = 100
+	smallUpperRange = 90
 )
 
 func fillData() {
 	for i := 0; i < 100; i++ {
 		if i < smallUpperRange {
 			data[i] = make([]byte, smallDataSize)
-		} else if i < medianUpperRange {
-			data[i] = make([]byte, medianDataSize)
 		} else {
 			data[i] = make([]byte, largeDataSize)
 		}
@@ -73,7 +68,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	sha1 := hex.EncodeToString(sha1CheckSum[partition])
 	w.Header().Add("X-SHA1", sha1)
 	w.Write(data[partition])
-	log.Infof("HTTP server returned %d bytes at position %d with SHA-1 checksum %s",
+	log.Debugf("HTTP server returned %d bytes at position %d with SHA-1 checksum %s",
 		len(data[partition]), partition, sha1)
 }
 

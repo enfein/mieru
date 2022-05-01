@@ -27,6 +27,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/enfein/mieru/pkg/log"
@@ -44,9 +45,32 @@ var (
 	localProxyHost = flag.String("local_proxy_host", "", "The host IP or domain name that local socks proxy is running.")
 	localProxyPort = flag.Int("local_proxy_port", 0, "The TCP port that local socks proxy is running.")
 	testCase       = flag.String("test_case", "new_conn", fmt.Sprintf("Supported: %q, %q.", NewConnTest, ReuseConnTest))
-	intervalMs     = flag.Int("interval", 500, "Sleep in milliseconds between two requests.")
+	intervalMs     = flag.Int("interval", 0, "Sleep in milliseconds between two requests.")
 	numRequest     = flag.Int("num_request", 1, "Number of HTTP requests send to server before exit.")
+
+	totalBytes int64
+	startTime  time.Time
 )
+
+type countedConn struct {
+	net.Conn
+}
+
+func (c countedConn) Read(b []byte) (n int, err error) {
+	n, err = c.Conn.Read(b)
+	atomic.AddInt64(&totalBytes, int64(n))
+	return
+}
+
+func (c countedConn) Write(b []byte) (n int, err error) {
+	n, err = c.Conn.Write(b)
+	atomic.AddInt64(&totalBytes, int64(n))
+	return
+}
+
+func wrapConn(conn net.Conn) net.Conn {
+	return countedConn{Conn: conn}
+}
 
 func init() {
 	log.SetFormatter(&log.DaemonFormatter{})
@@ -70,9 +94,13 @@ func main() {
 		log.Fatalf("number of HTTP request can't be a negative number")
 	}
 
+	startTime = time.Now()
 	if *testCase == NewConnTest {
-		for i := 0; i < *numRequest; i++ {
+		for i := 1; i <= *numRequest; i++ {
 			CreateNewConnAndDoRequest(i)
+			if i%10 == 0 {
+				printNetworkSpeed(i)
+			}
 			time.Sleep(time.Millisecond * time.Duration(*intervalMs))
 		}
 	} else if *testCase == ReuseConnTest {
@@ -81,8 +109,12 @@ func main() {
 		if err != nil {
 			log.Fatalf("dial to socks: %v", err)
 		}
-		for i := 0; i < *numRequest; i++ {
+		conn = wrapConn(conn)
+		for i := 1; i <= *numRequest; i++ {
 			DoRequestWithExistingConn(conn, i)
+			if i%10 == 0 {
+				printNetworkSpeed(i)
+			}
 			time.Sleep(time.Millisecond * time.Duration(*intervalMs))
 		}
 		conn.Close()
@@ -96,7 +128,7 @@ func CreateNewConnAndDoRequest(seq int) {
 		log.Fatalf("dial to socks: %v", err)
 	}
 	defer conn.Close()
-	DoRequestWithExistingConn(conn, seq)
+	DoRequestWithExistingConn(wrapConn(conn), seq)
 }
 
 func DoRequestWithExistingConn(conn net.Conn, seq int) {
@@ -129,14 +161,22 @@ func DoRequestWithExistingConn(conn net.Conn, seq int) {
 	if err != nil {
 		log.Fatalf("failed to read HTTP response: %v", err)
 	}
-	log.Infof("round %d: HTTP client received response body with %d bytes", seq, len(body))
+	log.Debugf("Round %d: HTTP client received response body with %d bytes", seq, len(body))
 
 	computedCheckSumArr := sha1.Sum(body)
 	computedCheckSum := hex.EncodeToString(computedCheckSumArr[:])
-	log.Infof("HTTP client computed SHA-1 checksum: %s", computedCheckSum)
+	log.Debugf("HTTP client computed SHA-1 checksum: %s", computedCheckSum)
 
 	if providedCheckSum != computedCheckSum {
 		log.Fatalf("SHA-1 checksum not match. Provided by server: %s, computed with response data: %s",
 			providedCheckSum, computedCheckSum)
 	}
+}
+
+func printNetworkSpeed(seq int) {
+	sec := int(time.Now().Sub(startTime) / time.Second)
+	if sec <= 0 {
+		sec = 1
+	}
+	log.Infof("Round %d: network speed is %d KB/s", seq, totalBytes/int64(1024*sec))
 }

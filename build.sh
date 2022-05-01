@@ -92,8 +92,9 @@ protoc -I="$ROOT/pkg/appctl/proto" \
     "$ROOT/pkg/appctl/proto/servercfg.proto" \
     "$ROOT/pkg/appctl/proto/user.proto"
 
+CGO_ENABLED=0 go fmt ./...
 CGO_ENABLED=0 go build -v ./...
-CGO_ENABLED=0 go test -test.v -timeout=2m0s ./...
+CGO_ENABLED=0 go test -test.v -timeout=1m0s ./...
 CGO_ENABLED=0 go vet ./...
 
 # Build the client binary for mac, linux and windows.
@@ -186,8 +187,8 @@ if [[ $? -eq 0 ]]; then
     set -e
 
     cd "$ROOT"
-    CGO_ENABLED=0 go build -ldflags="-X 'github.com/enfein/mieru/pkg/kcp.TestOnlySegmentDropRate=10'" cmd/mieru/mieru.go
-    CGO_ENABLED=0 go build -ldflags="-X 'github.com/enfein/mieru/pkg/kcp.TestOnlySegmentDropRate=10'" cmd/mita/mita.go
+    CGO_ENABLED=0 go build cmd/mieru/mieru.go
+    CGO_ENABLED=0 go build cmd/mita/mita.go
     CGO_ENABLED=0 go build test/cmd/sockshttpclient/sockshttpclient.go
     CGO_ENABLED=0 go build test/cmd/httpserver/httpserver.go
 
