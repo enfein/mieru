@@ -13,7 +13,7 @@
                     "portBindings": [
                         {
                             "port": 2022,
-                            "protocol": "UDP"
+                            "protocol": "TCP"
                         }
                     ]
                 }

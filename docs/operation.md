@@ -17,13 +17,13 @@
 用户可以使用下面的指令打印 mita 的全部日志
 
 ```sh
-journalctl -u mita --no-pager
+journalctl -u mita -xe --no-pager
 ```
 
 只有当你登录服务器的用户属于 `adm` 或 `systemd-journal` 用户组时才可以查看日志。必要时可以使用 `sudo` 提升权限。
 
 ```sh
-sudo journalctl -u mita --no-pager
+sudo journalctl -u mita -xe --no-pager
 ```
 
 ## 查看客户端 mieru 的日志
@@ -90,10 +90,18 @@ mieru start
 
 ```
 INFO [metrics - connections] ActiveOpens=0 CurrEstablished=0 MaxConn=0 PassiveOpens=0
+INFO [metrics - server decryption] ServerDirectDecrypt=0 ServerFailedDirectDecrypt=0
+INFO [metrics - client decryption] ClientDirectDecrypt=0 ClientFailedDirectDecrypt=0
+INFO [metrics - UDP packets] InPkts=0 OutPkts=0
 INFO [metrics - KCP segments] EarlyRetransSegs=0 FastRetransSegs=0 InSegs=0 LostSegs=0 OutOfWindowSegs=0 OutSegs=0 RepeatSegs=0 RetransSegs=0
+INFO [metrics - UDP bytes] InBytes=0 OutBytes=0
+INFO [metrics - KCP bytes] BytesReceived=0 BytesSent=0 PaddingSent=0
+INFO [metrics - TCP bytes] InBytes=0 OutBytes=0 PaddingSent=0
+INFO [metrics - replay protection] ReplayKnownSession=0 ReplayNewSession=0
+INFO [metrics - error] KCPInErrors=0 KCPReceiveErrors=0 KCPSendErrors=0 TCPReceiveErrors=0 TCPSendErrors=0 UDPInErrors=0
 ```
 
-如果 `InSegs` 的值不为 0，说明服务器成功解密了客户端发送的数据包。如果 `OutSegs` 的值不为 0，说明服务器向客户端返回了数据包。
+如果 `CurrEstablished` 的值不为 0，说明此刻服务器与客户端之间有活跃的连接。如果 `ServerDirectDecrypt` 的值不为 0，说明服务器曾经成功解密了客户端发送的数据包。如果 TCP 或者 UDP 的 `OutBytes` 的值不为 0，说明服务器曾经向客户端发送过数据包。
 
 ## 故障诊断与排查
 
@@ -103,3 +111,6 @@ mieru 为了防止 GFW 主动探测，增强了服务器端的隐蔽性，但是
 2. mita 代理服务是否已经启动？用 `mita status` 指令查看。
 3. mieru 客户端是否已经启动？用 `mieru status` 指令查看。
 4. 客户端和服务器的设置中，端口号是否相同？用户名是否相同？密码是否相同？用 `mieru describe config` 和 `mita describe config` 查看。
+5. 打开客户端和服务器的调试日志，查看具体的网络连接情况。
+
+如果未能解决问题，可以提交 GitHub Issue 联系开发者。

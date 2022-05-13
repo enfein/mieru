@@ -1,5 +1,5 @@
 Name: mieru
-Version: 1.3.0
+Version: 1.4.0
 Release: 1%{?dist}
 Summary: Mieru proxy client
 License: GPLv3+
@@ -9,6 +9,7 @@ BuildArch: x86_64
 
 %description
 Mieru proxy client.
+
 
 %prep
 

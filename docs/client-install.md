@@ -1,52 +1,40 @@
 # 客户端安装与配置
 
-**【1】下载 mieru 安装包**
+## 下载 mieru 安装包
 
 mieru 客户端软件支持 Windows，Mac OS 和 Linux 系统。用户可以在 GitHub Releases 页面用浏览器下载。如果 GitHub 没有被墙，也可以使用 Linux / Mac 终端或 Windows PowerShell 下载。
 
 ```powershell
 # Windows PowerShell
-Invoke-WebRequest https://github.com/enfein/mieru/releases/download/v1.3.0/mieru_1.3.0_windows_amd64.zip -OutFile mieru_1.3.0_windows_amd64.zip
+Invoke-WebRequest https://github.com/enfein/mieru/releases/download/v1.4.0/mieru_1.4.0_windows_amd64.zip -OutFile mieru_1.4.0_windows_amd64.zip
 ```
 
 ```sh
 # Mac OS
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.3.0/mieru_1.3.0_darwin_amd64.tar.gz
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.4.0/mieru_1.4.0_darwin_amd64.tar.gz
 ```
 
-解压缩之后，就可以得到可执行文件 `mieru` 或 `mieru.exe`。
+解压缩之后，就可以得到可执行文件 `mieru.exe` 或 `mieru`。
 
 如果你的客户端操作系统是 Linux，可以使用下面的指令下载和安装 mieru。
 
 ```sh
 # Debian / Ubuntu
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.3.0/mieru_1.3.0_amd64.deb
-sudo dpkg -i mieru_1.3.0_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.4.0/mieru_1.4.0_amd64.deb
+sudo dpkg -i mieru_1.4.0_amd64.deb
 
 # Fedora / CentOS / Red Hat Enterprise Linux
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.3.0/mieru-1.3.0-1.x86_64.rpm
-sudo rpm -Uvh --force mieru-1.3.0-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.4.0/mieru-1.4.0-1.x86_64.rpm
+sudo rpm -Uvh --force mieru-1.4.0-1.x86_64.rpm
 
 # Others
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.3.0/mieru_1.3.0_linux_amd64.tar.gz
-tar -zxvf mieru_1.3.0_linux_amd64.tar.gz
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.4.0/mieru_1.4.0_linux_amd64.tar.gz
+tar -zxvf mieru_1.4.0_linux_amd64.tar.gz
 ```
 
-**【可选】将 mieru 可执行文件移动或添加至系统路径 PATH**
+接下来，将 mieru 可执行文件移动或添加至系统路径 `PATH`。这样，输入指令时就不需要指定 mieru 可执行文件的位置了。如果使用了 debian 或 RPM 安装包，那么不需要执行这一步。
 
-这样，输入指令时就不需要指定 mieru 可执行文件的位置了。
-
-如果使用了 debian 或 RPM 安装包，那么不需要执行这一步。
-
-**【2】查询客户端的设置**
-
-```sh
-mieru describe config
-```
-
-如果是第一次完成 mieru 的安装，设置应该是空的，此时会返回 `{}`。
-
-**【3】修改客户端的设置**
+## 修改客户端的设置
 
 用户可以通过
 
@@ -72,7 +60,7 @@ mieru apply config <FILE>
                     "portBindings": [
                         {
                             "port": -1,
-                            "protocol": "UDP"
+                            "protocol": "TCP"
                         }
                     ]
                 }
@@ -96,7 +84,9 @@ mieru apply config <FILE>
 6. 请为 `rpcPort` 属性指定一个从 1025 到 65535 之间的数值。**请确保防火墙允许使用该端口进行通信。**
 7. 请为 `socks5Port` 属性指定一个从 1025 到 65535 之间的数值。该端口不能与 `rpcPort` 相同。**请确保防火墙允许使用该端口进行通信。**
 
-如果你安装了多台代理服务器，或者一台服务器监听多个端口，可以把它们都添加到客户端设置中。每次发起新的连接时，mieru 会随机选取其中的一台服务器和一个端口。**如果使用了多台服务器，请确保每一台服务器都启动了 mita 代理服务。**这种设置的一个示例如下
+如果你安装了多台代理服务器，或者一台服务器监听多个端口，可以把它们都添加到客户端设置中。每次发起新的连接时，mieru 会随机选取其中的一台服务器和一个端口。**如果使用了多台服务器，请确保每一台服务器都启动了 mita 代理服务。**
+
+上述设置的一个示例如下
 
 ```js
             "servers": [
@@ -106,11 +96,11 @@ mieru apply config <FILE>
                     "portBindings": [
                         {
                             "port": 1110,
-                            "protocol": "UDP"
+                            "protocol": "TCP"
                         },
                         {
                             "port": 1111,
-                            "protocol": "UDP"
+                            "protocol": "TCP"
                         }
                     ]
                 },
@@ -120,7 +110,7 @@ mieru apply config <FILE>
                     "portBindings": [
                         {
                             "port": 2222,
-                            "protocol": "UDP"
+                            "protocol": "TCP"
                         }
                     ]
                 }
@@ -141,7 +131,7 @@ mieru describe config
 
 指令查看当前设置。
 
-**【4】启动客户端**
+## 启动客户端
 
 ```sh
 mieru start
@@ -151,7 +141,7 @@ mieru start
 
 mieru 客户端不会与系统一同启动。在重新启动计算机后，需要手动使用 `mieru start` 指令启动客户端。
 
-Windows 用户请注意，在命令提示符或 Powershell 中使用 `mieru start` 指令启动客户端之后，请勿关闭命令提示符或 Powershell 窗口。关闭窗口将导致 mieru 客户端停止运行。
+**Windows 用户请注意，在命令提示符或 Powershell 中使用 `mieru start` 指令启动客户端之后，请勿关闭命令提示符或 Powershell 窗口。关闭窗口将导致 mieru 客户端停止运行。**
 
 如果需要停止 mieru 客户端，请输入指令
 
@@ -159,9 +149,9 @@ Windows 用户请注意，在命令提示符或 Powershell 中使用 `mieru star
 mieru stop
 ```
 
-注意，在使用 `mieru apply config <FILE>` 修改设置后，需要用 `mieru stop` 和 `mieru start` 重启客户端，才能使新设置生效。
+注意，每次使用 `mieru apply config <FILE>` 修改设置后，需要用 `mieru stop` 和 `mieru start` 重启客户端，才能使新设置生效。
 
-**【5】配置浏览器**
+## 配置浏览器
 
 Chrome / Firefox 等浏览器可以通过安装插件，使用 socks5 代理访问墙外的网站。关于 socks5 代理的地址，请填写 `localhost:xxxx`，其中 `xxxx` 是客户端设置中 `socks5Port` 的值。这个地址在调用 `mieru start` 指令时也会打印出来。
 

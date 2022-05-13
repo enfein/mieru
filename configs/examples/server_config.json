@@ -2,11 +2,11 @@
     "portBindings": [
         {
             "port": 2012,
-            "protocol": "UDP"
+            "protocol": "TCP"
         },
         {
             "port": 2022,
-            "protocol": "UDP"
+            "protocol": "TCP"
         }
     ],
     "users": [
@@ -15,8 +15,8 @@
             "password": "shilishanlubuhuanjian"
         },
         {
-            "name": "zhanggaoli",
-            "password": "xihuanwanwangqiu"
+            "name": "jianchiqingling",
+            "password": "touzhele"
         }
     ],
     "loggingLevel": "INFO"

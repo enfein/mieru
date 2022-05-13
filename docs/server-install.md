@@ -6,29 +6,29 @@
 
 在安装和配置开始之前，先通过 SSH 连接到服务器，再执行下面的指令。
 
-**【1】下载 mita 安装包**
+## 下载 mita 安装包
 
 ```sh
 # Debian / Ubuntu
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.3.0/mita_1.3.0_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.4.0/mita_1.4.0_amd64.deb
 
 # Fedora / CentOS / Red Hat Enterprise Linux
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.3.0/mita-1.3.0-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.4.0/mita-1.4.0-1.x86_64.rpm
 ```
 
 如果上述链接被墙，请翻墙后使用浏览器从 GitHub Releases 页面下载安装包。
 
-**【2】安装 mita 软件包**
+## 安装 mita 软件包
 
 ```sh
 # Debian / Ubuntu
-sudo dpkg -i mita_1.3.0_amd64.deb
+sudo dpkg -i mita_1.4.0_amd64.deb
 
 # Fedora / CentOS / Red Hat Enterprise Linux
-sudo rpm -Uvh --force mita-1.3.0-1.x86_64.rpm
+sudo rpm -Uvh --force mita-1.4.0-1.x86_64.rpm
 ```
 
-**【3】赋予当前用户操作 mita 的权限，需要重启服务器使此设置生效**
+## 赋予当前用户操作 mita 的权限，需要重启服务器使此设置生效
 
 ```sh
 sudo usermod -a -G mita $USER
@@ -36,7 +36,7 @@ sudo usermod -a -G mita $USER
 sudo reboot
 ```
 
-**【4】重启后，使用 SSH 重新连接到服务器，检查 mita 守护进程的状态**
+## 重启后，使用 SSH 重新连接到服务器，检查 mita 守护进程的状态
 
 ```sh
 systemctl status mita
@@ -44,7 +44,7 @@ systemctl status mita
 
 如果输出中包含 `active (running)` ，表示 mita 守护进程已经开始运行。通常情况下，mita 会在服务器启动后自动开始运行。
 
-**【5】查询 mita 的工作状态**
+## 查询 mita 的工作状态
 
 ```sh
 mita status
@@ -52,15 +52,9 @@ mita status
 
 如果刚刚完成安装，此时的输出为 `mieru server status is "IDLE"`，表示 mita 还没有开始监听来自 mieru 客户端的请求。
 
-**【6】查询代理服务器设置**
+## 修改代理服务器设置
 
-```sh
-mita describe config
-```
-
-如果刚刚完成安装，设置应该是空的，此时会返回 `{}`。
-
-**【7】修改代理服务器设置**
+mieru 代理支持 TCP 和 UDP 两种不同的传输协议。要了解协议之间的差别，请阅读 [mieru 代理协议](https://github.com/enfein/mieru/blob/main/docs/protocol.md)。本教程以 TCP 协议为例进行讲解。如果要使用 UDP 协议，将所有配置文件中的 `TCP` 更换为 `UDP` 即可。
 
 用户可以通过
 
@@ -75,7 +69,7 @@ mita apply config <FILE>
     "portBindings": [
         {
             "port": -1,
-            "protocol": "UDP"
+            "protocol": "TCP"
         }
     ],
     "users": [
@@ -90,7 +84,7 @@ mita apply config <FILE>
 
 请将这个模板下载或复制到你的服务器中，用文本编辑器打开，并修改如下的内容：
 
-1. `portBindings` -> `port` 属性是 mita 监听的 UDP 端口号，请指定一个从 1025 到 65535 之间的值。**请确保防火墙允许使用该端口进行通信。**
+1. `portBindings` -> `port` 属性是 mita 监听的 TCP 或 UDP 端口号，请指定一个从 1025 到 65535 之间的值。**请确保防火墙允许使用该端口进行通信。**
 2. 在 `users` -> `name` 属性中填写用户名。
 3. 在 `users` -> `password` 属性中填写该用户的密码。
 
@@ -100,11 +94,11 @@ mita apply config <FILE>
     "portBindings": [
         {
             "port": 1111,
-            "protocol": "UDP"
+            "protocol": "TCP"
         },
         {
             "port": 2222,
-            "protocol": "UDP"
+            "protocol": "TCP"
         }
     ],
 ```
@@ -138,7 +132,7 @@ mita describe config
 
 指令查看当前设置。
 
-**【8】启动代理服务**
+## 启动代理服务
 
 使用指令
 
@@ -162,11 +156,11 @@ mita status
 mita stop
 ```
 
-注意，在使用 `mita apply config <FILE>` 修改设置后，需要用 `mita stop` 和 `mita start` 重启代理服务，才能使新设置生效。
+注意，每次使用 `mita apply config <FILE>` 修改设置后，需要用 `mita stop` 和 `mita start` 重启代理服务，才能使新设置生效。
 
 启动代理服务后，请继续进行[客户端安装与配置](https://github.com/enfein/mieru/blob/main/docs/client-install.md)。
 
-**【可选】安装 NTP 服务**
+## 【可选】安装 NTP 网络时间同步服务
 
 客户端和代理服务器软件会根据用户名、密码和系统时间，分别计算密钥。只有当客户端和服务器的密钥相同时，服务器才能解密和响应客户端的请求。这要求客户端和服务器的系统时间不能有很大的差别。
 
@@ -183,7 +177,9 @@ sudo dnf install ntp
 sudo yum install ntp
 ```
 
-**【可选】关闭 ICMP Destination Unreachable 消息**
+## 【可选】关闭 ICMP Destination Unreachable 消息
+
+这里的操作仅对使用 UDP 协议的用户有效。使用 TCP 协议的用户，请跳过本节内容。
 
 我们在前面讲到，当服务器无法解密客户端发送的数据时，不会返回任何内容。不过，如果外界向服务器发送 UDP 包进行主动探测，依旧可以区分下面两种情况：
 
