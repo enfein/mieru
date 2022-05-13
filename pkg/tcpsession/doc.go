@@ -13,31 +13,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package netutil_test
+package tcpsession
 
-import (
-	"testing"
-
-	"github.com/enfein/mieru/pkg/netutil"
-)
-
-func TestMaybeDecorateIPv6(t *testing.T) {
-	testcases := []struct {
-		input string
-		want  string
-	}{
-		{"", ""},
-		{"google.com", "google.com"},
-		{"google.com:443", "google.com:443"},
-		{"0.0.0.0", "0.0.0.0"},
-		{"127.0.0.1:53", "127.0.0.1:53"},
-		{"::", "[::]"},
-		{"2001:db8::", "[2001:db8::]"},
-	}
-
-	for _, tc := range testcases {
-		if out := netutil.MaybeDecorateIPv6(tc.input); out != tc.want {
-			t.Errorf("MaybeDecorateIPv6(%q) = %q, want %q", tc.input, out, tc.want)
-		}
-	}
-}
+// Testing port range: [12350, 12370).

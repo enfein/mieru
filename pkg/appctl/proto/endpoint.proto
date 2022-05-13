@@ -22,6 +22,7 @@ option go_package = "github.com/enfein/mieru/pkg/appctl/appctlpb";
 enum TransportProtocol {
     UNKNOWN_TRANSPORT_PROTOCOL = 0;
     UDP = 1;
+    TCP = 2;
 }
 
 message PortBinding {

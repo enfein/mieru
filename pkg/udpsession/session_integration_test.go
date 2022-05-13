@@ -27,10 +27,10 @@ import (
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/kcp"
+	"github.com/enfein/mieru/pkg/rng"
+	"github.com/enfein/mieru/pkg/testtool"
 	"github.com/enfein/mieru/pkg/udpsession"
 )
-
-const timeLayout string = "15:04:05.00"
 
 var users = map[string]*appctlpb.User{
 	"dengxiaoping": {
@@ -51,9 +51,9 @@ var users = map[string]*appctlpb.User{
 	},
 }
 
-func runClient(t *testing.T, laddr, serverAddr string, username, password []byte) error {
+func runClient(t *testing.T, laddr, serverAddr string, username, password []byte, writeSize, readSize int) error {
 	hashedPassword := cipher.HashPassword(password, username)
-	block, err := cipher.BlockCipherFromPassword(hashedPassword)
+	block, err := cipher.BlockCipherFromPassword(hashedPassword, true)
 	if err != nil {
 		return fmt.Errorf("cipher.BlockCipherFromPassword() failed: %w", err)
 	}
@@ -62,29 +62,38 @@ func runClient(t *testing.T, laddr, serverAddr string, username, password []byte
 		return fmt.Errorf("udpsession.DialWithOptions() failed: %w", err)
 	}
 	defer sess.Close()
-	t.Logf("[%s] client is running on %v", time.Now().Format(timeLayout), laddr)
+	t.Logf("[%s] client is running on %v", time.Now().Format(testtool.TimeLayout), laddr)
 
-	respBuf := make([]byte, kcp.MaxBufSize)
-	for i := 0; i < 100; i++ {
-		sleepMillis := 100 + mrand.Intn(100)
+	for i := 0; i < 50; i++ {
+		sleepMillis := 50 + mrand.Intn(50)
 		time.Sleep(time.Duration(sleepMillis) * time.Millisecond)
 
-		data := udpsession.TestHelperGenRot13Input(1024)
+		resp := make([]byte, 0, writeSize)
+		respBuf := make([]byte, readSize)
+		data := testtool.TestHelperGenRot13Input(writeSize)
 
 		// Send data to server.
 		if _, err = sess.Write(data); err != nil {
 			return fmt.Errorf("Write() failed: %w", err)
 		}
-		sess.SetReadDeadline(time.Now().Add(60 * time.Second))
+		sess.SetReadDeadline(time.Now().Add(1 * time.Second))
 
 		// Get and verify server response.
-		size, err := sess.Read(respBuf)
-		if err != nil {
-			return fmt.Errorf("Read() failed: %w", err)
+		totalSize := 0
+		for totalSize < writeSize {
+			size, err := sess.Read(respBuf)
+			if err != nil {
+				return fmt.Errorf("Read() failed: %w", err)
+			}
+			resp = append(resp, respBuf[:size]...)
+			totalSize += size
 		}
-		revert, err := udpsession.TestHelperRot13(respBuf[:size])
+		if totalSize != writeSize {
+			return fmt.Errorf("read %d bytes, want %d bytes", totalSize, writeSize)
+		}
+		revert, err := testtool.TestHelperRot13(resp[:totalSize])
 		if err != nil {
-			return fmt.Errorf("udpsession.TestHelperRot13() failed: %w", err)
+			return fmt.Errorf("testtool.TestHelperRot13() failed: %w", err)
 		}
 		if !bytes.Equal(data, revert) {
 			return fmt.Errorf("verification failed")
@@ -93,11 +102,12 @@ func runClient(t *testing.T, laddr, serverAddr string, username, password []byte
 	return nil
 }
 
-// TestKCPSessionsIPv4 creates one listener and four clients. Each client sends
+// TestKCPSessionsIPv4 creates one listener and two clients. Each client sends
 // some data (in format [A-Za-z]+) to the listener. The listener returns the
 // ROT13 (rotate by 13 places) of the data back to the client.
 func TestKCPSessionsIPv4(t *testing.T) {
 	kcp.TestOnlySegmentDropRate = "5"
+	rng.InitSeed()
 	party, err := udpsession.ListenWithOptions("127.0.0.1:12315", users)
 	if err != nil {
 		t.Fatalf("udpsession.ListenWithOptions() failed: %v", err)
@@ -105,13 +115,13 @@ func TestKCPSessionsIPv4(t *testing.T) {
 
 	go func() {
 		for {
-			s, err := party.AcceptKCP()
+			s, err := party.Accept()
 			if err != nil {
 				return
 			} else {
-				t.Logf("[%s] accepting new connection from %v", time.Now().Format(timeLayout), s.RemoteAddr())
+				t.Logf("[%s] accepting new connection from %v", time.Now().Format(testtool.TimeLayout), s.RemoteAddr())
 				go func() {
-					if err = udpsession.TestHelperServeConn(s); err != nil {
+					if err = testtool.TestHelperServeConn(s); err != nil {
 						return
 					}
 				}()
@@ -123,26 +133,27 @@ func TestKCPSessionsIPv4(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
-		if err := runClient(t, "127.0.0.1:12316", "127.0.0.1:12315", []byte("jiangzemin"), []byte("20001027")); err != nil {
-			t.Errorf("[%s] jiangzemin failed: %v", time.Now().Format(timeLayout), err)
+		if err := runClient(t, "127.0.0.1:12316", "127.0.0.1:12315", []byte("jiangzemin"), []byte("20001027"), 1024*64, 9000); err != nil {
+			t.Errorf("[%s] jiangzemin failed: %v", time.Now().Format(testtool.TimeLayout), err)
 		}
 		wg.Done()
 	}()
 	go func() {
-		if err := runClient(t, "127.0.0.1:12317", "127.0.0.1:12315", []byte("xijinping"), []byte("20200630")); err != nil {
-			t.Errorf("[%s] xijinping failed: %v", time.Now().Format(timeLayout), err)
+		if err := runClient(t, "127.0.0.1:12317", "127.0.0.1:12315", []byte("xijinping"), []byte("20200630"), 9000, 1024*64); err != nil {
+			t.Errorf("[%s] xijinping failed: %v", time.Now().Format(testtool.TimeLayout), err)
 		}
 		wg.Done()
 	}()
 	wg.Wait()
 
 	party.Close()
-	time.Sleep(100 * time.Millisecond) // Wait for resources to be released.
+	time.Sleep(1 * time.Second) // Wait for resources to be released.
 }
 
 // TestKCPSessionsIPv6 is similar to TestKCPSessionsIPv4 but running in IPv6.
 func TestKCPSessionsIPv6(t *testing.T) {
 	kcp.TestOnlySegmentDropRate = "5"
+	rng.InitSeed()
 	party, err := udpsession.ListenWithOptions("[::1]:12318", users)
 	if err != nil {
 		t.Fatalf("udpsession.ListenWithOptions() failed: %v", err)
@@ -150,13 +161,13 @@ func TestKCPSessionsIPv6(t *testing.T) {
 
 	go func() {
 		for {
-			s, err := party.AcceptKCP()
+			s, err := party.Accept()
 			if err != nil {
 				return
 			} else {
-				t.Logf("[%s] accepting new connection from %v", time.Now().Format(timeLayout), s.RemoteAddr())
+				t.Logf("[%s] accepting new connection from %v", time.Now().Format(testtool.TimeLayout), s.RemoteAddr())
 				go func() {
-					if err = udpsession.TestHelperServeConn(s); err != nil {
+					if err = testtool.TestHelperServeConn(s); err != nil {
 						return
 					}
 				}()
@@ -168,19 +179,19 @@ func TestKCPSessionsIPv6(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
-		if err := runClient(t, "[::1]:12319", "[::1]:12318", []byte("jiangzemin"), []byte("20001027")); err != nil {
-			t.Errorf("[%s] jiangzemin failed: %v", time.Now().Format(timeLayout), err)
+		if err := runClient(t, "[::1]:12319", "[::1]:12318", []byte("jiangzemin"), []byte("20001027"), 1024*64, 9000); err != nil {
+			t.Errorf("[%s] jiangzemin failed: %v", time.Now().Format(testtool.TimeLayout), err)
 		}
 		wg.Done()
 	}()
 	go func() {
-		if err := runClient(t, "[::1]:12320", "[::1]:12318", []byte("xijinping"), []byte("20200630")); err != nil {
-			t.Errorf("[%s] xijinping failed: %v", time.Now().Format(timeLayout), err)
+		if err := runClient(t, "[::1]:12320", "[::1]:12318", []byte("xijinping"), []byte("20200630"), 9000, 1024*64); err != nil {
+			t.Errorf("[%s] xijinping failed: %v", time.Now().Format(testtool.TimeLayout), err)
 		}
 		wg.Done()
 	}()
 	wg.Wait()
 
 	party.Close()
-	time.Sleep(100 * time.Millisecond) // Wait for resources to be released.
+	time.Sleep(1 * time.Second) // Wait for resources to be released.
 }

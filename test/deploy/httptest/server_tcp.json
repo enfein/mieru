@@ -1,0 +1,30 @@
+{
+    "portBindings": [
+        {
+            "port": 8964,
+            "protocol": "TCP"
+        },
+        {
+            "port": 9648,
+            "protocol": "TCP"
+        },
+        {
+            "port": 6489,
+            "protocol": "TCP"
+        },
+        {
+            "port": 4896,
+            "protocol": "TCP"
+        }
+    ],
+    "users": [
+        {
+            "name": "baozi",
+            "password": "manlianpenfen"
+        }
+    ],
+    "advancedSettings": {
+        "allowLocalDestination": true
+    },
+    "loggingLevel": "INFO"
+}

@@ -32,8 +32,10 @@ import (
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/netutil"
+	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/socks5"
 	"github.com/enfein/mieru/pkg/stderror"
+	"github.com/enfein/mieru/pkg/tcpsession"
 	"github.com/enfein/mieru/pkg/udpsession"
 	"google.golang.org/grpc"
 )
@@ -275,18 +277,30 @@ var serverRunFunc = func(s []string) error {
 			if err != nil {
 				return fmt.Errorf(stderror.CreateSocks5ServerFailedErr, err)
 			}
-			protocol := config.GetPortBindings()[i].GetProtocol().String()
+			protocol := config.GetPortBindings()[i].GetProtocol()
 			port := config.GetPortBindings()[i].GetPort()
-			if err := appctl.GetSocks5ServerGroup().Add(protocol, int(port), socks5Server); err != nil {
+			if err := appctl.GetSocks5ServerGroup().Add(protocol.String(), int(port), socks5Server); err != nil {
 				return fmt.Errorf(stderror.AddSocks5ServerToGroupFailedErr, err)
 			}
 
 			// Run the egress socks5 server in the background.
 			go func() {
 				socks5Addr := netutil.MaybeDecorateIPv6(netutil.AllIPAddr()) + ":" + strconv.Itoa(int(port))
-				l, err := udpsession.ListenWithOptions(socks5Addr, appctl.UserListToMap(config.GetUsers()))
-				if err != nil {
-					log.Fatalf("udpsession.ListenWithOptions(%q) failed: %v", socks5Addr, err)
+				var l net.Listener
+				var err error
+				if protocol == appctlpb.TransportProtocol_TCP {
+					l, err = tcpsession.ListenWithOptions(socks5Addr, appctl.UserListToMap(config.GetUsers()))
+					if err != nil {
+						log.Fatalf("tcpsession.ListenWithOptions(%q) failed: %v", socks5Addr, err)
+					}
+					l.(*tcpsession.TCPSessionListener).SetSuppressFirstNError(rng.IntRange(1_000_000_000, 2_000_000_000))
+				} else if protocol == appctlpb.TransportProtocol_UDP {
+					l, err = udpsession.ListenWithOptions(socks5Addr, appctl.UserListToMap(config.GetUsers()))
+					if err != nil {
+						log.Fatalf("udpsession.ListenWithOptions(%q) failed: %v", socks5Addr, err)
+					}
+				} else {
+					log.Fatalf("found unknown transport protocol %s in server config", protocol.String())
 				}
 				initProxyTasks.Done()
 				log.Infof("mieru server daemon socks5 server %q is running", socks5Addr)

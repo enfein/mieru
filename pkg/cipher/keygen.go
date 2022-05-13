@@ -18,6 +18,7 @@ package cipher
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"fmt"
 	"time"
 
 	"golang.org/x/crypto/pbkdf2"
@@ -25,9 +26,11 @@ import (
 
 const (
 	// defaultIter is the default number of iterations to generate the key.
+	// This is part of mieru protocol. This value should not be changed.
 	defaultIter = 4096
 
 	// refreshInterval is the amount of time when the salt used to generate cipher block is changed.
+	// This is part of mieru protocol. This value should not be changed.
 	refreshInterval = 5 * time.Minute
 )
 
@@ -37,7 +40,11 @@ type pbkdf2Gen struct {
 	Iter int
 }
 
+// NewKey creates a new key from the given password.
 func (g *pbkdf2Gen) NewKey(password []byte, keyLen int) ([]byte, error) {
+	if len(password) == 0 {
+		return nil, fmt.Errorf("password is empty")
+	}
 	return pbkdf2.Key(password, g.Salt, g.Iter, keyLen, sha256.New), nil
 }
 

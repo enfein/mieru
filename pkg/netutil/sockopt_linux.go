@@ -13,31 +13,31 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package netutil_test
+//go:build linux
+
+package netutil
 
 import (
-	"testing"
+	"syscall"
 
-	"github.com/enfein/mieru/pkg/netutil"
+	"golang.org/x/sys/unix"
 )
 
-func TestMaybeDecorateIPv6(t *testing.T) {
-	testcases := []struct {
-		input string
-		want  string
-	}{
-		{"", ""},
-		{"google.com", "google.com"},
-		{"google.com:443", "google.com:443"},
-		{"0.0.0.0", "0.0.0.0"},
-		{"127.0.0.1:53", "127.0.0.1:53"},
-		{"::", "[::]"},
-		{"2001:db8::", "[2001:db8::]"},
-	}
-
-	for _, tc := range testcases {
-		if out := netutil.MaybeDecorateIPv6(tc.input); out != tc.want {
-			t.Errorf("MaybeDecorateIPv6(%q) = %q, want %q", tc.input, out, tc.want)
+// ReuseAddrPort sets SO_REUSEADDR and SO_REUSEPORT options to a given connection.
+func ReuseAddrPort(network, address string, conn syscall.RawConn) error {
+	var err error
+	// See syscall.RawConn.Control
+	conn.Control(func(fd uintptr) {
+		// Set SO_REUSEADDR
+		err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEADDR, 1)
+		if err != nil {
+			return
 		}
-	}
+		// Set SO_REUSEPORT
+		err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
+		if err != nil {
+			return
+		}
+	})
+	return err
 }

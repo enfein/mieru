@@ -24,9 +24,6 @@ import (
 	"github.com/enfein/mieru/pkg/log"
 )
 
-// Cache is a global replay cache.
-var Cache *ReplayCache = NewCache(600_000, 10*time.Minute)
-
 // ReplayCache stores the signature of recent decrypted packets to avoid
 // a replay attack.
 type ReplayCache struct {

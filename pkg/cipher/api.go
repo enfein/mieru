@@ -17,6 +17,7 @@ package cipher
 
 import (
 	"crypto/sha256"
+	"fmt"
 )
 
 const (
@@ -32,6 +33,30 @@ type BlockCipher interface {
 
 	// Decrypt method removes the nonce in the src, then decryptes the src.
 	Decrypt(ciphertext []byte) ([]byte, error)
+
+	NonceSize() int
+
+	Overhead() int
+
+	// Clone method creates a deep copy of block cipher itself.
+	// Panic if this operation fails.
+	Clone() BlockCipher
+
+	// SetImplicitNonceMode enables or disables implicit nonce mode.
+	// Under implicit nonce mode, the nonce is set exactly once on the first
+	// Encrypt() or Decrypt() call. After that, all Encrypt() or Decrypt()
+	// calls will not look up nonce in the data. Each Encrypt() or Decrypt()
+	// will cause the nonce value to be increased by 1.
+	//
+	// Implicit nonce mode is disabled by default.
+	//
+	// Disabling implicit nonce mode removes the implicit nonce (state)
+	// from the block cipher.
+	SetImplicitNonceMode(enable bool)
+
+	// IsStateless returns true if the BlockCipher can do arbitrary Encrypt()
+	// and Decrypt() in any sequence.
+	IsStateless() bool
 }
 
 // HashPassword generates a hashed password from
@@ -45,8 +70,8 @@ func HashPassword(rawPassword, uniqueValue []byte) []byte {
 
 // BlockCipherFromPassword creates a BlockCipher object from the password
 // with the default settings.
-func BlockCipherFromPassword(password []byte) (BlockCipher, error) {
-	cipherList, err := getBlockCipherList(password)
+func BlockCipherFromPassword(password []byte, stateless bool) (BlockCipher, error) {
+	cipherList, err := getBlockCipherList(password, stateless)
 	if err != nil {
 		return nil, err
 	}
@@ -55,6 +80,39 @@ func BlockCipherFromPassword(password []byte) (BlockCipher, error) {
 
 // BlockCipherListFromPassword creates three BlockCipher objects using different salts
 // from the password with the default settings.
-func BlockCipherListFromPassword(password []byte) ([]BlockCipher, error) {
-	return getBlockCipherList(password)
+func BlockCipherListFromPassword(password []byte, stateless bool) ([]BlockCipher, error) {
+	return getBlockCipherList(password, stateless)
+}
+
+// TryDecrypt tries to decrypt the data with all possible keys generated from the password.
+// If successful, returns the block cipher as well as the decrypted results.
+func TryDecrypt(data, password []byte, stateless bool) (BlockCipher, []byte, error) {
+	blocks, err := BlockCipherListFromPassword(password, stateless)
+	if err != nil {
+		return nil, nil, fmt.Errorf("BlockCipherListFromPassword() failed: %w", err)
+	}
+	return SelectDecrypt(data, blocks)
+}
+
+// SelectDecrypt returns the appropriate cipher block that can decrypt the data,
+// as well as the decrypted result.
+func SelectDecrypt(data []byte, blocks []BlockCipher) (BlockCipher, []byte, error) {
+	for _, block := range blocks {
+		decrypted, err := block.Decrypt(data)
+		if err != nil {
+			continue
+		}
+		return block, decrypted, nil
+	}
+
+	return nil, nil, fmt.Errorf("unable to decrypt from supplied %d cipher blocks", len(blocks))
+}
+
+// CloneBlockCiphers clones a slice of block ciphers.
+func CloneBlockCiphers(blocks []BlockCipher) []BlockCipher {
+	clones := make([]BlockCipher, len(blocks))
+	for i, b := range blocks {
+		clones[i] = b.Clone()
+	}
+	return clones
 }

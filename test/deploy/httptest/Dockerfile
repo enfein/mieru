@@ -15,13 +15,14 @@
 
 # Assume this file is executed with `docker build -f` from the root dir of mieru project.
 
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
 WORKDIR /test
 
 # Copy binaries, data and test script into the container.
 COPY mieru mita sockshttpclient httpserver \
-    test/deploy/httptest/client.json test/deploy/httptest/server.json \
+    test/deploy/httptest/client_tcp.json test/deploy/httptest/server_tcp.json \
+    test/deploy/httptest/client_udp.json test/deploy/httptest/server_udp.json \
     test/deploy/httptest/test.sh /test/
 
 # Create mita user and server config directory.

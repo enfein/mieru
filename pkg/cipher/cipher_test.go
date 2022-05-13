@@ -30,7 +30,7 @@ func TestDefaultNonceSize(t *testing.T) {
 	}
 	c, err := newAESGCMBlockCipher(key)
 	if err != nil {
-		t.Fatalf("create AES GCM block cipher: %v", err)
+		t.Fatalf("newAESGCMBlockCipher() failed: %v", err)
 	}
 	if c.NonceSize() != DefaultNonceSize {
 		t.Errorf("got nonce size %d; want %d", c.NonceSize(), DefaultNonceSize)
@@ -44,10 +44,160 @@ func TestDefaultOverhead(t *testing.T) {
 	}
 	c, err := newAESGCMBlockCipher(key)
 	if err != nil {
-		t.Fatalf("create AES GCM block cipher: %v", err)
+		t.Fatalf("newAESGCMBlockCipher() failed: %v", err)
 	}
 	if c.Overhead() != DefaultOverhead {
 		t.Errorf("got overhead size %d; want %d", c.Overhead(), DefaultOverhead)
+	}
+}
+
+func TestAESGCMBlockCipherEncryptDecrypt(t *testing.T) {
+	for i := 0; i < 1000; i++ {
+		var key []byte
+		mrand.Seed(time.Now().UnixNano())
+		n := mrand.Intn(3)
+		switch n {
+		case 0:
+			key = make([]byte, 16)
+		case 1:
+			key = make([]byte, 24)
+		case 2:
+			key = make([]byte, 32)
+		}
+		if _, err := crand.Read(key); err != nil {
+			t.Fatalf("fail to generate key: %v", err)
+		}
+		cipher, err := newAESGCMBlockCipher(key)
+		if err != nil {
+			t.Fatalf("newAESGCMBlockCipher() failed: %v", err)
+		}
+		if !cipher.IsStateless() {
+			t.Fatalf("IsStateless() = %v, want %v", cipher.IsStateless(), true)
+		}
+
+		size := mrand.Intn(4096)
+		data := make([]byte, size)
+		if _, err := crand.Read(data); err != nil {
+			t.Fatalf("fail to generate data: %v", err)
+		}
+
+		ciphertext, err := cipher.Encrypt(data)
+		if err != nil {
+			t.Fatalf("Encrypt() failed: %v", err)
+		}
+		plaintext, err := cipher.Decrypt(ciphertext)
+		if err != nil {
+			t.Fatalf("Decrypt() failed: %v", err)
+		}
+		if !bytes.Equal(data, plaintext) {
+			t.Errorf("data after decryption is different")
+		}
+	}
+}
+
+func TestAESGCMBlockCipherEncryptDecryptImplicitMode(t *testing.T) {
+	key := make([]byte, 32)
+	if _, err := crand.Read(key); err != nil {
+		t.Fatalf("fail to generate key: %v", err)
+	}
+	sendCipher, err := newAESGCMBlockCipher(key)
+	if err != nil {
+		t.Fatalf("newAESGCMBlockCipher() failed: %v", err)
+	}
+	sendCipher.SetImplicitNonceMode(true)
+	recvCipher := sendCipher.Clone().(*AESGCMBlockCipher)
+	if sendCipher.IsStateless() {
+		t.Fatalf("IsStateless() = %v, want %v", sendCipher.IsStateless(), false)
+	}
+	if recvCipher.IsStateless() {
+		t.Fatalf("IsStateless() = %v, want %v", recvCipher.IsStateless(), false)
+	}
+
+	data := make([]byte, 4096)
+	for i := 0; i < 1000; i++ {
+		if _, err := crand.Read(data); err != nil {
+			t.Fatalf("fail to generate data: %v", err)
+		}
+		ciphertext, err := sendCipher.Encrypt(data)
+		if err != nil {
+			t.Fatalf("Encrypt() failed: %v", err)
+		}
+		plaintext, err := recvCipher.Decrypt(ciphertext)
+		if err != nil {
+			t.Fatalf("Decrypt() failed: %v", err)
+		}
+		if !bytes.Equal(data, plaintext) {
+			t.Errorf("data after decryption is different")
+		}
+	}
+}
+
+func TestAESGCMBlockCipherClone(t *testing.T) {
+	key := make([]byte, 32)
+	if _, err := crand.Read(key); err != nil {
+		t.Fatalf("fail to generate key: %v", err)
+	}
+	cipher1, err := newAESGCMBlockCipher(key)
+	if err != nil {
+		t.Fatalf("newAESGCMBlockCipher() failed: %v", err)
+	}
+	cipher1.SetImplicitNonceMode(true)
+	nonce := make([]byte, cipher1.NonceSize())
+	if _, err := crand.Read(nonce); err != nil {
+		t.Fatalf("fail to generate nonce: %v", err)
+	}
+	cipher1.implicitNonce = make([]byte, cipher1.NonceSize())
+	copy(cipher1.implicitNonce, nonce)
+	cipher2 := cipher1.Clone().(*AESGCMBlockCipher)
+
+	data := make([]byte, 4096)
+	if _, err := crand.Read(data); err != nil {
+		t.Fatalf("fail to generate data: %v", err)
+	}
+	ciphertext1, err := cipher1.Encrypt(data)
+	if err != nil {
+		t.Fatalf("Encrypt() failed: %v", err)
+	}
+	ciphertext2, err := cipher2.Encrypt(data)
+	if err != nil {
+		t.Fatalf("Encrypt() failed: %v", err)
+	}
+	if !bytes.Equal(ciphertext1, ciphertext2) {
+		t.Errorf("data after encryption is different")
+	}
+
+	copy(cipher1.implicitNonce, nonce)
+	copy(cipher2.implicitNonce, nonce)
+	plaintext1, err := cipher1.Decrypt(ciphertext1)
+	if err != nil {
+		t.Fatalf("Decrypt() failed: %v", err)
+	}
+	plaintext2, err := cipher2.Decrypt(ciphertext2)
+	if err != nil {
+		t.Fatalf("Decrypt() failed: %v", err)
+	}
+	if !bytes.Equal(plaintext1, plaintext2) {
+		t.Errorf("data after decryption is different")
+	}
+}
+
+func TestAESGCMBlockCipherIncreaseNonce(t *testing.T) {
+	testdata := []struct {
+		input  []byte
+		output []byte
+	}{
+		{[]byte{0x89, 0x64}, []byte{0x8a, 0x64}},
+		{[]byte{0xff, 0xff, 0xff, 0xfe}, []byte{0x00, 0x00, 0x00, 0xff}},
+		{[]byte{0xff, 0xff, 0xff, 0xff}, []byte{0x00, 0x00, 0x00, 0x00}},
+	}
+
+	cipher := &AESGCMBlockCipher{enableImplicitNonce: true}
+	for _, tc := range testdata {
+		cipher.implicitNonce = tc.input
+		cipher.increaseNonce()
+		if !bytes.Equal(cipher.implicitNonce, tc.output) {
+			t.Errorf("got %v, want %v", cipher.implicitNonce, tc.output)
+		}
 	}
 }
 
@@ -71,48 +221,6 @@ func TestAESGCMBlockCipherValidateKeySize(t *testing.T) {
 		}
 		if got == nil && tc.err {
 			t.Errorf("got no error; want error")
-		}
-	}
-}
-
-func TestAESGCMBlockCipherEncryptDecrypt(t *testing.T) {
-	round := 1000
-	for i := 0; i < round; i++ {
-		var key []byte
-		mrand.Seed(time.Now().UnixNano())
-		n := mrand.Intn(3)
-		switch n {
-		case 0:
-			key = make([]byte, 16)
-		case 1:
-			key = make([]byte, 24)
-		case 2:
-			key = make([]byte, 32)
-		}
-		if _, err := crand.Read(key); err != nil {
-			t.Fatalf("fail to generate key: %v", err)
-		}
-		c, err := newAESGCMBlockCipher(key)
-		if err != nil {
-			t.Errorf("create AES GCM block cipher: %v", err)
-		}
-
-		size := mrand.Intn(4096)
-		data := make([]byte, size)
-		if _, err := mrand.Read(data); err != nil {
-			t.Fatalf("fail to generate data: %v", err)
-		}
-
-		ciphertext, err := c.Encrypt(data)
-		if err != nil {
-			t.Errorf("encrypt: %v", err)
-		}
-		plaintext, err := c.Decrypt(ciphertext)
-		if err != nil {
-			t.Errorf("decrypt: %v", err)
-		}
-		if !bytes.Equal(data, plaintext) {
-			t.Errorf("data after decryption is different")
 		}
 	}
 }

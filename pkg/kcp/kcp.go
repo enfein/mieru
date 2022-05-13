@@ -58,6 +58,9 @@ const (
 	IKCP_PROBE_LIMIT      = 120000 // maxinum window probe timeout
 	IKCP_SN_OFFSET        = 12     // offset to get sequence number in KCP header
 	IKCP_TOTAL_LEN_OFFSET = 22     // offset to get segment total length (data + padding)
+
+	// maxPaddingSize is the maximum size of padding added to a single KCP segment.
+	maxPaddingSize = 256
 )
 
 var (
@@ -283,26 +286,6 @@ func (kcp *KCP) Input(data []byte, ackNoDelay bool) error {
 		if len(data) < int(tlen) {
 			log.Warnf("data size %d is smaller than KCP length %d", len(data), tlen)
 			return stderror.ErrOutOfRange
-		}
-
-		// Log the KCP segment if TRACE logging is enabled.
-		if log.IsLevelEnabled(log.TraceLevel) {
-			dataField := "[...]"
-			if dlen <= 64 {
-				dataField = fmt.Sprintf("%v", data[:dlen])
-			}
-			log.WithFields(log.Fields{
-				"conv": conv,
-				"cmd":  Command2Str(int(cmd)),
-				"frg":  frg,
-				"wnd":  wnd,
-				"ts":   ts,
-				"sn":   sn,
-				"una":  una,
-				"dlen": dlen,
-				"tlen": tlen,
-				"data": dataField,
-			}).Tracef("decoded KCP packet")
 		}
 
 		if cmd != IKCP_CMD_PUSH && cmd != IKCP_CMD_ACK &&
@@ -594,13 +577,13 @@ func (kcp *KCP) Output(ackOnly bool) uint32 {
 				lastSegPtr := buffer[lastSegIdx:]
 				var segTotalLen uint16
 				decode16u(lastSegPtr[IKCP_TOTAL_LEN_OFFSET:], &segTotalLen)
-				paddingSize = rng.Intn(minInt(4*(int(segTotalLen)+IKCP_OVERHEAD), remainingSpace))
+				paddingSize = rng.Intn(minInt(maxPaddingSize, remainingSpace))
 				if paddingSize > 0 {
 					crand.Read(lastSegPtr[IKCP_OVERHEAD+int(segTotalLen) : IKCP_OVERHEAD+int(segTotalLen)+paddingSize])
 					segTotalLen += uint16(paddingSize)
 					encode16u(lastSegPtr[IKCP_TOTAL_LEN_OFFSET:], segTotalLen)
 					ptr = ptr[paddingSize:]
-					atomic.AddUint64(&metrics.PaddingSent, uint64(paddingSize))
+					atomic.AddUint64(&metrics.KCPPaddingSent, uint64(paddingSize))
 				}
 			}
 		}

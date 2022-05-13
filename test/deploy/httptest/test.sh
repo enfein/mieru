@@ -47,10 +47,10 @@ sleep 1
 ./mita run &
 sleep 1
 
-# Update mieru server config.
-./mita apply config server.json
+# Update mieru server with TCP config.
+./mita apply config server_tcp.json
 if [[ "$?" -ne 0 ]]; then
-    echo "command 'mita apply config server.json' failed"
+    echo "command 'mita apply config server_tcp.json' failed"
     exit 1
 fi
 echo "mieru server config:"
@@ -62,12 +62,12 @@ if [[ "$?" -ne 0 ]]; then
     echo "command 'mita start' failed"
     exit 1
 fi
-./mita profile cpu start /test/mita.cpu.gz
+./mita profile cpu start /test/mita.tcp.cpu.gz
 
-# Update mieru client config.
-./mieru apply config client.json
+# Update mieru client with TCP config.
+./mieru apply config client_tcp.json
 if [[ "$?" -ne 0 ]]; then
-    echo "command 'mieru apply config client.json' failed"
+    echo "command 'mieru apply config client_tcp.json' failed"
     exit 1
 fi
 echo "mieru client config:"
@@ -79,7 +79,88 @@ if [[ "$?" -ne 0 ]]; then
     echo "command 'mieru start' failed"
     exit 1
 fi
-./mieru profile cpu start /test/mieru.cpu.gz
+./mieru profile cpu start /test/mieru.tcp.cpu.gz
+
+# Start testing.
+sleep 1
+./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
+  -local_proxy_host=127.0.0.1 -local_proxy_port=1080 \
+  -test_case=new_conn -num_request=7200
+if [ "$?" -ne "0" ]; then
+    print_mieru_client_log
+    print_mieru_client_thread_dump
+    print_mieru_server_thread_dump
+    echo "Test new_conn failed."
+    exit 1
+fi
+
+sleep 1
+./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
+  -local_proxy_host=127.0.0.1 -local_proxy_port=1080 \
+  -test_case=reuse_conn -num_request=7200
+if [ "$?" -ne "0" ]; then
+    print_mieru_client_log
+    print_mieru_client_thread_dump
+    print_mieru_server_thread_dump
+    echo "Test reuse_conn failed."
+    exit 1
+fi
+
+# Collect profile with TCP.
+./mieru profile cpu stop
+./mita profile cpu stop
+./mieru get heap-profile /test/mieru.tcp.heap.gz
+./mita get heap-profile /test/mita.tcp.heap.gz
+
+# Stop mieru client.
+./mieru stop
+if [[ "$?" -ne 0 ]]; then
+    echo "command 'mieru stop' failed"
+    exit 1
+fi
+sleep 1
+
+# Stop mieru server proxy.
+./mita stop
+if [[ "$?" -ne 0 ]]; then
+    echo "command 'mita stop' failed"
+    exit 1
+fi
+sleep 1
+
+# Update mieru server with UDP config.
+./mita apply config server_udp.json
+if [[ "$?" -ne 0 ]]; then
+    echo "command 'mita apply config server_udp.json' failed"
+    exit 1
+fi
+echo "mieru server config:"
+./mita describe config
+
+# Start mieru server proxy.
+./mita start
+if [[ "$?" -ne 0 ]]; then
+    echo "command 'mita start' failed"
+    exit 1
+fi
+./mita profile cpu start /test/mita.udp.cpu.gz
+
+# Update mieru client with UDP config.
+./mieru apply config client_udp.json
+if [[ "$?" -ne 0 ]]; then
+    echo "command 'mieru apply config client_udp.json' failed"
+    exit 1
+fi
+echo "mieru client config:"
+./mieru describe config
+
+# Start mieru client.
+./mieru start
+if [[ "$?" -ne 0 ]]; then
+    echo "command 'mieru start' failed"
+    exit 1
+fi
+./mieru profile cpu start /test/mieru.udp.cpu.gz
 
 # Start testing.
 sleep 1
@@ -106,10 +187,11 @@ if [ "$?" -ne "0" ]; then
     exit 1
 fi
 
+# Collect profile with UDP.
 ./mieru profile cpu stop
 ./mita profile cpu stop
-./mieru get heap-profile /test/mieru.heap.gz
-./mita get heap-profile /test/mita.heap.gz
+./mieru get heap-profile /test/mieru.udp.heap.gz
+./mita get heap-profile /test/mita.udp.heap.gz
 
 print_mieru_client_log
 echo "Test is successful."

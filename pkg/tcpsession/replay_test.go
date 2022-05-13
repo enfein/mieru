@@ -1,4 +1,4 @@
-// Copyright (C) 2021  mieru authors
+// Copyright (C) 2022  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,12 +13,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package udpsession
+package tcpsession
 
 import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"sync"
 	"testing"
@@ -26,7 +27,6 @@ import (
 
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
-	"github.com/enfein/mieru/pkg/kcp"
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/recording"
 	"github.com/enfein/mieru/pkg/testtool"
@@ -34,11 +34,11 @@ import (
 
 func runCloseWaitClient(t *testing.T, laddr, raddr string, username, password []byte, clientReq, serverResp *testtool.ReplayRecord) error {
 	hashedPassword := cipher.HashPassword(password, username)
-	block, err := cipher.BlockCipherFromPassword(hashedPassword, true)
+	block, err := cipher.BlockCipherFromPassword(hashedPassword, false)
 	if err != nil {
 		return fmt.Errorf("cipher.BlockCipherFromPassword() failed: %w", err)
 	}
-	sess, err := DialWithOptions(context.Background(), "udp", laddr, raddr, block)
+	sess, err := DialWithOptions(context.Background(), "tcp", laddr, raddr, block)
 	if err != nil {
 		return fmt.Errorf("DialWithOptions() failed: %w", err)
 	}
@@ -64,8 +64,8 @@ func runCloseWaitClient(t *testing.T, laddr, raddr string, username, password []
 				continue
 			}
 			records := sess.recordedPackets.Export()
-			for j := len(records) - 1; j >= 0; j-- {
-				if records[j].Direction() == recording.Egress && len(records[j].Data()) >= 1024 {
+			for j := 0; j < len(records); j++ {
+				if records[j].Direction() == recording.Egress {
 					clientReq.Data = records[j].Data()
 					found = true
 					break
@@ -104,8 +104,8 @@ func runCloseWaitClient(t *testing.T, laddr, raddr string, username, password []
 				continue
 			}
 			records := sess.recordedPackets.Export()
-			for j := len(records) - 1; j >= 0; j-- {
-				if records[j].Direction() == recording.Ingress && len(records[j].Data()) >= 1024 {
+			for j := 0; j < len(records); j++ {
+				if records[j].Direction() == recording.Ingress {
 					serverResp.Data = records[j].Data()
 					found = true
 					break
@@ -128,103 +128,14 @@ func runCloseWaitClient(t *testing.T, laddr, raddr string, username, password []
 
 // TestReplayServerResponse creates 1 client, 1 server and 1 monitor.
 // The monitor records the traffic between the client and server, then replays
-// the server's response back to the client. The client should drop the replay
-// packet before processing it.
-func TestReplayServerResponse(t *testing.T) {
-	kcp.TestOnlySegmentDropRate = ""
-	serverAddr := "127.0.0.1:12321"
-	clientAddr := "127.0.0.1:12322"
-	attackAddr := "127.0.0.1:12323"
-	clientUDPAddr, _ := net.ResolveUDPAddr("udp", clientAddr)
-	attackUDPAddr, _ := net.ResolveUDPAddr("udp", attackAddr)
-	users := map[string]*appctlpb.User{
-		"danchaofan": {
-			Name:     "danchaofan",
-			Password: "19501125",
-		},
-	}
-
-	server, err := ListenWithOptions(serverAddr, users)
-	if err != nil {
-		t.Fatalf("ListenWithOptions() failed: %v", err)
-	}
-
-	go func() {
-		for {
-			s, err := server.Accept()
-			if err != nil {
-				return
-			} else {
-				t.Logf("[%s] accepting new connection from %v", time.Now().Format(testtool.TimeLayout), s.RemoteAddr())
-				go func() {
-					if err = testtool.TestHelperServeConn(s); err != nil {
-						return
-					}
-				}()
-			}
-		}
-	}()
-	time.Sleep(1 * time.Second)
-
-	serverResp := &testtool.ReplayRecord{
-		Ready:  make(chan struct{}),
-		Finish: make(chan struct{}),
-	}
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		if err := runCloseWaitClient(t, clientAddr, serverAddr, []byte("danchaofan"), []byte("19501125"), nil, serverResp); err != nil {
-			t.Errorf("[%s] maoanying failed: %v", time.Now().Format(testtool.TimeLayout), err)
-		}
-		wg.Done()
-	}()
-	<-serverResp.Ready
-
-	// Get the current UDP error counter.
-	errCnt := metrics.UDPInErrors
-	t.Logf("metrics.UDPInErrors value before replay: %d", metrics.UDPInErrors)
-
-	// Replay the server's response to the client.
-	replayConn, err := net.ListenUDP("udp", attackUDPAddr)
-	if err != nil {
-		t.Fatalf("net.ListenUDP() on %v failed: %v", attackUDPAddr, err)
-	}
-	defer replayConn.Close()
-	replayConn.WriteTo(serverResp.Data, clientUDPAddr)
-
-	// The UDP error counter should increase.
-	increased := false
-	for i := 0; i < 50; i++ {
-		if metrics.UDPInErrors > errCnt {
-			increased = true
-			break
-		} else {
-			time.Sleep(100 * time.Millisecond)
-		}
-	}
-	t.Logf("metrics.UDPInErrors value after replay: %d", metrics.UDPInErrors)
-	if !increased {
-		t.Errorf("metrics.UDPInErrors value %d is not changed after replay server response", metrics.UDPInErrors)
-	}
-
-	close(serverResp.Finish)
-	wg.Wait()
-	server.Close()
-	time.Sleep(1 * time.Second) // Wait for resources to be released.
-}
-
-// TestReplayServerResponse creates 1 client, 1 server and 1 monitor.
-// The monitor records the traffic between the client and server, then replays
 // the client's request to the server. The monitor should not get any response
 // from the server.
 func TestReplayClientRequest(t *testing.T) {
-	kcp.TestOnlySegmentDropRate = ""
-	serverAddr := "127.0.0.1:12324"
-	clientAddr := "127.0.0.1:12325"
-	attackAddr := "127.0.0.1:12326"
-	serverUDPAddr, _ := net.ResolveUDPAddr("udp", serverAddr)
-	attackUDPAddr, _ := net.ResolveUDPAddr("udp", attackAddr)
+	serverAddr := "127.0.0.1:12356"
+	clientAddr := "127.0.0.1:12357"
+	attackAddr := "127.0.0.1:12358"
+	serverTCPAddr, _ := net.ResolveTCPAddr("tcp", serverAddr)
+	attackTCPAddr, _ := net.ResolveTCPAddr("tcp", attackAddr)
 	users := map[string]*appctlpb.User{
 		"danchaofan": {
 			Name:     "danchaofan",
@@ -259,6 +170,7 @@ func TestReplayClientRequest(t *testing.T) {
 		Finish: make(chan struct{}),
 	}
 
+	established := metrics.CurrEstablished
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -271,15 +183,11 @@ func TestReplayClientRequest(t *testing.T) {
 
 	// Wait for server to accept the first client request.
 	for i := 0; i < 50; i++ {
-		if len(server.sessions) == 1 {
+		if metrics.CurrEstablished > established {
 			break
 		} else {
 			time.Sleep(100 * time.Millisecond)
 		}
-	}
-	t.Logf("number of UDP sessions before replay: %d", len(server.sessions))
-	if len(server.sessions) != 1 {
-		t.Errorf("number of UDP sessions before replay is not 1")
 	}
 
 	// Get the current replay counter.
@@ -287,12 +195,12 @@ func TestReplayClientRequest(t *testing.T) {
 	t.Logf("metrics.ReplayNewSession value before replay: %d", metrics.ReplayNewSession)
 
 	// Replay the client's request to the server.
-	replayConn, err := net.ListenUDP("udp", attackUDPAddr)
+	replayConn, err := net.DialTCP("tcp", attackTCPAddr, serverTCPAddr)
 	if err != nil {
-		t.Fatalf("net.ListenUDP() on %v failed: %v", attackUDPAddr, err)
+		t.Fatalf("net.DialTCP() failed: %v", err)
 	}
 	defer replayConn.Close()
-	replayConn.WriteTo(clientReq.Data, serverUDPAddr)
+	replayConn.Write(clientReq.Data)
 
 	// The replay counter should increase.
 	increased := false
@@ -309,10 +217,12 @@ func TestReplayClientRequest(t *testing.T) {
 		t.Errorf("metrics.ReplayNewSession value %d is not changed after replay client request", metrics.ReplayNewSession)
 	}
 
-	// The number of UDP sessions in the server side should not increase.
-	t.Logf("number of UDP sessions after replay: %d", len(server.sessions))
-	if len(server.sessions) > 1 {
-		t.Errorf("number of UDP sessions is changed from %d to %d after replay client request", 1, len(server.sessions))
+	// The attacker should not receive any data.
+	recvBuf := make([]byte, 1500)
+	replayConn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	n, err := replayConn.Read(recvBuf)
+	if n != 0 || err != io.EOF {
+		t.Errorf("attacker received response from server")
 	}
 
 	close(clientReq.Finish)

@@ -33,7 +33,10 @@ var (
 	// server decryption
 	ServerDirectDecrypt       uint64 // number of decryption using the cipher block associated with the connection
 	ServerFailedDirectDecrypt uint64 // number of decryption using the stored cipher block but failed
-	ServerIterateDecrypt      uint64 // number of decryption tried by iterating registered users
+
+	// client decryption
+	ClientDirectDecrypt       uint64 // number of decryption using the cipher block associated with the connection
+	ClientFailedDirectDecrypt uint64 // number of decryption using the stored cipher block but failed
 
 	// UDP packets
 	InPkts  uint64 // incoming packets count
@@ -50,13 +53,17 @@ var (
 	RetransSegs      uint64 // retransmission KCP segments
 
 	// UDP bytes
-	InBytes  uint64 // UDP bytes received
-	OutBytes uint64 // UDP bytes sent
+	UDPInBytes  uint64 // UDP bytes received
+	UDPOutBytes uint64 // UDP bytes sent
 
 	// KCP bytes
-	BytesSent     uint64 // bytes sent from upper level
-	BytesReceived uint64 // bytes received to upper level
-	PaddingSent   uint64 // bytes sent for padding purpose
+	KCPBytesSent     uint64 // KCP bytes sent from upper level
+	KCPBytesReceived uint64 // KCP bytes delivered to upper level
+	KCPPaddingSent   uint64 // KCP bytes sent for padding purpose
+
+	TCPInBytes     uint64 // TCP bytes received
+	TCPOutBytes    uint64 // TCP bytes sent
+	TCPPaddingSent uint64 // TCP bytes sent for padding purpose
 
 	// Replay protection
 	ReplayKnownSession uint64 // replay packets sent from a known session
@@ -67,6 +74,8 @@ var (
 	KCPInErrors      uint64 // packet input errors reported from KCP
 	KCPSendErrors    uint64 // packet send errors reported from KCP
 	KCPReceiveErrors uint64 // packet receive errors reported from KCP
+	TCPSendErrors    uint64 // TCP send errors
+	TCPReceiveErrors uint64 // TCP receive errors
 )
 
 var ticker *time.Ticker
@@ -117,12 +126,15 @@ func logMetrics() {
 	for {
 		select {
 		case <-ticker.C:
+			log.Infof("[metrics]")
 			LogConnections()
-			LogDecryption()
+			LogServerDecryption()
+			LogClientDecryption()
 			LogUDPPackets()
 			LogKCPSegments()
 			LogUDPBytes()
 			LogKCPBytes()
+			LogTCPBytes()
 			LogReplay()
 			LogErrors()
 		case <-done:
@@ -140,12 +152,18 @@ func LogConnections() {
 	}).Infof("[metrics - connections]")
 }
 
-func LogDecryption() {
+func LogServerDecryption() {
 	log.WithFields(log.Fields{
 		"ServerDirectDecrypt":       ServerDirectDecrypt,
 		"ServerFailedDirectDecrypt": ServerFailedDirectDecrypt,
-		"ServerIterateDecrypt":      ServerIterateDecrypt,
 	}).Infof("[metrics - server decryption]")
+}
+
+func LogClientDecryption() {
+	log.WithFields(log.Fields{
+		"ClientDirectDecrypt":       ClientDirectDecrypt,
+		"ClientFailedDirectDecrypt": ClientFailedDirectDecrypt,
+	}).Infof("[metrics - client decryption]")
 }
 
 func LogUDPPackets() {
@@ -170,17 +188,25 @@ func LogKCPSegments() {
 
 func LogUDPBytes() {
 	log.WithFields(log.Fields{
-		"InBytes":  InBytes,
-		"OutBytes": OutBytes,
+		"InBytes":  UDPInBytes,
+		"OutBytes": UDPOutBytes,
 	}).Infof("[metrics - UDP bytes]")
 }
 
 func LogKCPBytes() {
 	log.WithFields(log.Fields{
-		"BytesSent":     BytesSent,
-		"BytesReceived": BytesReceived,
-		"PaddingSent":   PaddingSent,
+		"BytesSent":     KCPBytesSent,
+		"BytesReceived": KCPBytesReceived,
+		"PaddingSent":   KCPPaddingSent,
 	}).Infof("[metrics - KCP bytes]")
+}
+
+func LogTCPBytes() {
+	log.WithFields(log.Fields{
+		"InBytes":     TCPInBytes,
+		"OutBytes":    TCPOutBytes,
+		"PaddingSent": TCPPaddingSent,
+	}).Infof("[metrics - TCP bytes]")
 }
 
 func LogReplay() {
@@ -196,5 +222,7 @@ func LogErrors() {
 		"KCPInErrors":      KCPInErrors,
 		"KCPSendErrors":    KCPSendErrors,
 		"KCPReceiveErrors": KCPReceiveErrors,
+		"TCPSendErrors":    TCPSendErrors,
+		"TCPReceiveErrors": TCPReceiveErrors,
 	}).Infof("[metrics - error]")
 }

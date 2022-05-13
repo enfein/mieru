@@ -17,6 +17,7 @@ import (
 	"github.com/enfein/mieru/pkg/kcp"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
+	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/recording"
 	"github.com/enfein/mieru/pkg/replay"
 	"github.com/enfein/mieru/pkg/rng"
@@ -27,25 +28,31 @@ import (
 )
 
 const (
-	// Reserved size at the front of KCP buffer.
+	// kcpReservedSize is the reserved size at the front of KCP buffer.
 	kcpReservedSize = 0
 
-	// Accept backlog.
+	// defaultMTU is the default MTU of packets in the network.
+	defaultMTU = 1400
+
+	// acceptBacklog is the maximum number of pending accept requests of a listener.
 	acceptBacklog = 1024
 
-	// Network connection read timeout.
+	// netConnReadTimeout is the network connection read timeout.
 	// The network connection will return error if no response for this period after request is sent.
 	netConnReadTimeout = 10 * time.Second
 
-	// Maximum idle duration before the session is auto closed.
+	// maxIdleDuration is the maximum idle duration before the session is auto closed.
 	maxIdleDuration = 120 * time.Second
 
-	// Maximum duration before a keepalive packet is sent.
+	// maxHeartbeatDuration is the maximum duration before a keepalive packet is sent.
 	maxHeartbeatDuration = 30 * time.Second
 )
 
 // zeroTime is used to clear the deadline.
 var zeroTime = time.Time{}
+
+// replayCache records possible replay in UDP sessions.
+var replayCache = replay.NewCache(600_000, 10*time.Minute)
 
 type (
 	// UDPSession defines a KCP session implemented by UDP.
@@ -53,19 +60,17 @@ type (
 		mu sync.Mutex
 
 		conn    net.PacketConn     // the underlying packet connection
-		ownConn bool               // true if we created conn internally, false if provided by caller
+		ownConn bool               // true if we created the conn, false if provided by the listener
 		kcp     *kcp.KCP           // KCP ARQ protocol
-		l       *Listener          // pointing to the Listener object if it's been accepted by a Listener
 		block   cipher.BlockCipher // block encryption object
 
 		// keepalive
 		idleDeadline  time.Time // the time when session will be auto closed due to idle
 		heartbeatTime time.Time // client only: the time when a heartbeat packet should be sent to avoid being closed
 
-		// kcp receiving is based on packets
-		// recvbuf turns packets into stream
-		recvbuf []byte
-		bufptr  []byte
+		// kcp receiving is based on packets, recvBuf turns packets into stream.
+		recvBuf    []byte
+		recvBufPtr []byte
 
 		// settings
 		remote       net.Addr      // remote peer address
@@ -75,7 +80,6 @@ type (
 		headerSize   int           // the header size additional to a KCP frame
 		ackNoDelay   bool          // send ack immediately for each incoming packet(testing purpose)
 		writeDelay   bool          // delay kcp.flush() for Write() for bulk transfer
-		dup          int           // duplicate udp packets(testing purpose)
 
 		// notifications
 		die          chan struct{} // notify current session has Closed
@@ -103,19 +107,10 @@ type (
 		buffer []byte
 		addr   net.Addr
 	}
-
-	setReadBuffer interface {
-		SetReadBuffer(bytes int) error
-	}
-
-	setWriteBuffer interface {
-		SetWriteBuffer(bytes int) error
-	}
 )
 
 // newUDPSession create a new udp session for client or server, depending on if listener is nil.
-func newUDPSession(conv uint32, l *Listener, conn net.PacketConn, ownConn bool,
-	remote net.Addr, block cipher.BlockCipher) *UDPSession {
+func newUDPSession(conv uint32, conn net.PacketConn, ownConn bool, remote net.Addr, block cipher.BlockCipher) *UDPSession {
 	sess := new(UDPSession)
 	sess.die = make(chan struct{})
 	sess.chReadEvent = make(chan struct{}, 1)
@@ -125,10 +120,9 @@ func newUDPSession(conv uint32, l *Listener, conn net.PacketConn, ownConn bool,
 	sess.remote = remote
 	sess.conn = conn
 	sess.ownConn = ownConn
-	sess.l = l
 	sess.block = block
 	sess.idleDuration = maxIdleDuration
-	sess.recvbuf = make([]byte, kcp.MaxBufSize)
+	sess.recvBuf = make([]byte, kcp.MaxBufSize)
 	sess.recordingEnabled = false
 	sess.recordedPackets = recording.NewRecords()
 
@@ -136,13 +130,9 @@ func newUDPSession(conv uint32, l *Listener, conn net.PacketConn, ownConn bool,
 		_, err := net.ResolveUDPAddr("udp", conn.LocalAddr().String())
 		if err == nil {
 			if sess.IsClient() {
-				if log.IsLevelEnabled(log.DebugLevel) {
-					log.Debugf("creating new client UDP session [%v - %v]", conn.LocalAddr(), remote)
-				}
+				log.Debugf("creating new client UDP session [%v - %v]", conn.LocalAddr(), remote)
 			} else {
-				if log.IsLevelEnabled(log.DebugLevel) {
-					log.Debugf("creating new server UDP session [%v - %v]", conn.LocalAddr(), remote)
-				}
+				log.Debugf("creating new server UDP session [%v - %v]", conn.LocalAddr(), remote)
 			}
 		}
 	}
@@ -158,6 +148,12 @@ func newUDPSession(conv uint32, l *Listener, conn net.PacketConn, ownConn bool,
 
 	sess.kcp.ReserveBytes(kcpReservedSize)
 
+	if netutil.GetIPVersion(sess.remote.String()) == netutil.IP_VERSION_4 {
+		sess.SetMtu(defaultMTU - 20 - 8 - kcp.OuterHeaderSize)
+	} else {
+		sess.SetMtu(defaultMTU - 40 - 8 - kcp.OuterHeaderSize)
+	}
+
 	if sess.IsClient() {
 		go sess.readLoop()
 		atomic.AddUint64(&metrics.ActiveOpens, 1)
@@ -172,9 +168,9 @@ func newUDPSession(conv uint32, l *Listener, conn net.PacketConn, ownConn bool,
 	}
 
 	currEst := atomic.AddUint64(&metrics.CurrEstablished, 1)
-	maxconn := atomic.LoadUint64(&metrics.MaxConn)
-	if currEst > maxconn {
-		atomic.CompareAndSwapUint64(&metrics.MaxConn, maxconn, currEst)
+	maxConn := atomic.LoadUint64(&metrics.MaxConn)
+	if currEst > maxConn {
+		atomic.CompareAndSwapUint64(&metrics.MaxConn, maxConn, currEst)
 	}
 
 	return sess
@@ -188,42 +184,40 @@ func (s *UDPSession) Read(b []byte) (n int, err error) {
 	defer s.SetReadDeadline(zeroTime)
 	for {
 		s.mu.Lock()
-		// When bufptr has remaining data, copy from bufptr.
-		if len(s.bufptr) > 0 {
-			n = copy(b, s.bufptr)
-			s.bufptr = s.bufptr[n:]
+		// When recvBufPtr has remaining data, copy from recvBufPtr.
+		if len(s.recvBufPtr) > 0 {
+			n = copy(b, s.recvBufPtr)
+			s.recvBufPtr = s.recvBufPtr[n:]
 			s.mu.Unlock()
-			atomic.AddUint64(&metrics.BytesReceived, uint64(n))
+			atomic.AddUint64(&metrics.KCPBytesReceived, uint64(n))
 			return n, nil
 		}
 
 		// Otherwise, when KCP recv queue has data, copy from recv queue.
 		if size := s.kcp.PeekSize(); size > 0 {
-			// When b is large enough. Receive data into b directly.
+			// When b is large enough, receive data into b directly.
 			if len(b) >= size {
 				if _, err = s.kcp.Recv(b); err != nil {
 					atomic.AddUint64(&metrics.KCPReceiveErrors, 1)
 				}
 				s.mu.Unlock()
-				atomic.AddUint64(&metrics.BytesReceived, uint64(size))
+				atomic.AddUint64(&metrics.KCPBytesReceived, uint64(size))
 				return size, nil
 			}
 
-			// b is not large enough, first copy to recvbuf then copy to b.
-			// If needed, resize the stream buffer to guarantee a sufficient space.
-			if cap(s.recvbuf) < size {
-				s.recvbuf = make([]byte, size)
+			// When b is not large enough, first copy to recvbuf then copy to b.
+			// If needed, resize recvBuf to guarantee a sufficient space.
+			if cap(s.recvBuf) < size {
+				s.recvBuf = make([]byte, size)
 			}
-
-			// Resize the length of recvbuf to correspond to data size.
-			s.recvbuf = s.recvbuf[:size]
-			if _, err = s.kcp.Recv(s.recvbuf); err != nil {
+			s.recvBuf = s.recvBuf[:size]
+			if _, err = s.kcp.Recv(s.recvBuf); err != nil {
 				atomic.AddUint64(&metrics.KCPReceiveErrors, 1)
 			}
-			n = copy(b, s.recvbuf)
-			s.bufptr = s.recvbuf[n:] // pointer update
+			n = copy(b, s.recvBuf)
+			s.recvBufPtr = s.recvBuf[n:]
 			s.mu.Unlock()
-			atomic.AddUint64(&metrics.BytesReceived, uint64(n))
+			atomic.AddUint64(&metrics.KCPBytesReceived, uint64(n))
 			return n, nil
 		}
 
@@ -311,7 +305,7 @@ func (s *UDPSession) WriteBuffers(v [][]byte) (n int, err error) {
 				s.uncork()
 			}
 			s.mu.Unlock()
-			atomic.AddUint64(&metrics.BytesSent, uint64(n))
+			atomic.AddUint64(&metrics.KCPBytesSent, uint64(n))
 			return n, nil
 		}
 
@@ -356,11 +350,8 @@ func (s *UDPSession) Close() error {
 	})
 
 	if once {
-		if log.IsLevelEnabled(log.DebugLevel) {
-			log.Debugf("closing UDPSession [%v - %v]", s.LocalAddr(), s.RemoteAddr())
-		}
-
-		atomic.AddUint64(&metrics.CurrEstablished, ^uint64(0)) // CurrEstab -= 1
+		log.Debugf("closing UDPSession [%v - %v]", s.LocalAddr(), s.RemoteAddr())
+		atomic.AddUint64(&metrics.CurrEstablished, ^uint64(0))
 
 		s.mu.Lock()
 
@@ -401,12 +392,12 @@ func (s *UDPSession) RemoteAddr() net.Addr {
 
 // If this UDP session is owned by client.
 func (s *UDPSession) IsClient() bool {
-	return s.l == nil
+	return s.ownConn
 }
 
 // If this UDP session is owned by proxy server.
 func (s *UDPSession) IsServer() bool {
-	return s.l != nil
+	return !s.ownConn
 }
 
 // SetDeadline sets the deadline associated with the listener. A zero time value disables the deadline.
@@ -486,15 +477,6 @@ func (s *UDPSession) SetACKNoDelay(nodelay bool) {
 	s.ackNoDelay = nodelay
 }
 
-// (deprecated)
-//
-// SetDUP duplicates udp packets for kcp output.
-func (s *UDPSession) SetDUP(dup int) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.dup = dup
-}
-
 // SetNoDelay calls KCP NoDelay().
 func (s *UDPSession) SetNoDelay(nodelay, interval, resend uint32, nc bool) {
 	s.mu.Lock()
@@ -523,30 +505,6 @@ func (s *UDPSession) SetDSCP(dscp int) error {
 
 		if succeed {
 			return nil
-		}
-	}
-	return stderror.ErrInvalidOperation
-}
-
-// SetReadBuffer sets the socket read buffer, no effect if it's accepted from Listener
-func (s *UDPSession) SetReadBuffer(bytes int) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.IsClient() {
-		if nc, ok := s.conn.(setReadBuffer); ok {
-			return nc.SetReadBuffer(bytes)
-		}
-	}
-	return stderror.ErrInvalidOperation
-}
-
-// SetWriteBuffer sets the socket write buffer, no effect if it's accepted from Listener
-func (s *UDPSession) SetWriteBuffer(bytes int) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.IsClient() {
-		if nc, ok := s.conn.(setWriteBuffer); ok {
-			return nc.SetWriteBuffer(bytes)
 		}
 	}
 	return stderror.ErrInvalidOperation
@@ -616,10 +574,12 @@ func (s *UDPSession) packetInput(data []byte) {
 	var err error
 	if len(data) >= kcp.OuterHeaderSize {
 		data, err = s.block.Decrypt(data)
+		atomic.AddUint64(&metrics.ClientDirectDecrypt, 1)
 		if err != nil {
 			if log.IsLevelEnabled(log.DebugLevel) {
 				log.Debugf("UDPSession %v: failed to decrypt input with %d bytes", s.LocalAddr(), len(data))
 			}
+			atomic.AddUint64(&metrics.ClientFailedDirectDecrypt, 1)
 			return
 		}
 		decrypted = true
@@ -632,8 +592,6 @@ func (s *UDPSession) packetInput(data []byte) {
 
 // Input decrypted packet to KCP.
 func (s *UDPSession) inputToKCP(data []byte) {
-	var kcpInErrors uint64
-
 	if log.IsLevelEnabled(log.TraceLevel) {
 		log.Tracef("UDPSession %v: input %d bytes to KCP", s.LocalAddr(), len(data))
 	}
@@ -642,7 +600,7 @@ func (s *UDPSession) inputToKCP(data []byte) {
 		if log.IsLevelEnabled(log.DebugLevel) {
 			log.Debugf("UDPSession %v: KCP input rejected with err %v", s.LocalAddr(), ret)
 		}
-		kcpInErrors++
+		atomic.AddUint64(&metrics.KCPInErrors, 1)
 	}
 	s.updateIdleDeadline(s.kcp.LastInputTime())
 	if n := s.kcp.PeekSize(); n >= 0 {
@@ -656,10 +614,7 @@ func (s *UDPSession) inputToKCP(data []byte) {
 	s.mu.Unlock()
 
 	atomic.AddUint64(&metrics.InPkts, 1)
-	atomic.AddUint64(&metrics.InBytes, uint64(len(data)))
-	if kcpInErrors > 0 {
-		atomic.AddUint64(&metrics.KCPInErrors, kcpInErrors)
-	}
+	atomic.AddUint64(&metrics.UDPInBytes, uint64(len(data)))
 }
 
 // uncork sends data to txqueue (if there is any).
@@ -692,7 +647,7 @@ func (s *UDPSession) tx(txqueue []ipMessage) {
 		}
 	}
 	atomic.AddUint64(&metrics.OutPkts, uint64(npkts))
-	atomic.AddUint64(&metrics.OutBytes, uint64(nbytes))
+	atomic.AddUint64(&metrics.UDPOutBytes, uint64(nbytes))
 }
 
 // post-processing for sending a packet from kcp core
@@ -718,15 +673,13 @@ func (s *UDPSession) outputCallback(buf []byte) {
 
 	// TxQueue and record output
 	var msg ipMessage
-	for i := 0; i < s.dup+1; i++ {
-		bts := kcp.PktCachePool.Get()[:len(encrypted)]
-		copy(bts, encrypted)
-		msg.buffer = bts
-		msg.addr = s.remote
-		s.txqueue = append(s.txqueue, msg)
-		if s.recordingEnabled {
-			s.recordedPackets.Append(bts, recording.Egress)
-		}
+	bts := kcp.PktCachePool.Get()[:len(encrypted)]
+	copy(bts, encrypted)
+	msg.buffer = bts
+	msg.addr = s.remote
+	s.txqueue = append(s.txqueue, msg)
+	if s.recordingEnabled {
+		s.recordedPackets.Append(bts, recording.Egress)
 	}
 }
 
@@ -827,39 +780,30 @@ func (s *UDPSession) stopRecording() {
 	s.recordingEnabled = false
 }
 
-type (
-	// Listener defines a server which will be waiting to accept incoming connections.
-	Listener struct {
-		users   map[string]*appctlpb.User // registered users
-		conn    net.PacketConn            // the underlying packet connection
-		ownConn bool                      // true if we created conn internally, false if provided by caller
+// Listener defines a server which will be waiting to accept incoming UDP connections.
+type Listener struct {
+	users map[string]*appctlpb.User // registered users
+	conn  net.PacketConn            // the underlying packet connection
 
-		sessions        map[string]*UDPSession // all sessions accepted by this Listener
-		sessionLock     sync.RWMutex
-		chAccepts       chan *UDPSession // Listen() backlog
-		chSessionClosed chan net.Addr    // session close queue
+	sessions    map[string]*UDPSession // all sessions accepted by this Listener
+	sessionLock sync.RWMutex           // session lock
+	chAccepts   chan *UDPSession       // Accept() backlog
 
-		die     chan struct{} // notify the listener has closed
-		dieOnce sync.Once
+	die     chan struct{} // notify the listener has closed
+	dieOnce sync.Once
 
-		// socket error handling
-		socketReadError     atomic.Value
-		chSocketReadError   chan struct{}
-		socketReadErrorOnce sync.Once
+	// socket error handling
+	socketReadError     atomic.Value
+	chSocketReadError   chan struct{}
+	socketReadErrorOnce sync.Once
 
-		rdeadline atomic.Value // read deadline for Accept()
-	}
-)
+	rdeadline atomic.Value // read deadline for Accept()
+}
 
 // -------- Listener public methods --------
 
-// Accept implements the Accept method in the Listener interface; it waits for the next call and returns a generic Conn.
+// Accept implements the Accept() method in the net.Listener interface.
 func (l *Listener) Accept() (net.Conn, error) {
-	return l.AcceptKCP()
-}
-
-// AcceptKCP accepts a KCP connection.
-func (l *Listener) AcceptKCP() (*UDPSession, error) {
 	var timeout <-chan time.Time
 	if tdeadline, ok := l.rdeadline.Load().(time.Time); ok && !tdeadline.IsZero() {
 		timeout = time.After(time.Until(tdeadline))
@@ -888,10 +832,8 @@ func (l *Listener) Close() error {
 
 	var err error
 	if once {
-		if l.ownConn {
-			err = l.conn.Close()
-			log.Infof("Listener %v: closed", l.Addr())
-		}
+		err = l.conn.Close()
+		log.Infof("Listener %v: closed", l.Addr())
 	} else {
 		err = fmt.Errorf("close after listener is already closed: %w", io.ErrClosedPipe)
 	}
@@ -899,25 +841,8 @@ func (l *Listener) Close() error {
 }
 
 // Addr returns the listener's network address.
-// The Addr returned is shared by all invocations of Addr, so do not modify it.
 func (l *Listener) Addr() net.Addr {
 	return l.conn.LocalAddr()
-}
-
-// SetReadBuffer sets the socket read buffer for the Listener
-func (l *Listener) SetReadBuffer(bytes int) error {
-	if nc, ok := l.conn.(setReadBuffer); ok {
-		return nc.SetReadBuffer(bytes)
-	}
-	return stderror.ErrInvalidOperation
-}
-
-// SetWriteBuffer sets the socket write buffer for the Listener
-func (l *Listener) SetWriteBuffer(bytes int) error {
-	if nc, ok := l.conn.(setWriteBuffer); ok {
-		return nc.SetWriteBuffer(bytes)
-	}
-	return stderror.ErrInvalidOperation
 }
 
 // SetDSCP sets the 6bit DSCP field in IPv4 header, or 8bit Traffic Class in IPv6 header.
@@ -1011,7 +936,7 @@ func (l *Listener) packetInput(raw []byte, addr net.Addr) {
 				if len(password) == 0 {
 					password = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
 				}
-				block, data, err = tryDecrypt(raw, password)
+				block, data, err = cipher.TryDecrypt(raw, password, true)
 				if err == nil {
 					decrypted = true
 					break
@@ -1031,7 +956,7 @@ func (l *Listener) packetInput(raw []byte, addr net.Addr) {
 		if isKnownSession {
 			// For an already established session, we need to put every packet into the replay cache.
 			// Since AEAD is used, only the packet prefix is added to the replay cache.
-			if replay.Cache.IsDuplicate(raw[:kcp.OuterHeaderSize]) {
+			if replayCache.IsDuplicate(raw[:kcp.OuterHeaderSize]) {
 				atomic.AddUint64(&metrics.ReplayKnownSession, 1)
 			}
 			if conv == s.kcp.ConversationID() {
@@ -1053,7 +978,7 @@ func (l *Listener) packetInput(raw []byte, addr net.Addr) {
 		if s == nil || connWithSameAddr {
 			// Do not let the new sessions overwhelm accept queue.
 			if len(l.chAccepts) < cap(l.chAccepts) {
-				if replay.Cache.IsDuplicate(raw[:kcp.OuterHeaderSize]) && s == nil {
+				if replayCache.IsDuplicate(raw[:kcp.OuterHeaderSize]) && s == nil {
 					// Found a replay attack. Don't establish the connection.
 					atomic.AddUint64(&metrics.ReplayNewSession, 1)
 					if log.IsLevelEnabled(log.DebugLevel) {
@@ -1061,7 +986,7 @@ func (l *Listener) packetInput(raw []byte, addr net.Addr) {
 					}
 					return
 				}
-				s = newUDPSession(conv, l, l.conn, false, addr, block)
+				s = newUDPSession(conv, l.conn, false, addr, block)
 				s.inputToKCP(data)
 				l.sessionLock.Lock()
 				l.sessions[addr.String()] = s
@@ -1122,7 +1047,16 @@ func ListenWithOptions(laddr string, users map[string]*appctlpb.User) (*Listener
 		return nil, fmt.Errorf("net.ListenUDP() failed: %w", err)
 	}
 
-	return serveConn(users, conn, true)
+	l := new(Listener)
+	l.users = users
+	l.conn = conn
+	l.sessions = make(map[string]*UDPSession)
+	l.chAccepts = make(chan *UDPSession, acceptBacklog)
+	l.die = make(chan struct{})
+	l.chSocketReadError = make(chan struct{})
+	schedule.System.Put(l.periodCleanTask, time.Now().Add(5*time.Second))
+	go l.readLoop()
+	return l, nil
 }
 
 // DialWithOptions connects to the remote address "raddr" on the network "udp"
@@ -1132,9 +1066,8 @@ func DialWithOptions(ctx context.Context, network, laddr, raddr string, block ci
 	switch network {
 	case "udp", "udp4", "udp6":
 	default:
-		return nil, fmt.Errorf("network %s not supported by KCP", network)
+		return nil, fmt.Errorf("network %s not supported", network)
 	}
-
 	udpRemoteAddr, err := net.ResolveUDPAddr("udp", raddr)
 	if err != nil {
 		return nil, fmt.Errorf("net.ResolveUDPAddr() failed: %w", err)
@@ -1146,6 +1079,7 @@ func DialWithOptions(ctx context.Context, network, laddr, raddr string, block ci
 			return nil, fmt.Errorf("net.ResolveUDPAddr() failed: %w", err)
 		}
 	}
+
 	conn, err := net.ListenUDP(network, udpLocalAddr)
 	if err != nil {
 		return nil, fmt.Errorf("net.ListenUDP() failed: %w", err)
@@ -1155,45 +1089,10 @@ func DialWithOptions(ctx context.Context, network, laddr, raddr string, block ci
 	if err = binary.Read(crand.Reader, binary.LittleEndian, &convid); err != nil {
 		return nil, fmt.Errorf("binary.Read() failed: %w", err)
 	}
-	return newUDPSession(convid, nil, conn, true, udpRemoteAddr, block), nil
+	return newUDPSession(convid, conn, true, udpRemoteAddr, block), nil
 }
 
+// DialWithOptionsReturnConn calls DialWithOptions and returns a generic net.Conn.
 func DialWithOptionsReturnConn(ctx context.Context, network, laddr, raddr string, block cipher.BlockCipher) (net.Conn, error) {
 	return DialWithOptions(ctx, network, laddr, raddr, block)
-}
-
-// Try to decrypt the data with all possible keys generated from the password.
-// Use CRC to validate if decryption is successful.
-// If successful, returns the block cipher as well as the decrypted results.
-func tryDecrypt(data, password []byte) (cipher.BlockCipher, []byte, error) {
-	blocks, err := cipher.BlockCipherListFromPassword(password)
-	if err != nil {
-		return nil, nil, fmt.Errorf("cipher.BlockCipherListFromPassword() failed: %w", err)
-	}
-
-	for _, block := range blocks {
-		decrypted, err := block.Decrypt(data)
-		atomic.AddUint64(&metrics.ServerIterateDecrypt, 1)
-		if err != nil {
-			continue
-		}
-		return block, decrypted, nil
-	}
-
-	return nil, nil, fmt.Errorf("unable to decrypt with the supplied password")
-}
-
-func serveConn(users map[string]*appctlpb.User, conn net.PacketConn, ownConn bool) (*Listener, error) {
-	l := new(Listener)
-	l.users = users
-	l.conn = conn
-	l.ownConn = ownConn
-	l.sessions = make(map[string]*UDPSession)
-	l.chAccepts = make(chan *UDPSession, acceptBacklog)
-	l.chSessionClosed = make(chan net.Addr)
-	l.die = make(chan struct{})
-	l.chSocketReadError = make(chan struct{})
-	schedule.System.Put(l.periodCleanTask, time.Now().Add(5*time.Second))
-	go l.readLoop()
-	return l, nil
 }

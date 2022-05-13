@@ -140,7 +140,12 @@ func (s *Server) Serve(l net.Listener) error {
 	for {
 		select {
 		case conn := <-s.chAccept:
-			go s.ServeConn(conn)
+			go func() {
+				err := s.ServeConn(conn)
+				if err != nil {
+					log.Debugf("socks5 server listener %v ServeConn() failed: %v", s.listener.Addr(), err)
+				}
+			}()
 		case err := <-s.chAcceptErr:
 			log.Errorf("encountered error when socks5 server accept new connection: %v", err)
 			log.Infof("closing socks5 server listener")
@@ -161,6 +166,9 @@ func (s *Server) Serve(l net.Listener) error {
 // ServeConn is used to serve a single connection.
 func (s *Server) ServeConn(conn net.Conn) error {
 	defer conn.Close()
+	if log.IsLevelEnabled(log.TraceLevel) {
+		log.Tracef("socks5 server starts to serve connection [%v - %v]", conn.LocalAddr(), conn.RemoteAddr())
+	}
 
 	if s.config.UseProxy {
 		// When proxy is enabled, forward all the traffic to proxy.
@@ -184,7 +192,15 @@ func (s *Server) ServeConn(conn net.Conn) error {
 			log.Fatalf("Proxy dial function is not set in socks5 server config")
 		}
 		ctx := context.Background()
-		block, err := cipher.BlockCipherFromPassword(proxyConf.Password)
+		var block cipher.BlockCipher
+		var err error
+		if proxyConf.NetworkType == "tcp" {
+			block, err = cipher.BlockCipherFromPassword(proxyConf.Password, false)
+		} else if proxyConf.NetworkType == "udp" {
+			block, err = cipher.BlockCipherFromPassword(proxyConf.Password, true)
+		} else {
+			return fmt.Errorf("proxy network type %q is not supported", proxyConf.NetworkType)
+		}
 		if err != nil {
 			return fmt.Errorf("cipher.BlockCipherFromPassword() failed: %w", err)
 		}
@@ -220,29 +236,18 @@ func (s *Server) ServeConn(conn net.Conn) error {
 		// Read the version byte.
 		version := []byte{0}
 		if _, err := bufConn.Read(version); err != nil {
-			if log.IsLevelEnabled(log.DebugLevel) {
-				log.Debugf("socks failed to get version byte: %v", err)
-			}
-			return err
+			return fmt.Errorf("failed to get version byte: %w", err)
 		}
 
 		// Ensure we are compatible.
 		if version[0] != socks5Version {
-			err := fmt.Errorf("unsupported SOCKS version: %v", version)
-			if log.IsLevelEnabled(log.DebugLevel) {
-				log.Debugf("socks %v", err)
-			}
-			return err
+			return fmt.Errorf("unsupported SOCKS version: %v", version)
 		}
 
 		// Authenticate the connection.
 		authContext, err := s.authenticate(conn, bufConn)
 		if err != nil {
-			err = fmt.Errorf("failed to authenticate: %w", err)
-			if log.IsLevelEnabled(log.DebugLevel) {
-				log.Debugf("socks %v", err)
-			}
-			return err
+			return fmt.Errorf("failed to authenticate: %w", err)
 		}
 
 		request, err := NewRequest(bufConn)
@@ -261,11 +266,7 @@ func (s *Server) ServeConn(conn net.Conn) error {
 
 		// Process the client request.
 		if err := s.handleRequest(request, conn); err != nil {
-			err = fmt.Errorf("failed to handle request: %w", err)
-			if log.IsLevelEnabled(log.DebugLevel) {
-				log.Debugf("socks %v", err)
-			}
-			return err
+			return fmt.Errorf("failed to handle request: %w", err)
 		}
 	}
 
@@ -286,6 +287,9 @@ func (s *Server) acceptLoop() {
 			return
 		}
 		s.chAccept <- conn
+		if log.IsLevelEnabled(log.TraceLevel) {
+			log.Tracef("socks5 server accepted connection [%v - %v]", conn.LocalAddr(), conn.RemoteAddr())
+		}
 	}
 }
 

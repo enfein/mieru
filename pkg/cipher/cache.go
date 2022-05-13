@@ -30,20 +30,43 @@ type cachedCiphers struct {
 
 var blockCipherCache = sync.Map{}
 
-func getBlockCipherList(password []byte) ([]BlockCipher, error) {
+// getBlockCipherList returns three BlockCipher. If stateless is true,
+// we will try to use cached BlockCipher. Otherwise, new BlockCipher is created.
+func getBlockCipherList(password []byte, stateless bool) ([]BlockCipher, error) {
 	pw := string(password)
-	c, ok := blockCipherCache.Load(pw)
-	if ok {
-		// Check if the cached entry is expired.
-		if c.(cachedCiphers).createTime.Add(cacheValidInterval).Before(time.Now()) {
-			ok = false
+
+	// Try to find []BlockCipher from cache if it is stateless.
+	if stateless {
+		c, ok := blockCipherCache.Load(pw)
+		if ok {
+			// Check if the cached entry is expired.
+			if c.(cachedCiphers).createTime.Add(cacheValidInterval).Before(time.Now()) {
+				ok = false
+			}
+		}
+		if ok {
+			return c.(cachedCiphers).cipherList, nil
 		}
 	}
-	if ok {
-		return c.(cachedCiphers).cipherList, nil
+
+	// If not stateless or not found, generate the []BlockCipher.
+	blockCiphers, t, err := newBlockCipherList(password, stateless)
+	if err != nil {
+		return nil, fmt.Errorf("newBlockCipherList() failed: %v", err)
 	}
 
-	// Otherwise, generate the []BlockCipher and insert it into the cache.
+	// Insert back to cache if it is stateless.
+	if stateless {
+		entry := cachedCiphers{
+			cipherList: blockCiphers,
+			createTime: t,
+		}
+		blockCipherCache.Store(pw, entry)
+	}
+	return blockCiphers, nil
+}
+
+func newBlockCipherList(password []byte, stateless bool) ([]BlockCipher, time.Time, error) {
 	t := time.Now()
 	salts := saltFromTime(t)
 	blockCiphers := make([]BlockCipher, 0, 3)
@@ -54,18 +77,16 @@ func getBlockCipherList(password []byte) ([]BlockCipher, error) {
 		}
 		cipherKey, err := keygen.NewKey(password, DefaultKeyLen)
 		if err != nil {
-			return nil, fmt.Errorf("NewKey() failed: %w", err)
+			return nil, t, fmt.Errorf("NewKey() failed: %w", err)
 		}
 		blockCipher, err := newAESGCMBlockCipher(cipherKey)
 		if err != nil {
-			return nil, fmt.Errorf("NewAESGCMBlockCipher() failed: %w", err)
+			return nil, t, fmt.Errorf("NewAESGCMBlockCipher() failed: %w", err)
+		}
+		if !stateless {
+			blockCipher.SetImplicitNonceMode(true)
 		}
 		blockCiphers = append(blockCiphers, blockCipher)
 	}
-	entry := cachedCiphers{
-		cipherList: blockCiphers,
-		createTime: t,
-	}
-	blockCipherCache.Store(pw, entry)
-	return entry.cipherList, nil
+	return blockCiphers, t, nil
 }

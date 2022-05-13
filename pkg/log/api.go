@@ -28,7 +28,7 @@ import (
 )
 
 // maxClientLogFiles is the maximum number of client log files stored in the disk.
-const maxClientLogFiles = 100
+const maxClientLogFiles = 25
 
 // cachedClientLogDir is the directory where client log files are stored.
 //

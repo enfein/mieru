@@ -36,6 +36,7 @@ const (
 	GetThreadDumpFailedErr                  = "get thread dump failed: %w"
 	LoadClientConfigFailedErr               = "load mieru client config failed: %w"
 	LoadServerConfigFailedErr               = "load mieru server config failed: %w"
+	SegmentSizeTooBig                       = "segment size too big"
 	ServerNotRunning                        = "mieru server daemon is not running"
 	ServerNotRunningErr                     = "mieru server daemon is not running: %w"
 	ServerProxyNotRunningErr                = "mieru server proxy is not running: %w"

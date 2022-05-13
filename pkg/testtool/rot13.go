@@ -1,4 +1,4 @@
-// Copyright (C) 2021  mieru authors
+// Copyright (C) 2022  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,15 +13,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package udpsession
+package testtool
 
 import (
 	"fmt"
 	mrand "math/rand"
+	"net"
 	"regexp"
 	"time"
-
-	"github.com/enfein/mieru/pkg/kcp"
 )
 
 // TestHelperGenRot13Input generates valid rotate-13 input.
@@ -67,9 +66,9 @@ func TestHelperRot13(in []byte) ([]byte, error) {
 
 // TestHelperServeConn serves client requests and returns the rotate-13 of
 // the input.
-func TestHelperServeConn(conn *UDPSession) error {
+func TestHelperServeConn(conn net.Conn) error {
 	defer conn.Close()
-	buf := make([]byte, kcp.MaxBufSize)
+	buf := make([]byte, 1024*1024) // maximum Read() or Write() size is 1 MB
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {

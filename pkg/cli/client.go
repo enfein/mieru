@@ -35,6 +35,7 @@ import (
 	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/socks5"
 	"github.com/enfein/mieru/pkg/stderror"
+	"github.com/enfein/mieru/pkg/tcpsession"
 	"github.com/enfein/mieru/pkg/udpsession"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -290,12 +291,21 @@ var clientRunFunc = func(s []string) error {
 		}
 		for _, bindingInfo := range serverInfo.GetPortBindings() {
 			proxyPort := bindingInfo.GetPort()
-			proxyConfigs = append(proxyConfigs, socks5.ProxyConfig{
-				NetworkType: "udp",
-				Address:     netutil.MaybeDecorateIPv6(proxyHost) + ":" + strconv.Itoa(int(proxyPort)),
-				Password:    hashedPassword,
-				Dial:        udpsession.DialWithOptionsReturnConn,
-			})
+			if bindingInfo.GetProtocol() == appctlpb.TransportProtocol_TCP {
+				proxyConfigs = append(proxyConfigs, socks5.ProxyConfig{
+					NetworkType: "tcp",
+					Address:     netutil.MaybeDecorateIPv6(proxyHost) + ":" + strconv.Itoa(int(proxyPort)),
+					Password:    hashedPassword,
+					Dial:        tcpsession.DialWithOptionsReturnConn,
+				})
+			} else if bindingInfo.GetProtocol() == appctlpb.TransportProtocol_UDP {
+				proxyConfigs = append(proxyConfigs, socks5.ProxyConfig{
+					NetworkType: "udp",
+					Address:     netutil.MaybeDecorateIPv6(proxyHost) + ":" + strconv.Itoa(int(proxyPort)),
+					Password:    hashedPassword,
+					Dial:        udpsession.DialWithOptionsReturnConn,
+				})
+			}
 		}
 	}
 
