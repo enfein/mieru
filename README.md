@@ -38,6 +38,7 @@ mieru 的翻墙原理与 shadowsocks / v2ray 等软件类似，在客户端和�
 - env
 - git
 - go (version >= 1.17)
+- make
 - sha256sum
 - tar
 - zip
@@ -51,7 +52,7 @@ mieru 的翻墙原理与 shadowsocks / v2ray 等软件类似，在客户端和�
 
 - rpmbuild
 
-编译时，进入项目根目录，调用指令 `./build.sh` 即可。编译结果会存放在项目根目录下的 `release` 文件夹。
+编译时，进入项目根目录，调用指令 `make` 即可。编译结果会存放在项目根目录下的 `release` 文件夹。
 
 ## 联系作者
 
