@@ -7,6 +7,9 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync/atomic"
+
+	"github.com/enfein/mieru/pkg/metrics"
 )
 
 const (
@@ -34,13 +37,13 @@ var (
 	unrecognizedAddrType = fmt.Errorf("unrecognized address type")
 )
 
-// AddressRewriter is used to rewrite a destination transparently
+// AddressRewriter is used to rewrite a destination transparently.
 type AddressRewriter interface {
 	Rewrite(ctx context.Context, request *Request) (context.Context, *AddrSpec)
 }
 
 // AddrSpec is used to return the target AddrSpec
-// which may be specified as IPv4, IPv6, or a FQDN
+// which may be specified as IPv4, IPv6, or a FQDN.
 type AddrSpec struct {
 	FQDN string
 	IP   net.IP
@@ -63,19 +66,19 @@ func (a AddrSpec) Address() string {
 	return net.JoinHostPort(a.FQDN, strconv.Itoa(a.Port))
 }
 
-// A Request represents request received by a server
+// A Request represents request received by a server.
 type Request struct {
-	// Protocol version
+	// Protocol version.
 	Version uint8
-	// Requested command
+	// Requested command.
 	Command uint8
-	// AuthContext provided during negotiation
+	// AuthContext provided during negotiation.
 	AuthContext *AuthContext
-	// AddrSpec of the the network that sent the request
+	// AddrSpec of the the network that sent the request.
 	RemoteAddr *AddrSpec
-	// AddrSpec of the desired destination
+	// AddrSpec of the desired destination.
 	DestAddr *AddrSpec
-	// AddrSpec of the actual destination (might be affected by rewrite)
+	// AddrSpec of the actual destination (might be affected by rewrite).
 	realDestAddr *AddrSpec
 	bufConn      io.Reader
 }
@@ -85,20 +88,20 @@ type conn interface {
 	RemoteAddr() net.Addr
 }
 
-// NewRequest creates a new Request from the tcp connection
+// NewRequest creates a new Request from the tcp connection.
 func NewRequest(bufConn io.Reader) (*Request, error) {
-	// Read the version byte
+	// Read the version byte.
 	header := []byte{0, 0, 0}
 	if _, err := io.ReadAtLeast(bufConn, header, 3); err != nil {
 		return nil, fmt.Errorf("failed to get command version: %w", err)
 	}
 
-	// Ensure we are compatible
+	// Ensure we are compatible.
 	if header[0] != socks5Version {
 		return nil, fmt.Errorf("unsupported command version: %v", header[0])
 	}
 
-	// Read in the destination address
+	// Read in the destination address.
 	dest, err := readAddrSpec(bufConn)
 	if err != nil {
 		return nil, err
@@ -114,15 +117,16 @@ func NewRequest(bufConn io.Reader) (*Request, error) {
 	return request, nil
 }
 
-// handleRequest is used for request processing after authentication
+// handleRequest is used for request processing after authentication.
 func (s *Server) handleRequest(req *Request, conn conn) error {
 	ctx := context.Background()
 
-	// Resolve the address if we have a FQDN
+	// Resolve the address if we have a FQDN.
 	dest := req.DestAddr
 	if dest.FQDN != "" {
 		ctx_, addr, err := s.config.Resolver.Resolve(ctx, dest.FQDN)
 		if err != nil {
+			atomic.AddUint64(&metrics.Socks5DNSResolveErrors, 1)
 			if err := sendReply(conn, hostUnreachable, nil); err != nil {
 				return fmt.Errorf("failed to send reply: %w", err)
 			}
@@ -132,7 +136,7 @@ func (s *Server) handleRequest(req *Request, conn conn) error {
 		dest.IP = addr
 	}
 
-	// Apply any address rewrites
+	// Apply any address rewrites.
 	req.realDestAddr = req.DestAddr
 	if s.config.Rewriter != nil {
 		ctx, req.realDestAddr = s.config.Rewriter.Rewrite(ctx, req)
@@ -143,7 +147,7 @@ func (s *Server) handleRequest(req *Request, conn conn) error {
 		return fmt.Errorf("access to localhost resource via proxy is not allowed")
 	}
 
-	// Switch on the command
+	// Switch on the command.
 	switch req.Command {
 	case ConnectCommand:
 		return s.handleConnect(ctx, conn, req)
@@ -152,6 +156,7 @@ func (s *Server) handleRequest(req *Request, conn conn) error {
 	case AssociateCommand:
 		return s.handleAssociate(ctx, conn, req)
 	default:
+		atomic.AddUint64(&metrics.Socks5UnsupportedCommandErrors, 1)
 		if err := sendReply(conn, commandNotSupported, nil); err != nil {
 			return fmt.Errorf("failed to send reply: %w", err)
 		}
@@ -159,9 +164,9 @@ func (s *Server) handleRequest(req *Request, conn conn) error {
 	}
 }
 
-// handleConnect is used to handle a connect command
+// handleConnect is used to handle a connect command.
 func (s *Server) handleConnect(ctx context.Context, conn conn, req *Request) error {
-	// Check if this is allowed
+	// Check if this is allowed.
 	if ctx_, ok := s.config.Rules.Allow(ctx, req); !ok {
 		if err := sendReply(conn, ruleFailure, nil); err != nil {
 			return fmt.Errorf("failed to send reply: %w", err)
@@ -171,7 +176,7 @@ func (s *Server) handleConnect(ctx context.Context, conn conn, req *Request) err
 		ctx = ctx_
 	}
 
-	// Attempt to connect
+	// Attempt to connect.
 	if s.config.NetworkType == "" {
 		s.config.NetworkType = "tcp"
 	}
@@ -180,10 +185,13 @@ func (s *Server) handleConnect(ctx context.Context, conn conn, req *Request) err
 	if err != nil {
 		msg := err.Error()
 		resp := hostUnreachable
+		atomic.AddUint64(&metrics.Socks5HostUnreachableErrors, 1)
 		if strings.Contains(msg, "refused") {
 			resp = connectionRefused
+			atomic.AddUint64(&metrics.Socks5ConnectionRefusedErrors, 1)
 		} else if strings.Contains(msg, "network is unreachable") {
 			resp = networkUnreachable
+			atomic.AddUint64(&metrics.Socks5NetworkUnreachableErrors, 1)
 		}
 		if err := sendReply(conn, resp, nil); err != nil {
 			return fmt.Errorf("failed to send reply: %w", err)
@@ -192,32 +200,32 @@ func (s *Server) handleConnect(ctx context.Context, conn conn, req *Request) err
 	}
 	defer target.Close()
 
-	// Send success
+	// Send success.
 	local := target.LocalAddr().(*net.TCPAddr)
 	bind := AddrSpec{IP: local.IP, Port: local.Port}
 	if err := sendReply(conn, successReply, &bind); err != nil {
 		return fmt.Errorf("failed to send reply: %w", err)
 	}
 
-	// Start proxying
+	// Start proxying.
 	errCh := make(chan error, 2)
 	go proxy(target, req.bufConn, errCh)
 	go proxy(conn, target, errCh)
 
-	// Wait
+	// Wait for connection to close.
 	for i := 0; i < 2; i++ {
 		e := <-errCh
 		if e != nil {
-			// return from this function closes target (and conn).
+			// Return from this function closes target (and conn).
 			return e
 		}
 	}
 	return nil
 }
 
-// handleBind is used to handle a connect command
+// handleBind is used to handle a bind command.
 func (s *Server) handleBind(ctx context.Context, conn conn, req *Request) error {
-	// Check if this is allowed
+	// Check if this is allowed.
 	if ctx_, ok := s.config.Rules.Allow(ctx, req); !ok {
 		if err := sendReply(conn, ruleFailure, nil); err != nil {
 			return fmt.Errorf("failed to send reply: %w", err)
@@ -227,15 +235,16 @@ func (s *Server) handleBind(ctx context.Context, conn conn, req *Request) error 
 		ctx = ctx_
 	}
 
+	atomic.AddUint64(&metrics.Socks5UnsupportedCommandErrors, 1)
 	if err := sendReply(conn, commandNotSupported, nil); err != nil {
 		return fmt.Errorf("failed to send reply: %w", err)
 	}
 	return nil
 }
 
-// handleAssociate is used to handle a connect command
+// handleAssociate is used to handle a associate command.
 func (s *Server) handleAssociate(ctx context.Context, conn conn, req *Request) error {
-	// Check if this is allowed
+	// Check if this is allowed.
 	if ctx_, ok := s.config.Rules.Allow(ctx, req); !ok {
 		if err := sendReply(conn, ruleFailure, nil); err != nil {
 			return fmt.Errorf("failed to send reply: %w", err)
@@ -245,6 +254,7 @@ func (s *Server) handleAssociate(ctx context.Context, conn conn, req *Request) e
 		ctx = ctx_
 	}
 
+	atomic.AddUint64(&metrics.Socks5UnsupportedCommandErrors, 1)
 	if err := sendReply(conn, commandNotSupported, nil); err != nil {
 		return fmt.Errorf("failed to send reply: %w", err)
 	}
@@ -252,17 +262,17 @@ func (s *Server) handleAssociate(ctx context.Context, conn conn, req *Request) e
 }
 
 // readAddrSpec is used to read AddrSpec.
-// Expects an address type byte, follwed by the address and port
+// Expects an address type byte, follwed by the address and port.
 func readAddrSpec(r io.Reader) (*AddrSpec, error) {
 	d := &AddrSpec{}
 
-	// Get the address type
+	// Get the address type.
 	addrType := []byte{0}
 	if _, err := r.Read(addrType); err != nil {
 		return nil, err
 	}
 
-	// Handle on a per type basis
+	// Handle on a per type basis.
 	switch addrType[0] {
 	case ipv4Address:
 		addr := make([]byte, 4)
@@ -293,7 +303,7 @@ func readAddrSpec(r io.Reader) (*AddrSpec, error) {
 		return nil, unrecognizedAddrType
 	}
 
-	// Read the port
+	// Read the port number.
 	port := []byte{0, 0}
 	if _, err := io.ReadAtLeast(r, port, 2); err != nil {
 		return nil, err
@@ -303,9 +313,9 @@ func readAddrSpec(r io.Reader) (*AddrSpec, error) {
 	return d, nil
 }
 
-// sendReply is used to send a reply message
+// sendReply is used to send a reply message.
 func sendReply(w io.Writer, resp uint8, addr *AddrSpec) error {
-	// Format the address
+	// Format the address.
 	var addrType uint8
 	var addrBody []byte
 	var addrPort uint16
@@ -334,17 +344,17 @@ func sendReply(w io.Writer, resp uint8, addr *AddrSpec) error {
 		return fmt.Errorf("failed to format address: %v", addr)
 	}
 
-	// Format the message
+	// Format the message.
 	msg := make([]byte, 6+len(addrBody))
 	msg[0] = socks5Version
 	msg[1] = resp
-	msg[2] = 0 // Reserved
+	msg[2] = 0 // reserved byte
 	msg[3] = addrType
 	copy(msg[4:], addrBody)
 	msg[4+len(addrBody)] = byte(addrPort >> 8)
 	msg[4+len(addrBody)+1] = byte(addrPort & 0xff)
 
-	// Send the message
+	// Send the message.
 	_, err := w.Write(msg)
 	return err
 }
@@ -354,7 +364,7 @@ type closeWriter interface {
 }
 
 // proxy is used to suffle data from src to destination, and sends errors
-// down a dedicated channel
+// down a dedicated channel.
 func proxy(dst io.Writer, src io.Reader, errCh chan error) {
 	_, err := io.Copy(dst, src)
 	if tcpConn, ok := dst.(closeWriter); ok {

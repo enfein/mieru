@@ -7,6 +7,8 @@ import (
 	"net"
 	"strings"
 	"testing"
+
+	"github.com/enfein/mieru/pkg/metrics"
 )
 
 type MockConn struct {
@@ -21,8 +23,8 @@ func (m *MockConn) RemoteAddr() net.Addr {
 	return &net.TCPAddr{IP: []byte{127, 0, 0, 1}, Port: 65432}
 }
 
-func TestRequest_Connect(t *testing.T) {
-	// Create a local listener
+func TestRequestConnect(t *testing.T) {
+	// Create a local listener as the destination target.
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("net.Listen() failed: %v", err)
@@ -50,14 +52,15 @@ func TestRequest_Connect(t *testing.T) {
 	}()
 	lAddr := l.Addr().(*net.TCPAddr)
 
-	// Make server
-	s := &Server{config: &Config{
-		Rules:                 PermitAll(),
-		Resolver:              DNSResolver{},
-		AllowLocalDestination: true,
-	}}
+	// Create a socks server.
+	s := &Server{
+		config: &Config{
+			Rules:                 PermitAll(),
+			AllowLocalDestination: true,
+		},
+	}
 
-	// Create the connect request
+	// Create the connect request.
 	buf := bytes.NewBuffer(nil)
 	buf.Write([]byte{5, 1, 0, 1, 127, 0, 0, 1})
 
@@ -65,10 +68,9 @@ func TestRequest_Connect(t *testing.T) {
 	binary.BigEndian.PutUint16(port, uint16(lAddr.Port))
 	buf.Write(port)
 
-	// Send a ping
 	buf.Write([]byte("ping"))
 
-	// Handle the request
+	// Socks server handles the request.
 	resp := &MockConn{}
 	req, err := NewRequest(buf)
 	if err != nil {
@@ -79,7 +81,7 @@ func TestRequest_Connect(t *testing.T) {
 		t.Fatalf("handleRequest() failed: %v", err)
 	}
 
-	// Verify response
+	// Verify response from socks server.
 	out := resp.buf.Bytes()
 	want := []byte{
 		5,
@@ -91,7 +93,7 @@ func TestRequest_Connect(t *testing.T) {
 		'p', 'o', 'n', 'g',
 	}
 
-	// Ignore the port for both
+	// Ignore the port number before compare the result.
 	out[8] = 0
 	out[9] = 0
 
@@ -100,8 +102,8 @@ func TestRequest_Connect(t *testing.T) {
 	}
 }
 
-func TestRequest_Connect_RuleFail(t *testing.T) {
-	// Create a local listener
+func TestRequestConnectRuleFail(t *testing.T) {
+	// Create a local listener as the destination target.
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("net.Listen() failed: %v", err)
@@ -129,14 +131,15 @@ func TestRequest_Connect_RuleFail(t *testing.T) {
 	}()
 	lAddr := l.Addr().(*net.TCPAddr)
 
-	// Make server
-	s := &Server{config: &Config{
-		Rules:                 PermitNone(),
-		Resolver:              DNSResolver{},
-		AllowLocalDestination: true,
-	}}
+	// Create a socks server.
+	s := &Server{
+		config: &Config{
+			Rules:                 PermitNone(),
+			AllowLocalDestination: true,
+		},
+	}
 
-	// Create the connect request
+	// Create the connect request.
 	buf := bytes.NewBuffer(nil)
 	buf.Write([]byte{5, 1, 0, 1, 127, 0, 0, 1})
 
@@ -144,10 +147,9 @@ func TestRequest_Connect_RuleFail(t *testing.T) {
 	binary.BigEndian.PutUint16(port, uint16(lAddr.Port))
 	buf.Write(port)
 
-	// Send a ping
 	buf.Write([]byte("ping"))
 
-	// Handle the request
+	// Socks server handles the request.
 	resp := &MockConn{}
 	req, err := NewRequest(buf)
 	if err != nil {
@@ -158,7 +160,7 @@ func TestRequest_Connect_RuleFail(t *testing.T) {
 		t.Fatalf("handleRequest() failed: %v", err)
 	}
 
-	// Verify response
+	// Verify response from socks server.
 	out := resp.buf.Bytes()
 	want := []byte{
 		5,
@@ -171,5 +173,57 @@ func TestRequest_Connect_RuleFail(t *testing.T) {
 
 	if !bytes.Equal(out, want) {
 		t.Fatalf("got %v, want %v", out, want)
+	}
+}
+
+func TestRequestUnsupportedCommand(t *testing.T) {
+	testcases := []struct {
+		req  []byte
+		resp []byte
+	}{
+		{
+			[]byte{5, BindCommand, 0, 1, 127, 0, 0, 1, 0, 1},
+			[]byte{5, commandNotSupported, 0, 1, 0, 0, 0, 0, 0, 0},
+		},
+		{
+			[]byte{5, AssociateCommand, 0, 1, 127, 0, 0, 1, 0, 1},
+			[]byte{5, commandNotSupported, 0, 1, 0, 0, 0, 0, 0, 0},
+		},
+	}
+
+	// Create a socks server.
+	s := &Server{
+		config: &Config{
+			Rules:                 PermitAll(),
+			AllowLocalDestination: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		errCnt := metrics.Socks5UnsupportedCommandErrors
+
+		// Create the connect request.
+		buf := bytes.NewBuffer(nil)
+		buf.Write(tc.req)
+
+		// Socks server handles the request.
+		resp := &MockConn{}
+		req, err := NewRequest(buf)
+		if err != nil {
+			t.Fatalf("NewRequest() failed: %v", err)
+		}
+
+		if err := s.handleRequest(req, resp); err != nil {
+			t.Fatalf("handleRequest() failed: %v", err)
+		}
+
+		// Verify response from socks server.
+		out := resp.buf.Bytes()
+		if !bytes.Equal(out, tc.resp) {
+			t.Errorf("got %v, want %v", out, tc.resp)
+		}
+		if metrics.Socks5UnsupportedCommandErrors <= errCnt {
+			t.Errorf("metrics.Socks5UnsupportedCommandErrors value is not changed")
+		}
 	}
 }

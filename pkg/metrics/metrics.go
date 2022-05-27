@@ -69,13 +69,23 @@ var (
 	ReplayKnownSession uint64 // replay packets sent from a known session
 	ReplayNewSession   uint64 // replay packets sent from a new session
 
-	// Errors
+	// UDP Errors
 	UDPInErrors      uint64 // UDP read errors reported from net.PacketConn
 	KCPInErrors      uint64 // packet input errors reported from KCP
 	KCPSendErrors    uint64 // packet send errors reported from KCP
 	KCPReceiveErrors uint64 // packet receive errors reported from KCP
+
+	// TCP Errors
 	TCPSendErrors    uint64 // TCP send errors
 	TCPReceiveErrors uint64 // TCP receive errors
+
+	// Socks5 Errors
+	Socks5HandshakeErrors          uint64 // Socks5 handshake errors
+	Socks5DNSResolveErrors         uint64 // Socks5 can't resolve DNS address
+	Socks5UnsupportedCommandErrors uint64 // Socks5 command is not supported
+	Socks5NetworkUnreachableErrors uint64 // Destination network is unreachable
+	Socks5HostUnreachableErrors    uint64 // Destination Host is unreachable
+	Socks5ConnectionRefusedErrors  uint64 // Connection is refused
 )
 
 var ticker *time.Ticker
@@ -136,7 +146,9 @@ func logMetrics() {
 			LogKCPBytes()
 			LogTCPBytes()
 			LogReplay()
-			LogErrors()
+			LogUDPErrors()
+			LogTCPErrors()
+			LogSocks5Errors()
 		case <-done:
 			return
 		}
@@ -216,13 +228,29 @@ func LogReplay() {
 	}).Infof("[metrics - replay protection]")
 }
 
-func LogErrors() {
+func LogUDPErrors() {
 	log.WithFields(log.Fields{
 		"UDPInErrors":      UDPInErrors,
 		"KCPInErrors":      KCPInErrors,
 		"KCPSendErrors":    KCPSendErrors,
 		"KCPReceiveErrors": KCPReceiveErrors,
+	}).Infof("[metrics - UDP errors]")
+}
+
+func LogTCPErrors() {
+	log.WithFields(log.Fields{
 		"TCPSendErrors":    TCPSendErrors,
 		"TCPReceiveErrors": TCPReceiveErrors,
-	}).Infof("[metrics - error]")
+	}).Infof("[metrics - TCP errors]")
+}
+
+func LogSocks5Errors() {
+	log.WithFields(log.Fields{
+		"HandshakeErrors":    Socks5HandshakeErrors,
+		"DNSResolveErrors":   Socks5DNSResolveErrors,
+		"UnsupportedCommand": Socks5UnsupportedCommandErrors,
+		"NetworkUnreachable": Socks5NetworkUnreachableErrors,
+		"HostUnreachable":    Socks5HostUnreachableErrors,
+		"ConnectionRefused":  Socks5ConnectionRefusedErrors,
+	}).Infof("[metrics - server socks5 errors]")
 }

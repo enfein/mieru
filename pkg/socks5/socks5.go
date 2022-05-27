@@ -9,9 +9,11 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"sync/atomic"
 
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
+	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/stderror"
 )
 
@@ -236,22 +238,26 @@ func (s *Server) ServeConn(conn net.Conn) error {
 		// Read the version byte.
 		version := []byte{0}
 		if _, err := bufConn.Read(version); err != nil {
+			atomic.AddUint64(&metrics.Socks5HandshakeErrors, 1)
 			return fmt.Errorf("failed to get version byte: %w", err)
 		}
 
 		// Ensure we are compatible.
 		if version[0] != socks5Version {
+			atomic.AddUint64(&metrics.Socks5HandshakeErrors, 1)
 			return fmt.Errorf("unsupported SOCKS version: %v", version)
 		}
 
 		// Authenticate the connection.
 		authContext, err := s.authenticate(conn, bufConn)
 		if err != nil {
+			atomic.AddUint64(&metrics.Socks5HandshakeErrors, 1)
 			return fmt.Errorf("failed to authenticate: %w", err)
 		}
 
 		request, err := NewRequest(bufConn)
 		if err != nil {
+			atomic.AddUint64(&metrics.Socks5HandshakeErrors, 1)
 			if err == unrecognizedAddrType {
 				if err := sendReply(conn, addrTypeNotSupported, nil); err != nil {
 					return fmt.Errorf("failed to send reply: %w", err)

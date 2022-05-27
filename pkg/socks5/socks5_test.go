@@ -10,7 +10,7 @@ import (
 )
 
 func TestSocks5Connect(t *testing.T) {
-	// Create a local listener.
+	// Create a local listener as the destination target.
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("net.Listen() failed: %v", err)
@@ -38,7 +38,7 @@ func TestSocks5Connect(t *testing.T) {
 	}()
 	lAddr := l.Addr().(*net.TCPAddr)
 
-	// Create a socks server
+	// Create a socks server.
 	creds := StaticCredentials{
 		"foo": "bar",
 	}
@@ -52,7 +52,7 @@ func TestSocks5Connect(t *testing.T) {
 		t.Fatalf("New() failed: %v", err)
 	}
 
-	// Start listening
+	// Socks server start listening.
 	go func() {
 		if err := serv.ListenAndServe("tcp", "127.0.0.1:12345"); err != nil {
 			t.Errorf("ListenAndServe() failed: %v", err)
@@ -61,13 +61,12 @@ func TestSocks5Connect(t *testing.T) {
 	}()
 	time.Sleep(10 * time.Millisecond)
 
-	// Get a local conn
+	// Dial to socks server.
 	conn, err := net.Dial("tcp", "127.0.0.1:12345")
 	if err != nil {
 		t.Fatalf("net.Dial() failed: %v", err)
 	}
 
-	// Connect, auth and connec to local
 	req := bytes.NewBuffer(nil)
 	req.Write([]byte{5})
 	req.Write([]byte{2, NoAuth, UserPassAuth})
@@ -78,13 +77,12 @@ func TestSocks5Connect(t *testing.T) {
 	binary.BigEndian.PutUint16(port, uint16(lAddr.Port))
 	req.Write(port)
 
-	// Send a ping
 	req.Write([]byte("ping"))
 
-	// Send all the bytes
+	// Send all the bytes.
 	conn.Write(req.Bytes())
 
-	// Verify response
+	// Verify response from socks server.
 	want := []byte{
 		socks5Version, UserPassAuth,
 		1, authSuccess,
@@ -103,7 +101,7 @@ func TestSocks5Connect(t *testing.T) {
 		t.Fatalf("io.ReadAtLeast() failed: %v", err)
 	}
 
-	// Ignore the port
+	// Ignore the port number before compare the result.
 	out[12] = 0
 	out[13] = 0
 

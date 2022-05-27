@@ -89,6 +89,7 @@ mieru start
 如果服务器仅有一个客户端，判断连接是否正常，只需要查看服务器日志。例如，在下面的日志示例中
 
 ```
+INFO [metrics]
 INFO [metrics - connections] ActiveOpens=0 CurrEstablished=0 MaxConn=0 PassiveOpens=0
 INFO [metrics - server decryption] ServerDirectDecrypt=0 ServerFailedDirectDecrypt=0
 INFO [metrics - client decryption] ClientDirectDecrypt=0 ClientFailedDirectDecrypt=0
@@ -98,7 +99,9 @@ INFO [metrics - UDP bytes] InBytes=0 OutBytes=0
 INFO [metrics - KCP bytes] BytesReceived=0 BytesSent=0 PaddingSent=0
 INFO [metrics - TCP bytes] InBytes=0 OutBytes=0 PaddingSent=0
 INFO [metrics - replay protection] ReplayKnownSession=0 ReplayNewSession=0
-INFO [metrics - error] KCPInErrors=0 KCPReceiveErrors=0 KCPSendErrors=0 TCPReceiveErrors=0 TCPSendErrors=0 UDPInErrors=0
+INFO [metrics - UDP errors] KCPInErrors=0 KCPReceiveErrors=0 KCPSendErrors=0 UDPInErrors=0
+INFO [metrics - TCP errors] TCPReceiveErrors=0 TCPSendErrors=0
+INFO [metrics - server socks5 errors] ConnectionRefused=0 DNSResolveErrors=0 HandshakeErrors=0 HostUnreachable=0 NetworkUnreachable=0 UnsupportedCommand=0
 ```
 
 如果 `CurrEstablished` 的值不为 0，说明此刻服务器与客户端之间有活跃的连接。如果 `ServerDirectDecrypt` 的值不为 0，说明服务器曾经成功解密了客户端发送的数据包。如果 TCP 或者 UDP 的 `OutBytes` 的值不为 0，说明服务器曾经向客户端发送过数据包。
