@@ -24,5 +24,5 @@ systemctl enable mita.service
 systemctl start mita.service
 
 ################################################################################
-# Developer note: sync this file with build/package/mita/rpm/mita.spec
+# Developer note: sync this file with build/package/mita/amd64/rpm/mita.spec
 ################################################################################

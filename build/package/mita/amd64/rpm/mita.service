@@ -17,5 +17,5 @@ RestartSec=1
 WantedBy=multi-user.target
 
 ################################################################################
-# Developer note: sync this file with build/package/mita/debian/lib/systemd/system/mita.service
+# Developer note: sync this file with build/package/mita/amd64/debian/lib/systemd/system/mita.service
 ################################################################################

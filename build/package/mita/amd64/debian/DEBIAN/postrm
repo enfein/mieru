@@ -4,5 +4,5 @@ set -e
 systemctl daemon-reload
 
 ################################################################################
-# Developer note: sync this file with build/package/mita/rpm/mita.spec
+# Developer note: sync this file with build/package/mita/amd64/rpm/mita.spec
 ################################################################################

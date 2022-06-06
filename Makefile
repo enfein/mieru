@@ -18,50 +18,86 @@ SHORT_SHA=$(shell git rev-parse --short HEAD)
 PROJECT_NAME=$(shell basename "${ROOT}")
 
 # If this version is changed, also change the version in
-# - build/package/mieru/debian/DEBIAN/control
-# - build/package/mieru/rpm/mieru.spec
-# - build/package/mita/debian/DEBIAN/control
-# - build/package/mita/rpm/mita.spec
+# - build/package/mieru/amd64/debian/DEBIAN/control
+# - build/package/mieru/amd64/rpm/mieru.spec
+# - build/package/mita/amd64/debian/DEBIAN/control
+# - build/package/mita/amd64/rpm/mita.spec
 # - docs/client-install.md
 # - docs/server-install.md
 VERSION="1.4.0"
 
-.PHONY: build bin lib deb rpm test-container fmt vet protobuf src clean clean-cache
-
 # Build binaries and installation packages.
+.PHONY: build
 build: bin deb rpm
 
 # Build binaries.
-bin: lib client-mac-amd64 client-linux-amd64 client-windows-amd64 server-linux-amd64
+.PHONY: bin
+bin: lib client-mac client-linux client-windows-amd64 server-linux
 
 # Compile go libraries and run unit tests.
+.PHONY: lib
 lib: fmt
 	CGO_ENABLED=0 go build -v ./...
 	CGO_ENABLED=0 go test -test.v -timeout=1m0s ./...
 
-# Build MacOS client.
+# Build MacOS clients.
+.PHONY: client-mac
+client-mac: client-mac-amd64 client-mac-arm64
+
+# Build MacOS amd64 client.
+.PHONY: client-mac-amd64
 client-mac-amd64:
-	mkdir -p release/darwin
-	env GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/darwin/mieru cmd/mieru/mieru.go
-	cd release/darwin;\
-		sha256sum mieru > mieru_${VERSION}_darwin.sha256.txt;\
+	mkdir -p release/darwin/amd64
+	env GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/darwin/amd64/mieru cmd/mieru/mieru.go
+	cd release/darwin/amd64;\
+		sha256sum mieru > mieru_${VERSION}_darwin_amd64.sha256.txt;\
 		tar -zcvf mieru_${VERSION}_darwin_amd64.tar.gz mieru;\
 		sha256sum mieru_${VERSION}_darwin_amd64.tar.gz > mieru_${VERSION}_darwin_amd64.tar.gz.sha256.txt
-	mv release/darwin/mieru_${VERSION}_darwin_amd64.tar.gz release/
-	mv release/darwin/mieru_${VERSION}_darwin_amd64.tar.gz.sha256.txt release/
+	mv release/darwin/amd64/mieru_${VERSION}_darwin_amd64.tar.gz release/
+	mv release/darwin/amd64/mieru_${VERSION}_darwin_amd64.tar.gz.sha256.txt release/
 
-# Build linux client.
+# Build MacOS arm64 client.
+.PHONY: client-mac-arm64
+client-mac-arm64:
+	mkdir -p release/darwin/arm64
+	env GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/darwin/arm64/mieru cmd/mieru/mieru.go
+	cd release/darwin/arm64;\
+		sha256sum mieru > mieru_${VERSION}_darwin_arm64.sha256.txt;\
+		tar -zcvf mieru_${VERSION}_darwin_arm64.tar.gz mieru;\
+		sha256sum mieru_${VERSION}_darwin_arm64.tar.gz > mieru_${VERSION}_darwin_arm64.tar.gz.sha256.txt
+	mv release/darwin/arm64/mieru_${VERSION}_darwin_arm64.tar.gz release/
+	mv release/darwin/arm64/mieru_${VERSION}_darwin_arm64.tar.gz.sha256.txt release/
+
+# Build linux clients.
+.PHONY: client-linux
+client-linux: client-linux-amd64 client-linux-arm64
+
+# Build linux amd64 client.
+.PHONY: client-linux-amd64
 client-linux-amd64:
-	mkdir -p release/linux
-	env GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/linux/mieru cmd/mieru/mieru.go
-	cd release/linux;\
-		sha256sum mieru > mieru_${VERSION}_linux.sha256.txt;\
+	mkdir -p release/linux/amd64
+	env GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/linux/amd64/mieru cmd/mieru/mieru.go
+	cd release/linux/amd64;\
+		sha256sum mieru > mieru_${VERSION}_linux_amd64.sha256.txt;\
 		tar -zcvf mieru_${VERSION}_linux_amd64.tar.gz mieru;\
 		sha256sum mieru_${VERSION}_linux_amd64.tar.gz > mieru_${VERSION}_linux_amd64.tar.gz.sha256.txt
-	mv release/linux/mieru_${VERSION}_linux_amd64.tar.gz release/
-	mv release/linux/mieru_${VERSION}_linux_amd64.tar.gz.sha256.txt release/
+	mv release/linux/amd64/mieru_${VERSION}_linux_amd64.tar.gz release/
+	mv release/linux/amd64/mieru_${VERSION}_linux_amd64.tar.gz.sha256.txt release/
 
-# Build windows client.
+# Build linux arm64 client.
+.PHONY: client-linux-arm64
+client-linux-arm64:
+	mkdir -p release/linux/arm64
+	env GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/linux/arm64/mieru cmd/mieru/mieru.go
+	cd release/linux/arm64;\
+		sha256sum mieru > mieru_${VERSION}_linux_arm64.sha256.txt;\
+		tar -zcvf mieru_${VERSION}_linux_arm64.tar.gz mieru;\
+		sha256sum mieru_${VERSION}_linux_arm64.tar.gz > mieru_${VERSION}_linux_arm64.tar.gz.sha256.txt
+	mv release/linux/arm64/mieru_${VERSION}_linux_arm64.tar.gz release/
+	mv release/linux/arm64/mieru_${VERSION}_linux_arm64.tar.gz.sha256.txt release/
+
+# Build windows amd64 client.
+.PHONY: client-windows-amd64
 client-windows-amd64:
 	mkdir -p release/windows
 	env GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/windows/mieru.exe cmd/mieru/mieru.go
@@ -72,74 +108,102 @@ client-windows-amd64:
 	mv release/windows/mieru_${VERSION}_windows_amd64.zip release/
 	mv release/windows/mieru_${VERSION}_windows_amd64.zip.sha256.txt release/
 
-# Build linux server.
+# Build linux servers.
+.PHONY: server-linux
+server-linux: server-linux-amd64 server-linux-arm64
+
+# Build linux amd64 server.
+.PHONY: server-linux-amd64
 server-linux-amd64:
-	mkdir -p release/linux
-	env GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/linux/mita cmd/mita/mita.go
-	cd release/linux;\
-		sha256sum mita > mita_${VERSION}_linux.sha256.txt;\
+	mkdir -p release/linux/amd64
+	env GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/linux/amd64/mita cmd/mita/mita.go
+	cd release/linux/amd64;\
+		sha256sum mita > mita_${VERSION}_linux_amd64.sha256.txt;\
 		tar -zcvf mita_${VERSION}_linux_amd64.tar.gz mita;\
 		sha256sum mita_${VERSION}_linux_amd64.tar.gz > mita_${VERSION}_linux_amd64.tar.gz.sha256.txt
-	mv release/linux/mita_${VERSION}_linux_amd64.tar.gz release/
-	mv release/linux/mita_${VERSION}_linux_amd64.tar.gz.sha256.txt release/
+	mv release/linux/amd64/mita_${VERSION}_linux_amd64.tar.gz release/
+	mv release/linux/amd64/mita_${VERSION}_linux_amd64.tar.gz.sha256.txt release/
+
+# Build linux arm64 server.
+.PHONY: server-linux-arm64
+server-linux-arm64:
+	mkdir -p release/linux/arm64
+	env GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/linux/arm64/mita cmd/mita/mita.go
+	cd release/linux/arm64;\
+		sha256sum mita > mita_${VERSION}_linux_arm64.sha256.txt;\
+		tar -zcvf mita_${VERSION}_linux_arm64.tar.gz mita;\
+		sha256sum mita_${VERSION}_linux_arm64.tar.gz > mita_${VERSION}_linux_arm64.tar.gz.sha256.txt
+	mv release/linux/arm64/mita_${VERSION}_linux_arm64.tar.gz release/
+	mv release/linux/arm64/mita_${VERSION}_linux_arm64.tar.gz.sha256.txt release/
 
 # Build debian installation packages.
-deb: deb-client deb-server
+.PHONY: deb
+deb: deb-client-amd64 deb-server-amd64
 
-# Build client debian installation package.
-deb-client: client-linux-amd64
+# Build client debian amd64 installation package.
+.PHONY: deb-client-amd64
+deb-client-amd64: client-linux-amd64
 	if [ ! -z $$(command -v dpkg-deb) ] && [ ! -z $$(command -v fakeroot) ]; then\
-		mkdir -p build/package/mieru/debian/usr/bin;\
-		cp release/linux/mieru build/package/mieru/debian/usr/bin/;\
-		cd build/package/mieru;\
+		rm -rf build/package/mieru/amd64/debian/usr/bin;\
+		mkdir -p build/package/mieru/amd64/debian/usr/bin;\
+		cp release/linux/amd64/mieru build/package/mieru/amd64/debian/usr/bin/;\
+		cd build/package/mieru/amd64;\
 		fakeroot dpkg-deb --build debian .;\
 		cd "${ROOT}";\
-		mv build/package/mieru/mieru_${VERSION}_amd64.deb release/;\
+		mv build/package/mieru/amd64/mieru_${VERSION}_amd64.deb release/;\
 		cd release;\
 		sha256sum mieru_${VERSION}_amd64.deb > mieru_${VERSION}_amd64.deb.sha256.txt;\
 	fi
 
-# Build server debian installation package.
-deb-server: server-linux-amd64
+# Build server debian amd64 installation package.
+.PHONY: deb-server-amd64
+deb-server-amd64: server-linux-amd64
 	if [ ! -z $$(command -v dpkg-deb) ] && [ ! -z $$(command -v fakeroot) ]; then\
-		mkdir -p build/package/mita/debian/usr/bin;\
-		cp release/linux/mita build/package/mita/debian/usr/bin/;\
-		cd build/package/mita;\
+		rm -rf build/package/mita/amd64/debian/usr/bin;\
+		mkdir -p build/package/mita/amd64/debian/usr/bin;\
+		cp release/linux/amd64/mita build/package/mita/amd64/debian/usr/bin/;\
+		cd build/package/mita/amd64;\
 		fakeroot dpkg-deb --build debian .;\
 		cd "${ROOT}";\
-		mv build/package/mita/mita_${VERSION}_amd64.deb release/;\
+		mv build/package/mita/amd64/mita_${VERSION}_amd64.deb release/;\
 		cd release;\
 		sha256sum mita_${VERSION}_amd64.deb > mita_${VERSION}_amd64.deb.sha256.txt;\
 	fi
 
 # Build RPM installation packages.
-rpm: rpm-client rpm-server
+.PHONY: rpm
+rpm: rpm-client-amd64 rpm-server-amd64
 
-# Build client RPM installation package.
-rpm-client: client-linux-amd64
+# Build client RPM amd64 installation package.
+.PHONY: rpm-client-amd64
+rpm-client-amd64: client-linux-amd64
 	if [ ! -z $$(command -v rpmbuild) ]; then\
-		cp release/linux/mieru build/package/mieru/rpm/;\
-		cd build/package/mieru/rpm;\
+		rm -rf build/package/mieru/amd64/rpm/mieru;\
+		cp release/linux/amd64/mieru build/package/mieru/amd64/rpm/;\
+		cd build/package/mieru/amd64/rpm;\
 		rpmbuild -ba --build-in-place --define "_topdir $$(pwd)" mieru.spec;\
 		cd "${ROOT}";\
-		mv build/package/mieru/rpm/RPMS/x86_64/mieru-${VERSION}-1.x86_64.rpm release/;\
+		mv build/package/mieru/amd64/rpm/RPMS/x86_64/mieru-${VERSION}-1.x86_64.rpm release/;\
 		cd release;\
 		sha256sum mieru-${VERSION}-1.x86_64.rpm > mieru-${VERSION}-1.x86_64.rpm.sha256.txt;\
 	fi
 
-# Build server RPM installation package.
-rpm-server: server-linux-amd64
+# Build server RPM amd64 installation package.
+.PHONY: rpm-server-amd64
+rpm-server-amd64: server-linux-amd64
 	if [ ! -z $$(command -v rpmbuild) ]; then\
-		cp release/linux/mita build/package/mita/rpm/;\
-		cd build/package/mita/rpm;\
+		rm -rf build/package/mita/amd64/rpm/mita;\
+		cp release/linux/amd64/mita build/package/mita/amd64/rpm/;\
+		cd build/package/mita/amd64/rpm;\
 		rpmbuild -ba --build-in-place --define "_topdir $$(pwd)" mita.spec;\
 		cd "${ROOT}";\
-		mv build/package/mita/rpm/RPMS/x86_64/mita-${VERSION}-1.x86_64.rpm release/;\
+		mv build/package/mita/amd64/rpm/RPMS/x86_64/mita-${VERSION}-1.x86_64.rpm release/;\
 		cd release;\
 		sha256sum mita-${VERSION}-1.x86_64.rpm > mita-${VERSION}-1.x86_64.rpm.sha256.txt;\
 	fi
 
 # Build a docker image to run integration tests.
+.PHONY: test-container
 test-container:
 	if [ ! -z $$(command -v docker) ]; then\
 		CGO_ENABLED=0 go build cmd/mieru/mieru.go;\
@@ -151,15 +215,18 @@ test-container:
 	fi
 
 # Format source code.
+.PHONY: fmt
 fmt:
 	CGO_ENABLED=0 go fmt ./...
 
 # Run go vet.
+.PHONY: vet
 vet:
 	CGO_ENABLED=0 go vet ./...
 
 # Generate source code from protobuf.
 # Call this after proto files are changed.
+.PHONY: protobuf
 protobuf:
 	# This protobuf compiler only works for linux amd64 machine.
 	if [ ! -x "${ROOT}/tools/build/protoc" ]; then\
@@ -189,15 +256,18 @@ protobuf:
 		"${ROOT}/pkg/appctl/proto/user.proto"
 
 # Package source code.
+.PHONY: src
 src: clean
 	cd ..; tar --exclude="${PROJECT_NAME}/.git" -zcvf source.tar.gz "${PROJECT_NAME}"; zip -r source.zip "${PROJECT_NAME}" -x \*.git\*
 	mkdir -p release; mv ../source.tar.gz release; mv ../source.zip release
 
 # Clean all the files outside the git repository.
+.PHONY: clean
 clean:
 	git clean -fxd
 
 # Clean go build cache.
+.PHONY: clean-cache
 clean-cache:
 	go clean -cache
 	go clean -testcache
