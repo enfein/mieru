@@ -1,13 +1,21 @@
 /build/package/mieru/amd64/debian/usr/bin/
 /build/package/mieru/amd64/rpm/**
 !/build/package/mieru/amd64/rpm/mieru.spec
+
+/build/package/mieru/arm64/debian/usr/bin/
+/build/package/mieru/arm64/rpm/**
+!/build/package/mieru/arm64/rpm/mieru.spec
+
 /build/package/mita/amd64/debian/usr/bin/
 /build/package/mita/amd64/rpm/**
 !/build/package/mita/amd64/rpm/mita.service
 !/build/package/mita/amd64/rpm/mita.spec
 
-/mieru
-/mita
+/build/package/mita/arm64/debian/usr/bin/
+/build/package/mita/arm64/rpm/**
+!/build/package/mita/arm64/rpm/mita.service
+!/build/package/mita/arm64/rpm/mita.spec
+
 /release
 /tools/build/**
 !/tools/build/README.md
@@ -18,3 +26,5 @@
 *.dylib
 *.deb
 *.rpm
+
+.vscode/

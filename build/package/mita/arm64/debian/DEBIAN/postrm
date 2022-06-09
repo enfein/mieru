@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+
+systemctl daemon-reload
+
+################################################################################
+# Developer note: sync this file with build/package/mita/arm64/rpm/mita.spec
+################################################################################

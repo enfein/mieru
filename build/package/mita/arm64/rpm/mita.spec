@@ -44,7 +44,7 @@ install %{name}.service %{buildroot}/lib/systemd/system/%{name}.service
 
 %post
 ################################################################################
-# Developer note: sync %post with build/package/mita/amd64/debian/DEBIAN/postinst
+# Developer note: sync %post with build/package/mita/arm64/debian/DEBIAN/postinst
 ################################################################################
 /usr/bin/id mita > /dev/null 2>&1
 rc=$?
@@ -66,7 +66,7 @@ systemctl start mita.service
 
 %preun
 ################################################################################
-# Developer note: sync %preun with build/package/mita/amd64/debian/DEBIAN/prerm
+# Developer note: sync %preun with build/package/mita/arm64/debian/DEBIAN/prerm
 ################################################################################
 set -e
 
@@ -75,7 +75,7 @@ systemctl stop mita.service
 
 %postun
 ################################################################################
-# Developer note: sync %postun with build/package/mita/amd64/debian/DEBIAN/postrm
+# Developer note: sync %postun with build/package/mita/arm64/debian/DEBIAN/postrm
 ################################################################################
 set -e
 

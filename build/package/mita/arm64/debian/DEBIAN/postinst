@@ -1,0 +1,28 @@
+#!/bin/sh
+
+# The execution sequence of upgrade debian package:
+# 1. prerm
+# 2. postrm
+# 3. preinst
+# 4. postinst
+
+/usr/bin/id mita > /dev/null 2>&1
+rc=$?
+if [ $rc -ne 0 ]; then
+    /usr/sbin/useradd --no-create-home --user-group mita
+fi
+
+set -e
+
+mkdir -p /etc/mita
+chmod 775 /etc/mita
+
+systemctl daemon-reload
+
+# Server daemon will run with the system.
+systemctl enable mita.service
+systemctl start mita.service
+
+################################################################################
+# Developer note: sync this file with build/package/mita/arm64/rpm/mita.spec
+################################################################################

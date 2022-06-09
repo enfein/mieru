@@ -20,8 +20,12 @@ PROJECT_NAME=$(shell basename "${ROOT}")
 # If this version is changed, also change the version in
 # - build/package/mieru/amd64/debian/DEBIAN/control
 # - build/package/mieru/amd64/rpm/mieru.spec
+# - build/package/mieru/arm64/debian/DEBIAN/control
+# - build/package/mieru/arm64/rpm/mieru.spec
 # - build/package/mita/amd64/debian/DEBIAN/control
 # - build/package/mita/amd64/rpm/mita.spec
+# - build/package/mita/arm64/debian/DEBIAN/control
+# - build/package/mita/arm64/rpm/mita.spec
 # - docs/client-install.md
 # - docs/server-install.md
 VERSION="1.4.0"
@@ -118,11 +122,7 @@ server-linux-amd64:
 	mkdir -p release/linux/amd64
 	env GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/linux/amd64/mita cmd/mita/mita.go
 	cd release/linux/amd64;\
-		sha256sum mita > mita_${VERSION}_linux_amd64.sha256.txt;\
-		tar -zcvf mita_${VERSION}_linux_amd64.tar.gz mita;\
-		sha256sum mita_${VERSION}_linux_amd64.tar.gz > mita_${VERSION}_linux_amd64.tar.gz.sha256.txt
-	mv release/linux/amd64/mita_${VERSION}_linux_amd64.tar.gz release/
-	mv release/linux/amd64/mita_${VERSION}_linux_amd64.tar.gz.sha256.txt release/
+		sha256sum mita > mita_${VERSION}_linux_amd64.sha256.txt
 
 # Build linux arm64 server.
 .PHONY: server-linux-arm64
@@ -130,17 +130,13 @@ server-linux-arm64:
 	mkdir -p release/linux/arm64
 	env GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/linux/arm64/mita cmd/mita/mita.go
 	cd release/linux/arm64;\
-		sha256sum mita > mita_${VERSION}_linux_arm64.sha256.txt;\
-		tar -zcvf mita_${VERSION}_linux_arm64.tar.gz mita;\
-		sha256sum mita_${VERSION}_linux_arm64.tar.gz > mita_${VERSION}_linux_arm64.tar.gz.sha256.txt
-	mv release/linux/arm64/mita_${VERSION}_linux_arm64.tar.gz release/
-	mv release/linux/arm64/mita_${VERSION}_linux_arm64.tar.gz.sha256.txt release/
+		sha256sum mita > mita_${VERSION}_linux_arm64.sha256.txt
 
 # Build debian installation packages.
 .PHONY: deb
-deb: deb-client-amd64 deb-server-amd64
+deb: deb-client-amd64 deb-client-arm64 deb-server-amd64 deb-server-arm64
 
-# Build client debian amd64 installation package.
+# Build debian client amd64 installation package.
 .PHONY: deb-client-amd64
 deb-client-amd64: client-linux-amd64
 	if [ ! -z $$(command -v dpkg-deb) ] && [ ! -z $$(command -v fakeroot) ]; then\
@@ -155,7 +151,22 @@ deb-client-amd64: client-linux-amd64
 		sha256sum mieru_${VERSION}_amd64.deb > mieru_${VERSION}_amd64.deb.sha256.txt;\
 	fi
 
-# Build server debian amd64 installation package.
+# Build debian client arm64 installation package.
+.PHONY: deb-client-arm64
+deb-client-arm64: client-linux-arm64
+	if [ ! -z $$(command -v dpkg-deb) ] && [ ! -z $$(command -v fakeroot) ]; then\
+		rm -rf build/package/mieru/arm64/debian/usr/bin;\
+		mkdir -p build/package/mieru/arm64/debian/usr/bin;\
+		cp release/linux/arm64/mieru build/package/mieru/arm64/debian/usr/bin/;\
+		cd build/package/mieru/arm64;\
+		fakeroot dpkg-deb --build debian .;\
+		cd "${ROOT}";\
+		mv build/package/mieru/arm64/mieru_${VERSION}_arm64.deb release/;\
+		cd release;\
+		sha256sum mieru_${VERSION}_arm64.deb > mieru_${VERSION}_arm64.deb.sha256.txt;\
+	fi
+
+# Build debian server amd64 installation package.
 .PHONY: deb-server-amd64
 deb-server-amd64: server-linux-amd64
 	if [ ! -z $$(command -v dpkg-deb) ] && [ ! -z $$(command -v fakeroot) ]; then\
@@ -170,36 +181,79 @@ deb-server-amd64: server-linux-amd64
 		sha256sum mita_${VERSION}_amd64.deb > mita_${VERSION}_amd64.deb.sha256.txt;\
 	fi
 
+# Build debian server arm64 installation package.
+.PHONY: deb-server-arm64
+deb-server-arm64: server-linux-arm64
+	if [ ! -z $$(command -v dpkg-deb) ] && [ ! -z $$(command -v fakeroot) ]; then\
+		rm -rf build/package/mita/arm64/debian/usr/bin;\
+		mkdir -p build/package/mita/arm64/debian/usr/bin;\
+		cp release/linux/arm64/mita build/package/mita/arm64/debian/usr/bin/;\
+		cd build/package/mita/arm64;\
+		fakeroot dpkg-deb --build debian .;\
+		cd "${ROOT}";\
+		mv build/package/mita/arm64/mita_${VERSION}_arm64.deb release/;\
+		cd release;\
+		sha256sum mita_${VERSION}_arm64.deb > mita_${VERSION}_arm64.deb.sha256.txt;\
+	fi
+
 # Build RPM installation packages.
 .PHONY: rpm
-rpm: rpm-client-amd64 rpm-server-amd64
+rpm: rpm-client-amd64 rpm-client-arm64 rpm-server-amd64 rpm-server-arm64
 
-# Build client RPM amd64 installation package.
+# Build RPM client amd64 installation package.
 .PHONY: rpm-client-amd64
 rpm-client-amd64: client-linux-amd64
 	if [ ! -z $$(command -v rpmbuild) ]; then\
 		rm -rf build/package/mieru/amd64/rpm/mieru;\
 		cp release/linux/amd64/mieru build/package/mieru/amd64/rpm/;\
 		cd build/package/mieru/amd64/rpm;\
-		rpmbuild -ba --build-in-place --define "_topdir $$(pwd)" mieru.spec;\
+		rpmbuild -bb --target x86_64 --build-in-place --define "_topdir $$(pwd)" mieru.spec;\
 		cd "${ROOT}";\
 		mv build/package/mieru/amd64/rpm/RPMS/x86_64/mieru-${VERSION}-1.x86_64.rpm release/;\
 		cd release;\
 		sha256sum mieru-${VERSION}-1.x86_64.rpm > mieru-${VERSION}-1.x86_64.rpm.sha256.txt;\
 	fi
 
-# Build server RPM amd64 installation package.
+# Build RPM client arm64 installation package.
+.PHONY: rpm-client-arm64
+rpm-client-arm64: client-linux-arm64
+	if [ ! -z $$(command -v rpmbuild) ]; then\
+		rm -rf build/package/mieru/arm64/rpm/mieru;\
+		cp release/linux/arm64/mieru build/package/mieru/arm64/rpm/;\
+		cd build/package/mieru/arm64/rpm;\
+		rpmbuild -bb --target aarch64 --build-in-place --define "_topdir $$(pwd)" mieru.spec;\
+		cd "${ROOT}";\
+		mv build/package/mieru/arm64/rpm/RPMS/aarch64/mieru-${VERSION}-1.aarch64.rpm release/;\
+		cd release;\
+		sha256sum mieru-${VERSION}-1.aarch64.rpm > mieru-${VERSION}-1.aarch64.rpm.sha256.txt;\
+	fi
+
+# Build RPM server amd64 installation package.
 .PHONY: rpm-server-amd64
 rpm-server-amd64: server-linux-amd64
 	if [ ! -z $$(command -v rpmbuild) ]; then\
 		rm -rf build/package/mita/amd64/rpm/mita;\
 		cp release/linux/amd64/mita build/package/mita/amd64/rpm/;\
 		cd build/package/mita/amd64/rpm;\
-		rpmbuild -ba --build-in-place --define "_topdir $$(pwd)" mita.spec;\
+		rpmbuild -bb --target x86_64 --build-in-place --define "_topdir $$(pwd)" mita.spec;\
 		cd "${ROOT}";\
 		mv build/package/mita/amd64/rpm/RPMS/x86_64/mita-${VERSION}-1.x86_64.rpm release/;\
 		cd release;\
 		sha256sum mita-${VERSION}-1.x86_64.rpm > mita-${VERSION}-1.x86_64.rpm.sha256.txt;\
+	fi
+
+# Build RPM server arm64 installation package.
+.PHONY: rpm-server-arm64
+rpm-server-arm64: server-linux-arm64
+	if [ ! -z $$(command -v rpmbuild) ]; then\
+		rm -rf build/package/mita/arm64/rpm/mita;\
+		cp release/linux/arm64/mita build/package/mita/arm64/rpm/;\
+		cd build/package/mita/arm64/rpm;\
+		rpmbuild -bb --target aarch64 --build-in-place --define "_topdir $$(pwd)" mita.spec;\
+		cd "${ROOT}";\
+		mv build/package/mita/arm64/rpm/RPMS/aarch64/mita-${VERSION}-1.aarch64.rpm release/;\
+		cd release;\
+		sha256sum mita-${VERSION}-1.aarch64.rpm > mita-${VERSION}-1.aarch64.rpm.sha256.txt;\
 	fi
 
 # Build a docker image to run integration tests.
