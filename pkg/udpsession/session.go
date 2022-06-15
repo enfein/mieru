@@ -48,11 +48,16 @@ const (
 	maxHeartbeatDuration = 30 * time.Second
 )
 
-// zeroTime is used to clear the deadline.
-var zeroTime = time.Time{}
+var (
+	// zeroTime is used to clear the deadline.
+	zeroTime = time.Time{}
 
-// replayCache records possible replay in UDP sessions.
-var replayCache = replay.NewCache(600_000, 10*time.Minute)
+	// replayCache records possible replay in UDP sessions.
+	replayCache = replay.NewCache(600_000, 10*time.Minute)
+
+	// globalMTU is the L2 MTU used by all the UDP sessions.
+	globalMTU int32 = defaultMTU
+)
 
 type (
 	// UDPSession defines a KCP session implemented by UDP.
@@ -149,9 +154,9 @@ func newUDPSession(conv uint32, conn net.PacketConn, ownConn bool, remote net.Ad
 	sess.kcp.ReserveBytes(kcpReservedSize)
 
 	if netutil.GetIPVersion(sess.remote.String()) == netutil.IP_VERSION_4 {
-		sess.SetMtu(defaultMTU - 20 - 8 - kcp.OuterHeaderSize)
+		sess.SetMtu(int(globalMTU) - 20 - 8 - kcp.OuterHeaderSize)
 	} else {
-		sess.SetMtu(defaultMTU - 40 - 8 - kcp.OuterHeaderSize)
+		sess.SetMtu(int(globalMTU) - 40 - 8 - kcp.OuterHeaderSize)
 	}
 
 	if sess.IsClient() {
@@ -1095,4 +1100,13 @@ func DialWithOptions(ctx context.Context, network, laddr, raddr string, block ci
 // DialWithOptionsReturnConn calls DialWithOptions and returns a generic net.Conn.
 func DialWithOptionsReturnConn(ctx context.Context, network, laddr, raddr string, block cipher.BlockCipher) (net.Conn, error) {
 	return DialWithOptions(ctx, network, laddr, raddr, block)
+}
+
+// SetGlobalMTU adjust the L2 MTU of all UDP sessions.
+// It does nothing if the MTU value is out of range.
+func SetGlobalMTU(mtu int32) {
+	if mtu >= 1280 && mtu <= 1500 {
+		atomic.StoreInt32(&globalMTU, mtu)
+		log.Infof("UDP session MTU is set to %d", mtu)
+	}
 }

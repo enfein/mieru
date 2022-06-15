@@ -262,6 +262,11 @@ var serverRunFunc = func(s []string) error {
 	if err = appctl.ValidateFullServerConfig(config); err == nil {
 		appctl.SetAppStatus(appctlpb.AppStatus_STARTING)
 
+		// Set MTU for UDP sessions.
+		if config.GetMtu() != 0 {
+			udpsession.SetGlobalMTU(config.GetMtu())
+		}
+
 		n := len(config.GetPortBindings())
 		var proxyTasks sync.WaitGroup
 		var initProxyTasks sync.WaitGroup

@@ -11,6 +11,5 @@
             "password": "fa7206ed2a94"
         }
     ],
-    "loggingLevel": "DEBUG",
-    "mtu": 1300
+    "mtu": 500
 }

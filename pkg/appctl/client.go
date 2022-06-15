@@ -327,6 +327,7 @@ func DeleteClientConfigProfile(profileName string) error {
 // 2.4.3. the server has at least 1 port binding, and for each port binding
 // 2.4.3.1. port number is valid
 // 2.4.3.2. protocol is valid
+// 2.5. if set, MTU is valid
 func ValidateClientConfigPatch(patch *pb.ClientConfig) error {
 	for _, profile := range patch.GetProfiles() {
 		name := profile.GetProfileName()
@@ -363,6 +364,9 @@ func ValidateClientConfigPatch(patch *pb.ClientConfig) error {
 					return fmt.Errorf("server protocol is not set")
 				}
 			}
+		}
+		if profile.GetMtu() != 0 && (profile.GetMtu() < 1280 || profile.GetMtu() > 1500) {
+			return fmt.Errorf("MTU value %d is out of range, valid range is [1280, 1500]", profile.GetMtu())
 		}
 	}
 	return nil

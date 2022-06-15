@@ -104,10 +104,16 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 		return &pb.Empty{}, nil
 	}
 
+	SetAppStatus(pb.AppStatus_STARTING)
+
+	// Set MTU for UDP sessions.
+	if config.GetMtu() != 0 {
+		udpsession.SetGlobalMTU(config.GetMtu())
+	}
+
 	n := len(config.GetPortBindings())
 	var initProxyTasks sync.WaitGroup
 	initProxyTasks.Add(n)
-	SetAppStatus(pb.AppStatus_STARTING)
 
 	for i := 0; i < n; i++ {
 		// Create the egress socks5 server.
@@ -464,6 +470,7 @@ func DeleteServerUsers(names []string) error {
 // 2. for each user
 // 2.1. user name is not empty
 // 2.2. user has either a password or a hashed password
+// 3. if set, MTU is valid
 func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 	for _, portBinding := range patch.GetPortBindings() {
 		port := portBinding.GetPort()
@@ -482,6 +489,9 @@ func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 		if user.GetPassword() == "" && user.GetHashedPassword() == "" {
 			return fmt.Errorf("user password is not set")
 		}
+	}
+	if patch.GetMtu() != 0 && (patch.GetMtu() < 1280 || patch.GetMtu() > 1500) {
+		return fmt.Errorf("MTU value %d is out of range, valid range is [1280, 1500]", patch.GetMtu())
 	}
 	return nil
 }
@@ -557,12 +567,19 @@ func mergeServerConfig(dst, src *pb.ServerConfig) error {
 	} else {
 		loggingLevel = dst.GetLoggingLevel()
 	}
+	var mtu int32
+	if src.GetMtu() != 0 {
+		mtu = src.GetMtu()
+	} else {
+		mtu = dst.GetMtu()
+	}
 
 	proto.Reset(dst)
 	dst.PortBindings = mergedPortBindings
 	dst.Users = mergedUsers
 	dst.AdvancedSettings = advancedSettings
 	dst.LoggingLevel = loggingLevel
+	dst.Mtu = mtu
 	return nil
 }
 

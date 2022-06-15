@@ -32,6 +32,10 @@ message ClientProfile {
 
     // A list of servers to connect.
     repeated ServerEndpoint servers = 3;
+
+    // Maximum transmission unit of L2 payload.
+    // This setting only applies to UDP protocol.
+    int32 mtu = 4;
 }
 
 message ClientAdvancedSettings {}

@@ -33,7 +33,8 @@
                         }
                     ]
                 }
-            ]
+            ],
+            "mtu": 1350
         },
         {
             "profileName": "new",
@@ -51,7 +52,8 @@
                         }
                     ]
                 }
-            ]
+            ],
+            "mtu": 1400
         }
     ],
     "activeProfile": "new",

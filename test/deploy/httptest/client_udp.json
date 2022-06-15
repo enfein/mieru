@@ -28,7 +28,8 @@
                         }
                     ]
                 }
-            ]
+            ],
+            "mtu": 1460
         }
     ],
     "activeProfile": "default",

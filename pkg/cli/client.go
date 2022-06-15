@@ -309,6 +309,11 @@ var clientRunFunc = func(s []string) error {
 		}
 	}
 
+	// Set MTU for UDP sessions.
+	if activeProfile.GetMtu() != 0 {
+		udpsession.SetGlobalMTU(activeProfile.GetMtu())
+	}
+
 	// Create the local socks5 server.
 	socks5Config := &socks5.Config{
 		UseProxy:  true,

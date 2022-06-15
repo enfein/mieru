@@ -42,6 +42,9 @@ message ServerConfig {
     // Server logging level.
     LoggingLevel loggingLevel = 4;
 
+    // Maximum transmission unit of L2 payload.
+    // This setting only applies to UDP protocol.
+    int32 mtu = 5;
 }
 
 service ServerConfigService {

@@ -23,5 +23,6 @@
             "password": "c30ce98ebe45"
         }
     ],
-    "loggingLevel": "INFO"
+    "loggingLevel": "INFO",
+    "mtu": 1400
 }
