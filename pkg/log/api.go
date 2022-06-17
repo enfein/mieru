@@ -155,14 +155,22 @@ func RemoveOldClientLogFiles() error {
 }
 
 // prepareClientLogDir creates client log directory is needed.
+// If environment variable MIERU_LOG_DIR is specified, that value is used.
 func prepareClientLogDir() error {
 	if cachedClientLogDir != "" {
 		return os.MkdirAll(cachedClientLogDir, 0755)
 	}
-	cacheDir, err := os.UserCacheDir()
-	if err != nil {
-		return err
+
+	if v, found := os.LookupEnv("MIERU_LOG_DIR"); found {
+		v = strings.TrimSpace(v)
+		v = strings.TrimSuffix(v, string(os.PathSeparator))
+		cachedClientLogDir = v
+	} else {
+		cacheDir, err := os.UserCacheDir()
+		if err != nil {
+			return err
+		}
+		cachedClientLogDir = cacheDir + string(os.PathSeparator) + "mieru"
 	}
-	cachedClientLogDir = cacheDir + string(os.PathSeparator) + "mieru"
 	return os.MkdirAll(cachedClientLogDir, 0755)
 }

@@ -21,6 +21,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"sync"
@@ -39,18 +40,20 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// ServerUDS is the UNIX domain socket that server is listening to RPC requests.
-const ServerUDS = "/var/run/mita.sock"
+const (
+	// ServerUDS is the UNIX domain socket that server is listening to RPC requests.
+	ServerUDS = "/var/run/mita.sock"
+)
 
 var (
 	// ServerRPCServerStarted is closed when server RPC server is started.
 	ServerRPCServerStarted chan struct{} = make(chan struct{})
 
-	// serverIOLock is required to load server config and store server config.
-	serverIOLock sync.Mutex
-
 	cachedServerConfigDir      string = "/etc/mita"
 	cachedServerConfigFilePath string = "/etc/mita/server.conf.pb"
+
+	// serverIOLock is required to load server config and store server config.
+	serverIOLock sync.Mutex
 
 	// serverRPCServerRef holds a pointer to server RPC server.
 	serverRPCServerRef atomic.Value
@@ -337,13 +340,12 @@ func LoadServerConfig() (*pb.ServerConfig, error) {
 	serverIOLock.Lock()
 	defer serverIOLock.Unlock()
 
-	err := checkServerConfigDir()
-	if err != nil {
-		return nil, fmt.Errorf("checkServerConfigDir() failed: %w", err)
-	}
 	fileName, err := serverConfigFilePath()
 	if err != nil {
 		return nil, fmt.Errorf("serverConfigFilePath() failed: %w", err)
+	}
+	if err := checkServerConfigDir(); err != nil {
+		return nil, fmt.Errorf("checkServerConfigDir() failed: %w", err)
 	}
 
 	if log.IsLevelEnabled(log.DebugLevel) {
@@ -381,13 +383,12 @@ func StoreServerConfig(config *pb.ServerConfig) error {
 	}
 	config.Users = HashUserPasswords(config.GetUsers(), false)
 
-	err := checkServerConfigDir()
-	if err != nil {
-		return fmt.Errorf("checkServerConfigDir() failed: %w", err)
-	}
 	fileName, err := serverConfigFilePath()
 	if err != nil {
 		return fmt.Errorf("serverConfigFilePath() failed: %w", err)
+	}
+	if err := checkServerConfigDir(); err != nil {
+		return fmt.Errorf("checkServerConfigDir() failed: %w", err)
 	}
 
 	b, err := proto.Marshal(config)
@@ -522,7 +523,12 @@ func checkServerConfigDir() error {
 }
 
 // serverConfigFilePath returns the server config file path.
+// If environment variable MITA_CONFIG_FILE is specified, that value is returned.
 func serverConfigFilePath() (string, error) {
+	if v, found := os.LookupEnv("MITA_CONFIG_FILE"); found {
+		cachedServerConfigFilePath = v
+		cachedServerConfigDir = filepath.Dir(v)
+	}
 	return cachedServerConfigFilePath, nil
 }
 

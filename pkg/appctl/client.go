@@ -21,6 +21,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"sync"
@@ -196,13 +197,12 @@ func LoadClientConfig() (*pb.ClientConfig, error) {
 	clientIOLock.Lock()
 	defer clientIOLock.Unlock()
 
-	err := prepareClientConfigDir()
-	if err != nil {
-		return nil, fmt.Errorf("prepareClientConfigDir() failed: %w", err)
-	}
 	fileName, err := clientConfigFilePath()
 	if err != nil {
 		return nil, fmt.Errorf("clientConfigFilePath() failed: %w", err)
+	}
+	if err := prepareClientConfigDir(); err != nil {
+		return nil, fmt.Errorf("prepareClientConfigDir() failed: %w", err)
 	}
 
 	if log.IsLevelEnabled(log.DebugLevel) {
@@ -235,13 +235,12 @@ func StoreClientConfig(config *pb.ClientConfig) error {
 	clientIOLock.Lock()
 	defer clientIOLock.Unlock()
 
-	err := prepareClientConfigDir()
-	if err != nil {
-		return fmt.Errorf("prepareClientConfigDir() failed: %w", err)
-	}
 	fileName, err := clientConfigFilePath()
 	if err != nil {
 		return fmt.Errorf("clientConfigFilePath() failed: %w", err)
+	}
+	if err := prepareClientConfigDir(); err != nil {
+		return fmt.Errorf("prepareClientConfigDir() failed: %w", err)
 	}
 
 	for _, profile := range config.GetProfiles() {
@@ -445,15 +444,20 @@ func prepareClientConfigDir() error {
 }
 
 // clientConfigFilePath returns the client config file path.
+// If environment variable MIERU_CONFIG_FILE is specified, that value is returned.
 func clientConfigFilePath() (string, error) {
 	if cachedClientConfigFilePath != "" {
 		return cachedClientConfigFilePath, nil
 	}
-	if cachedClientConfigDir == "" {
-		err := prepareClientConfigDir()
-		if err != nil {
-			return "", fmt.Errorf("prepareClientConfigDir() failed: %w", err)
-		}
+
+	if v, found := os.LookupEnv("MIERU_CONFIG_FILE"); found {
+		cachedClientConfigFilePath = v
+		cachedClientConfigDir = filepath.Dir(v)
+		return cachedClientConfigFilePath, nil
+	}
+
+	if err := prepareClientConfigDir(); err != nil {
+		return "", fmt.Errorf("prepareClientConfigDir() failed: %w", err)
 	}
 	cachedClientConfigFilePath = cachedClientConfigDir + string(os.PathSeparator) + "client.conf.pb"
 	return cachedClientConfigFilePath, nil

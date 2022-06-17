@@ -2,7 +2,6 @@
 Description=Mieru proxy server
 After=network-online.target network.service networking.service NetworkManager.service systemd-networkd.service
 Wants=network-online.target
-AssertPathExists=/etc/mita
 StartLimitBurst=5
 StartLimitIntervalSec=60
 
