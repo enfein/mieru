@@ -15,9 +15,10 @@
             "password": "shilishanlubuhuanjian"
         },
         {
-            "name": "jianchiqingling",
-            "password": "touzhele"
+            "name": "dongtaiqingling",
+            "password": "jiasu"
         }
     ],
-    "loggingLevel": "INFO"
+    "loggingLevel": "INFO",
+    "mtu": 1400
 }

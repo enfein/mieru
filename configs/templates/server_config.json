@@ -11,5 +11,6 @@
             "password": "<your-password>"
         }
     ],
-    "loggingLevel": "INFO"
+    "loggingLevel": "INFO",
+    "mtu": 1400
 }
