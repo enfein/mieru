@@ -16,12 +16,18 @@
 package rng
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	mrand "math/rand"
+	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 var once sync.Once
+
+var hostFixedValue atomic.Value
 
 // InitSeed initializes the random seed.
 func InitSeed() {
@@ -58,6 +64,22 @@ func RandTime(begin, end time.Time) time.Time {
 	randSec := randNano / 1000000000
 	randNano = randNano % 1000000000
 	return time.Unix(randSec, randNano)
+}
+
+// FixedInt returns an integer that always stays the same within one machine.
+// The return value is bitwise AND with the mask.
+func FixedInt(mask int) int {
+	v, ok := hostFixedValue.Load().(int)
+	if !ok {
+		name, err := os.Hostname()
+		if err != nil {
+			name = ""
+		}
+		b := sha256.Sum256([]byte(name))
+		v = int(binary.BigEndian.Uint32(b[:]))
+		hostFixedValue.Store(v)
+	}
+	return v & mask
 }
 
 // scaleDown returns a random number from [0.0, 1.0), where

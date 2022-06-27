@@ -58,9 +58,6 @@ const (
 	IKCP_PROBE_LIMIT      = 120000 // maxinum window probe timeout
 	IKCP_SN_OFFSET        = 12     // offset to get sequence number in KCP header
 	IKCP_TOTAL_LEN_OFFSET = 22     // offset to get segment total length (data + padding)
-
-	// maxPaddingSize is the maximum size of padding added to a single KCP segment.
-	maxPaddingSize = 256
 )
 
 var (
@@ -77,6 +74,9 @@ var (
 
 	// refTime is a monotonic reference time point.
 	refTime time.Time = time.Now()
+
+	// maxPaddingSize is the maximum size of padding added to a single KCP segment.
+	maxPaddingSize = 256 + rng.FixedInt(0x0000_00ff)
 )
 
 func init() {

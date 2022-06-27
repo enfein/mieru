@@ -49,9 +49,6 @@ const (
 	// useful + padding payload length.
 	PayloadOverhead = 4
 
-	// maxPaddingSize is the maximum size of padding added to a single TCP payload.
-	maxPaddingSize = 256
-
 	baseWriteChunkSize = 9000
 
 	maxWriteChunkSize = MaxPayloadSize - PayloadOverhead
@@ -60,8 +57,13 @@ const (
 	acceptBacklog = 1024
 )
 
-// replayCache records possible replay in TCP sessions.
-var replayCache = replay.NewCache(1200_000, 10*time.Minute)
+var (
+	// replayCache records possible replay in TCP sessions.
+	replayCache = replay.NewCache(1200_000, 10*time.Minute)
+
+	// maxPaddingSize is the maximum size of padding added to a single TCP payload.
+	maxPaddingSize = 256 + rng.FixedInt(0x0000_00ff)
+)
 
 // TCPSession defines a TCP session.
 type TCPSession struct {

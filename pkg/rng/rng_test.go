@@ -44,3 +44,12 @@ func TestRandTime(t *testing.T) {
 		t.Errorf("generated rand time is out of range")
 	}
 }
+
+func TestFixedInt(t *testing.T) {
+	InitSeed()
+	v := FixedInt(0x000000ff)
+	v2 := FixedInt(0x000000ff)
+	if v2 != v {
+		t.Errorf("FixedInt() = %d, want %d", v2, v)
+	}
+}
