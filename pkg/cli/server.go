@@ -298,7 +298,7 @@ var serverRunFunc = func(s []string) error {
 					if err != nil {
 						log.Fatalf("tcpsession.ListenWithOptions(%q) failed: %v", socks5Addr, err)
 					}
-					l.(*tcpsession.TCPSessionListener).SetSuppressFirstNError(rng.IntRange(1_000_000_000, 2_000_000_000))
+					l.(*tcpsession.TCPSessionListener).SetSuppressFirstNError(rng.IntRange(0, 10))
 				} else if protocol == appctlpb.TransportProtocol_UDP {
 					l, err = udpsession.ListenWithOptions(socks5Addr, appctl.UserListToMap(config.GetUsers()))
 					if err != nil {

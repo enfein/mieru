@@ -143,7 +143,7 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 				if err != nil {
 					log.Fatalf("tcpsession.ListenWithOptions(%q) failed: %v", socks5Addr, err)
 				}
-				l.(*tcpsession.TCPSessionListener).SetSuppressFirstNError(rng.IntRange(1_000_000_000, 2_000_000_000))
+				l.(*tcpsession.TCPSessionListener).SetSuppressFirstNError(rng.IntRange(0, 10))
 			} else if protocol == pb.TransportProtocol_UDP {
 				l, err = udpsession.ListenWithOptions(socks5Addr, UserListToMap(config.GetUsers()))
 				if err != nil {
