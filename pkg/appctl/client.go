@@ -197,7 +197,7 @@ func LoadClientConfig() (*pb.ClientConfig, error) {
 	clientIOLock.Lock()
 	defer clientIOLock.Unlock()
 
-	fileName, err := clientConfigFilePath()
+	fileName, fileType, err := clientConfigFilePath()
 	if err != nil {
 		return nil, fmt.Errorf("clientConfigFilePath() failed: %w", err)
 	}
@@ -222,9 +222,17 @@ func LoadClientConfig() (*pb.ClientConfig, error) {
 	}
 
 	c := &pb.ClientConfig{}
-	err = proto.Unmarshal(b, c)
-	if err != nil {
-		return nil, fmt.Errorf("proto.Unmarshal() failed: %w", err)
+	switch fileType {
+	case PROTOBUF_CONFIG_FILE_TYPE:
+		if err := proto.Unmarshal(b, c); err != nil {
+			return nil, fmt.Errorf("proto.Unmarshal() failed: %w", err)
+		}
+	case JSON_CONFIG_FILE_TYPE:
+		if err := Unmarshal(b, c); err != nil {
+			return nil, fmt.Errorf("Unmarshal() failed: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("config file type is invalid")
 	}
 
 	return c, nil
@@ -235,7 +243,7 @@ func StoreClientConfig(config *pb.ClientConfig) error {
 	clientIOLock.Lock()
 	defer clientIOLock.Unlock()
 
-	fileName, err := clientConfigFilePath()
+	fileName, fileType, err := clientConfigFilePath()
 	if err != nil {
 		return fmt.Errorf("clientConfigFilePath() failed: %w", err)
 	}
@@ -247,9 +255,18 @@ func StoreClientConfig(config *pb.ClientConfig) error {
 		profile.User = HashUserPassword(profile.GetUser(), true)
 	}
 
-	b, err := proto.Marshal(config)
-	if err != nil {
-		return fmt.Errorf("proto.Marshal() failed: %w", err)
+	var b []byte
+	switch fileType {
+	case PROTOBUF_CONFIG_FILE_TYPE:
+		if b, err = proto.Marshal(config); err != nil {
+			return fmt.Errorf("proto.Marshal() failed: %w", err)
+		}
+	case JSON_CONFIG_FILE_TYPE:
+		if b, err = Marshal(config); err != nil {
+			return fmt.Errorf("Marshal() failed: %w", err)
+		}
+	default:
+		return fmt.Errorf("config file type is invalid")
 	}
 
 	err = os.WriteFile(fileName, b, 0660)
@@ -443,28 +460,35 @@ func prepareClientConfigDir() error {
 	return os.MkdirAll(cachedClientConfigDir, 0755)
 }
 
-// clientConfigFilePath returns the client config file path.
-// If environment variable MIERU_CONFIG_FILE is specified, that value is returned.
-func clientConfigFilePath() (string, error) {
+// clientConfigFilePath returns the client config file path and file type.
+// If environment variable MIERU_CONFIG_FILE or MIERU_CONFIG_JSON_FILE is specified,
+// those values are returned.
+func clientConfigFilePath() (string, ConfigFileType, error) {
 	if cachedClientConfigFilePath != "" {
-		return cachedClientConfigFilePath, nil
+		return cachedClientConfigFilePath, FindConfigFileType(cachedClientConfigFilePath), nil
 	}
 
 	if v, found := os.LookupEnv("MIERU_CONFIG_FILE"); found {
 		cachedClientConfigFilePath = v
 		cachedClientConfigDir = filepath.Dir(v)
-		return cachedClientConfigFilePath, nil
+		return cachedClientConfigFilePath, PROTOBUF_CONFIG_FILE_TYPE, nil
+	}
+	if v, found := os.LookupEnv("MIERU_CONFIG_JSON_FILE"); found {
+		cachedClientConfigFilePath = v
+		cachedClientConfigDir = filepath.Dir(v)
+		return cachedClientConfigFilePath, JSON_CONFIG_FILE_TYPE, nil
 	}
 
 	if err := prepareClientConfigDir(); err != nil {
-		return "", fmt.Errorf("prepareClientConfigDir() failed: %w", err)
+		return "", INVALID_CONFIG_FILE_TYPE, fmt.Errorf("prepareClientConfigDir() failed: %w", err)
 	}
 	cachedClientConfigFilePath = cachedClientConfigDir + string(os.PathSeparator) + "client.conf.pb"
-	return cachedClientConfigFilePath, nil
+	return cachedClientConfigFilePath, FindConfigFileType(cachedClientConfigFilePath), nil
 }
 
 // mergeClientConfigByProfile merges the source client config into destination.
-// If a profile is specified in source, it is added to destination, or replacing existing profile in destination.
+// If a profile is specified in source, it is added to destination,
+// or replacing existing profile in destination.
 func mergeClientConfigByProfile(dst, src *pb.ClientConfig) {
 	dstMapping := map[string]*pb.ClientProfile{}
 	srcMapping := map[string]*pb.ClientProfile{}
@@ -535,7 +559,7 @@ func mergeClientConfigByProfile(dst, src *pb.ClientConfig) {
 
 // deleteClientConfigFile deletes the client config file.
 func deleteClientConfigFile() error {
-	path, err := clientConfigFilePath()
+	path, _, err := clientConfigFilePath()
 	if err != nil {
 		return fmt.Errorf("clientConfigFilePath() failed: %w", err)
 	}

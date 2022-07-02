@@ -92,6 +92,59 @@ func TestClientApplyReject(t *testing.T) {
 	}
 }
 
+func TestClientLoadConfigFromJSON(t *testing.T) {
+	beforeClientTest(t)
+
+	// Copy the JSON configuration file to test directory.
+	b, err := os.ReadFile("testdata/client_apply_config_1.json")
+	if err != nil {
+		t.Fatalf("os.ReadFile() failed: %v", err)
+	}
+	configFilePath := cachedClientConfigDir + string(os.PathSeparator) + "client_load.json"
+	if err := os.WriteFile(configFilePath, b, 0660); err != nil {
+		t.Fatalf("os.WriteFile() failed: %v", err)
+	}
+	cachedClientConfigFilePath = ""
+
+	if err := os.Setenv("MIERU_CONFIG_JSON_FILE", configFilePath); err != nil {
+		t.Fatalf("os.Setenv() failed: %v", err)
+	}
+	defer os.Unsetenv("MIERU_CONFIG_JSON_FILE")
+
+	// Load JSON configuration file.
+	config, err := LoadClientConfig()
+	if err != nil {
+		t.Fatalf("LoadClientConfig() failed: %v", err)
+	}
+	if config.GetActiveProfile() != "default" {
+		t.Errorf("client config data is unexpected")
+	}
+
+	afterClientTest(t)
+}
+
+func TestClientStoreConfigToJSON(t *testing.T) {
+	beforeClientTest(t)
+
+	configFilePath := cachedClientConfigDir + string(os.PathSeparator) + "client_store.json"
+	cachedClientConfigFilePath = ""
+
+	if err := os.Setenv("MIERU_CONFIG_JSON_FILE", configFilePath); err != nil {
+		t.Fatalf("os.Setenv() failed: %v", err)
+	}
+	defer os.Unsetenv("MIERU_CONFIG_JSON_FILE")
+
+	// Store JSON configuration file.
+	if err := StoreClientConfig(&appctlpb.ClientConfig{}); err != nil {
+		t.Fatalf("StoreClientConfig() failed: %v", err)
+	}
+	if _, err := os.Stat(configFilePath); err != nil {
+		t.Errorf("client config is not found at %q", configFilePath)
+	}
+
+	afterClientTest(t)
+}
+
 func TestClientDeleteProfile(t *testing.T) {
 	beforeClientTest(t)
 
