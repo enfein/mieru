@@ -82,14 +82,11 @@ type TCPSession struct {
 	recvBuf    []byte // data received from network but not read by caller
 	recvBufPtr []byte // reading position of received data
 
-	nError              int32 // number of I/O errors occurred
-	suppressFirstNError int32 // don't report first N I/O errors to caller
-
 	recordingEnabled bool
 	recordedPackets  recording.Records
 }
 
-func newTCPSession(conn net.Conn, isClient bool, blocks []cipher.BlockCipher, suppressFirstNError int32) *TCPSession {
+func newTCPSession(conn net.Conn, isClient bool, blocks []cipher.BlockCipher) *TCPSession {
 	if isClient {
 		log.Debugf("creating new client TCP session [%v - %v]", conn.LocalAddr(), conn.RemoteAddr())
 		atomic.AddUint64(&metrics.ActiveOpens, 1)
@@ -103,14 +100,12 @@ func newTCPSession(conn net.Conn, isClient bool, blocks []cipher.BlockCipher, su
 		atomic.CompareAndSwapUint64(&metrics.MaxConn, maxConn, currEst)
 	}
 	return &TCPSession{
-		Conn:                conn,
-		isClient:            isClient,
-		candidates:          blocks,
-		recvBuf:             make([]byte, MaxPayloadSize),
-		nError:              0,
-		suppressFirstNError: suppressFirstNError,
-		recordingEnabled:    false,
-		recordedPackets:     recording.NewRecords(),
+		Conn:             conn,
+		isClient:         isClient,
+		candidates:       blocks,
+		recvBuf:          make([]byte, MaxPayloadSize),
+		recordingEnabled: false,
+		recordedPackets:  recording.NewRecords(),
 	}
 }
 
@@ -118,21 +113,23 @@ func newTCPSession(conn net.Conn, isClient bool, blocks []cipher.BlockCipher, su
 func (s *TCPSession) Read(b []byte) (n int, err error) {
 	s.recvMutex.Lock()
 	defer s.recvMutex.Unlock()
-	n, err = s.readInternal(b)
+	var errType stderror.ErrorType
+	n, err, errType = s.readInternal(b)
 	if err != nil {
 		if errors.Is(err, io.EOF) {
 			// EOF must be reported back to caller as is.
 			return n, io.EOF
 		}
 		atomic.AddUint64(&metrics.TCPReceiveErrors, 1)
-		val := atomic.AddInt32(&s.nError, 1)
 		if log.IsLevelEnabled(log.DebugLevel) {
-			log.Debugf("TCP session [%v - %v] Read error %d: %v", s.LocalAddr(), s.RemoteAddr(), val, err)
+			log.Debugf("TCP session [%v - %v] Read error: %v", s.LocalAddr(), s.RemoteAddr(), err)
 		}
-		if val > s.suppressFirstNError {
-			return n, err
+		if errType == stderror.CRYPTO_ERROR {
+			// This looks like an attack.
+			// Continue to read some data from the TCP connection before closing.
+			s.readAfterError()
 		}
-		return 0, nil
+		return n, err
 	}
 	return n, nil
 }
@@ -144,14 +141,10 @@ func (s *TCPSession) Write(b []byte) (n int, err error) {
 	n, err = s.writeInternal(b)
 	if err != nil {
 		atomic.AddUint64(&metrics.TCPSendErrors, 1)
-		val := atomic.AddInt32(&s.nError, 1)
 		if log.IsLevelEnabled(log.DebugLevel) {
-			log.Debugf("TCP session [%v - %v] Write error %d: %v", s.LocalAddr(), s.RemoteAddr(), val, err)
+			log.Debugf("TCP session [%v - %v] Write error: %v", s.LocalAddr(), s.RemoteAddr(), err)
 		}
-		if val > s.suppressFirstNError {
-			return n, err
-		}
-		return 0, nil
+		return n, err
 	}
 	return n, nil
 }
@@ -163,17 +156,7 @@ func (s *TCPSession) Close() error {
 	return s.Conn.Close()
 }
 
-// SetSuppressFirstNError suppress the first N I/O error before
-// return the error to caller.
-func (s *TCPSession) SetSuppressFirstNError(n int) {
-	s.recvMutex.Lock()
-	defer s.recvMutex.Unlock()
-	s.sendMutex.Lock()
-	defer s.sendMutex.Unlock()
-	s.suppressFirstNError = int32(n)
-}
-
-func (s *TCPSession) readInternal(b []byte) (n int, err error) {
+func (s *TCPSession) readInternal(b []byte) (n int, err error, errType stderror.ErrorType) {
 	if log.IsLevelEnabled(log.TraceLevel) {
 		log.Tracef("TCPSession received request to read maximum %d bytes", len(b))
 	}
@@ -182,7 +165,7 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error) {
 	if len(s.recvBufPtr) > 0 {
 		n = copy(b, s.recvBufPtr)
 		s.recvBufPtr = s.recvBufPtr[n:]
-		return n, nil
+		return n, nil, stderror.NO_ERROR
 	}
 
 	// Read encrypted payload length.
@@ -193,7 +176,7 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error) {
 	}
 	encryptedLen := make([]byte, readLen)
 	if _, err := io.ReadFull(s.Conn, encryptedLen); err != nil {
-		return 0, fmt.Errorf("read %d bytes from TCPSession failed: %w", readLen, err)
+		return 0, fmt.Errorf("read %d bytes from TCPSession failed: %w", readLen, err), stderror.NETWORK_ERROR
 	}
 	if s.recordingEnabled {
 		s.recordedPackets.Append(encryptedLen, recording.Ingress)
@@ -209,7 +192,7 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error) {
 		var peerBlock cipher.BlockCipher
 		peerBlock, decryptedLen, err = cipher.SelectDecrypt(encryptedLen, cipher.CloneBlockCiphers(s.candidates))
 		if err != nil {
-			return 0, fmt.Errorf("cipher.SelectDecrypt() failed: %w", err)
+			return 0, fmt.Errorf("cipher.SelectDecrypt() failed: %w", err), stderror.CRYPTO_ERROR
 		}
 		s.recv = peerBlock.Clone()
 		firstRead = true
@@ -226,27 +209,27 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error) {
 			} else {
 				atomic.AddUint64(&metrics.ServerFailedDirectDecrypt, 1)
 			}
-			return 0, fmt.Errorf("Decrypt() failed: %w", err)
+			return 0, fmt.Errorf("Decrypt() failed: %w", err), stderror.CRYPTO_ERROR
 		}
 	}
 	if replayCache.IsDuplicate(encryptedLen[:cipher.DefaultOverhead]) {
 		if firstRead {
 			atomic.AddUint64(&metrics.ReplayNewSession, 1)
-			return 0, fmt.Errorf("found possible replay attack from %v", s.Conn.RemoteAddr())
+			return 0, fmt.Errorf("found possible replay attack from %v", s.Conn.RemoteAddr()), stderror.REPLAY_ERROR
 		} else {
 			atomic.AddUint64(&metrics.ReplayKnownSession, 1)
 		}
 	}
 	readLen = int(binary.LittleEndian.Uint16(decryptedLen))
 	if readLen > MaxPayloadSize {
-		return 0, fmt.Errorf(stderror.SegmentSizeTooBig)
+		return 0, fmt.Errorf(stderror.SegmentSizeTooBig), stderror.PROTOCOL_ERROR
 	}
 	readLen += cipher.DefaultOverhead
 
 	// Read encrypted payload.
 	encryptedPayload := make([]byte, readLen)
 	if _, err := io.ReadFull(s.Conn, encryptedPayload); err != nil {
-		return 0, fmt.Errorf("read %d bytes from TCPSession failed: %w", readLen, err)
+		return 0, fmt.Errorf("read %d bytes from TCPSession failed: %w", readLen, err), stderror.NETWORK_ERROR
 	}
 	if s.recordingEnabled {
 		s.recordedPackets.Append(encryptedPayload, recording.Ingress)
@@ -264,7 +247,7 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error) {
 		} else {
 			atomic.AddUint64(&metrics.ServerFailedDirectDecrypt, 1)
 		}
-		return 0, fmt.Errorf("Decrypt() failed: %w", err)
+		return 0, fmt.Errorf("Decrypt() failed: %w", err), stderror.CRYPTO_ERROR
 	}
 	if replayCache.IsDuplicate(encryptedPayload[:cipher.DefaultOverhead]) {
 		atomic.AddUint64(&metrics.ReplayKnownSession, 1)
@@ -272,12 +255,12 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error) {
 
 	// Extract useful payload from decrypted payload.
 	if len(decryptedPayload) < PayloadOverhead {
-		return 0, stderror.ErrInvalidArgument
+		return 0, stderror.ErrInvalidArgument, stderror.PROTOCOL_ERROR
 	}
 	usefulSize := int(binary.LittleEndian.Uint16(decryptedPayload))
 	totalSize := int(binary.LittleEndian.Uint16(decryptedPayload[2:]))
 	if usefulSize > totalSize || totalSize+PayloadOverhead != len(decryptedPayload) {
-		return 0, stderror.ErrInvalidArgument
+		return 0, stderror.ErrInvalidArgument, stderror.PROTOCOL_ERROR
 	}
 	if log.IsLevelEnabled(log.TraceLevel) {
 		log.Tracef("TCPSession received %d bytes actual payload", usefulSize)
@@ -285,7 +268,7 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error) {
 
 	// When b is large enough, receive data into b directly.
 	if len(b) >= usefulSize {
-		return copy(b, decryptedPayload[PayloadOverhead:PayloadOverhead+usefulSize]), nil
+		return copy(b, decryptedPayload[PayloadOverhead:PayloadOverhead+usefulSize]), nil, stderror.NO_ERROR
 	}
 
 	// When b is not large enough, first copy to recvbuf then copy to b.
@@ -297,7 +280,7 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error) {
 	copy(s.recvBuf, decryptedPayload[PayloadOverhead:PayloadOverhead+usefulSize])
 	n = copy(b, s.recvBuf)
 	s.recvBufPtr = s.recvBuf[n:]
-	return n, nil
+	return n, nil, stderror.NO_ERROR
 }
 
 func (s *TCPSession) writeInternal(b []byte) (n int, err error) {
@@ -386,6 +369,34 @@ func (s *TCPSession) writeChunk(b []byte) (n int, err error) {
 	return len(b), nil
 }
 
+// readAfterError continues to read some data from the TCP connection after
+// an error happened due to possible attack.
+func (s *TCPSession) readAfterError() {
+	// Set TCP read deadline to avoid being blocked forever.
+	timeoutMillis := rng.IntRange(500, 5000)
+	timeoutMillis += rng.FixedInt(0x0000_0fff) // Maximum 4.095 seconds.
+	s.Conn.SetReadDeadline(time.Now().Add(time.Duration(timeoutMillis) * time.Millisecond))
+
+	// Determine the read buffer size.
+	bufSizeType := rng.FixedInt(0x0000_0003)
+	bufSize := 1 << (12 + bufSizeType) // 4, 8, 16, 32 KB
+	buf := make([]byte, bufSize)
+
+	// Determine the number of bytes to read.
+	// Minimum 2 bytes, maximum 1280 bytes.
+	min := rng.IntRange(2, 1026)
+	min += rng.FixedInt(0x0000_00ff)
+
+	n, err := io.ReadAtLeast(s.Conn, buf, min)
+	if log.IsLevelEnabled(log.DebugLevel) {
+		if err != nil {
+			log.Debugf("TCP session [%v - %v] read after TCP error failed to complete: %v", s.LocalAddr(), s.RemoteAddr(), err)
+		} else {
+			log.Debugf("TCP session [%v - %v] read at least %d bytes after TCP error", s.LocalAddr(), s.RemoteAddr(), n)
+		}
+	}
+}
+
 func (s *TCPSession) startRecording() {
 	s.recvMutex.Lock()
 	defer s.recvMutex.Unlock()
@@ -405,8 +416,7 @@ func (s *TCPSession) stopRecording() {
 type TCPSessionListener struct {
 	net.Listener
 
-	users               map[string]*appctlpb.User // registered users
-	suppressFirstNError int32                     // don't report first N I/O errors to caller
+	users map[string]*appctlpb.User // registered users
 
 	startOnce   sync.Once
 	chAccept    chan net.Conn
@@ -446,7 +456,7 @@ func (l *TCPSessionListener) WrapConn(conn net.Conn) net.Conn {
 		}
 		blocks = append(blocks, blocksFromUser...)
 	}
-	return newTCPSession(conn, false, blocks, l.suppressFirstNError)
+	return newTCPSession(conn, false, blocks)
 }
 
 // Accept implements the Accept() method in the net.Listener interface.
@@ -471,14 +481,6 @@ func (l *TCPSessionListener) Addr() net.Addr {
 	return l.Listener.Addr()
 }
 
-// SetSuppressFirstNError suppress the first N I/O error
-// in subsequent created TCP connections before return the error to caller.
-func (l *TCPSessionListener) SetSuppressFirstNError(n int) {
-	if n >= 0 {
-		l.suppressFirstNError = int32(n)
-	}
-}
-
 func (l *TCPSessionListener) acceptLoop() {
 	for {
 		conn, err := l.Listener.Accept()
@@ -500,12 +502,11 @@ func ListenWithOptions(laddr string, users map[string]*appctlpb.User) (*TCPSessi
 		return nil, fmt.Errorf("net.ListenTCP() failed: %w", err)
 	}
 	listener := &TCPSessionListener{
-		Listener:            l,
-		users:               users,
-		suppressFirstNError: 0,
-		chAccept:            make(chan net.Conn, acceptBacklog),
-		chAcceptErr:         make(chan error),
-		die:                 make(chan struct{}),
+		Listener:    l,
+		users:       users,
+		chAccept:    make(chan net.Conn, acceptBacklog),
+		chAcceptErr: make(chan error),
+		die:         make(chan struct{}),
 	}
 	listener.Start()
 	return listener, nil
@@ -536,7 +537,7 @@ func DialWithOptions(ctx context.Context, network, laddr, raddr string, block ci
 	if err != nil {
 		return nil, fmt.Errorf("DialContext() failed: %w", err)
 	}
-	return newTCPSession(conn, true, []cipher.BlockCipher{block}, 0), nil
+	return newTCPSession(conn, true, []cipher.BlockCipher{block}), nil
 }
 
 // DialWithOptionsReturnConn calls DialWithOptions and returns a generic net.Conn.

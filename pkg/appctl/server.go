@@ -31,7 +31,6 @@ import (
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/netutil"
-	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/socks5"
 	"github.com/enfein/mieru/pkg/stderror"
 	"github.com/enfein/mieru/pkg/tcpsession"
@@ -143,7 +142,6 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 				if err != nil {
 					log.Fatalf("tcpsession.ListenWithOptions(%q) failed: %v", socks5Addr, err)
 				}
-				l.(*tcpsession.TCPSessionListener).SetSuppressFirstNError(rng.IntRange(0, 10))
 			} else if protocol == pb.TransportProtocol_UDP {
 				l, err = udpsession.ListenWithOptions(socks5Addr, UserListToMap(config.GetUsers()))
 				if err != nil {

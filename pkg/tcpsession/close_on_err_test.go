@@ -85,8 +85,9 @@ func TestCloseOnErr(t *testing.T) {
 		t.Errorf("metrics.TCPReceiveErrors value unexpectly increased")
 	}
 
-	// Send a larger message. This should trigger TCP read error in server.
-	data = testtool.TestHelperGenRot13Input(256)
+	// Send a second small message. Combined with the first message it is larger than decryption unit.
+	// This should trigger TCP read error in server.
+	data = testtool.TestHelperGenRot13Input(48)
 	if _, err := conn.Write(data); err != nil {
 		t.Fatalf("Write() failed: %v", err)
 	}
@@ -95,16 +96,23 @@ func TestCloseOnErr(t *testing.T) {
 	if metrics.TCPReceiveErrors <= errCnt {
 		t.Errorf("metrics.TCPReceiveErrors value is not increased")
 	}
+
+	// Send a larger message for server to drain after error.
+	data = testtool.TestHelperGenRot13Input(65536)
+	if _, err := conn.Write(data); err != nil {
+		t.Fatalf("Write() failed: %v", err)
+	}
+	time.Sleep(1 * time.Second)
 	errCnt = metrics.TCPReceiveErrors
 
-	// Send the third message to verify the connection has been closed by server.
+	// Verify the connection has been closed by server.
 	data = testtool.TestHelperGenRot13Input(256)
 	_, err = conn.Write(data)
 	if err == nil {
 		t.Fatalf("unexpected successful Write()")
 	}
 	time.Sleep(1 * time.Second)
-	t.Logf("metrics.TCPReceiveErrors value after 3 client writes: %d", metrics.TCPReceiveErrors)
+	t.Logf("metrics.TCPReceiveErrors value after 4 client writes: %d", metrics.TCPReceiveErrors)
 	if metrics.TCPReceiveErrors > errCnt {
 		// The number of error should not increase because the conn is already closed by server.
 		t.Errorf("metrics.TCPReceiveErrors value is increased unexpectly")
@@ -114,7 +122,7 @@ func TestCloseOnErr(t *testing.T) {
 	time.Sleep(1 * time.Second) // Wait for resources to be released.
 }
 
-func TestSuppressError(t *testing.T) {
+func TestErrorMetrics(t *testing.T) {
 	serverAddr := "127.0.0.1:12361"
 	clientAddr := "127.0.0.1:12362"
 	clientTCPAddr, _ := net.ResolveTCPAddr("tcp", clientAddr)
@@ -129,7 +137,6 @@ func TestSuppressError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListenWithOptions() failed: %v", err)
 	}
-	server.SetSuppressFirstNError(1_000_000)
 	go func() {
 		for {
 			s, err := server.Accept()
@@ -166,18 +173,18 @@ func TestSuppressError(t *testing.T) {
 		time.Sleep(time.Duration(sleepMillis) * time.Millisecond)
 		data := testtool.TestHelperGenRot13Input(rng.IntRange(256, 65536))
 
-		// Send data to server. The connection should not be closed by server.
-		// All write should be successful.
+		// Send data to server. The connection should be closed by the server after reading some data.
 		if _, err = conn.Write(data); err != nil {
-			t.Errorf("Write() failed: %v", err)
+			t.Logf("Write() failed after %d attempts", i+1)
+			break
 		}
 	}
 	time.Sleep(1 * time.Second)
 
 	// The TCP error counter should increase.
-	t.Logf("metrics.TCPReceiveErrors value after 50 client writes: %d", metrics.TCPReceiveErrors)
-	if metrics.TCPReceiveErrors < errCnt+50 {
-		t.Errorf("got %d TCPReceiveErrors, want at least %d", metrics.TCPReceiveErrors, errCnt+50)
+	t.Logf("metrics.TCPReceiveErrors value after client writes: %d", metrics.TCPReceiveErrors)
+	if metrics.TCPReceiveErrors < errCnt+1 {
+		t.Errorf("got %d TCPReceiveErrors, want at least %d", metrics.TCPReceiveErrors, errCnt+1)
 	}
 
 	server.Close()
