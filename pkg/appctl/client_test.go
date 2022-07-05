@@ -66,6 +66,7 @@ func TestApply2ClientConfig(t *testing.T) {
 func TestClientApplyReject(t *testing.T) {
 	cases := []string{
 		"testdata/client_reject_active_profile_mismatch.json",
+		"testdata/client_reject_invalid_rpc_port.json",
 		"testdata/client_reject_mtu_too_big.json",
 		"testdata/client_reject_mtu_too_small.json",
 		"testdata/client_reject_no_active_profile.json",
@@ -74,7 +75,6 @@ func TestClientApplyReject(t *testing.T) {
 		"testdata/client_reject_no_port.json",
 		"testdata/client_reject_no_profile_name.json",
 		"testdata/client_reject_no_protocol.json",
-		"testdata/client_reject_no_rpc_port.json",
 		"testdata/client_reject_no_server_addr.json",
 		"testdata/client_reject_no_socks5_port.json",
 		"testdata/client_reject_no_user_name.json",

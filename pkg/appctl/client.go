@@ -415,7 +415,8 @@ func ValidateFullClientConfig(config *pb.ClientConfig) error {
 	if !foundActiveProfile {
 		return fmt.Errorf("active profile is not found in the profile list")
 	}
-	if config.GetRpcPort() < 1 || config.GetRpcPort() > 65535 {
+	// RPC port is allowed to set to 0, which means disable RPC.
+	if config.GetRpcPort() < 0 || config.GetRpcPort() > 65535 {
 		return fmt.Errorf("RPC port number %d is invalid", config.GetRpcPort())
 	}
 	if config.GetSocks5Port() < 1 || config.GetSocks5Port() > 65535 {

@@ -244,27 +244,32 @@ var clientRunFunc = func(s []string) error {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(1)
 
-	// Run the RPC server in the background.
-	go func() {
-		rpcAddr := "localhost:" + strconv.Itoa(int(config.GetRpcPort()))
-		rpcListener, err := net.Listen("tcp", rpcAddr)
-		if err != nil {
-			log.Fatalf("listen on RPC address tcp %q failed: %v", rpcAddr, err)
-		}
-		grpcServer := grpc.NewServer()
-		appctl.SetClientRPCServerRef(grpcServer)
-		appctlpb.RegisterClientLifecycleServiceServer(grpcServer, appctl.NewClientLifecycleService())
-		close(appctl.ClientRPCServerStarted)
-		log.Infof("mieru client RPC server is running")
-		if err = grpcServer.Serve(rpcListener); err != nil {
-			log.Fatalf("run gRPC server failed: %v", err)
-		}
-		log.Infof("mieru client RPC server is stopped")
-		wg.Done()
-	}()
-	<-appctl.ClientRPCServerStarted
+	// RPC port is allowed to set to 0. In that case, don't run RPC server.
+	// When RPC server is not running, mieru commands can't be used to control the proxy client.
+	// This mode is typically used by a mobile app, where the app controls the lifecycle of the proxy client.
+	if config.GetRpcPort() != 0 {
+		wg.Add(1)
+		go func() {
+			rpcAddr := "localhost:" + strconv.Itoa(int(config.GetRpcPort()))
+			rpcListener, err := net.Listen("tcp", rpcAddr)
+			if err != nil {
+				log.Fatalf("listen on RPC address tcp %q failed: %v", rpcAddr, err)
+			}
+			grpcServer := grpc.NewServer()
+			appctl.SetClientRPCServerRef(grpcServer)
+			appctlpb.RegisterClientLifecycleServiceServer(grpcServer, appctl.NewClientLifecycleService())
+			close(appctl.ClientRPCServerStarted)
+			log.Infof("mieru client RPC server is running")
+			if err = grpcServer.Serve(rpcListener); err != nil {
+				log.Fatalf("run gRPC server failed: %v", err)
+			}
+			log.Infof("mieru client RPC server is stopped")
+			wg.Done()
+		}()
+		<-appctl.ClientRPCServerStarted
+	}
 
 	// Collect remote proxy addresses and password.
 	activeProfile, err := appctl.GetActiveProfileFromConfig(config, config.GetActiveProfile())
