@@ -212,7 +212,7 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error, errType stderror.
 			return 0, fmt.Errorf("Decrypt() failed: %w", err), stderror.CRYPTO_ERROR
 		}
 	}
-	if replayCache.IsDuplicate(encryptedLen[:cipher.DefaultOverhead]) {
+	if !s.isClient && replayCache.IsDuplicate(encryptedLen[:cipher.DefaultOverhead]) {
 		if firstRead {
 			atomic.AddUint64(&metrics.ReplayNewSession, 1)
 			return 0, fmt.Errorf("found possible replay attack from %v", s.Conn.RemoteAddr()), stderror.REPLAY_ERROR
@@ -249,7 +249,7 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error, errType stderror.
 		}
 		return 0, fmt.Errorf("Decrypt() failed: %w", err), stderror.CRYPTO_ERROR
 	}
-	if replayCache.IsDuplicate(encryptedPayload[:cipher.DefaultOverhead]) {
+	if !s.isClient && replayCache.IsDuplicate(encryptedPayload[:cipher.DefaultOverhead]) {
 		atomic.AddUint64(&metrics.ReplayKnownSession, 1)
 	}
 
@@ -350,6 +350,12 @@ func (s *TCPSession) writeChunk(b []byte) (n int, err error) {
 	encryptedPayload, err := s.send.Encrypt(payload)
 	if err != nil {
 		return 0, fmt.Errorf("Encrypted() failed: %w", err)
+	}
+
+	// Add egress encrypted length and encrypted payload to replay cache.
+	if !s.isClient {
+		replayCache.IsDuplicate(encryptedLen[:cipher.DefaultOverhead])
+		replayCache.IsDuplicate(encryptedPayload[:cipher.DefaultOverhead])
 	}
 
 	// Send encrypted payload length + encrypted payload.

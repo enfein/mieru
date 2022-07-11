@@ -655,11 +655,12 @@ func (s *UDPSession) tx(txqueue []ipMessage) {
 	atomic.AddUint64(&metrics.UDPOutBytes, uint64(nbytes))
 }
 
-// post-processing for sending a packet from kcp core
-// steps:
+// Post-processing for sending a packet from kcp core, including
+//
 // 1. Encryption
 // 2. TxQueue
-// 3. Record output if enabled
+// 3. Add to replay cache
+// 4. Record output if enabled
 func (s *UDPSession) outputCallback(buf []byte) {
 	if log.IsLevelEnabled(log.TraceLevel) {
 		log.Tracef("UDPSession %v: starting output %d bytes", s.LocalAddr(), len(buf))
@@ -683,6 +684,12 @@ func (s *UDPSession) outputCallback(buf []byte) {
 	msg.buffer = bts
 	msg.addr = s.remote
 	s.txqueue = append(s.txqueue, msg)
+
+	// Add egress packet to replay cache.
+	if s.IsServer() {
+		replayCache.IsDuplicate(bts[:kcp.OuterHeaderSize])
+	}
+
 	if s.recordingEnabled {
 		s.recordedPackets.Append(bts, recording.Egress)
 	}

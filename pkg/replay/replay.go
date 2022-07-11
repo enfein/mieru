@@ -108,6 +108,14 @@ func (c *ReplayCache) Sizes() (int, int) {
 	return len(c.current), len(c.previous)
 }
 
+// Clear removes all the data in the replay cache.
+func (c *ReplayCache) Clear() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.current = make(map[uint64]struct{})
+	c.previous = make(map[uint64]struct{})
+}
+
 func (c *ReplayCache) computeSignature(data []byte) uint64 {
 	signature := [8]byte{}
 	for i, v := range c.salt {
