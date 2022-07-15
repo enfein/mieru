@@ -192,6 +192,7 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error, errType stderror.
 		var peerBlock cipher.BlockCipher
 		peerBlock, decryptedLen, err = cipher.SelectDecrypt(encryptedLen, cipher.CloneBlockCiphers(s.candidates))
 		if err != nil {
+			atomic.AddUint64(&metrics.ServerFailedIterateDecrypt, 1)
 			return 0, fmt.Errorf("cipher.SelectDecrypt() failed: %w", err), stderror.CRYPTO_ERROR
 		}
 		s.recv = peerBlock.Clone()

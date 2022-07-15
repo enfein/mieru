@@ -957,7 +957,12 @@ func (l *Listener) packetInput(raw []byte, addr net.Addr) {
 		}
 	}
 
-	if decrypted && len(data) >= kcp.IKCP_OVERHEAD {
+	if !decrypted {
+		atomic.AddUint64(&metrics.ServerFailedIterateDecrypt, 1)
+		return
+	}
+
+	if len(data) >= kcp.IKCP_OVERHEAD {
 		var conv, sn uint32
 		conv = binary.LittleEndian.Uint32(data)
 		sn = binary.LittleEndian.Uint32(data[kcp.IKCP_SN_OFFSET:])

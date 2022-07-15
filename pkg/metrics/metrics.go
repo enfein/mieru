@@ -31,8 +31,9 @@ var (
 	CurrEstablished uint64 // current number of established connections
 
 	// server decryption
-	ServerDirectDecrypt       uint64 // number of decryption using the cipher block associated with the connection
-	ServerFailedDirectDecrypt uint64 // number of decryption using the stored cipher block but failed
+	ServerDirectDecrypt        uint64 // number of decryption using the cipher block associated with the connection
+	ServerFailedDirectDecrypt  uint64 // number of decryption using the stored cipher block but failed
+	ServerFailedIterateDecrypt uint64 // number of decryption that failed after iterating all possible cipher blocks
 
 	// client decryption
 	ClientDirectDecrypt       uint64 // number of decryption using the cipher block associated with the connection
@@ -166,8 +167,9 @@ func LogConnections() {
 
 func LogServerDecryption() {
 	log.WithFields(log.Fields{
-		"ServerDirectDecrypt":       ServerDirectDecrypt,
-		"ServerFailedDirectDecrypt": ServerFailedDirectDecrypt,
+		"ServerDirectDecrypt":        ServerDirectDecrypt,
+		"ServerFailedDirectDecrypt":  ServerFailedDirectDecrypt,
+		"ServerFailedIterateDecrypt": ServerFailedIterateDecrypt,
 	}).Infof("[metrics - server decryption]")
 }
 
