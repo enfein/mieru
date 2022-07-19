@@ -177,26 +177,3 @@ sudo dnf install ntp
 # CentOS / Red Hat Enterprise Linux
 sudo yum install ntp
 ```
-
-## 【可选】关闭 ICMP Destination Unreachable 消息
-
-这里的操作仅对使用 UDP 协议的用户有效。使用 TCP 协议的用户，请跳过本节内容。
-
-我们在前面讲到，当服务器无法解密客户端发送的数据时，不会返回任何内容。不过，如果外界向服务器发送 UDP 包进行主动探测，依旧可以区分下面两种情况：
-
-1. 没有任何服务在监听这个 UDP 端口
-2. 某个服务在监听这个 UDP 端口，但没有返回任何内容
-
-这是因为，当没有任何服务在监听这个 UDP 端口时，Linxu 内核会返回一个 ICMP Destination Unreachable - Port Unreachable 消息。
-
-如果不想让外界探测服务器在监听哪些 UDP 端口，可以设置 Linux 系统防火墙丢弃 ICMP Destination Unreachable 消息。
-
-```sh
-sudo iptables -A OUTPUT -p icmp --icmp-type 3 -j DROP
-```
-
-注意，启用这条防火墙规则会使故障排查变得复杂。如果需要删除这条防火墙规则，请使用
-
-```sh
-sudo iptables -D OUTPUT -p icmp --icmp-type 3 -j DROP
-```
