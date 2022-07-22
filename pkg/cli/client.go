@@ -195,9 +195,10 @@ var clientStartFunc = func(s []string) error {
 		return fmt.Errorf(stderror.StartClientFailedErr, err)
 	}
 
-	// Verify client daemon is running.
+	// Wait until client daemon is running.
+	// The maximum waiting time is 10 seconds.
 	var lastErr error
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 100; i++ {
 		lastErr = appctl.IsClientDaemonRunning(context.Background())
 		if lastErr == nil {
 			log.Infof("mieru client is started, listening to localhost:%d", config.GetSocks5Port())
