@@ -84,7 +84,7 @@ mieru apply config <FILE>
 2. 在 `profiles` -> `user` -> `password` 属性中，填写密码。此处必须与代理服务器中的设置相同。
 3. 在 `profiles` -> `servers` -> `ipAddress` 属性中，填写代理服务器的公网地址。支持 IPv4 和 IPv6 地址。
 4. 如果你为代理服务器注册了域名，请在 `profiles` -> `servers` -> `domainName` 中填写域名。否则，请勿修改这个属性。
-5. 在 `profiles` -> `servers` -> `portBindings` -> `port` 中填写 mita 监听的 TCP/UDP 端口号。这个端口号必须与代理服务器中的设置相同。
+5. 在 `profiles` -> `servers` -> `portBindings` -> `port` 中填写 mita 监听的 TCP 或 UDP 端口号。这个端口号必须与代理服务器中的设置相同。
 6. 请为 `rpcPort` 属性指定一个从 1025 到 65535 之间的数值。**请确保防火墙允许使用该端口进行通信。**
 7. 请为 `socks5Port` 属性指定一个从 1025 到 65535 之间的数值。该端口不能与 `rpcPort` 相同。**请确保防火墙允许使用该端口进行通信。**
 
@@ -93,35 +93,35 @@ mieru apply config <FILE>
 上述设置的一个示例如下
 
 ```js
+{
+    "profiles": [
+        {
+            "profileName": "default",
+            "user": {
+                "name": "baozi",
+                "password": "shilishanlubuhuanjian"
+            },
             "servers": [
                 {
-                    "ipAddress": "1.1.1.1",
+                    "ipAddress": "12.34.56.78",
                     "domainName": "",
                     "portBindings": [
                         {
-                            "port": 1110,
-                            "protocol": "TCP"
-                        },
-                        {
-                            "port": 1111,
-                            "protocol": "TCP"
-                        }
-                    ]
-                },
-                {
-                    "ipAddress": "2.2.2.2",
-                    "domainName": "",
-                    "portBindings": [
-                        {
-                            "port": 2222,
+                            "port": 2022,
                             "protocol": "TCP"
                         }
                     ]
                 }
-            ]
+            ],
+            "mtu": 1400
+        }
+    ],
+    "activeProfile": "default",
+    "rpcPort": 8964,
+    "socks5Port": 1080,
+    "loggingLevel": "INFO"
+}
 ```
-
-我们在 `configs/examples/client_config.json` 提供了配置文件的一个例子，仅供参考。
 
 假设这个配置文件的文件名是 `client_config.json`，在修改完成之后，调用指令 `mieru apply config client_config.json` 写入该配置。
 

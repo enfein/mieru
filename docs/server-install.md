@@ -119,7 +119,34 @@ mita apply config <FILE>
     ],
 ```
 
-我们在 `configs/examples/server_config.json` 提供了配置文件的一个例子，仅供参考。
+下面是服务器配置文件的一个例子，仅供参考。
+
+```js
+{
+    "portBindings": [
+        {
+            "port": 2012,
+            "protocol": "TCP"
+        },
+        {
+            "port": 2022,
+            "protocol": "TCP"
+        }
+    ],
+    "users": [
+        {
+            "name": "baozi",
+            "password": "shilishanlubuhuanjian"
+        },
+        {
+            "name": "dongtaiqingling",
+            "password": "jiasu"
+        }
+    ],
+    "loggingLevel": "INFO",
+    "mtu": 1400
+}
+```
 
 假设在服务器上，这个配置文件的文件名是 `server_config.json`，在文件修改完成之后，请调用指令 `mita apply config server_config.json` 写入该配置。
 
