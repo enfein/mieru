@@ -62,7 +62,7 @@ var (
 	replayCache = replay.NewCache(1200_000, 10*time.Minute)
 
 	// maxPaddingSize is the maximum size of padding added to a single TCP payload.
-	maxPaddingSize = 256 + rng.FixedInt(0x0000_00ff)
+	maxPaddingSize = 256 + rng.FixedInt(256)
 )
 
 // TCPSession defines a TCP session.
@@ -380,19 +380,19 @@ func (s *TCPSession) writeChunk(b []byte) (n int, err error) {
 // an error happened due to possible attack.
 func (s *TCPSession) readAfterError() {
 	// Set TCP read deadline to avoid being blocked forever.
-	timeoutMillis := rng.IntRange(500, 5000)
-	timeoutMillis += rng.FixedInt(0x0000_0fff) // Maximum 4.095 seconds.
+	timeoutMillis := rng.IntRange(1000, 5000)
+	timeoutMillis += rng.FixedInt(60000) // Maximum 60 seconds.
 	s.Conn.SetReadDeadline(time.Now().Add(time.Duration(timeoutMillis) * time.Millisecond))
 
 	// Determine the read buffer size.
-	bufSizeType := rng.FixedInt(0x0000_0003)
+	bufSizeType := rng.FixedInt(4)
 	bufSize := 1 << (12 + bufSizeType) // 4, 8, 16, 32 KB
 	buf := make([]byte, bufSize)
 
 	// Determine the number of bytes to read.
 	// Minimum 2 bytes, maximum 1280 bytes.
 	min := rng.IntRange(2, 1026)
-	min += rng.FixedInt(0x0000_00ff)
+	min += rng.FixedInt(256)
 
 	n, err := io.ReadAtLeast(s.Conn, buf, min)
 	if log.IsLevelEnabled(log.DebugLevel) {

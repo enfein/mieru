@@ -23,6 +23,8 @@ WORKDIR /test
 COPY mieru mita sockshttpclient httpserver \
     test/deploy/httptest/client_tcp.json test/deploy/httptest/server_tcp.json \
     test/deploy/httptest/client_udp.json test/deploy/httptest/server_udp.json \
+    test/deploy/httptest/libtest.sh \
+    test/deploy/httptest/test_tcp.sh test/deploy/httptest/test_udp.sh \
     test/deploy/httptest/test.sh /test/
 
 # Create mita user and server config directory.

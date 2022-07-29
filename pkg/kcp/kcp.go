@@ -76,7 +76,7 @@ var (
 	refTime time.Time = time.Now()
 
 	// maxPaddingSize is the maximum size of padding added to a single KCP segment.
-	maxPaddingSize = 256 + rng.FixedInt(0x0000_00ff)
+	maxPaddingSize = 256 + rng.FixedInt(256)
 )
 
 func init() {

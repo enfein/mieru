@@ -19,7 +19,7 @@ mieru 的翻墙原理与 shadowsocks / v2ray 等软件类似，在客户端和�
 5. 当服务器无法解密客户端发送的数据时，不会返回任何内容。GFW 很难通过主动探测发现 mieru 服务。
 6. mieru 支持多个用户共享代理服务器。
 7. 支持 IPv4 和 IPv6。
-8. 客户端软件支持 Windows，Mac OS 和 Linux 系统。
+8. 客户端软件支持 Windows, Mac OS, Linux 和 Android 系统。Android 用户请使用 SagerNet 客户端并安装 mieru 插件。
 
 ## 使用教程
 
@@ -60,4 +60,4 @@ mieru 的翻墙原理与 shadowsocks / v2ray 等软件类似，在客户端和�
 
 ## 许可证
 
-使用本软件需遵从 GPL 第三版协议。
+使用本软件需遵从 GPL-3 协议。

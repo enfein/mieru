@@ -24,6 +24,6 @@ mieru 本身没有提供基于域名规则或 IP 地址位置来判断是否应�
 
 ![配置 Tor 浏览器](https://github.com/enfein/mieru/blob/main/docs/assets/config_tor_browser.png)
 
-通过这种方式翻墙的网速比较慢，加载 GitHub 大概需要一分钟的时间，看视频是更加不可能了。
+通过这种方式翻墙的网速比较慢，可能无法流畅观看视频。
 
 建议高风险用户阅读[编程随想的博客](https://program-think.blogspot.com/)中关于信息安全的文章，保护好隐私和踪迹，避免被跨省追捕。

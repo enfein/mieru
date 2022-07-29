@@ -47,8 +47,8 @@ func TestRandTime(t *testing.T) {
 
 func TestFixedInt(t *testing.T) {
 	InitSeed()
-	v := FixedInt(0x000000ff)
-	v2 := FixedInt(0x000000ff)
+	v := FixedInt(256)
+	v2 := FixedInt(256)
 	if v2 != v {
 		t.Errorf("FixedInt() = %d, want %d", v2, v)
 	}

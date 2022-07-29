@@ -66,9 +66,11 @@ func RandTime(begin, end time.Time) time.Time {
 	return time.Unix(randSec, randNano)
 }
 
-// FixedInt returns an integer that always stays the same within one machine.
-// The return value is bitwise AND with the mask.
-func FixedInt(mask int) int {
+// FixedInt returns an integer in [0, n) that always stays the same within one machine.
+func FixedInt(n int) int {
+	if n <= 0 {
+		return 0
+	}
 	v, ok := hostFixedValue.Load().(int)
 	if !ok {
 		name, err := os.Hostname()
@@ -76,10 +78,11 @@ func FixedInt(mask int) int {
 			name = ""
 		}
 		b := sha256.Sum256([]byte(name))
-		v = int(binary.BigEndian.Uint32(b[:]))
+		b[0] = b[0] & 0b01111111
+		v = int(binary.BigEndian.Uint32(b[:4]))
 		hostFixedValue.Store(v)
 	}
-	return v & mask
+	return v % n
 }
 
 // scaleDown returns a random number from [0.0, 1.0), where
