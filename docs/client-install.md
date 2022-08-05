@@ -6,15 +6,15 @@ mieru 客户端软件支持 Windows，Mac OS 和 Linux 系统。用户可以在 
 
 ```powershell
 # Windows PowerShell
-Invoke-WebRequest https://github.com/enfein/mieru/releases/download/v1.6.0/mieru_1.6.0_windows_amd64.zip -OutFile mieru_1.6.0_windows_amd64.zip
+Invoke-WebRequest https://github.com/enfein/mieru/releases/download/v1.6.1/mieru_1.6.1_windows_amd64.zip -OutFile mieru_1.6.1_windows_amd64.zip
 ```
 
 ```sh
 # Mac OS (Intel CPU)
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.6.0/mieru_1.6.0_darwin_amd64.tar.gz
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.6.1/mieru_1.6.1_darwin_amd64.tar.gz
 
 # Mac OS (ARM CPU)
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.6.0/mieru_1.6.0_darwin_arm64.tar.gz
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.6.1/mieru_1.6.1_darwin_arm64.tar.gz
 ```
 
 解压缩之后，就可以得到可执行文件 `mieru.exe` 或 `mieru`。
@@ -23,16 +23,16 @@ curl -LSO https://github.com/enfein/mieru/releases/download/v1.6.0/mieru_1.6.0_d
 
 ```sh
 # Debian / Ubuntu
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.6.0/mieru_1.6.0_amd64.deb
-sudo dpkg -i mieru_1.6.0_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.6.1/mieru_1.6.1_amd64.deb
+sudo dpkg -i mieru_1.6.1_amd64.deb
 
 # Fedora / CentOS / Red Hat Enterprise Linux
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.6.0/mieru-1.6.0-1.x86_64.rpm
-sudo rpm -Uvh --force mieru-1.6.0-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.6.1/mieru-1.6.1-1.x86_64.rpm
+sudo rpm -Uvh --force mieru-1.6.1-1.x86_64.rpm
 
 # Others
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.6.0/mieru_1.6.0_linux_amd64.tar.gz
-tar -zxvf mieru_1.6.0_linux_amd64.tar.gz
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.6.1/mieru_1.6.1_linux_amd64.tar.gz
+tar -zxvf mieru_1.6.1_linux_amd64.tar.gz
 ```
 
 接下来，将 mieru 可执行文件移动或添加至系统路径 `PATH`。这样，输入指令时就不需要指定 mieru 可执行文件的位置了。如果使用了 debian 或 RPM 安装包，那么不需要执行这一步。

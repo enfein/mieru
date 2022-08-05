@@ -28,7 +28,7 @@ PROJECT_NAME=$(shell basename "${ROOT}")
 # - build/package/mita/arm64/rpm/mita.spec
 # - docs/client-install.md
 # - docs/server-install.md
-VERSION="1.6.0"
+VERSION="1.6.1"
 
 # Build binaries and installation packages.
 .PHONY: build

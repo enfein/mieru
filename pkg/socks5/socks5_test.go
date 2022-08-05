@@ -24,8 +24,8 @@ func TestSocks5Connect(t *testing.T) {
 		defer conn.Close()
 
 		buf := make([]byte, 4)
-		if _, err := io.ReadAtLeast(conn, buf, 4); err != nil {
-			t.Errorf("io.ReadAtLeast() failed: %v", err)
+		if _, err := io.ReadFull(conn, buf); err != nil {
+			t.Errorf("io.ReadFull() failed: %v", err)
 			return
 		}
 
@@ -97,8 +97,8 @@ func TestSocks5Connect(t *testing.T) {
 	out := make([]byte, len(want))
 
 	conn.SetDeadline(time.Now().Add(time.Second))
-	if _, err := io.ReadAtLeast(conn, out, len(out)); err != nil {
-		t.Fatalf("io.ReadAtLeast() failed: %v", err)
+	if _, err := io.ReadFull(conn, out); err != nil {
+		t.Fatalf("io.ReadFull() failed: %v", err)
 	}
 
 	// Ignore the port number before compare the result.

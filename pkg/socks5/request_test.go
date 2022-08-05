@@ -38,8 +38,8 @@ func TestRequestConnect(t *testing.T) {
 		defer conn.Close()
 
 		buf := make([]byte, 4)
-		if _, err := io.ReadAtLeast(conn, buf, 4); err != nil {
-			t.Errorf("io.ReadAtLeast() failed: %v", err)
+		if _, err := io.ReadFull(conn, buf); err != nil {
+			t.Errorf("io.ReadFull() failed: %v", err)
 			return
 		}
 
@@ -117,8 +117,8 @@ func TestRequestConnectRuleFail(t *testing.T) {
 		defer conn.Close()
 
 		buf := make([]byte, 4)
-		if _, err := io.ReadAtLeast(conn, buf, 4); err != nil {
-			t.Errorf("io.ReadAtLeast() failed: %v", err)
+		if _, err := io.ReadFull(conn, buf); err != nil {
+			t.Errorf("io.ReadFull() failed: %v", err)
 			return
 		}
 

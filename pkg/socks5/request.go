@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
 )
 
@@ -92,7 +93,7 @@ type conn interface {
 func NewRequest(bufConn io.Reader) (*Request, error) {
 	// Read the version byte.
 	header := []byte{0, 0, 0}
-	if _, err := io.ReadAtLeast(bufConn, header, 3); err != nil {
+	if _, err := io.ReadFull(bufConn, header); err != nil {
 		return nil, fmt.Errorf("failed to get command version: %w", err)
 	}
 
@@ -225,6 +226,10 @@ func (s *Server) handleConnect(ctx context.Context, conn conn, req *Request) err
 
 // handleBind is used to handle a bind command.
 func (s *Server) handleBind(ctx context.Context, conn conn, req *Request) error {
+	if log.IsLevelEnabled(log.DebugLevel) {
+		log.Debugf("received unsupported socks5 bind request from %v", conn.RemoteAddr())
+	}
+
 	// Check if this is allowed.
 	if ctx_, ok := s.config.Rules.Allow(ctx, req); !ok {
 		if err := sendReply(conn, ruleFailure, nil); err != nil {
@@ -244,6 +249,10 @@ func (s *Server) handleBind(ctx context.Context, conn conn, req *Request) error 
 
 // handleAssociate is used to handle a associate command.
 func (s *Server) handleAssociate(ctx context.Context, conn conn, req *Request) error {
+	if log.IsLevelEnabled(log.DebugLevel) {
+		log.Debugf("received unsupported socks5 associate request from %v", conn.RemoteAddr())
+	}
+
 	// Check if this is allowed.
 	if ctx_, ok := s.config.Rules.Allow(ctx, req); !ok {
 		if err := sendReply(conn, ruleFailure, nil); err != nil {
@@ -268,7 +277,7 @@ func readAddrSpec(r io.Reader) (*AddrSpec, error) {
 
 	// Get the address type.
 	addrType := []byte{0}
-	if _, err := r.Read(addrType); err != nil {
+	if _, err := io.ReadFull(r, addrType); err != nil {
 		return nil, err
 	}
 
@@ -276,25 +285,25 @@ func readAddrSpec(r io.Reader) (*AddrSpec, error) {
 	switch addrType[0] {
 	case ipv4Address:
 		addr := make([]byte, 4)
-		if _, err := io.ReadAtLeast(r, addr, len(addr)); err != nil {
+		if _, err := io.ReadFull(r, addr); err != nil {
 			return nil, err
 		}
 		d.IP = net.IP(addr)
 
 	case ipv6Address:
 		addr := make([]byte, 16)
-		if _, err := io.ReadAtLeast(r, addr, len(addr)); err != nil {
+		if _, err := io.ReadFull(r, addr); err != nil {
 			return nil, err
 		}
 		d.IP = net.IP(addr)
 
 	case fqdnAddress:
-		if _, err := r.Read(addrType); err != nil {
+		if _, err := io.ReadFull(r, addrType); err != nil {
 			return nil, err
 		}
 		addrLen := int(addrType[0])
 		fqdn := make([]byte, addrLen)
-		if _, err := io.ReadAtLeast(r, fqdn, addrLen); err != nil {
+		if _, err := io.ReadFull(r, fqdn); err != nil {
 			return nil, err
 		}
 		d.FQDN = string(fqdn)
@@ -305,7 +314,7 @@ func readAddrSpec(r io.Reader) (*AddrSpec, error) {
 
 	// Read the port number.
 	port := []byte{0, 0}
-	if _, err := io.ReadAtLeast(r, port, 2); err != nil {
+	if _, err := io.ReadFull(r, port); err != nil {
 		return nil, err
 	}
 	d.Port = (int(port[0]) << 8) | int(port[1])

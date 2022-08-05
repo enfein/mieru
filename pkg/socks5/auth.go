@@ -65,7 +65,7 @@ func (a UserPassAuthenticator) Authenticate(reader io.Reader, writer io.Writer) 
 
 	// Get the version and username length
 	header := []byte{0, 0}
-	if _, err := io.ReadAtLeast(reader, header, 2); err != nil {
+	if _, err := io.ReadFull(reader, header); err != nil {
 		return nil, err
 	}
 
@@ -77,19 +77,19 @@ func (a UserPassAuthenticator) Authenticate(reader io.Reader, writer io.Writer) 
 	// Get the user name
 	userLen := int(header[1])
 	user := make([]byte, userLen)
-	if _, err := io.ReadAtLeast(reader, user, userLen); err != nil {
+	if _, err := io.ReadFull(reader, user); err != nil {
 		return nil, err
 	}
 
 	// Get the password length
-	if _, err := reader.Read(header[:1]); err != nil {
+	if _, err := io.ReadFull(reader, header[:1]); err != nil {
 		return nil, err
 	}
 
 	// Get the password
 	passLen := int(header[0])
 	pass := make([]byte, passLen)
-	if _, err := io.ReadAtLeast(reader, pass, passLen); err != nil {
+	if _, err := io.ReadFull(reader, pass); err != nil {
 		return nil, err
 	}
 
@@ -140,12 +140,12 @@ func noAcceptableAuth(conn io.Writer) error {
 // and proceeding auth methods
 func readMethods(r io.Reader) ([]byte, error) {
 	header := []byte{0}
-	if _, err := r.Read(header); err != nil {
+	if _, err := io.ReadFull(r, header); err != nil {
 		return nil, err
 	}
 
 	numMethods := int(header[0])
 	methods := make([]byte, numMethods)
-	_, err := io.ReadAtLeast(r, methods, numMethods)
+	_, err := io.ReadFull(r, methods)
 	return methods, err
 }

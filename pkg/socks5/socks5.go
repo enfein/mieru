@@ -237,7 +237,7 @@ func (s *Server) ServeConn(conn net.Conn) error {
 
 		// Read the version byte.
 		version := []byte{0}
-		if _, err := bufConn.Read(version); err != nil {
+		if _, err := io.ReadFull(bufConn, version); err != nil {
 			atomic.AddUint64(&metrics.Socks5HandshakeErrors, 1)
 			return fmt.Errorf("failed to get version byte: %w", err)
 		}
