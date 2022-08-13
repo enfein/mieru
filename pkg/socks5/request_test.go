@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"io"
 	"net"
-	"strings"
 	"testing"
 
 	"github.com/enfein/mieru/pkg/metrics"
@@ -55,7 +54,6 @@ func TestRequestConnect(t *testing.T) {
 	// Create a socks server.
 	s := &Server{
 		config: &Config{
-			Rules:                 PermitAll(),
 			AllowLocalDestination: true,
 		},
 	}
@@ -102,80 +100,6 @@ func TestRequestConnect(t *testing.T) {
 	}
 }
 
-func TestRequestConnectRuleFail(t *testing.T) {
-	// Create a local listener as the destination target.
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("net.Listen() failed: %v", err)
-	}
-	go func() {
-		conn, err := l.Accept()
-		if err != nil {
-			t.Errorf("Accept() failed: %v", err)
-			return
-		}
-		defer conn.Close()
-
-		buf := make([]byte, 4)
-		if _, err := io.ReadFull(conn, buf); err != nil {
-			t.Errorf("io.ReadFull() failed: %v", err)
-			return
-		}
-
-		want := []byte("ping")
-		if !bytes.Equal(buf, want) {
-			t.Errorf("got %v, want %v", buf, want)
-			return
-		}
-		conn.Write([]byte("pong"))
-	}()
-	lAddr := l.Addr().(*net.TCPAddr)
-
-	// Create a socks server.
-	s := &Server{
-		config: &Config{
-			Rules:                 PermitNone(),
-			AllowLocalDestination: true,
-		},
-	}
-
-	// Create the connect request.
-	buf := bytes.NewBuffer(nil)
-	buf.Write([]byte{5, 1, 0, 1, 127, 0, 0, 1})
-
-	port := []byte{0, 0}
-	binary.BigEndian.PutUint16(port, uint16(lAddr.Port))
-	buf.Write(port)
-
-	buf.Write([]byte("ping"))
-
-	// Socks server handles the request.
-	resp := &MockConn{}
-	req, err := NewRequest(buf)
-	if err != nil {
-		t.Fatalf("NewRequest() failed: %v", err)
-	}
-
-	if err := s.handleRequest(req, resp); !strings.Contains(err.Error(), "blocked by rules") {
-		t.Fatalf("handleRequest() failed: %v", err)
-	}
-
-	// Verify response from socks server.
-	out := resp.buf.Bytes()
-	want := []byte{
-		5,
-		2,
-		0,
-		1,
-		0, 0, 0, 0,
-		0, 0,
-	}
-
-	if !bytes.Equal(out, want) {
-		t.Fatalf("got %v, want %v", out, want)
-	}
-}
-
 func TestRequestUnsupportedCommand(t *testing.T) {
 	testcases := []struct {
 		req  []byte
@@ -194,7 +118,6 @@ func TestRequestUnsupportedCommand(t *testing.T) {
 	// Create a socks server.
 	s := &Server{
 		config: &Config{
-			Rules:                 PermitAll(),
 			AllowLocalDestination: true,
 		},
 	}

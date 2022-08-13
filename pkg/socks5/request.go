@@ -38,11 +38,6 @@ var (
 	unrecognizedAddrType = fmt.Errorf("unrecognized address type")
 )
 
-// AddressRewriter is used to rewrite a destination transparently.
-type AddressRewriter interface {
-	Rewrite(ctx context.Context, request *Request) (context.Context, *AddrSpec)
-}
-
 // AddrSpec is used to return the target AddrSpec
 // which may be specified as IPv4, IPv6, or a FQDN.
 type AddrSpec struct {
@@ -79,9 +74,8 @@ type Request struct {
 	RemoteAddr *AddrSpec
 	// AddrSpec of the desired destination.
 	DestAddr *AddrSpec
-	// AddrSpec of the actual destination (might be affected by rewrite).
-	realDestAddr *AddrSpec
-	bufConn      io.Reader
+
+	bufConn io.Reader
 }
 
 type conn interface {
@@ -137,12 +131,6 @@ func (s *Server) handleRequest(req *Request, conn conn) error {
 		dest.IP = addr
 	}
 
-	// Apply any address rewrites.
-	req.realDestAddr = req.DestAddr
-	if s.config.Rewriter != nil {
-		ctx, req.realDestAddr = s.config.Rewriter.Rewrite(ctx, req)
-	}
-
 	// Return error if access local destination is not allowed.
 	if !s.config.AllowLocalDestination && isLocalhostDest(req) {
 		return fmt.Errorf("access to localhost resource via proxy is not allowed")
@@ -167,22 +155,12 @@ func (s *Server) handleRequest(req *Request, conn conn) error {
 
 // handleConnect is used to handle a connect command.
 func (s *Server) handleConnect(ctx context.Context, conn conn, req *Request) error {
-	// Check if this is allowed.
-	if ctx_, ok := s.config.Rules.Allow(ctx, req); !ok {
-		if err := sendReply(conn, ruleFailure, nil); err != nil {
-			return fmt.Errorf("failed to send reply: %w", err)
-		}
-		return fmt.Errorf("connect to %v blocked by rules", req.DestAddr)
-	} else {
-		ctx = ctx_
-	}
-
 	// Attempt to connect.
 	if s.config.NetworkType == "" {
 		s.config.NetworkType = "tcp"
 	}
 	var d net.Dialer
-	target, err := d.DialContext(ctx, s.config.NetworkType, req.realDestAddr.Address())
+	target, err := d.DialContext(ctx, s.config.NetworkType, req.DestAddr.Address())
 	if err != nil {
 		msg := err.Error()
 		resp := hostUnreachable
@@ -229,17 +207,6 @@ func (s *Server) handleBind(ctx context.Context, conn conn, req *Request) error 
 	if log.IsLevelEnabled(log.DebugLevel) {
 		log.Debugf("received unsupported socks5 bind request from %v", conn.RemoteAddr())
 	}
-
-	// Check if this is allowed.
-	if ctx_, ok := s.config.Rules.Allow(ctx, req); !ok {
-		if err := sendReply(conn, ruleFailure, nil); err != nil {
-			return fmt.Errorf("failed to send reply: %w", err)
-		}
-		return fmt.Errorf("bind to %v blocked by rules", req.DestAddr)
-	} else {
-		ctx = ctx_
-	}
-
 	atomic.AddUint64(&metrics.Socks5UnsupportedCommandErrors, 1)
 	if err := sendReply(conn, commandNotSupported, nil); err != nil {
 		return fmt.Errorf("failed to send reply: %w", err)
@@ -252,17 +219,6 @@ func (s *Server) handleAssociate(ctx context.Context, conn conn, req *Request) e
 	if log.IsLevelEnabled(log.DebugLevel) {
 		log.Debugf("received unsupported socks5 associate request from %v", conn.RemoteAddr())
 	}
-
-	// Check if this is allowed.
-	if ctx_, ok := s.config.Rules.Allow(ctx, req); !ok {
-		if err := sendReply(conn, ruleFailure, nil); err != nil {
-			return fmt.Errorf("failed to send reply: %w", err)
-		}
-		return fmt.Errorf("associate to %v blocked by rules", req.DestAddr)
-	} else {
-		ctx = ctx_
-	}
-
 	atomic.AddUint64(&metrics.Socks5UnsupportedCommandErrors, 1)
 	if err := sendReply(conn, commandNotSupported, nil); err != nil {
 		return fmt.Errorf("failed to send reply: %w", err)
