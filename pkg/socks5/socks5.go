@@ -14,6 +14,7 @@ import (
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
+	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/stderror"
 )
 
@@ -55,10 +56,6 @@ type Config struct {
 	// BindIP is used for bind or udp associate
 	BindIP net.IP
 
-	// Network type when dial to the destination.
-	// If not specified, "tcp" is used.
-	NetworkType string
-
 	// Allow using socks5 to access resources served in localhost.
 	AllowLocalDestination bool
 
@@ -80,9 +77,9 @@ type Server struct {
 	die         chan struct{}
 }
 
-// New creates a new Server and potentially returns an error
+// New creates a new Server and potentially returns an error.
 func New(conf *Config) (*Server, error) {
-	// Ensure we have at least one authentication method enabled
+	// Ensure we have at least one authentication method enabled.
 	if len(conf.AuthMethods) == 0 {
 		if conf.Credentials != nil {
 			conf.AuthMethods = []Authenticator{&UserPassAuthenticator{conf.Credentials}}
@@ -91,9 +88,17 @@ func New(conf *Config) (*Server, error) {
 		}
 	}
 
-	// Ensure we have a DNS resolver
+	// Ensure we have a DNS resolver.
 	if conf.Resolver == nil {
 		conf.Resolver = DNSResolver{}
+	}
+
+	// Provide a default bind IP.
+	if conf.BindIP == nil {
+		conf.BindIP = net.ParseIP(netutil.AllIPAddr())
+		if conf.BindIP == nil {
+			return nil, fmt.Errorf("set socks5 bind IP failed")
+		}
 	}
 
 	server := &Server{
@@ -104,7 +109,6 @@ func New(conf *Config) (*Server, error) {
 	}
 
 	server.authMethods = make(map[uint8]Authenticator)
-
 	for _, a := range conf.AuthMethods {
 		server.authMethods[a.GetCode()] = a
 	}
@@ -186,7 +190,7 @@ func (s *Server) acceptLoop() {
 }
 
 func (s *Server) clientServeConn(conn net.Conn) error {
-	// When proxy is enabled, forward all the traffic to proxy.
+	// Proxy is enabled, forward all the traffic to proxy.
 	// If there are multiple proxy endpoints, randomly select one of them.
 	n := len(s.config.ProxyConf)
 	if n == 0 {
@@ -224,6 +228,16 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 		return fmt.Errorf("proxy Dial(%q, %q) failed: %w", proxyConf.NetworkType, proxyConf.Address, err)
 	}
 
+	if err := s.proxySocks5AuthReq(conn, proxyConn); err != nil {
+		atomic.AddUint64(&metrics.Socks5HandshakeErrors, 1)
+		return err
+	}
+	if err := s.proxySocks5ConnReq(conn, proxyConn); err != nil {
+		atomic.AddUint64(&metrics.Socks5HandshakeErrors, 1)
+		return err
+	}
+
+	// After the connection is established, copy bidirectionally.
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
@@ -251,14 +265,12 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 func (s *Server) serverServeConn(conn net.Conn) error {
 	bufConn := bufio.NewReader(conn)
 
-	// Read the version byte.
+	// Read the version byte and ensure we are compatible.
 	version := []byte{0}
 	if _, err := io.ReadFull(bufConn, version); err != nil {
 		atomic.AddUint64(&metrics.Socks5HandshakeErrors, 1)
 		return fmt.Errorf("failed to get version byte: %w", err)
 	}
-
-	// Ensure we are compatible.
 	if version[0] != socks5Version {
 		atomic.AddUint64(&metrics.Socks5HandshakeErrors, 1)
 		return fmt.Errorf("unsupported SOCKS version: %v", version)

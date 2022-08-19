@@ -155,12 +155,8 @@ func (s *Server) handleRequest(req *Request, conn conn) error {
 
 // handleConnect is used to handle a connect command.
 func (s *Server) handleConnect(ctx context.Context, conn conn, req *Request) error {
-	// Attempt to connect.
-	if s.config.NetworkType == "" {
-		s.config.NetworkType = "tcp"
-	}
 	var d net.Dialer
-	target, err := d.DialContext(ctx, s.config.NetworkType, req.DestAddr.Address())
+	target, err := d.DialContext(ctx, "tcp", req.DestAddr.Address())
 	if err != nil {
 		msg := err.Error()
 		resp := hostUnreachable
@@ -223,6 +219,118 @@ func (s *Server) handleAssociate(ctx context.Context, conn conn, req *Request) e
 	if err := sendReply(conn, commandNotSupported, nil); err != nil {
 		return fmt.Errorf("failed to send reply: %w", err)
 	}
+	return nil
+}
+
+// proxySocks5AuthReq transfers the socks5 authentication request and response
+// between socks5 client and server.
+func (s *Server) proxySocks5AuthReq(conn, proxyConn net.Conn) error {
+	// Send the version and authtication methods to the server.
+	version := []byte{0}
+	if _, err := io.ReadFull(conn, version); err != nil {
+		return fmt.Errorf("failed to get version byte: %w", err)
+	}
+	if version[0] != socks5Version {
+		return fmt.Errorf("unsupported SOCKS version: %v", version)
+	}
+	nMethods := []byte{0}
+	if _, err := io.ReadFull(conn, nMethods); err != nil {
+		return fmt.Errorf("failed to get the length of authentication methods: %w", err)
+	}
+	methods := make([]byte, int(nMethods[0]))
+	if _, err := io.ReadFull(conn, methods); err != nil {
+		return fmt.Errorf("failed to get authentication methods: %w", err)
+	}
+	authReq := []byte{}
+	authReq = append(authReq, version...)
+	authReq = append(authReq, nMethods...)
+	authReq = append(authReq, methods...)
+	if _, err := proxyConn.Write(authReq); err != nil {
+		return fmt.Errorf("failed to write authentication request to the server: %w", err)
+	}
+
+	// Get server authentication response.
+	authResp := make([]byte, 2)
+	if _, err := io.ReadFull(proxyConn, authResp); err != nil {
+		return fmt.Errorf("failed to read authentication response from the socks5 server: %w", err)
+	}
+	if _, err := conn.Write(authResp); err != nil {
+		return fmt.Errorf("failed to write authentication response to the socks5 client: %w", err)
+	}
+
+	return nil
+}
+
+// proxySocks5ConnReq transfers the socks5 connection request and response
+// between socks5 client and server.
+func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) error {
+	// Send the connection request to the server.
+	connReq := make([]byte, 4)
+	if _, err := io.ReadFull(conn, connReq); err != nil {
+		return fmt.Errorf("failed to get socks5 connection request: %w", err)
+	}
+	// cmd := connReq[1]
+	reqAddrType := connReq[3]
+	var reqFQDNLen []byte
+	var dstAddr []byte
+	switch reqAddrType {
+	case ipv4Address:
+		dstAddr = make([]byte, 6)
+	case fqdnAddress:
+		reqFQDNLen = []byte{0}
+		if _, err := io.ReadFull(conn, reqFQDNLen); err != nil {
+			return fmt.Errorf("failed to get FQDN length: %w", err)
+		}
+		dstAddr = make([]byte, reqFQDNLen[0]+2)
+	case ipv6Address:
+		dstAddr = make([]byte, 18)
+	default:
+		return fmt.Errorf("unsupported address type: %d", reqAddrType)
+	}
+	if _, err := io.ReadFull(conn, dstAddr); err != nil {
+		return fmt.Errorf("failed to get destination address: %w", err)
+	}
+	if len(reqFQDNLen) != 0 {
+		connReq = append(connReq, reqFQDNLen...)
+	}
+	connReq = append(connReq, dstAddr...)
+	if _, err := proxyConn.Write(connReq); err != nil {
+		return fmt.Errorf("failed to write connection request to the server: %w", err)
+	}
+
+	// Get server connection response.
+	connResp := make([]byte, 4)
+	if _, err := io.ReadFull(proxyConn, connResp); err != nil {
+		return fmt.Errorf("failed to read connection response from the server: %w", err)
+	}
+	respAddrType := connResp[3]
+	var respFQDNLen []byte
+	var bindAddr []byte
+	switch respAddrType {
+	case ipv4Address:
+		bindAddr = make([]byte, 6)
+	case fqdnAddress:
+		respFQDNLen = []byte{0}
+		if _, err := io.ReadFull(proxyConn, respFQDNLen); err != nil {
+			return fmt.Errorf("failed to get FQDN length: %w", err)
+		}
+		bindAddr = make([]byte, respFQDNLen[0]+2)
+	case ipv6Address:
+		bindAddr = make([]byte, 18)
+	default:
+		return fmt.Errorf("unsupported address type: %d", respAddrType)
+	}
+	if _, err := io.ReadFull(proxyConn, bindAddr); err != nil {
+		return fmt.Errorf("failed to get bind address: %w", err)
+	}
+	if len(respFQDNLen) != 0 {
+		connResp = append(connResp, respFQDNLen...)
+	}
+	connResp = append(connResp, bindAddr...)
+	if _, err := conn.Write(connResp); err != nil {
+		return fmt.Errorf("failed to write connection response to the socks5 client: %w", err)
+	}
+
 	return nil
 }
 
