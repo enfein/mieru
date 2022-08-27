@@ -1,7 +1,6 @@
 package socks5
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -230,44 +229,23 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 
 	if err := s.proxySocks5AuthReq(conn, proxyConn); err != nil {
 		atomic.AddUint64(&metrics.Socks5HandshakeErrors, 1)
+		proxyConn.Close()
 		return err
 	}
 	if err := s.proxySocks5ConnReq(conn, proxyConn); err != nil {
 		atomic.AddUint64(&metrics.Socks5HandshakeErrors, 1)
+		proxyConn.Close()
 		return err
 	}
 
 	// After the connection is established, copy bidirectionally.
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		io.Copy(proxyConn, conn)
-		if err := proxyConn.Close(); err != nil {
-			if log.IsLevelEnabled(log.DebugLevel) {
-				log.Debugf("[%v - %v] Close() failed: %v", proxyConn.LocalAddr(), proxyConn.RemoteAddr(), err)
-			}
-		}
-		wg.Done()
-	}()
-	go func() {
-		io.Copy(conn, proxyConn)
-		if err := conn.Close(); err != nil {
-			if log.IsLevelEnabled(log.DebugLevel) {
-				log.Debugf("[%v - %v] Close() failed: %v", conn.LocalAddr(), conn.RemoteAddr(), err)
-			}
-		}
-		wg.Done()
-	}()
-	wg.Wait()
-	return nil
+	return BidiCopy(proxyConn, conn)
 }
 
 func (s *Server) serverServeConn(conn net.Conn) error {
-	bufConn := bufio.NewReader(conn)
-
 	// Read the version byte and ensure we are compatible.
 	version := []byte{0}
-	if _, err := io.ReadFull(bufConn, version); err != nil {
+	if _, err := io.ReadFull(conn, version); err != nil {
 		atomic.AddUint64(&metrics.Socks5HandshakeErrors, 1)
 		return fmt.Errorf("failed to get version byte: %w", err)
 	}
@@ -277,13 +255,13 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 	}
 
 	// Authenticate the connection.
-	authContext, err := s.authenticate(conn, bufConn)
+	authContext, err := s.authenticate(conn)
 	if err != nil {
 		atomic.AddUint64(&metrics.Socks5HandshakeErrors, 1)
 		return fmt.Errorf("failed to authenticate: %w", err)
 	}
 
-	request, err := NewRequest(bufConn)
+	request, err := NewRequest(conn)
 	if err != nil {
 		atomic.AddUint64(&metrics.Socks5HandshakeErrors, 1)
 		if err == unrecognizedAddrType {

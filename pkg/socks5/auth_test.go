@@ -3,117 +3,111 @@ package socks5
 import (
 	"bytes"
 	"testing"
+
+	"github.com/enfein/mieru/pkg/testtool"
 )
 
 func TestNoAuth(t *testing.T) {
-	req := bytes.NewBuffer(nil)
-	req.Write([]byte{1, NoAuth})
-	var resp bytes.Buffer
+	clientConn, serverConn := testtool.BufPipe()
+	clientConn.Write([]byte{1, NoAuth})
 
 	s, _ := New(&Config{})
-	ctx, err := s.authenticate(&resp, req)
+	ctx, err := s.authenticate(serverConn)
 	if err != nil {
-		t.Fatalf("err: %v", err)
+		t.Fatalf("authenticate() failed: %v", err)
 	}
-
 	if ctx.Method != NoAuth {
 		t.Fatal("Invalid Context Method")
 	}
 
-	out := resp.Bytes()
-	if !bytes.Equal(out, []byte{socks5Version, NoAuth}) {
-		t.Fatalf("bad: %v", out)
+	out := make([]byte, 2)
+	clientConn.Read(out)
+	want := []byte{socks5Version, NoAuth}
+	if !bytes.Equal(out, want) {
+		t.Fatalf("response = %v, want %v", out, want)
 	}
 }
 
-func TestPasswordAuth_Valid(t *testing.T) {
-	req := bytes.NewBuffer(nil)
-	req.Write([]byte{2, NoAuth, UserPassAuth})
-	req.Write([]byte{1, 3, 'f', 'o', 'o', 3, 'b', 'a', 'r'})
-	var resp bytes.Buffer
+func TestPasswordAuthValid(t *testing.T) {
+	clientConn, serverConn := testtool.BufPipe()
+	clientConn.Write([]byte{2, NoAuth, UserPassAuth})
+	clientConn.Write([]byte{1, 3, 'f', 'o', 'o', 3, 'b', 'a', 'r'})
 
 	cred := StaticCredentials{
 		"foo": "bar",
 	}
-
-	cator := UserPassAuthenticator{Credentials: cred}
-
-	s, _ := New(&Config{AuthMethods: []Authenticator{cator}})
-
-	ctx, err := s.authenticate(&resp, req)
+	authenticator := UserPassAuthenticator{Credentials: cred}
+	s, _ := New(&Config{AuthMethods: []Authenticator{authenticator}})
+	ctx, err := s.authenticate(serverConn)
 	if err != nil {
-		t.Fatalf("err: %v", err)
+		t.Fatalf("authenticate() failed: %v", err)
 	}
-
 	if ctx.Method != UserPassAuth {
 		t.Fatal("Invalid Context Method")
 	}
-
 	val, ok := ctx.Payload["Username"]
 	if !ok {
 		t.Fatal("Missing key Username in auth context's payload")
 	}
-
 	if val != "foo" {
 		t.Fatal("Invalid Username in auth context's payload")
 	}
 
-	out := resp.Bytes()
-	if !bytes.Equal(out, []byte{socks5Version, UserPassAuth, 1, authSuccess}) {
-		t.Fatalf("bad: %v", out)
+	out := make([]byte, 4)
+	clientConn.Read(out)
+	want := []byte{socks5Version, UserPassAuth, 1, authSuccess}
+	if !bytes.Equal(out, want) {
+		t.Fatalf("response = %v, want %v", out, want)
 	}
 }
 
-func TestPasswordAuth_Invalid(t *testing.T) {
-	req := bytes.NewBuffer(nil)
-	req.Write([]byte{2, NoAuth, UserPassAuth})
-	req.Write([]byte{1, 3, 'f', 'o', 'o', 3, 'b', 'a', 'z'})
-	var resp bytes.Buffer
+func TestPasswordAuthInvalid(t *testing.T) {
+	clientConn, serverConn := testtool.BufPipe()
+	clientConn.Write([]byte{2, NoAuth, UserPassAuth})
+	clientConn.Write([]byte{1, 3, 'f', 'o', 'o', 3, 'b', 'a', 'z'})
 
 	cred := StaticCredentials{
 		"foo": "bar",
 	}
-	cator := UserPassAuthenticator{Credentials: cred}
-	s, _ := New(&Config{AuthMethods: []Authenticator{cator}})
-
-	ctx, err := s.authenticate(&resp, req)
+	authenticator := UserPassAuthenticator{Credentials: cred}
+	s, _ := New(&Config{AuthMethods: []Authenticator{authenticator}})
+	ctx, err := s.authenticate(serverConn)
 	if err != UserAuthFailed {
-		t.Fatalf("err: %v", err)
+		t.Fatalf("authenticate() returns unexpected error: %v", err)
 	}
-
 	if ctx != nil {
 		t.Fatal("Invalid Context Method")
 	}
 
-	out := resp.Bytes()
-	if !bytes.Equal(out, []byte{socks5Version, UserPassAuth, 1, authFailure}) {
-		t.Fatalf("bad: %v", out)
+	out := make([]byte, 4)
+	clientConn.Read(out)
+	want := []byte{socks5Version, UserPassAuth, 1, authFailure}
+	if !bytes.Equal(out, want) {
+		t.Fatalf("response = %v, want %v", out, want)
 	}
 }
 
 func TestNoSupportedAuth(t *testing.T) {
-	req := bytes.NewBuffer(nil)
-	req.Write([]byte{1, NoAuth})
-	var resp bytes.Buffer
+	clientConn, serverConn := testtool.BufPipe()
+	clientConn.Write([]byte{1, NoAuth})
 
 	cred := StaticCredentials{
 		"foo": "bar",
 	}
-	cator := UserPassAuthenticator{Credentials: cred}
-
-	s, _ := New(&Config{AuthMethods: []Authenticator{cator}})
-
-	ctx, err := s.authenticate(&resp, req)
+	authenticator := UserPassAuthenticator{Credentials: cred}
+	s, _ := New(&Config{AuthMethods: []Authenticator{authenticator}})
+	ctx, err := s.authenticate(serverConn)
 	if err != NoSupportedAuth {
-		t.Fatalf("err: %v", err)
+		t.Fatalf("authenticate() returns unexpected error: %v", err)
 	}
-
 	if ctx != nil {
 		t.Fatal("Invalid Context Method")
 	}
 
-	out := resp.Bytes()
-	if !bytes.Equal(out, []byte{socks5Version, noAcceptable}) {
-		t.Fatalf("bad: %v", out)
+	out := make([]byte, 2)
+	clientConn.Read(out)
+	want := []byte{socks5Version, noAcceptable}
+	if !bytes.Equal(out, want) {
+		t.Fatalf("response = %v, want %v", out, want)
 	}
 }

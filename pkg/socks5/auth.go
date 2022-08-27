@@ -31,7 +31,7 @@ type AuthContext struct {
 }
 
 type Authenticator interface {
-	Authenticate(reader io.Reader, writer io.Writer) (*AuthContext, error)
+	Authenticate(conn io.ReadWriter) (*AuthContext, error)
 	GetCode() uint8
 }
 
@@ -42,8 +42,8 @@ func (a NoAuthAuthenticator) GetCode() uint8 {
 	return NoAuth
 }
 
-func (a NoAuthAuthenticator) Authenticate(reader io.Reader, writer io.Writer) (*AuthContext, error) {
-	_, err := writer.Write([]byte{socks5Version, NoAuth})
+func (a NoAuthAuthenticator) Authenticate(conn io.ReadWriter) (*AuthContext, error) {
+	_, err := conn.Write([]byte{socks5Version, NoAuth})
 	return &AuthContext{NoAuth, nil}, err
 }
 
@@ -57,15 +57,15 @@ func (a UserPassAuthenticator) GetCode() uint8 {
 	return UserPassAuth
 }
 
-func (a UserPassAuthenticator) Authenticate(reader io.Reader, writer io.Writer) (*AuthContext, error) {
+func (a UserPassAuthenticator) Authenticate(conn io.ReadWriter) (*AuthContext, error) {
 	// Tell the client to use user/pass auth
-	if _, err := writer.Write([]byte{socks5Version, UserPassAuth}); err != nil {
+	if _, err := conn.Write([]byte{socks5Version, UserPassAuth}); err != nil {
 		return nil, err
 	}
 
 	// Get the version and username length
 	header := []byte{0, 0}
-	if _, err := io.ReadFull(reader, header); err != nil {
+	if _, err := io.ReadFull(conn, header); err != nil {
 		return nil, err
 	}
 
@@ -77,29 +77,29 @@ func (a UserPassAuthenticator) Authenticate(reader io.Reader, writer io.Writer) 
 	// Get the user name
 	userLen := int(header[1])
 	user := make([]byte, userLen)
-	if _, err := io.ReadFull(reader, user); err != nil {
+	if _, err := io.ReadFull(conn, user); err != nil {
 		return nil, err
 	}
 
 	// Get the password length
-	if _, err := io.ReadFull(reader, header[:1]); err != nil {
+	if _, err := io.ReadFull(conn, header[:1]); err != nil {
 		return nil, err
 	}
 
 	// Get the password
 	passLen := int(header[0])
 	pass := make([]byte, passLen)
-	if _, err := io.ReadFull(reader, pass); err != nil {
+	if _, err := io.ReadFull(conn, pass); err != nil {
 		return nil, err
 	}
 
 	// Verify the password
 	if a.Credentials.Valid(string(user), string(pass)) {
-		if _, err := writer.Write([]byte{userAuthVersion, authSuccess}); err != nil {
+		if _, err := conn.Write([]byte{userAuthVersion, authSuccess}); err != nil {
 			return nil, err
 		}
 	} else {
-		if _, err := writer.Write([]byte{userAuthVersion, authFailure}); err != nil {
+		if _, err := conn.Write([]byte{userAuthVersion, authFailure}); err != nil {
 			return nil, err
 		}
 		return nil, UserAuthFailed
@@ -110,18 +110,18 @@ func (a UserPassAuthenticator) Authenticate(reader io.Reader, writer io.Writer) 
 }
 
 // authenticate is used to handle connection authentication
-func (s *Server) authenticate(conn io.Writer, bufConn io.Reader) (*AuthContext, error) {
+func (s *Server) authenticate(conn io.ReadWriter) (*AuthContext, error) {
 	// Get the methods
-	methods, err := readMethods(bufConn)
+	methods, err := readMethods(conn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get auth methods: %w", err)
 	}
 
 	// Select a usable method
 	for _, method := range methods {
-		cator, found := s.authMethods[method]
+		authenticator, found := s.authMethods[method]
 		if found {
-			return cator.Authenticate(bufConn, conn)
+			return authenticator.Authenticate(conn)
 		}
 	}
 
