@@ -89,37 +89,7 @@ mita apply config <FILE>
 2. 在 `users` -> `name` 属性中填写用户名。
 3. 在 `users` -> `password` 属性中填写该用户的密码。
 
-除此之外，mita 可以监听多个不同的端口，例如
-
-```js
-    "portBindings": [
-        {
-            "port": 1111,
-            "protocol": "TCP"
-        },
-        {
-            "port": 2222,
-            "protocol": "TCP"
-        }
-    ],
-```
-
-如果你想把代理线路分享给别人使用，也可以创建多个不同的用户，例如
-
-```js
-    "users": [
-        {
-            "name": "<user1@example.com>",
-            "password": "<user1-password>"
-        },
-        {
-            "name": "<user2@example.com>",
-            "password": "<user2-password>"
-        }
-    ],
-```
-
-下面是服务器配置文件的一个例子，仅供参考。
+除此之外，mita 可以监听多个不同的端口。如果你想把代理线路分享给别人使用，也可以创建多个不同的用户。下面是服务器配置文件的一个例子，仅供参考。
 
 ```js
 {
@@ -140,7 +110,7 @@ mita apply config <FILE>
         },
         {
             "name": "dongtaiqingling",
-            "password": "jiasu"
+            "password": "touzhele"
         }
     ],
     "loggingLevel": "INFO",

@@ -16,20 +16,42 @@
 package socks5
 
 import (
+	"fmt"
 	"io"
+	"net"
+	"sync/atomic"
 )
 
+type closeWriter interface {
+	CloseWrite() error
+}
+
 // BidiCopy does bi-directional data copy.
-func BidiCopy(conn1, conn2 io.ReadWriteCloser) error {
+func BidiCopy(conn1, conn2 io.ReadWriteCloser, isClient bool) error {
 	errCh := make(chan error, 2)
 	go func() {
 		_, err := io.Copy(conn1, conn2)
-		conn1.Close()
+		if isClient {
+			// Must call Close() to make sure counter is updated.
+			conn1.Close()
+		} else {
+			// Avoid counter updated twice due to twice Close(), use CloseWrite().
+			// The connection still needs to close here to unblock the other side.
+			if tcpConn1, ok := conn1.(closeWriter); ok {
+				tcpConn1.CloseWrite()
+			}
+		}
 		errCh <- err
 	}()
 	go func() {
 		_, err := io.Copy(conn2, conn1)
-		conn2.Close()
+		if isClient {
+			conn2.Close()
+		} else {
+			if tcpConn2, ok := conn2.(closeWriter); ok {
+				tcpConn2.CloseWrite()
+			}
+		}
 		errCh <- err
 	}()
 	for i := 0; i < 2; i++ {
@@ -37,5 +59,58 @@ func BidiCopy(conn1, conn2 io.ReadWriteCloser) error {
 			return err
 		}
 	}
+	return nil
+}
+
+// BidiCopyUDP does bi-directional data copy between a proxy client UDP endpoint
+// and the proxy tunnel.
+func BidiCopyUDP(udpConn net.UDPConn, tunnelConn UDPAssociateTunnelConn) error {
+	var addr atomic.Value
+	errCh := make(chan error, 2)
+
+	go func() {
+		buf := make([]byte, 1<<16)
+		for {
+			n, a, err := udpConn.ReadFrom(buf)
+			if err != nil {
+				errCh <- fmt.Errorf("ReadFrom UDP connection failed: %v", err)
+				break
+			}
+			udpAddr := addr.Load()
+			if udpAddr == nil {
+				addr.Store(a)
+			} else if udpAddr.(net.Addr).String() != a.String() {
+				errCh <- fmt.Errorf("ReadFrom new UDP endpoint %s, first use is %s", a.String(), udpAddr.(net.Addr).String())
+				break
+			}
+			if _, err = tunnelConn.Write(buf[:n]); err != nil {
+				errCh <- fmt.Errorf("Write tunnel failed: %v", err)
+				break
+			}
+		}
+	}()
+	go func() {
+		buf := make([]byte, 1<<16)
+		for {
+			n, err := tunnelConn.Read(buf)
+			if err != nil {
+				errCh <- fmt.Errorf("Read tunnel failed: %v", err)
+				break
+			}
+			udpAddr := addr.Load()
+			if udpAddr == nil {
+				errCh <- fmt.Errorf("UDP address is not ready")
+				break
+			}
+			if _, err = udpConn.WriteTo(buf[:n], udpAddr.(net.Addr)); err != nil {
+				errCh <- fmt.Errorf("WriteTo UDP connetion failed: %v", err)
+			}
+		}
+	}()
+
+	<-errCh
+	tunnelConn.Close()
+	udpConn.Close()
+	<-errCh
 	return nil
 }

@@ -232,14 +232,18 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 		proxyConn.Close()
 		return err
 	}
-	if err := s.proxySocks5ConnReq(conn, proxyConn); err != nil {
+	udpAssociateConn, err := s.proxySocks5ConnReq(conn, proxyConn)
+	if err != nil {
 		atomic.AddUint64(&metrics.Socks5HandshakeErrors, 1)
 		proxyConn.Close()
 		return err
 	}
 
-	// After the connection is established, copy bidirectionally.
-	return BidiCopy(proxyConn, conn)
+	if udpAssociateConn != nil {
+		log.Debugf("UDP association is listening on %v", udpAssociateConn.LocalAddr())
+		defer udpAssociateConn.Close()
+	}
+	return BidiCopy(conn, proxyConn, true)
 }
 
 func (s *Server) serverServeConn(conn net.Conn) error {

@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
 )
 
@@ -74,20 +73,13 @@ type Request struct {
 	RemoteAddr *AddrSpec
 	// AddrSpec of the desired destination.
 	DestAddr *AddrSpec
-
-	bufConn io.Reader
-}
-
-type conn interface {
-	Write([]byte) (int, error)
-	RemoteAddr() net.Addr
 }
 
 // NewRequest creates a new Request from the tcp connection.
-func NewRequest(bufConn io.Reader) (*Request, error) {
+func NewRequest(conn io.Reader) (*Request, error) {
 	// Read the version byte.
 	header := []byte{0, 0, 0}
-	if _, err := io.ReadFull(bufConn, header); err != nil {
+	if _, err := io.ReadFull(conn, header); err != nil {
 		return nil, fmt.Errorf("failed to get command version: %w", err)
 	}
 
@@ -97,7 +89,7 @@ func NewRequest(bufConn io.Reader) (*Request, error) {
 	}
 
 	// Read in the destination address.
-	dest, err := readAddrSpec(bufConn)
+	dest, err := readAddrSpec(conn)
 	if err != nil {
 		return nil, err
 	}
@@ -106,14 +98,13 @@ func NewRequest(bufConn io.Reader) (*Request, error) {
 		Version:  socks5Version,
 		Command:  header[1],
 		DestAddr: dest,
-		bufConn:  bufConn,
 	}
 
 	return request, nil
 }
 
 // handleRequest is used for request processing after authentication.
-func (s *Server) handleRequest(req *Request, conn conn) error {
+func (s *Server) handleRequest(req *Request, conn io.ReadWriteCloser) error {
 	ctx := context.Background()
 
 	// Resolve the address if we have a FQDN.
@@ -154,19 +145,21 @@ func (s *Server) handleRequest(req *Request, conn conn) error {
 }
 
 // handleConnect is used to handle a connect command.
-func (s *Server) handleConnect(ctx context.Context, conn conn, req *Request) error {
+func (s *Server) handleConnect(ctx context.Context, conn io.ReadWriteCloser, req *Request) error {
 	var d net.Dialer
 	target, err := d.DialContext(ctx, "tcp", req.DestAddr.Address())
 	if err != nil {
 		msg := err.Error()
-		resp := hostUnreachable
-		atomic.AddUint64(&metrics.Socks5HostUnreachableErrors, 1)
+		var resp uint8
 		if strings.Contains(msg, "refused") {
 			resp = connectionRefused
 			atomic.AddUint64(&metrics.Socks5ConnectionRefusedErrors, 1)
 		} else if strings.Contains(msg, "network is unreachable") {
 			resp = networkUnreachable
 			atomic.AddUint64(&metrics.Socks5NetworkUnreachableErrors, 1)
+		} else {
+			resp = hostUnreachable
+			atomic.AddUint64(&metrics.Socks5HostUnreachableErrors, 1)
 		}
 		if err := sendReply(conn, resp, nil); err != nil {
 			return fmt.Errorf("failed to send reply: %w", err)
@@ -182,27 +175,11 @@ func (s *Server) handleConnect(ctx context.Context, conn conn, req *Request) err
 		return fmt.Errorf("failed to send reply: %w", err)
 	}
 
-	// Start proxying.
-	errCh := make(chan error, 2)
-	go proxy(target, req.bufConn, errCh)
-	go proxy(conn, target, errCh)
-
-	// Wait for connection to close.
-	for i := 0; i < 2; i++ {
-		e := <-errCh
-		if e != nil {
-			// Return from this function closes target (and conn).
-			return e
-		}
-	}
-	return nil
+	return BidiCopy(conn, target, false)
 }
 
 // handleBind is used to handle a bind command.
-func (s *Server) handleBind(ctx context.Context, conn conn, req *Request) error {
-	if log.IsLevelEnabled(log.DebugLevel) {
-		log.Debugf("received unsupported socks5 bind request from %v", conn.RemoteAddr())
-	}
+func (s *Server) handleBind(ctx context.Context, conn io.ReadWriteCloser, req *Request) error {
 	atomic.AddUint64(&metrics.Socks5UnsupportedCommandErrors, 1)
 	if err := sendReply(conn, commandNotSupported, nil); err != nil {
 		return fmt.Errorf("failed to send reply: %w", err)
@@ -211,14 +188,13 @@ func (s *Server) handleBind(ctx context.Context, conn conn, req *Request) error 
 }
 
 // handleAssociate is used to handle a associate command.
-func (s *Server) handleAssociate(ctx context.Context, conn conn, req *Request) error {
-	if log.IsLevelEnabled(log.DebugLevel) {
-		log.Debugf("received unsupported socks5 associate request from %v", conn.RemoteAddr())
-	}
-	atomic.AddUint64(&metrics.Socks5UnsupportedCommandErrors, 1)
-	if err := sendReply(conn, commandNotSupported, nil); err != nil {
+func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, req *Request) error {
+	// Use 0.0.0.0:0 as the bind address. Client will fill in the port number.
+	if err := sendReply(conn, successReply, nil); err != nil {
 		return fmt.Errorf("failed to send reply: %w", err)
 	}
+
+	// TODO: implement UDP processing logic.
 	return nil
 }
 
@@ -262,14 +238,15 @@ func (s *Server) proxySocks5AuthReq(conn, proxyConn net.Conn) error {
 }
 
 // proxySocks5ConnReq transfers the socks5 connection request and response
-// between socks5 client and server.
-func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) error {
+// between socks5 client and server. Optionally, if UDP association is used,
+// return the created UDP connection.
+func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (net.Conn, error) {
 	// Send the connection request to the server.
 	connReq := make([]byte, 4)
 	if _, err := io.ReadFull(conn, connReq); err != nil {
-		return fmt.Errorf("failed to get socks5 connection request: %w", err)
+		return nil, fmt.Errorf("failed to get socks5 connection request: %w", err)
 	}
-	// cmd := connReq[1]
+	cmd := connReq[1]
 	reqAddrType := connReq[3]
 	var reqFQDNLen []byte
 	var dstAddr []byte
@@ -279,29 +256,29 @@ func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) error {
 	case fqdnAddress:
 		reqFQDNLen = []byte{0}
 		if _, err := io.ReadFull(conn, reqFQDNLen); err != nil {
-			return fmt.Errorf("failed to get FQDN length: %w", err)
+			return nil, fmt.Errorf("failed to get FQDN length: %w", err)
 		}
 		dstAddr = make([]byte, reqFQDNLen[0]+2)
 	case ipv6Address:
 		dstAddr = make([]byte, 18)
 	default:
-		return fmt.Errorf("unsupported address type: %d", reqAddrType)
+		return nil, fmt.Errorf("unsupported address type: %d", reqAddrType)
 	}
 	if _, err := io.ReadFull(conn, dstAddr); err != nil {
-		return fmt.Errorf("failed to get destination address: %w", err)
+		return nil, fmt.Errorf("failed to get destination address: %w", err)
 	}
 	if len(reqFQDNLen) != 0 {
 		connReq = append(connReq, reqFQDNLen...)
 	}
 	connReq = append(connReq, dstAddr...)
 	if _, err := proxyConn.Write(connReq); err != nil {
-		return fmt.Errorf("failed to write connection request to the server: %w", err)
+		return nil, fmt.Errorf("failed to write connection request to the server: %w", err)
 	}
 
 	// Get server connection response.
 	connResp := make([]byte, 4)
 	if _, err := io.ReadFull(proxyConn, connResp); err != nil {
-		return fmt.Errorf("failed to read connection response from the server: %w", err)
+		return nil, fmt.Errorf("failed to read connection response from the server: %w", err)
 	}
 	respAddrType := connResp[3]
 	var respFQDNLen []byte
@@ -312,26 +289,54 @@ func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) error {
 	case fqdnAddress:
 		respFQDNLen = []byte{0}
 		if _, err := io.ReadFull(proxyConn, respFQDNLen); err != nil {
-			return fmt.Errorf("failed to get FQDN length: %w", err)
+			return nil, fmt.Errorf("failed to get FQDN length: %w", err)
 		}
 		bindAddr = make([]byte, respFQDNLen[0]+2)
 	case ipv6Address:
 		bindAddr = make([]byte, 18)
 	default:
-		return fmt.Errorf("unsupported address type: %d", respAddrType)
+		return nil, fmt.Errorf("unsupported address type: %d", respAddrType)
 	}
 	if _, err := io.ReadFull(proxyConn, bindAddr); err != nil {
-		return fmt.Errorf("failed to get bind address: %w", err)
+		return nil, fmt.Errorf("failed to get bind address: %w", err)
 	}
 	if len(respFQDNLen) != 0 {
 		connResp = append(connResp, respFQDNLen...)
 	}
 	connResp = append(connResp, bindAddr...)
-	if _, err := conn.Write(connResp); err != nil {
-		return fmt.Errorf("failed to write connection response to the socks5 client: %w", err)
+
+	var udpConn net.Conn
+	if cmd == AssociateCommand {
+		// Create a UDP listener on a random port.
+		udpAddr, err := net.ResolveUDPAddr("udp", "0.0.0.0:0")
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve UDP address: %v", err)
+		}
+		udpConn, err = net.ListenUDP("udp", udpAddr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to listen UDP: %v", err)
+		}
+		// Get the port number and rewrite the response.
+		_, udpPortStr, err := net.SplitHostPort(udpConn.LocalAddr().String())
+		if err != nil {
+			udpConn.Close()
+			return nil, fmt.Errorf("failed to fetch UDP port number: %v", err)
+		}
+		udpPort, err := strconv.Atoi(udpPortStr)
+		if err != nil {
+			udpConn.Close()
+			return nil, fmt.Errorf("failed to convert UDP port number: %v", err)
+		}
+		lenResp := len(connResp)
+		connResp[lenResp-2] = byte(udpPort >> 8)
+		connResp[lenResp-1] = byte(udpPort)
 	}
 
-	return nil
+	if _, err := conn.Write(connResp); err != nil {
+		return nil, fmt.Errorf("failed to write connection response to the socks5 client: %w", err)
+	}
+
+	return udpConn, nil
 }
 
 // readAddrSpec is used to read AddrSpec.
@@ -430,20 +435,6 @@ func sendReply(w io.Writer, resp uint8, addr *AddrSpec) error {
 	// Send the message.
 	_, err := w.Write(msg)
 	return err
-}
-
-type closeWriter interface {
-	CloseWrite() error
-}
-
-// proxy is used to suffle data from src to destination, and sends errors
-// down a dedicated channel.
-func proxy(dst io.Writer, src io.Reader, errCh chan error) {
-	_, err := io.Copy(dst, src)
-	if tcpConn, ok := dst.(closeWriter); ok {
-		tcpConn.CloseWrite()
-	}
-	errCh <- err
 }
 
 func isLocalhostDest(req *Request) bool {

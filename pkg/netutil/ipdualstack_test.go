@@ -13,13 +13,28 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package netutil_test
+package netutil
 
 import (
 	"testing"
-
-	"github.com/enfein/mieru/pkg/netutil"
 )
+
+func TestGetIPVersion(t *testing.T) {
+	testcases := []struct {
+		input string
+		want  IPVersion
+	}{
+		{"google.com", IP_VERSION_UNKNOWN},
+		{"127.0.0.1", IP_VERSION_4},
+		{"1234::0", IP_VERSION_6},
+	}
+
+	for _, tc := range testcases {
+		if out := GetIPVersion(tc.input); out != tc.want {
+			t.Errorf("GetIPVersion(%v) = %v, want %v", tc.input, out, tc.want)
+		}
+	}
+}
 
 func TestMaybeDecorateIPv6(t *testing.T) {
 	testcases := []struct {
@@ -36,7 +51,7 @@ func TestMaybeDecorateIPv6(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		if out := netutil.MaybeDecorateIPv6(tc.input); out != tc.want {
+		if out := MaybeDecorateIPv6(tc.input); out != tc.want {
 			t.Errorf("MaybeDecorateIPv6(%q) = %q, want %q", tc.input, out, tc.want)
 		}
 	}

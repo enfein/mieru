@@ -254,5 +254,5 @@ func LogSocks5Errors() {
 		"NetworkUnreachable": Socks5NetworkUnreachableErrors,
 		"HostUnreachable":    Socks5HostUnreachableErrors,
 		"ConnectionRefused":  Socks5ConnectionRefusedErrors,
-	}).Infof("[metrics - server socks5 errors]")
+	}).Infof("[metrics - socks5 errors]")
 }
