@@ -34,6 +34,7 @@ var (
 	ErrOutOfRange       = fmt.Errorf("OUT OF RANGE")
 	ErrTimeout          = fmt.Errorf("TIMEOUT")
 	ErrUnknownCommand   = fmt.Errorf("UNKNOWN COMMAND")
+	ErrUnsupported      = fmt.Errorf("UNSUPPORTED")
 )
 
 // IsConnRefused returns true if the cause of error is connection refused.

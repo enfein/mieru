@@ -64,7 +64,7 @@ func BidiCopy(conn1, conn2 io.ReadWriteCloser, isClient bool) error {
 
 // BidiCopyUDP does bi-directional data copy between a proxy client UDP endpoint
 // and the proxy tunnel.
-func BidiCopyUDP(udpConn net.UDPConn, tunnelConn UDPAssociateTunnelConn) error {
+func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *UDPAssociateTunnelConn) error {
 	var addr atomic.Value
 	errCh := make(chan error, 2)
 

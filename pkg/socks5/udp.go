@@ -18,7 +18,6 @@ package socks5
 import (
 	"encoding/binary"
 	"io"
-	"net"
 
 	"github.com/enfein/mieru/pkg/stderror"
 )
@@ -32,12 +31,12 @@ import (
 //
 // the length is encoded with little endian.
 type UDPAssociateTunnelConn struct {
-	net.Conn
+	io.ReadWriteCloser
 }
 
 func (c *UDPAssociateTunnelConn) Read(b []byte) (n int, err error) {
 	delim := make([]byte, 1)
-	if _, err = io.ReadFull(c.Conn, delim); err != nil {
+	if _, err = io.ReadFull(c.ReadWriteCloser, delim); err != nil {
 		return 0, err
 	}
 	if delim[0] != 0x00 {
@@ -45,7 +44,7 @@ func (c *UDPAssociateTunnelConn) Read(b []byte) (n int, err error) {
 	}
 
 	lengthBytes := make([]byte, 2)
-	if _, err = io.ReadFull(c.Conn, lengthBytes); err != nil {
+	if _, err = io.ReadFull(c.ReadWriteCloser, lengthBytes); err != nil {
 		return 0, err
 	}
 	length := int(binary.LittleEndian.Uint16(lengthBytes))
@@ -53,11 +52,11 @@ func (c *UDPAssociateTunnelConn) Read(b []byte) (n int, err error) {
 		return 0, io.ErrShortBuffer
 	}
 
-	if n, err = io.ReadFull(c.Conn, b[:length]); err != nil {
+	if n, err = io.ReadFull(c.ReadWriteCloser, b[:length]); err != nil {
 		return 0, err
 	}
 
-	if _, err = io.ReadFull(c.Conn, delim); err != nil {
+	if _, err = io.ReadFull(c.ReadWriteCloser, delim); err != nil {
 		return 0, err
 	}
 	if delim[0] != 0xff {
@@ -76,12 +75,17 @@ func (c *UDPAssociateTunnelConn) Write(b []byte) (int, error) {
 	copy(data[3:], b)
 	data[3+len(b)] = 0xff
 
-	if _, err := c.Conn.Write(data); err != nil {
+	if _, err := c.ReadWriteCloser.Write(data); err != nil {
 		return 0, err
 	}
 	return len(b), nil
 }
 
 func (c *UDPAssociateTunnelConn) Close() error {
-	return c.Conn.Close()
+	return c.ReadWriteCloser.Close()
+}
+
+// WrapUDPAssociateTunnel wraps an existing connection with UDPAssociateTunnelConn.
+func WrapUDPAssociateTunnel(conn io.ReadWriteCloser) *UDPAssociateTunnelConn {
+	return &UDPAssociateTunnelConn{ReadWriteCloser: conn}
 }

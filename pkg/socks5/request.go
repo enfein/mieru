@@ -10,6 +10,8 @@ import (
 	"sync/atomic"
 
 	"github.com/enfein/mieru/pkg/metrics"
+	"github.com/enfein/mieru/pkg/netutil"
+	"github.com/enfein/mieru/pkg/stderror"
 )
 
 const (
@@ -194,7 +196,55 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 		return fmt.Errorf("failed to send reply: %w", err)
 	}
 
-	// TODO: implement UDP processing logic.
+	// Create a UDP listener on a random port.
+	// All the requests associated to this connection will go through this port.
+	udpAddr, err := net.ResolveUDPAddr("udp", netutil.MaybeDecorateIPv6(netutil.AllIPAddr())+":0")
+	if err != nil {
+		return fmt.Errorf("failed to resolve UDP address: %v", err)
+	}
+	_, err = net.ListenUDP("udp", udpAddr)
+	if err != nil {
+		return fmt.Errorf("failed to listen UDP: %v", err)
+	}
+	conn = WrapUDPAssociateTunnel(conn)
+	var udpErr atomic.Value
+
+	// Send outbound UDP packets.
+	go func() {
+		buf := make([]byte, 1<<16)
+		var n int
+		var err error
+		for {
+			n, err = conn.Read(buf)
+			if err != nil {
+				udpErr.Store(err)
+				return
+			}
+
+			// Validate received UDP request.
+			if n <= 6 {
+				udpErr.Store(stderror.ErrNoEnoughData)
+				return
+			}
+			if buf[0] != 0x00 || buf[1] != 0x00 {
+				udpErr.Store(stderror.ErrInvalidArgument)
+			}
+			if buf[2] != 0x00 {
+				// UDP fragment is not supported.
+				udpErr.Store(stderror.ErrUnsupported)
+			}
+			if buf[3] != 0x01 && buf[3] != 0x03 && buf[3] != 0x04 {
+				udpErr.Store(stderror.ErrInvalidArgument)
+			}
+			if (buf[3] == 0x01 && n <= 10) || (buf[3] == 0x03 && n <= int(buf[4])+6) || (buf[3] == 0x04 && n <= 22) {
+				udpErr.Store(stderror.ErrNoEnoughData)
+			}
+
+			// Get target address and send data.
+		}
+	}()
+
+	// Receive inbound UDP packets.
 	return nil
 }
 
@@ -240,7 +290,7 @@ func (s *Server) proxySocks5AuthReq(conn, proxyConn net.Conn) error {
 // proxySocks5ConnReq transfers the socks5 connection request and response
 // between socks5 client and server. Optionally, if UDP association is used,
 // return the created UDP connection.
-func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (net.Conn, error) {
+func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, error) {
 	// Send the connection request to the server.
 	connReq := make([]byte, 4)
 	if _, err := io.ReadFull(conn, connReq); err != nil {
@@ -305,7 +355,7 @@ func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (net.Conn, error) 
 	}
 	connResp = append(connResp, bindAddr...)
 
-	var udpConn net.Conn
+	var udpConn *net.UDPConn
 	if cmd == AssociateCommand {
 		// Create a UDP listener on a random port.
 		udpAddr, err := net.ResolveUDPAddr("udp", "0.0.0.0:0")

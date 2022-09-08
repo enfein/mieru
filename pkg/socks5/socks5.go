@@ -241,7 +241,7 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 
 	if udpAssociateConn != nil {
 		log.Debugf("UDP association is listening on %v", udpAssociateConn.LocalAddr())
-		defer udpAssociateConn.Close()
+		return BidiCopyUDP(udpAssociateConn, WrapUDPAssociateTunnel(proxyConn))
 	}
 	return BidiCopy(conn, proxyConn, true)
 }
