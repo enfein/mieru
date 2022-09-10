@@ -282,7 +282,7 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 
 	// Process the client request.
 	if err := s.handleRequest(request, conn); err != nil {
-		return fmt.Errorf("failed to handle request: %w", err)
+		return fmt.Errorf("handleRequest() failed: %w", err)
 	}
 	return nil
 }

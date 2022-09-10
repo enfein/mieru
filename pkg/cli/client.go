@@ -219,7 +219,7 @@ var clientRunFunc = func(s []string) error {
 			log.Errorf("remove old client log files failed: %v", err)
 		}
 	} else {
-		log.Warnf("use stdout for logging due to the following error: %v", err)
+		log.Infof("log to stdout due to the following reason: %v", err)
 	}
 
 	// Load and verify client config.

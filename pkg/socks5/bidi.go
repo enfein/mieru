@@ -108,9 +108,9 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *UDPAssociateTunnelConn) error
 		}
 	}()
 
-	<-errCh
+	err := <-errCh
 	tunnelConn.Close()
 	udpConn.Close()
-	<-errCh
-	return nil
+	err2 := <-errCh
+	return fmt.Errorf("BidiCopyUDP first error: %v, second error: %v", err, err2)
 }

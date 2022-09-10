@@ -87,6 +87,7 @@ var (
 	Socks5NetworkUnreachableErrors uint64 // Destination network is unreachable
 	Socks5HostUnreachableErrors    uint64 // Destination Host is unreachable
 	Socks5ConnectionRefusedErrors  uint64 // Connection is refused
+	Socks5UDPAssociateErrors       uint64 // UDP associate errors
 )
 
 var ticker *time.Ticker
@@ -254,5 +255,6 @@ func LogSocks5Errors() {
 		"NetworkUnreachable": Socks5NetworkUnreachableErrors,
 		"HostUnreachable":    Socks5HostUnreachableErrors,
 		"ConnectionRefused":  Socks5ConnectionRefusedErrors,
+		"UDPAssociateErrors": Socks5UDPAssociateErrors,
 	}).Infof("[metrics - socks5 errors]")
 }
