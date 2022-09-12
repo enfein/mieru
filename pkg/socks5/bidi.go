@@ -20,6 +20,9 @@ import (
 	"io"
 	"net"
 	"sync/atomic"
+
+	"github.com/enfein/mieru/pkg/log"
+	"github.com/enfein/mieru/pkg/metrics"
 )
 
 type closeWriter interface {
@@ -76,6 +79,7 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *UDPAssociateTunnelConn) error
 				errCh <- fmt.Errorf("ReadFrom UDP connection failed: %v", err)
 				break
 			}
+			atomic.AddUint64(&metrics.UDPAssociateInPkts, 1)
 			udpAddr := addr.Load()
 			if udpAddr == nil {
 				addr.Store(a)
@@ -104,13 +108,24 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *UDPAssociateTunnelConn) error
 			}
 			if _, err = udpConn.WriteTo(buf[:n], udpAddr.(net.Addr)); err != nil {
 				errCh <- fmt.Errorf("WriteTo UDP connetion failed: %v", err)
+				break
 			}
+			atomic.AddUint64(&metrics.UDPAssociateOutPkts, 1)
 		}
 	}()
 
-	err := <-errCh
+	var err error
+	err = <-errCh
+	if log.IsLevelEnabled(log.TraceLevel) {
+		log.Tracef("error in BidiCopyUDP(): %v", err)
+	}
+
 	tunnelConn.Close()
 	udpConn.Close()
-	err2 := <-errCh
-	return fmt.Errorf("BidiCopyUDP first error: %v, second error: %v", err, err2)
+
+	err = <-errCh
+	if log.IsLevelEnabled(log.TraceLevel) {
+		log.Tracef("error in BidiCopyUDP(): %v", err)
+	}
+	return nil
 }

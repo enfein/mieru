@@ -283,18 +283,31 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 					Port: int(buf[8])<<8 + int(buf[9]),
 				}
 				if _, err := udpConn.WriteToUDP(buf[10:n+1], dstAddr); err != nil {
-					log.Debugf("UDP associate WriteToUDP() failed: %v", err)
+					if log.IsLevelEnabled(log.TraceLevel) {
+						log.Tracef("UDP associate WriteToUDP() failed: %v", err)
+					}
+					atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
+				} else {
+					atomic.AddUint64(&metrics.UDPAssociateOutPkts, 1)
 				}
 			case 0x03:
 				fqdnLen := buf[4]
 				fqdn := string(buf[5 : 5+fqdnLen])
 				dstAddr, err := net.ResolveUDPAddr("udp", fqdn+":"+strconv.Itoa(int(buf[5+fqdnLen])<<8+int(buf[6+fqdnLen])))
 				if err != nil {
-					log.Debugf("UDP associate ResolveUDPAddr() failed: %v", err)
+					if log.IsLevelEnabled(log.TraceLevel) {
+						log.Tracef("UDP associate ResolveUDPAddr() failed: %v", err)
+					}
+					atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
 					break
 				}
 				if _, err := udpConn.WriteToUDP(buf[7+fqdnLen:n+1], dstAddr); err != nil {
-					log.Debugf("UDP associate WriteToUDP() failed: %v", err)
+					if log.IsLevelEnabled(log.TraceLevel) {
+						log.Tracef("UDP associate WriteToUDP() failed: %v", err)
+					}
+					atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
+				} else {
+					atomic.AddUint64(&metrics.UDPAssociateOutPkts, 1)
 				}
 			case 0x04:
 				dstAddr := &net.UDPAddr{
@@ -302,7 +315,12 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 					Port: int(buf[20])<<8 + int(buf[21]),
 				}
 				if _, err := udpConn.WriteToUDP(buf[22:n+1], dstAddr); err != nil {
-					log.Debugf("UDP associate WriteToUDP() failed: %v", err)
+					if log.IsLevelEnabled(log.TraceLevel) {
+						log.Tracef("UDP associate WriteToUDP() failed: %v", err)
+					}
+					atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
+				} else {
+					atomic.AddUint64(&metrics.UDPAssociateOutPkts, 1)
 				}
 			}
 		}
@@ -317,12 +335,25 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 		for {
 			n, err = udpConn.Read(buf)
 			if err != nil {
-				log.Debugf("UDP associate Read() failed: %v", err)
+				if log.IsLevelEnabled(log.TraceLevel) {
+					log.Tracef("UDP associate Read() failed: %v", err)
+				}
+				if udpErr.Load() == nil {
+					udpErr.Store(err)
+				}
+				atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
 				return
+			} else {
+				atomic.AddUint64(&metrics.UDPAssociateInPkts, 1)
 			}
 			_, err = conn.Write(buf[:n])
 			if err != nil {
-				log.Debugf("UDP associate Write() failed: %v", err)
+				if log.IsLevelEnabled(log.TraceLevel) {
+					log.Tracef("UDP associate Write() to proxy client failed: %v", err)
+				}
+				if udpErr.Load() == nil {
+					udpErr.Store(err)
+				}
 				return
 			}
 		}

@@ -70,6 +70,10 @@ var (
 	ReplayKnownSession uint64 // replay packets sent from a known session
 	ReplayNewSession   uint64 // replay packets sent from a new session
 
+	// Socks5 UDP association
+	UDPAssociateInPkts  uint64 // incoming UDP association packets count
+	UDPAssociateOutPkts uint64 // outgoing UDP association packets count
+
 	// UDP Errors
 	UDPInErrors      uint64 // UDP read errors reported from net.PacketConn
 	KCPInErrors      uint64 // packet input errors reported from KCP
@@ -147,6 +151,7 @@ func logMetrics() {
 			LogUDPBytes()
 			LogKCPBytes()
 			LogTCPBytes()
+			LogUDPAssociation()
 			LogReplay()
 			LogUDPErrors()
 			LogTCPErrors()
@@ -222,6 +227,13 @@ func LogTCPBytes() {
 		"OutBytes":    TCPOutBytes,
 		"PaddingSent": TCPPaddingSent,
 	}).Infof("[metrics - TCP bytes]")
+}
+
+func LogUDPAssociation() {
+	log.WithFields(log.Fields{
+		"UDPAssociateInPkts":  UDPAssociateInPkts,
+		"UDPAssociateOutPkts": UDPAssociateOutPkts,
+	}).Infof("[metrics - socks5 UDP association]")
 }
 
 func LogReplay() {
