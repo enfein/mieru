@@ -76,15 +76,19 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *UDPAssociateTunnelConn) error
 		for {
 			n, a, err := udpConn.ReadFrom(buf)
 			if err != nil {
+				// This is typically due to close of UDP listener.
+				// Don't contribute to metrics.Socks5UDPAssociateErrors.
 				errCh <- fmt.Errorf("ReadFrom UDP connection failed: %v", err)
 				break
 			}
 			atomic.AddUint64(&metrics.UDPAssociateInPkts, 1)
+			atomic.AddUint64(&metrics.UDPAssociateInBytes, uint64(n))
 			udpAddr := addr.Load()
 			if udpAddr == nil {
 				addr.Store(a)
 			} else if udpAddr.(net.Addr).String() != a.String() {
 				errCh <- fmt.Errorf("ReadFrom new UDP endpoint %s, first use is %s", a.String(), udpAddr.(net.Addr).String())
+				atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
 				break
 			}
 			if _, err = tunnelConn.Write(buf[:n]); err != nil {
@@ -106,26 +110,28 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *UDPAssociateTunnelConn) error
 				errCh <- fmt.Errorf("UDP address is not ready")
 				break
 			}
-			if _, err = udpConn.WriteTo(buf[:n], udpAddr.(net.Addr)); err != nil {
+			ws, err := udpConn.WriteTo(buf[:n], udpAddr.(net.Addr))
+			if err != nil {
 				errCh <- fmt.Errorf("WriteTo UDP connetion failed: %v", err)
 				break
 			}
 			atomic.AddUint64(&metrics.UDPAssociateOutPkts, 1)
+			atomic.AddUint64(&metrics.UDPAssociateOutBytes, uint64(ws))
 		}
 	}()
 
 	var err error
 	err = <-errCh
-	if log.IsLevelEnabled(log.TraceLevel) {
-		log.Tracef("error in BidiCopyUDP(): %v", err)
+	if log.IsLevelEnabled(log.DebugLevel) {
+		log.Debugf("BidiCopyUDP() with endpoint %v failed 1: %v", udpConn.LocalAddr(), err)
 	}
 
 	tunnelConn.Close()
 	udpConn.Close()
 
 	err = <-errCh
-	if log.IsLevelEnabled(log.TraceLevel) {
-		log.Tracef("error in BidiCopyUDP(): %v", err)
+	if log.IsLevelEnabled(log.DebugLevel) {
+		log.Debugf("BidiCopyUDP() with endpoint %v failed 2: %v", udpConn.LocalAddr(), err)
 	}
 	return nil
 }

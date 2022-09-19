@@ -71,8 +71,10 @@ var (
 	ReplayNewSession   uint64 // replay packets sent from a new session
 
 	// Socks5 UDP association
-	UDPAssociateInPkts  uint64 // incoming UDP association packets count
-	UDPAssociateOutPkts uint64 // outgoing UDP association packets count
+	UDPAssociateInBytes  uint64 // incoming UDP association bytes
+	UDPAssociateOutBytes uint64 // outgoing UDP association bytes
+	UDPAssociateInPkts   uint64 // incoming UDP association packets count
+	UDPAssociateOutPkts  uint64 // outgoing UDP association packets count
 
 	// UDP Errors
 	UDPInErrors      uint64 // UDP read errors reported from net.PacketConn
@@ -231,8 +233,10 @@ func LogTCPBytes() {
 
 func LogUDPAssociation() {
 	log.WithFields(log.Fields{
-		"UDPAssociateInPkts":  UDPAssociateInPkts,
-		"UDPAssociateOutPkts": UDPAssociateOutPkts,
+		"UDPAssociateInBytes":  UDPAssociateInBytes,
+		"UDPAssociateOutBytes": UDPAssociateOutBytes,
+		"UDPAssociateInPkts":   UDPAssociateInPkts,
+		"UDPAssociateOutPkts":  UDPAssociateOutPkts,
 	}).Infof("[metrics - socks5 UDP association]")
 }
 
