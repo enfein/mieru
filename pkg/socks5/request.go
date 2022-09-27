@@ -210,6 +210,8 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 
 	// Use 0.0.0.0:<port> as the bind address.
 	// This is the port used by the server. Client will rewrite the port number.
+	// As the traffic between the client and the server goes through tunnel,
+	// it is OK to use an IPv4 bind address even though the UDP listener is IPv6.
 	_, udpPortStr, err := net.SplitHostPort(udpConn.LocalAddr().String())
 	if err != nil {
 		atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
@@ -282,7 +284,7 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 					IP:   net.IP(buf[4:8]),
 					Port: int(buf[8])<<8 + int(buf[9]),
 				}
-				ws, err := udpConn.WriteToUDP(buf[10:n+1], dstAddr)
+				ws, err := udpConn.WriteToUDP(buf[10:n], dstAddr)
 				if err != nil {
 					if log.IsLevelEnabled(log.DebugLevel) {
 						log.Debugf("UDP associate [%v - %v] WriteToUDP() failed: %v", udpConn.LocalAddr(), dstAddr, err)
@@ -303,7 +305,7 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 					atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
 					break
 				}
-				ws, err := udpConn.WriteToUDP(buf[7+fqdnLen:n+1], dstAddr)
+				ws, err := udpConn.WriteToUDP(buf[7+fqdnLen:n], dstAddr)
 				if err != nil {
 					if log.IsLevelEnabled(log.DebugLevel) {
 						log.Debugf("UDP associate [%v - %v] WriteToUDP() failed: %v", udpConn.LocalAddr(), dstAddr, err)
@@ -318,7 +320,7 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 					IP:   net.IP(buf[4:20]),
 					Port: int(buf[20])<<8 + int(buf[21]),
 				}
-				ws, err := udpConn.WriteToUDP(buf[22:n+1], dstAddr)
+				ws, err := udpConn.WriteToUDP(buf[22:n], dstAddr)
 				if err != nil {
 					if log.IsLevelEnabled(log.DebugLevel) {
 						log.Debugf("UDP associate [%v - %v] WriteToUDP() failed: %v", udpConn.LocalAddr(), dstAddr, err)
@@ -480,12 +482,10 @@ func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, err
 
 	var udpConn *net.UDPConn
 	if cmd == AssociateCommand {
-		// Create a UDP listener on a random port.
-		udpAddr, err := net.ResolveUDPAddr("udp", "0.0.0.0:0")
-		if err != nil {
-			return nil, fmt.Errorf("net.ResolveUDPAddr() failed: %w", err)
-		}
-		udpConn, err = net.ListenUDP("udp", udpAddr)
+		// Create a UDP listener on a random port in IPv4 network.
+		var err error
+		udpAddr := &net.UDPAddr{IP: net.IP{0, 0, 0, 0}, Port: 0}
+		udpConn, err = net.ListenUDP("udp4", udpAddr)
 		if err != nil {
 			return nil, fmt.Errorf("net.ListenUDP() failed: %w", err)
 		}

@@ -59,6 +59,8 @@ func TestHelperRot13(in []byte) ([]byte, error) {
 			out[i] = in[i] + 13
 		} else if (in[i] >= 78 && in[i] <= 90) || (in[i] >= 110 && in[i] <= 122) {
 			out[i] = in[i] - 13
+		} else {
+			return nil, fmt.Errorf("input format is invalid")
 		}
 	}
 	return out, nil

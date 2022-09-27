@@ -1,0 +1,31 @@
+{
+    "portBindings": [
+        {
+            "port": 6666,
+            "protocol": "TCP"
+        },
+        {
+            "port": 9999,
+            "protocol": "TCP"
+        },
+        {
+            "port": 6489,
+            "protocol": "UDP"
+        },
+        {
+            "port": 4896,
+            "protocol": "UDP"
+        }
+    ],
+    "users": [
+        {
+            "name": "baozi",
+            "password": "manlianpenfen"
+        }
+    ],
+    "advancedSettings": {
+        "allowLocalDestination": true
+    },
+    "loggingLevel": "DEBUG",
+    "mtu": 1460
+}

@@ -27,7 +27,7 @@ import (
 //
 // Each original UDP packet will be wrapped like this
 //
-// 0x00 + 2 bytes of original length + original content + 0xff
+//	0x00 + 2 bytes of original length + original content + 0xff
 //
 // the length is encoded with little endian.
 type UDPAssociateTunnelConn struct {

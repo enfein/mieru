@@ -14,10 +14,9 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // httpserver is a simple HTTP server listening on port 8080.
-// There are 100 pre-filled data blocks: 80 blocks have 1 KiB data, 15 blocks have 64 KiB data,
-// and 5 blocks have 1 MiB data. When a request comes in, a random block is selected, and the
-// block as well as its SHA-1 value are returned to the client. The SHA-1 value is provided in
-// "X-SHA1" header.
+// There are 100 pre-filled data blocks: 90 blocks have 64 KiB data, 10 blocks have 1 MiB data.
+// When a request comes in, a random block is selected, and the block as well as its SHA-1 value
+// are returned to the client. The SHA-1 value is provided in "X-SHA1" header.
 package main
 
 import (

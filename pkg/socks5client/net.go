@@ -2,7 +2,6 @@ package socks5client
 
 import (
 	"bytes"
-	"fmt"
 	"net"
 	"strconv"
 	"time"
@@ -40,21 +39,6 @@ func (c *config) readAll(conn net.Conn) (resp []byte, err error) {
 	n, err := conn.Read(resp)
 	resp = resp[:n]
 	return
-}
-
-func lookupIPv4(host string) (net.IP, error) {
-	ips, err := net.LookupIP(host)
-	if err != nil {
-		return nil, err
-	}
-	for _, ip := range ips {
-		ipv4 := ip.To4()
-		if ipv4 == nil {
-			continue
-		}
-		return ipv4, nil
-	}
-	return nil, fmt.Errorf("no IPv4 address found for host: %s", host)
 }
 
 func splitHostPort(addr string) (host string, port uint16, err error) {

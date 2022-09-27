@@ -12,6 +12,7 @@ type (
 		Host    string
 		Auth    *auth
 		Timeout time.Duration
+		CmdType byte
 	}
 	auth struct {
 		Username string

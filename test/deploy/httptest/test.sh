@@ -27,9 +27,18 @@ cd /test && source ./libtest.sh
 ./httpserver &
 sleep 1
 
+# Start UDP server.
+./udpserver &
+sleep 1
+
 # Start mieru server daemon.
 ./mita run &
 sleep 1
+
+# Run UDP associate test.
+echo "========== BEGIN OF UDP ASSOCIATE TEST =========="
+./test_mix_udp_associate.sh
+echo "==========  END OF UDP ASSOCIATE TEST  =========="
 
 # Run TCP test.
 echo "========== BEGIN OF TCP TEST =========="

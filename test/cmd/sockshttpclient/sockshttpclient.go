@@ -43,7 +43,7 @@ var (
 	dstHost        = flag.String("dst_host", "", "The host IP or domain name that HTTP server is running.")
 	dstPort        = flag.Int("dst_port", 0, "The TCP port that HTTP server is listening.")
 	localProxyHost = flag.String("local_proxy_host", "", "The host IP or domain name that local socks proxy is running.")
-	localProxyPort = flag.Int("local_proxy_port", 0, "The TCP port that local socks proxy is running.")
+	localProxyPort = flag.Int("local_proxy_port", 0, "The TCP port that local socks proxy is listening.")
 	testCase       = flag.String("test_case", "new_conn", fmt.Sprintf("Supported: %q, %q.", NewConnTest, ReuseConnTest))
 	intervalMs     = flag.Int("interval", 0, "Sleep in milliseconds between two requests.")
 	numRequest     = flag.Int("num_request", 1, "Number of HTTP requests send to server before exit.")
@@ -90,8 +90,8 @@ func main() {
 	if *intervalMs < 0 {
 		log.Fatalf("interval can't be a negative number")
 	}
-	if *numRequest < 0 {
-		log.Fatalf("number of HTTP request can't be a negative number")
+	if *numRequest <= 0 {
+		log.Fatalf("number of HTTP request must be bigger than 0")
 	}
 
 	startTime = time.Now()
@@ -104,8 +104,8 @@ func main() {
 			time.Sleep(time.Millisecond * time.Duration(*intervalMs))
 		}
 	} else if *testCase == ReuseConnTest {
-		socksDialer := socks5client.DialSocksProxy(socks5client.SOCKS5, *localProxyHost+":"+strconv.Itoa(*localProxyPort))
-		conn, err := socksDialer("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
+		socksDialer := socks5client.DialSocksProxy(socks5client.SOCKS5, *localProxyHost+":"+strconv.Itoa(*localProxyPort), socks5client.ConnectCmd)
+		conn, _, _, err := socksDialer("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
 		if err != nil {
 			log.Fatalf("dial to socks: %v", err)
 		}
@@ -122,8 +122,8 @@ func main() {
 }
 
 func CreateNewConnAndDoRequest(seq int) {
-	socksDialer := socks5client.DialSocksProxy(socks5client.SOCKS5, *localProxyHost+":"+strconv.Itoa(*localProxyPort))
-	conn, err := socksDialer("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
+	socksDialer := socks5client.DialSocksProxy(socks5client.SOCKS5, *localProxyHost+":"+strconv.Itoa(*localProxyPort), socks5client.ConnectCmd)
+	conn, _, _, err := socksDialer("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
 	if err != nil {
 		log.Fatalf("dial to socks: %v", err)
 	}

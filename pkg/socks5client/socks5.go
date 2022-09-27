@@ -3,28 +3,26 @@ package socks5client
 import (
 	"fmt"
 	"net"
-
-	"github.com/enfein/mieru/pkg/log"
 )
 
-func (cfg *config) dialSocks5(targetAddr string) (_ net.Conn, err error) {
-	proxy := cfg.Host
+func (cfg *config) dialSocks5(targetAddr string) (conn net.Conn, err error) {
+	conn, _, _, err = cfg.dialSocks5Long(targetAddr)
+	return
+}
 
-	if log.IsLevelEnabled(log.DebugLevel) {
-		log.Debugf("socks5 client dial to %s %s", "tcp", proxy)
-	}
-	conn, err := net.DialTimeout("tcp", proxy, cfg.Timeout)
+func (cfg *config) dialSocks5Long(targetAddr string) (conn net.Conn, udpConn *net.UDPConn, proxyUDPAddr *net.UDPAddr, err error) {
+	proxy := cfg.Host
+	conn, err = net.DialTimeout("tcp", proxy, cfg.Timeout)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	defer func() {
-		if err != nil {
+		if err != nil && conn != nil {
 			conn.Close()
 		}
 	}()
 
 	var req requestBuilder
-
 	version := byte(5) // socks version 5
 	method := byte(0)  // method 0: no authentication (only anonymous access supported for now)
 	if cfg.Auth != nil {
@@ -38,15 +36,16 @@ func (cfg *config) dialSocks5(targetAddr string) (_ net.Conn, err error) {
 		method,
 	)
 
-	resp, err := cfg.sendReceive(conn, req.Bytes())
+	var resp []byte
+	resp, err = cfg.sendReceive(conn, req.Bytes())
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	} else if len(resp) != 2 {
-		return nil, fmt.Errorf("server does not respond properly")
+		return nil, nil, nil, fmt.Errorf("server does not respond properly")
 	} else if resp[0] != 5 {
-		return nil, fmt.Errorf("server does not support Socks 5")
+		return nil, nil, nil, fmt.Errorf("server does not support Socks 5")
 	} else if resp[1] != method {
-		return nil, fmt.Errorf("socks method negotiation failed")
+		return nil, nil, nil, fmt.Errorf("socks method negotiation failed")
 	}
 	if cfg.Auth != nil {
 		version := byte(1) // user/password version 1
@@ -58,27 +57,29 @@ func (cfg *config) dialSocks5(targetAddr string) (_ net.Conn, err error) {
 		req.add([]byte(cfg.Auth.Username)...)
 		req.add(byte(len(cfg.Auth.Password)))
 		req.add([]byte(cfg.Auth.Password)...)
-		resp, err := cfg.sendReceive(conn, req.Bytes())
+		resp, err = cfg.sendReceive(conn, req.Bytes())
 		if err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		} else if len(resp) != 2 {
-			return nil, fmt.Errorf("server does not respond properly")
+			return nil, nil, nil, fmt.Errorf("server does not respond properly")
 		} else if resp[0] != version {
-			return nil, fmt.Errorf("server does not support user/password version 1")
+			return nil, nil, nil, fmt.Errorf("server does not support user/password version 1")
 		} else if resp[1] != 0 { // not success
-			return nil, fmt.Errorf("user/password login failed")
+			return nil, nil, nil, fmt.Errorf("user/password login failed")
 		}
 	}
 
 	// detail request
-	host, port, err := splitHostPort(targetAddr)
+	var host string
+	var port uint16
+	host, port, err = splitHostPort(targetAddr)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	req.Reset()
 	req.add(
 		5,               // version number
-		1,               // connect command
+		cfg.CmdType,     // command
 		0,               // reserved, must be zero
 		3,               // address type, 3 means domain name
 		byte(len(host)), // address length
@@ -91,11 +92,38 @@ func (cfg *config) dialSocks5(targetAddr string) (_ net.Conn, err error) {
 	resp, err = cfg.sendReceive(conn, req.Bytes())
 	if err != nil {
 		return
-	} else if len(resp) != 10 {
-		return nil, fmt.Errorf("server does not respond properly")
+	} else if len(resp) < 10 {
+		return nil, nil, nil, fmt.Errorf("server response is too short")
 	} else if resp[1] != 0 {
-		return nil, fmt.Errorf("can't complete SOCKS5 connection")
+		return nil, nil, nil, fmt.Errorf("SOCKS5 connection is not successful")
 	}
 
-	return conn, nil
+	if cfg.CmdType == UDPAssociateCmd {
+		// Get the endpoint to relay UDP packets.
+		var ip net.IP
+		switch resp[3] {
+		case IPv4:
+			ip = net.IP(resp[4:8])
+			port = uint16(resp[8])<<8 + uint16(resp[9])
+		case IPv6:
+			if len(resp) < 22 {
+				return nil, nil, nil, fmt.Errorf("server response is too short")
+			}
+			ip = net.IP(resp[4:20])
+			port = uint16(resp[20])<<8 + uint16(resp[21])
+		default:
+			return nil, nil, nil, fmt.Errorf("unsupported bind address")
+		}
+		proxyUDPAddr = &net.UDPAddr{IP: ip, Port: int(port)}
+
+		// Listen to a new UDP endpoint.
+		udpAddr := &net.UDPAddr{IP: net.IP{0, 0, 0, 0}, Port: 0}
+		udpConn, err = net.ListenUDP("udp4", udpAddr)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		return conn, udpConn, proxyUDPAddr, nil
+	}
+
+	return conn, nil, nil, nil
 }
