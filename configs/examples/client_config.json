@@ -24,5 +24,6 @@
     "activeProfile": "default",
     "rpcPort": 8964,
     "socks5Port": 1080,
-    "loggingLevel": "INFO"
+    "loggingLevel": "INFO",
+    "socks5ListenLAN": false
 }

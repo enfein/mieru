@@ -64,6 +64,15 @@ func AllIPAddr() string {
 	return "0.0.0.0"
 }
 
+// LocalIPAddr returns the localhost IP address.
+func LocalIPAddr() string {
+	// If IP dual stack is supported, bind to "::1" will also bind to
+	// "127.0.0.1". This may cause an error if the program is running
+	// inside a container. Generally, we believe "127.0.0.1" is available
+	// on every machine, so just use this.
+	return "127.0.0.1"
+}
+
 // GetIPVersion returns the IP version of the given network address.
 func GetIPVersion(addr string) IPVersion {
 	host, _, err := net.SplitHostPort(addr)

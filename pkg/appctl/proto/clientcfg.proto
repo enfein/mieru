@@ -50,11 +50,14 @@ message ClientConfig {
     // The management RPC port that client is listening in localhost.
     int32 rpcPort = 3;
 
-    // The socks5 port that mieru is listening in localhost.
+    // The socks5 port that mieru is listening.
     int32 socks5Port = 4;
 
     ClientAdvancedSettings advancedSettings = 5;
 
     // Client logging level.
     LoggingLevel loggingLevel = 6;
+
+    // If set, the socks5 port listens to LAN rather than localhost.
+    bool socks5ListenLAN = 7;
 }

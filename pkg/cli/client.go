@@ -186,7 +186,11 @@ var clientStartFunc = func(s []string) error {
 	}
 
 	if err = appctl.IsClientDaemonRunning(context.Background()); err == nil {
-		log.Infof("mieru client is running, listening to localhost:%d", config.GetSocks5Port())
+		if config.GetSocks5ListenLAN() {
+			log.Infof("mieru client is running, listening to 0.0.0.0:%d", config.GetSocks5Port())
+		} else {
+			log.Infof("mieru client is running, listening to 127.0.0.1:%d", config.GetSocks5Port())
+		}
 		return nil
 	}
 
@@ -201,7 +205,11 @@ var clientStartFunc = func(s []string) error {
 	for i := 0; i < 100; i++ {
 		lastErr = appctl.IsClientDaemonRunning(context.Background())
 		if lastErr == nil {
-			log.Infof("mieru client is started, listening to localhost:%d", config.GetSocks5Port())
+			if config.GetSocks5ListenLAN() {
+				log.Infof("mieru client is started, listening to 0.0.0.0:%d", config.GetSocks5Port())
+			} else {
+				log.Infof("mieru client is started, listening to 127.0.0.1:%d", config.GetSocks5Port())
+			}
 			return nil
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -333,7 +341,12 @@ var clientRunFunc = func(s []string) error {
 
 	// Run the local socks5 server in the background.
 	go func() {
-		socks5Addr := netutil.MaybeDecorateIPv6(netutil.AllIPAddr()) + ":" + strconv.Itoa(int(config.GetSocks5Port()))
+		var socks5Addr string
+		if config.GetSocks5ListenLAN() {
+			socks5Addr = netutil.MaybeDecorateIPv6(netutil.AllIPAddr()) + ":" + strconv.Itoa(int(config.GetSocks5Port()))
+		} else {
+			socks5Addr = netutil.MaybeDecorateIPv6(netutil.LocalIPAddr()) + ":" + strconv.Itoa(int(config.GetSocks5Port()))
+		}
 		l, err := net.Listen("tcp", socks5Addr)
 		if err != nil {
 			log.Fatalf("listen on socks5 address tcp %q failed: %v", socks5Addr, err)

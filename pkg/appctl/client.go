@@ -530,6 +530,12 @@ func mergeClientConfigByProfile(dst, src *pb.ClientConfig) {
 	} else {
 		loggingLevel = dst.GetLoggingLevel()
 	}
+	var socks5ListenLAN bool
+	if src.GetSocks5ListenLAN() {
+		socks5ListenLAN = src.GetSocks5ListenLAN()
+	} else {
+		socks5ListenLAN = dst.GetSocks5ListenLAN()
+	}
 
 	// Merge src into dst.
 	mergedProfileMapping := map[string]*pb.ClientProfile{}
@@ -556,6 +562,7 @@ func mergeClientConfigByProfile(dst, src *pb.ClientConfig) {
 	dst.Socks5Port = sock5Port
 	dst.AdvancedSettings = advancedSettings
 	dst.LoggingLevel = loggingLevel
+	dst.Socks5ListenLAN = socks5ListenLAN
 }
 
 // deleteClientConfigFile deletes the client config file.

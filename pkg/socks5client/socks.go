@@ -79,7 +79,18 @@ func SendUDP(conn *net.UDPConn, proxyAddr, dstAddr *net.UDPAddr, payload []byte)
 		// We don't compare the IP address because a wildcard address like 0.0.0.0 can be used.
 		return nil, fmt.Errorf("unexpected read from a different address")
 	}
-	return buf[:n], nil
+	if n <= 10 {
+		return nil, fmt.Errorf("UDP associate response is too short")
+	}
+	if buf[3] == IPv4 {
+		// Header length is 10 bytes.
+		return buf[10:n], nil
+	} else if buf[3] == IPv6 {
+		// Header length is 22 bytes.
+		return buf[22:n], nil
+	} else {
+		return nil, fmt.Errorf("UDP assciate unsupport address type")
+	}
 }
 
 func (c *config) dialFunc() func(string, string) (net.Conn, error) {

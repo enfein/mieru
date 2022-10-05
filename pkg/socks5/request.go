@@ -231,10 +231,13 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 	conn = WrapUDPAssociateTunnel(conn)
 	var udpErr atomic.Value
 
+	// addrMap maps the UDPAddr in string to the bytes in UDP associate header.
+	var addrMap sync.Map
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	// Send outbound UDP packets.
+	// Send UDP packets to destinations.
 	go func() {
 		defer wg.Done()
 		defer udpConn.Close()
@@ -284,6 +287,7 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 					IP:   net.IP(buf[4:8]),
 					Port: int(buf[8])<<8 + int(buf[9]),
 				}
+				addrMap.Store(dstAddr.String(), buf[:10])
 				ws, err := udpConn.WriteToUDP(buf[10:n], dstAddr)
 				if err != nil {
 					if log.IsLevelEnabled(log.DebugLevel) {
@@ -291,8 +295,8 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 					}
 					atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
 				} else {
-					atomic.AddUint64(&metrics.UDPAssociateOutPkts, 1)
-					atomic.AddUint64(&metrics.UDPAssociateOutBytes, uint64(ws))
+					atomic.AddUint64(&metrics.UDPAssociateInPkts, 1)
+					atomic.AddUint64(&metrics.UDPAssociateInBytes, uint64(ws))
 				}
 			case 0x03:
 				fqdnLen := buf[4]
@@ -305,6 +309,7 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 					atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
 					break
 				}
+				addrMap.Store(dstAddr.String(), buf[:7+fqdnLen])
 				ws, err := udpConn.WriteToUDP(buf[7+fqdnLen:n], dstAddr)
 				if err != nil {
 					if log.IsLevelEnabled(log.DebugLevel) {
@@ -312,14 +317,15 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 					}
 					atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
 				} else {
-					atomic.AddUint64(&metrics.UDPAssociateOutPkts, 1)
-					atomic.AddUint64(&metrics.UDPAssociateOutBytes, uint64(ws))
+					atomic.AddUint64(&metrics.UDPAssociateInPkts, 1)
+					atomic.AddUint64(&metrics.UDPAssociateInBytes, uint64(ws))
 				}
 			case 0x04:
 				dstAddr := &net.UDPAddr{
 					IP:   net.IP(buf[4:20]),
 					Port: int(buf[20])<<8 + int(buf[21]),
 				}
+				addrMap.Store(dstAddr.String(), buf[:22])
 				ws, err := udpConn.WriteToUDP(buf[22:n], dstAddr)
 				if err != nil {
 					if log.IsLevelEnabled(log.DebugLevel) {
@@ -327,45 +333,48 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 					}
 					atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
 				} else {
-					atomic.AddUint64(&metrics.UDPAssociateOutPkts, 1)
-					atomic.AddUint64(&metrics.UDPAssociateOutBytes, uint64(ws))
+					atomic.AddUint64(&metrics.UDPAssociateInPkts, 1)
+					atomic.AddUint64(&metrics.UDPAssociateInBytes, uint64(ws))
 				}
 			}
 		}
 	}()
 
-	// Receive inbound UDP packets.
+	// Receive UDP packets from destinations.
 	go func() {
 		defer wg.Done()
 		buf := make([]byte, 1<<16)
 		var n int
+		var addr *net.UDPAddr
 		var err error
 		for {
-			n, err = udpConn.Read(buf)
+			n, addr, err = udpConn.ReadFromUDP(buf)
 			if err != nil {
 				// This is typically due to close of UDP listener.
 				// Don't contribute to metrics.Socks5UDPAssociateErrors.
-				if log.IsLevelEnabled(log.DebugLevel) {
-					log.Debugf("UDP associate %v Read() failed: %v", udpConn.LocalAddr(), err)
-				}
+				log.Debugf("UDP associate %v Read() failed: %v", udpConn.LocalAddr(), err)
 				if udpErr.Load() == nil {
 					udpErr.Store(err)
 				}
 				return
-			} else {
-				atomic.AddUint64(&metrics.UDPAssociateInPkts, 1)
-				atomic.AddUint64(&metrics.UDPAssociateInBytes, uint64(n))
 			}
-			_, err = conn.Write(buf[:n])
+			v, ok := addrMap.Load(addr.String())
+			if !ok {
+				log.Debugf("UDP associate %v received packet from unknown remote %v, packet is discarded", udpConn.LocalAddr(), addr)
+				atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
+				continue
+			}
+			header := v.([]byte)
+			_, err = conn.Write(append(header, buf[:n]...))
 			if err != nil {
-				if log.IsLevelEnabled(log.DebugLevel) {
-					log.Debugf("UDP associate %v Write() to proxy client failed: %v", udpConn.LocalAddr(), err)
-				}
+				log.Debugf("UDP associate %v Write() to proxy client failed: %v", udpConn.LocalAddr(), err)
 				if udpErr.Load() == nil {
 					udpErr.Store(err)
 				}
 				return
 			}
+			atomic.AddUint64(&metrics.UDPAssociateOutPkts, 1)
+			atomic.AddUint64(&metrics.UDPAssociateOutBytes, uint64(n))
 		}
 	}()
 

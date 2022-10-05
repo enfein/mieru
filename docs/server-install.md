@@ -10,10 +10,10 @@
 
 ```sh
 # Debian / Ubuntu
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.6.1/mita_1.6.1_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.7.0/mita_1.7.0_amd64.deb
 
 # Fedora / CentOS / Red Hat Enterprise Linux
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.6.1/mita-1.6.1-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.7.0/mita-1.7.0-1.x86_64.rpm
 ```
 
 下载 ARM 架构的安装包，将链接中的 `amd64` 替换成 `arm64`，`x86_64` 替换成 `aarch64` 即可。如果上述链接被墙，请翻墙后使用浏览器从 GitHub Releases 页面下载安装。
@@ -22,10 +22,10 @@ curl -LSO https://github.com/enfein/mieru/releases/download/v1.6.1/mita-1.6.1-1.
 
 ```sh
 # Debian / Ubuntu
-sudo dpkg -i mita_1.6.1_amd64.deb
+sudo dpkg -i mita_1.7.0_amd64.deb
 
 # Fedora / CentOS / Red Hat Enterprise Linux
-sudo rpm -Uvh --force mita-1.6.1-1.x86_64.rpm
+sudo rpm -Uvh --force mita-1.7.0-1.x86_64.rpm
 ```
 
 ## 赋予当前用户操作 mita 的权限，需要重启服务器使此设置生效
@@ -88,6 +88,7 @@ mita apply config <FILE>
 1. `portBindings` -> `port` 属性是 mita 监听的 TCP 或 UDP 端口号，请指定一个从 1025 到 65535 之间的值。**请确保防火墙允许使用该端口进行通信。**
 2. 在 `users` -> `name` 属性中填写用户名。
 3. 在 `users` -> `password` 属性中填写该用户的密码。
+4. `mtu` 属性是使用 UDP 代理协议时，数据链路层最大的载荷大小。默认值是 1400，可以选择 1280 到 1500 之间的值。
 
 除此之外，mita 可以监听多个不同的端口。如果你想把代理线路分享给别人使用，也可以创建多个不同的用户。下面是服务器配置文件的一个例子，仅供参考。
 

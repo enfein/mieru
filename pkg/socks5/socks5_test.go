@@ -229,7 +229,7 @@ func TestSocks5UDPAssociation(t *testing.T) {
 	}
 
 	// Verify UDP response.
-	want = []byte("pong")
+	want = append([]byte{0, 0, 0, 1, 127, 0, 0, 1, byte(udpListenPort >> 8), byte(udpListenPort)}, []byte("pong")...)
 	out = make([]byte, len(want))
 	if _, err := io.ReadFull(wrappedConn, out); err != nil {
 		t.Fatalf("io.ReadFull() failed: %v", err)
