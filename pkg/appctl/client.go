@@ -58,30 +58,14 @@ var (
 	cachedClientConfigFilePath string
 
 	// clientRPCServerRef holds a pointer to client RPC server.
-	clientRPCServerRef atomic.Value
+	clientRPCServerRef atomic.Pointer[grpc.Server]
 
 	// clientSocks5ServerRef holds a pointer to client socks5 server.
-	clientSocks5ServerRef atomic.Value
+	clientSocks5ServerRef atomic.Pointer[socks5.Server]
 )
-
-func GetClientRPCServerRef() *grpc.Server {
-	s, ok := clientRPCServerRef.Load().(*grpc.Server)
-	if !ok {
-		return nil
-	}
-	return s
-}
 
 func SetClientRPCServerRef(server *grpc.Server) {
 	clientRPCServerRef.Store(server)
-}
-
-func GetClientSocks5ServerRef() *socks5.Server {
-	s, ok := clientSocks5ServerRef.Load().(*socks5.Server)
-	if !ok {
-		return nil
-	}
-	return s
 }
 
 func SetClientSocks5ServerRef(server *socks5.Server) {
@@ -102,7 +86,7 @@ func (c *clientLifecycleService) GetStatus(ctx context.Context, req *pb.Empty) (
 func (c *clientLifecycleService) Exit(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
 	SetAppStatus(pb.AppStatus_STOPPING)
 	log.Infof("received exit request from RPC caller")
-	socks5Server := GetClientSocks5ServerRef()
+	socks5Server := clientSocks5ServerRef.Load()
 	if socks5Server != nil {
 		log.Infof("stopping socks5 server")
 		if err := socks5Server.Close(); err != nil {
@@ -113,7 +97,7 @@ func (c *clientLifecycleService) Exit(ctx context.Context, req *pb.Empty) (*pb.E
 	} else {
 		log.Infof("socks5 server reference not found")
 	}
-	grpcServer := GetClientRPCServerRef()
+	grpcServer := clientRPCServerRef.Load()
 	if grpcServer != nil {
 		log.Infof("stopping RPC server")
 		go grpcServer.GracefulStop()

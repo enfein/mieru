@@ -166,3 +166,19 @@ Chrome / Firefox 等浏览器可以通过安装插件，使用 socks5 代理访�
 mieru 不使用 socks5 用户名和密码进行身份验证。
 
 关于在 Tor 浏览器中配置 socks5 代理，参见[翻墙安全指南](https://github.com/enfein/mieru/blob/main/docs/security.md)。
+
+## 配置 clash
+
+使用 mieru 作为 clash 的转发代理，可以参考下面的设置。
+
+```yaml
+proxies:
+  - name: mieru
+    type: socks5
+    server: 127.0.0.1
+    port: xxxx
+    udp: true
+
+rules:
+  - MATCH,mieru
+```

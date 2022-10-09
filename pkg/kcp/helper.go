@@ -38,35 +38,6 @@ func decode32u(p []byte, l *uint32) []byte {
 	return p[4:]
 }
 
-// Returns the minimum of two uint32.
-func min(a, b uint32) uint32 {
-	if a <= b {
-		return a
-	}
-	return b
-}
-
-// Returns the minimum of two int.
-func minInt(a, b int) int {
-	if a <= b {
-		return a
-	}
-	return b
-}
-
-// Returns the maximum of two uint32.
-func max(a, b uint32) uint32 {
-	if a >= b {
-		return a
-	}
-	return b
-}
-
-// Returns the midian of three uint32.
-func mid(lower, middle, upper uint32) uint32 {
-	return min(max(lower, middle), upper)
-}
-
 // Returns the difference between two uint32 as int32.
 func timediff(later, earlier uint32) int32 {
 	return (int32)(later - earlier)

@@ -10,6 +10,7 @@ import (
 
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
+	"github.com/enfein/mieru/pkg/mathext"
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/slicepool"
@@ -49,7 +50,7 @@ const (
 	IKCP_MTU_DEF = MaxMTU - OuterHeaderSize // KCP MTU
 
 	IKCP_ACK_FAST         = 3      // do retransmission after receiving the number of out of order ACK
-	IKCP_INTERVAL         = 20     // event loop interval
+	IKCP_INTERVAL         = 20     // event loop interval in milliseconds
 	IKCP_OVERHEAD         = 24     // size of KCP header
 	IKCP_DEADLINK         = 20     // retransmission times before link is dead
 	IKCP_THRESH_INIT      = 16     // initial slow start threshold (number of packets)
@@ -177,7 +178,6 @@ type KCP struct {
 
 	// Operation control.
 	interval  uint32 // output interval
-	tsFlush   uint32 // time to do next output
 	tsProbe   uint32 // time to send probe
 	probeWait uint32 // delay before sending the probe
 	deadLink  uint32 // number of retry before mark the link as disconnected
@@ -219,7 +219,6 @@ func NewKCP(conv uint32, output outputCallback) *KCP {
 	kcp.rxRTO = IKCP_RTO_DEF
 	kcp.rxMinRTO = IKCP_RTO_MIN
 	kcp.interval = IKCP_INTERVAL
-	kcp.tsFlush = IKCP_INTERVAL
 	kcp.ssthresh = IKCP_THRESH_INIT
 	kcp.deadLink = IKCP_DEADLINK
 	kcp.outputCall = output
@@ -577,7 +576,7 @@ func (kcp *KCP) Output(ackOnly bool) uint32 {
 				lastSegPtr := buffer[lastSegIdx:]
 				var segTotalLen uint16
 				decode16u(lastSegPtr[IKCP_TOTAL_LEN_OFFSET:], &segTotalLen)
-				paddingSize = rng.Intn(minInt(maxPaddingSize, remainingSpace))
+				paddingSize = rng.Intn(mathext.Min(maxPaddingSize, remainingSpace))
 				if paddingSize > 0 {
 					crand.Read(lastSegPtr[IKCP_OVERHEAD+int(segTotalLen) : IKCP_OVERHEAD+int(segTotalLen)+paddingSize])
 					segTotalLen += uint16(paddingSize)
@@ -605,13 +604,16 @@ func (kcp *KCP) Output(ackOnly bool) uint32 {
 	}
 
 	// flushBuffer sends out all the remaining data in the buffer.
-	flushBuffer := func() {
+	// It returns true if any data is sent.
+	flushBuffer := func() bool {
 		usedSize := len(buffer) - len(ptr)
 		if usedSize > kcp.reserved {
 			paddingSize := addPadding()
 			kcp.outputCall(buffer, usedSize+paddingSize)
 			kcp.lastOutputTime = time.Now()
+			return true
 		}
+		return false
 	}
 
 	// Process pending acknowledges. For each segment that can be acknowledged,
@@ -676,9 +678,9 @@ func (kcp *KCP) Output(ackOnly bool) uint32 {
 
 	// The initial congestion window size is set to the smaller of
 	// our send window size and remote receive window size.
-	cwnd := min(kcp.sendWindow, kcp.remoteWindow)
+	cwnd := mathext.Min(kcp.sendWindow, kcp.remoteWindow)
 	if !kcp.noCongestionWindow {
-		cwnd = min(kcp.congestionWindow, cwnd)
+		cwnd = mathext.Min(kcp.congestionWindow, cwnd)
 	}
 
 	// Prepare sending data by moving data from send queue to send buf,
@@ -892,7 +894,7 @@ func (kcp *KCP) SetMtu(mtu int) error {
 // NoDelay options.
 // fastest: ikcp_nodelay(kcp, 1, 20, 2, true)
 // nodelay: 0:disable(default), 1:enable
-// interval: internal update timer interval in millisec, default is 100ms
+// interval: internal update timer interval in millisecond
 // resend: 0:disable fast resend(default), 1:enable fast resend
 // nc: disable congestion control
 func (kcp *KCP) NoDelay(nodelay, interval, resend uint32, nc bool) {
@@ -1023,8 +1025,8 @@ func (kcp *KCP) calculateRTO(rtt int32) {
 			kcp.rxRTTvar += (delta - kcp.rxRTTvar) >> 2
 		}
 	}
-	rto = uint32(kcp.rxSRTT) + max(kcp.interval, uint32(kcp.rxRTTvar)<<2)
-	kcp.rxRTO = mid(kcp.rxMinRTO, rto, IKCP_RTO_MAX)
+	rto = uint32(kcp.rxSRTT) + mathext.Max(kcp.interval, uint32(kcp.rxRTTvar)<<2)
+	kcp.rxRTO = mathext.Mid(kcp.rxMinRTO, rto, IKCP_RTO_MAX)
 }
 
 // adjustSendUna adjusts our send unacknowledged sequence number based on the next packet

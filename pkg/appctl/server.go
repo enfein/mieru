@@ -55,19 +55,11 @@ var (
 	serverIOLock sync.Mutex
 
 	// serverRPCServerRef holds a pointer to server RPC server.
-	serverRPCServerRef atomic.Value
+	serverRPCServerRef atomic.Pointer[grpc.Server]
 
 	// socks5ServerGroup is a collection of server socks5 servers.
 	socks5ServerGroup = socks5.NewGroup()
 )
-
-func GetServerRPCServerRef() *grpc.Server {
-	s, ok := serverRPCServerRef.Load().(*grpc.Server)
-	if !ok {
-		return nil
-	}
-	return s
-}
 
 func SetServerRPCServerRef(server *grpc.Server) {
 	serverRPCServerRef.Store(server)
@@ -195,7 +187,7 @@ func (s *serverLifecycleService) Exit(ctx context.Context, req *pb.Empty) (*pb.E
 	}
 	SetAppStatus(pb.AppStatus_IDLE)
 
-	grpcServer := GetServerRPCServerRef()
+	grpcServer := serverRPCServerRef.Load()
 	if grpcServer != nil {
 		log.Infof("stopping RPC server")
 		go grpcServer.GracefulStop()
