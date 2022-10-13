@@ -54,7 +54,7 @@ mita status
 
 ## 修改代理服务器设置
 
-mieru 代理支持 TCP 和 UDP 两种不同的传输协议。要了解协议之间的差别，请阅读 [mieru 代理协议](https://github.com/enfein/mieru/blob/main/docs/protocol.md)。本教程以 TCP 协议为例进行讲解。如果要使用 UDP 协议，将所有配置文件中的 `TCP` 更换为 `UDP` 即可。
+mieru 代理支持 TCP 和 UDP 两种不同的传输协议。要了解协议之间的差别，请阅读 [mieru 代理协议](https://github.com/enfein/mieru/blob/main/docs/protocol.zh_CN.md)。本教程以 TCP 协议为例进行讲解。如果要使用 UDP 协议，将所有配置文件中的 `TCP` 更换为 `UDP` 即可。
 
 用户可以通过
 

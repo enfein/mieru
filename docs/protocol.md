@@ -42,7 +42,7 @@ The contents and length of the encrypted data segment are shown below.
 
 | nonce | encrypted length | authentication tag of encrypted length | encrypted | authentication tag of encrypted |
 | :----: | :----: | :----: | :----: | :----: |
-| 0 或 12 | 2 | 16 | X + Y + 4 | 16 |
+| 0 or 12 | 2 | 16 | X + Y + 4 | 16 |
 
 The nonce appears only once in the first data segment in each direction of the TCP connection (client to server, server to client). Each encrypted data segment transmits two sets of encrypted information: the first set transmits two bytes of `encrypted length`, and the second set transmits `encrypted` data of `X + Y + 4` bytes. AEAD algorithm adds 16 bytes of authentication tag after each set of encrypted information. The value of nonce is increased by 1 for each set of encrypted messages, and the changed nonce will be used in the next set of encryption or decryption calculations.
 
