@@ -1,38 +1,40 @@
-# mieru / 見える
+# 見える / mieru
 
-mieru【見える】是一款安全的、无流量特征、难以主动探测的，基于 TCP 或 UDP 协议的 socks5 网络代理软件。
+[中文文档](https://github.com/enfein/mieru/blob/main/README.zh_CN.md)
 
-mieru 代理软件由称为 mieru【見える】的客户端软件和称为 mita【見た】的代理服务器软件这两部分组成。
+mieru is a secure, hard to classify, hard to probe, TCP or UDP protocol-based socks5 network proxy software.
 
-## 原理和协议
+The mieru proxy software suite consists of two parts, a client software called mieru, and a proxy server software called mita.
 
-mieru 的翻墙原理与 shadowsocks / v2ray 等软件类似，在客户端和墙外的代理服务器之间建立一个加密的通道。GFW 不能破解加密传输的信息，无法判定你最终访问的网址，因此只能选择放行。
+## Protocol
 
-有关 mieru 协议的讲解，请参阅 [mieru 代理协议](https://github.com/enfein/mieru/blob/main/docs/protocol.md)。
+The principle of mieru is similar to shadowsocks / v2ray etc. It creates an encrypted channel between the client and the proxy server outside the firewall. GFW cannot decrypt the encrypted transmission and cannot determine the destination you end up visiting, so it has no choice but to let you go.
 
-## 特性
+For an explanation of the mieru protocol, see [mieru Proxy Protocol](https://github.com/enfein/mieru/blob/main/docs/protocol.md).
 
-1. 使用高强度的 AES-256-GCM 加密算法，基于用户名、密码和系统时间生成密钥。以现有计算能力，mieru 传输的数据内容无法被破解。
-2. mieru 实现了客户端和代理服务器之间所有传输内容的完整加密，不传输任何明文信息。网络观察者（例如 GFW）仅能获知时间、数据包的发送和接收地址，以及数据包的大小。除此之外，观察者无法得到其它任何流量信息。
-3. 当 mieru 发送数据包时，会在尾部填充随机信息。即便是传输相同的内容，数据包大小也不相同。
-4. 在使用 UDP 传输协议时，mieru 不需要客户端和服务器进行握手，即可直接发送数据。
-5. 当服务器无法解密客户端发送的数据时，不会返回任何内容。GFW 很难通过主动探测发现 mieru 服务。
-6. mieru 支持多个用户共享代理服务器。
-7. 支持 IPv4 和 IPv6。
-8. 客户端软件支持 Windows, Mac OS, Linux 和 Android 系统。Android 用户请使用 0.8.1-rc02 版本或以上 SagerNet 客户端并安装 1.6.1 版本或以上 mieru 插件。
+## Features
 
-## 使用教程
+1. mieru uses a high-strength AES-256-GCM encryption algorithm that generates encryption keys based on username, password and system time. With the current computing power, the data content transmitted by mieru cannot be cracked.
+2. mieru implements complete encryption of all transmitted content between the client and the proxy server, without transmitting any plaintext information. A network observer (e.g. GFW) only knows the time, the sending and receiving addresses of the packets, and the size of the packets. Other than that, the observer cannot get any other traffic information.
+3. When mieru sends a packet, it is padded with random bytes at the end. Even when the same content is transmitted, the packet size varies.
+4. When using the UDP transport protocol, mieru does not require a handshake between client and server.
+5. When the server can not decrypt the data sent by the client, no content is returned. it is difficult for GFW to discover the mieru service through active probing.
+6. mieru supports multiple users sharing a single proxy server.
+7. mieru supports IPv4 and IPv6.
+8. The client software supports Windows, Mac OS, Linux and Android systems. Android users should use SagerNet client version 0.8.1-rc02 or above, and install mieru plugin version 1.6.1 or above.
 
-1. [服务器安装与配置](https://github.com/enfein/mieru/blob/main/docs/server-install.md)
-2. [客户端安装与配置](https://github.com/enfein/mieru/blob/main/docs/client-install.md)
-3. [运营维护与故障排查](https://github.com/enfein/mieru/blob/main/docs/operation.md)
-4. [翻墙安全指南](https://github.com/enfein/mieru/blob/main/docs/security.md)
+## User Guide
 
-## 编译
+1. [Server Installation & Configuration](https://github.com/enfein/mieru/blob/main/docs/server-install.md)
+2. [Client Installation & Configuration](https://github.com/enfein/mieru/blob/main/docs/client-install.md)
+3. [Maintenance & Troubleshooting](https://github.com/enfein/mieru/blob/main/docs/operation.md)
+4. [Security Guide](https://github.com/enfein/mieru/blob/main/docs/security.md)
 
-编译 mieru 的客户端和服务器软件，建议在 Linux 系统中进行。编译过程可能需要翻墙下载依赖的软件包。
+## Compile
 
-编译所需的软件包括：
+Compiling should be done in Linux. The compilation process requires downloading dependent packages, which may be blocked by the firewall.
+
+The following softwares are required for compilation.
 
 - curl
 - env
@@ -43,21 +45,21 @@ mieru 的翻墙原理与 shadowsocks / v2ray 等软件类似，在客户端和�
 - tar
 - zip
 
-编译 debian 安装包需要：
+To build debian packages:
 
 - dpkg-deb
 - fakeroot
 
-编译 RPM 安装包需要：
+To build RPM packages:
 
 - rpmbuild
 
-编译时，进入项目根目录，调用指令 `make` 即可。编译结果会存放在项目根目录下的 `release` 文件夹。
+To compile, go to the root directory of the project and invoke `make`. The compilation result will be stored in the `release` directory.
 
-## 联系作者
+## Contact Us
 
-关于本项目，如果你有任何问题，请提交 GitHub Issue 联系我们。
+Use GitHub issue.
 
-## 许可证
+## License
 
-使用本软件需遵从 GPL-3 协议。
+Use of this software is subject to the GPL-3 license.

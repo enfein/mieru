@@ -1,51 +1,20 @@
-# 客户端安装与配置
+# Client Installation & Configuration
 
-## 下载 mieru 安装包
+## Download mieru installation package
 
-mieru 客户端软件支持 Windows，Mac OS 和 Linux 系统。用户可以在 GitHub Releases 页面用浏览器下载。如果 GitHub 没有被墙，也可以使用 Linux / Mac 终端或 Windows PowerShell 下载。
+The mieru client supports Windows, Mac OS, and Linux. Users can download it from the GitHub Releases page.
 
-```powershell
-# Windows PowerShell
-Invoke-WebRequest https://github.com/enfein/mieru/releases/download/v1.7.0/mieru_1.7.0_windows_amd64.zip -OutFile mieru_1.7.0_windows_amd64.zip
-```
+If your client OS is Linux, you can also install mieru using the debian and RPM installers.
 
-```sh
-# Mac OS (Intel CPU)
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.7.0/mieru_1.7.0_darwin_amd64.tar.gz
+## Modify proxy client settings
 
-# Mac OS (ARM CPU)
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.7.0/mieru_1.7.0_darwin_arm64.tar.gz
-```
-
-解压缩之后，就可以得到可执行文件 `mieru.exe` 或 `mieru`。
-
-如果你的客户端操作系统是 Linux，可以使用下面的指令下载和安装 mieru。如需下载 ARM 架构的安装包，将链接中的 `amd64` 替换成 `arm64`，`x86_64` 替换成 `aarch64` 即可。
-
-```sh
-# Debian / Ubuntu
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.7.0/mieru_1.7.0_amd64.deb
-sudo dpkg -i mieru_1.7.0_amd64.deb
-
-# Fedora / CentOS / Red Hat Enterprise Linux
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.7.0/mieru-1.7.0-1.x86_64.rpm
-sudo rpm -Uvh --force mieru-1.7.0-1.x86_64.rpm
-
-# Others
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.7.0/mieru_1.7.0_linux_amd64.tar.gz
-tar -zxvf mieru_1.7.0_linux_amd64.tar.gz
-```
-
-接下来，将 mieru 可执行文件移动或添加至系统路径 `PATH`。这样，输入指令时就不需要指定 mieru 可执行文件的位置了。如果使用了 debian 或 RPM 安装包，那么不需要执行这一步。
-
-## 修改客户端的设置
-
-用户可以通过
+Use can invoke command
 
 ```sh
 mieru apply config <FILE>
 ```
 
-指令来修改客户端的设置，这里的 `<FILE>` 是一个 JSON 格式的文件。我们在项目根目录下的 `configs/templates/client_config.json` 文件中提供了一个配置模板。该模板的内容如下所示：
+to modify the proxy client settings. Here `<FILE>` is a JSON formatted file. We provide a configuration template in the `configs/templates/client_config.json` file in the root of the project. The contents of this template are as follows.
 
 ```js
 {
@@ -79,21 +48,21 @@ mieru apply config <FILE>
 }
 ```
 
-请下载或复制这个模板，然后用文本编辑器修改如下的内容：
+Please download or copy this template and use a text editor to modify the following fields.
 
-1. 在 `profiles` -> `user` -> `name` 属性中，填写用户名。此处必须与代理服务器中的设置相同。
-2. 在 `profiles` -> `user` -> `password` 属性中，填写密码。此处必须与代理服务器中的设置相同。
-3. 在 `profiles` -> `servers` -> `ipAddress` 属性中，填写代理服务器的公网地址。支持 IPv4 和 IPv6 地址。
-4. 如果你为代理服务器注册了域名，请在 `profiles` -> `servers` -> `domainName` 中填写域名。否则，请勿修改这个属性。
-5. 在 `profiles` -> `servers` -> `portBindings` -> `port` 中填写 mita 监听的 TCP 或 UDP 端口号。这个端口号必须与代理服务器中的设置相同。
-6. 请为 `profiles` -> `mtu` 属性中指定一个从 1280 到 1500 之间的值。默认值为 1400。这个值可以与代理服务器中的设置不同。
-7. 请为 `rpcPort` 属性指定一个从 1025 到 65535 之间的数值。**请确保防火墙允许使用该端口进行通信。**
-8. 请为 `socks5Port` 属性指定一个从 1025 到 65535 之间的数值。该端口不能与 `rpcPort` 相同。**请确保防火墙允许使用该端口进行通信。**
-9. 如果客户端需要为局域网中的其他设备提供代理服务，请将 `socks5ListenLAN` 属性设置为 `true`。
+1. In the `profiles` -> `user` -> `name` property, fill in the username. This must be the same as the setting in the proxy server.
+2. In the `profiles` -> `user` -> `password` property, fill in the password. This must be the same as the setting in the proxy server.
+3. In the `profiles` -> `servers` -> `ipAddress` property, fill in the public address of the proxy server. Both IPv4 and IPv6 addresses are supported.
+4. If you have registered a domain name for the proxy server, please fill in the domain name in `profiles` -> `servers` -> `domainName`. Otherwise, do not modify this property.
+5. Fill in `profiles` -> `servers` -> `portBindings` -> `port` with the TCP or UDP port number that mita is listening on. The port number must be the same as the one set in the proxy server.
+6. Specify a value between 1280 and 1500 for the `profiles` -> `mtu` property. The default value is 1400. This value can be different from the setting in the proxy server.
+7. Please specify a value from 1025 to 65535 for the `rpcPort` property. **Please make sure that the firewall allows communication using this port.**
+8. Please specify a value between 1025 and 65535 for the `socks5Port` property. This port cannot be the same as `rpcPort`. **Make sure that the firewall allows communication on this port.**
+9. If the client needs to provide proxy services to other devices on the LAN, set the `socks5ListenLAN` property to `true`.
 
-如果你安装了多台代理服务器，或者一台服务器监听多个端口，可以把它们都添加到客户端设置中。每次发起新的连接时，mieru 会随机选取其中的一台服务器和一个端口。**如果使用了多台服务器，请确保每一台服务器都启动了 mita 代理服务。**
+If you have multiple proxy servers installed, or one server listening on multiple ports, you can add them all to the client settings. Each time a new connection is created, mieru will randomly select one of the servers and one of the ports. **If you are using multiple servers, make sure that each server has the mita proxy service started.**
 
-上述设置的一个示例如下
+An example of the above setting is as follows.
 
 ```js
 {
@@ -127,49 +96,49 @@ mieru apply config <FILE>
 }
 ```
 
-假设这个配置文件的文件名是 `client_config.json`，在修改完成之后，调用指令 `mieru apply config client_config.json` 写入该配置。
+Assuming the file name of this configuration file is `client_config.json`, call command `mieru apply config client_config.json` to write the configuration after it has been modified.
 
-如果配置有误，mieru 会打印出现的问题。请根据提示修改配置文件，重新运行 `mieru apply config <FILE>` 指令写入修正后的配置。
+If the configuration is incorrect, mieru will print the problem that occurred. Follow the prompts to modify the configuration file and re-run the `mieru apply config <FILE>` command to write the configuration.
 
-写入后，可以用
+After that, invoke command
 
 ```sh
 mieru describe config
 ```
 
-指令查看当前设置。
+to check the current proxy settings.
 
-## 启动客户端
+## Start proxy client
 
 ```sh
 mieru start
 ```
 
-如果输出显示 `mieru client is started, listening to 127.0.0.1:xxxx`，表示 mieru 客户端已经开始运行。
+If the output shows `mieru client is started, listening to 127.0.0.1:xxxx`, it means that the mieru client is up and running.
 
-mieru 客户端不会与系统一同启动。在重新启动计算机后，需要手动使用 `mieru start` 指令启动客户端。
+The mieru client will not be started automatically with system boot. After restarting the computer, you need to start the client manually with the `mieru start` command.
 
-**Windows 用户请注意，在命令提示符或 Powershell 中使用 `mieru start` 指令启动客户端之后，请勿关闭命令提示符或 Powershell 窗口。关闭窗口将导致 mieru 客户端停止运行。**
+**Windows users should note that after starting the client with the `mieru start` command at the command prompt or Powershell, do not close the command prompt or Powershell window. Closing the window will cause the mieru client to exit.**
 
-如果需要停止 mieru 客户端，请输入指令
+If you need to stop the mieru client, enter the following command
 
 ```sh
 mieru stop
 ```
 
-注意，每次使用 `mieru apply config <FILE>` 修改设置后，需要用 `mieru stop` 和 `mieru start` 重启客户端，才能使新设置生效。
+Note that every time you change the settings with `mieru apply config <FILE>`, you need to restart the client with `mieru stop` and `mieru start` for the new settings to take effect.
 
-## 配置浏览器
+## Configuring the browser
 
-Chrome / Firefox 等浏览器可以通过安装插件，使用 socks5 代理访问墙外的网站。关于 socks5 代理的地址，请填写 `127.0.0.1:xxxx`，其中 `xxxx` 是客户端设置中 `socks5Port` 的值。这个地址在调用 `mieru start` 指令时也会打印出来。
+Chrome / Firefox and other browsers can use socks5 proxy to access blocked websites by installing browser plugins. For the address of the socks5 proxy, please fill in `127.0.0.1:xxxx`, where `xxxx` is the value of `socks5Port` in the client settings. This address will also be printed when the `mieru start` command is called.
 
-mieru 不使用 socks5 用户名和密码进行身份验证。
+mieru doesn't use socks5 authentication.
 
-关于在 Tor 浏览器中配置 socks5 代理，参见[翻墙安全指南](https://github.com/enfein/mieru/blob/main/docs/security.md)。
+For configuring the socks5 proxy in the Tor browser, see the [Security Guide](https://github.com/enfein/mieru/blob/main/docs/security.md).
 
-## 配置 clash
+## Configuring clash
 
-使用 mieru 作为 clash 的转发代理，可以参考下面的设置。
+To use mieru as a forwarding agent for clash, you can refer to the following settings.
 
 ```yaml
 proxies:

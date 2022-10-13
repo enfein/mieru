@@ -1,29 +1,29 @@
-# 翻墙安全指南
+# Security Guide
 
-这篇文章主要讲解如何安全的使用 mieru 进行翻墙。
+This article focuses on how to safely use mieru. **Some content may be specific to China.**
 
-## 不使用国产操作系统和国产浏览器
+## Do NOT use domestic operating systems and domestic browsers
 
-国产浏览器，例如 360 安全浏览器、QQ 浏览器等，会记录和上传浏览器插件和网络代理的使用情况。使用国产操作系统和国产浏览器翻墙等于当着警察的面翻墙。
+Some domestic browsers, such as 360 Safe Browser and QQ Browser, record and upload the use of browser plugins and web proxies. Using a domestic operating system and a domestic browser notifies the police directly.
 
-## 分离国内流量和翻墙流量
+## Separate domestic traffic from international traffic
 
-用户不应该使用翻墙代理访问国内的网站。这种做法一方面会降低性能，另一方面也有助于 GFW 发现和封锁代理服务器。例如，bilibili 或者 GFW 发现有很多视频播放请求来源于某个云服务提供商的 IP，那么该 IP 可能会被判定为用于翻墙而遭到封禁。
+Users should not use proxies to access domestic websites. This practice can reduce performance and help GFW discover and block the proxy server. For example, if bilibili or GFW finds that a lot of video playback requests originate from a cloud service provider's IP, that IP may be judged to be used by proxy and be blocked.
 
-mieru 本身没有提供基于域名规则或 IP 地址位置来判断是否应该翻墙的功能。用户应当使用可以进行相关配置的浏览器插件，例如 [Proxy SwitchyOmega](https://github.com/FelisCatus/SwitchyOmega)，或者使用两个不同的浏览器，一个专门用于访问国内网站，而另一个专门用于翻墙。
+mieru does not provide the ability to determine if traffic should be proxied based on rules or IP address locations. Users should use a browser plugin that can be configured for this purpose, such as [Proxy SwitchyOmega](https://github.com/FelisCatus/SwitchyOmega), or use two different browsers, one dedicated to accessing domestic websites and the other dedicated to international traffic.
 
-## 使用虚拟机或单独的电脑翻墙
+## Use a virtual machine or a separate computer
 
-另一类针对翻墙软件的攻击发生在用户的电脑上。一些装机量极大的软件，例如 QQ，会扫描电脑上的进程和文件。如果发现用户在运行 shadowsocks 等知名翻墙软件，他们会记录和上报这些行为。
+Another type of attack occurs on the user's computer. Some heavily installed software, such as QQ, scans processes and files on the computer. If they find users running well-known proxy softwares such as shadowsocks, they will record and report these actions.
 
-考虑到国内用户很难完全不使用国产软件，我们建议创建一个虚拟机，或者使用单独的电脑进行翻墙。
+Considering that it is difficult for domestic users to not use domestic software at all, we recommend creating a virtual machine, or using a separate computer.
 
-## 使用 Tor 洋葱路由 / 洋葱浏览器
+## Use Tor browser
 
-翻墙软件开发者、调查记者、维权律师、在国外网站上参与政治讨论的人，都是高风险用户。除了上述三点之外，翻墙时请务必使用 [Tor](https://www.torproject.org/) 进行敏感操作。在国内无法直接连接 Tor 网桥，但是 mieru 可以作为 Tor 的前置代理。在 Tor 浏览器中使用前置代理的方法如下图所示（请使用自己电脑上 mieru 监听的端口号）。
+Anti-censorship software developers, investigative journalists, human rights lawyers, and people who engage in political discussions on foreign websites are all high-risk users. In addition to the above suggestions, please make sure to use [Tor](https://www.torproject.org/) for sensitive operations. You cannot connect directly to the Tor bridge in China, but mieru can be used as a Tor proxy. To use a proxy in the Tor browser, please follow the pictures below. Make sure to use the port number that mieru is listening to on your computer.
 
-![配置 Tor 浏览器](https://github.com/enfein/mieru/blob/main/docs/assets/config_tor_browser.png)
+![Configuring Tor browser](https://github.com/enfein/mieru/blob/main/docs/assets/config_tor_browser.png)
 
-通过这种方式翻墙的网速比较慢，可能无法流畅观看视频。
+![Configuring Tor browser](https://github.com/enfein/mieru/blob/main/docs/assets/config_tor_browser_2.png)
 
-建议高风险用户阅读[编程随想的博客](https://program-think.blogspot.com/)中关于信息安全的文章，保护好隐私和踪迹，避免被跨省追捕。
+When using Tor, the internet speed is slow, and you may not be able to watch videos smoothly.

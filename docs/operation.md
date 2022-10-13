@@ -1,10 +1,10 @@
-# 运营维护与故障排查
+# Maintenance & Troubleshooting
 
-## 关于配置文件存放地址
+## Configuration file location
 
-代理服务器软件 mita 的配置存放在 `/etc/mita/server.conf.pb`。这是一个以 protocol buffer 格式存储的二进制文件。为保护用户信息，mita 不会存储用户密码的明文，只会存储其校验码。
+The configuration of the mita proxy server is stored in `/etc/mita/server.conf.pb`. This is a binary file in protocol buffer format. To protect user information, mita does not store the user's password in plain text, it only stores the checksum.
 
-客户端软件 mieru 的配置文件同样是一个二进制文件。它在不同操作系统中存储的位置如下表所示
+The configuration file of the mieru client is also a binary file. It is stored in the following locations in different operating systems.
 
 | Operating System | Configuration File Path |
 | :----: | :----: |
@@ -12,23 +12,17 @@
 | Mac OS | /Users/USERNAME/Library/Application Support/mieru/client.conf.pb |
 | Windows | C:\Users\USERNAME\AppData\Roaming\mieru\client.conf.pb |
 
-## 查看代理服务器 mita 的日志
+## View mita proxy server log
 
-用户可以使用下面的指令打印 mita 的全部日志
-
-```sh
-journalctl -u mita -xe --no-pager
-```
-
-只有当你登录服务器的用户属于 `adm` 或 `systemd-journal` 用户组时才可以查看日志。必要时可以使用 `sudo` 提升权限。
+The user can print the full log of mita proxy server using the following command.
 
 ```sh
 sudo journalctl -u mita -xe --no-pager
 ```
 
-## 查看客户端 mieru 的日志
+## View mieru client log
 
-客户端 mieru 的日志存放位置如下表所示
+The location of the client mieru log files is shown in the following table.
 
 | Operating System | Configuration File Path |
 | :----: | :----: |
@@ -36,57 +30,41 @@ sudo journalctl -u mita -xe --no-pager
 | Mac OS | /Users/USERNAME/Library/Caches/mieru/ |
 | Windows | C:\Users\USERNAME\AppData\Local\mieru\ |
 
-每个日志文件的格式为 `yyyyMMdd_HHmm_PID.log`，其中 `yyyyMMdd_HHmm` 是 mieru 进程启动的时间，`PID` 是进程号码。每次重启 mieru 会生成一个新的日志文件。当日志文件的数量太多时，旧的文件会被自动删除。
+Each log file uses the format `yyyyMMdd_HHmm_PID.log`, where `yyyyMMdd_HHmm` is the time when the mieru process was started and `PID` is the process number. Each time mieru is restarted, a new log file is generated. When there are too many log files, the old ones will be deleted automatically.
 
-## 打开和关闭调试日志
+## Enable and disable debug logging
 
-mieru / mita 在默认的日志等级下，打印的信息非常少，不包含 IP 地址、端口号等敏感信息。如果需要诊断单个网络连接，则需要打开调试日志（debug log）。
+mieru / mita prints very little information at the default log level, which does not contain sensitive information such as IP addresses, port numbers, etc. If you need to diagnose a single network connection, you need to turn on the debug logging.
 
-本项目在 `configs/templates` 目录下提供了快速打开和关闭调试日志的配置文件。请将它们下载到服务器或本地计算机上，并输入以下指令。注意，改变 mieru / mita 的设置后，需要重新启动服务才能生效。
-
-打开 mita 代理服务器调试日志
+The project provides configuration files for quickly enable and disable debug logs in the `configs/templates` directory. Please download them to your server or local computer and enter the following commands. Note that changing the settings of mieru / mita requires restarting the service to take effect.
 
 ```sh
+# enable debug logging
 mita apply config server_enable_debug_logging.json
-```
 
-关闭 mita 代理服务器调试日志
-
-```sh
+# OR disable debug logging
 mita apply config server_disable_debug_logging.json
-```
 
-重新启动 mita 代理服务器
-
-```sh
 mita stop
 
 mita start
 ```
 
-打开 mieru 客户端调试日志
-
 ```sh
+# enable debug logging
 mieru apply config client_enable_debug_logging.json
-```
 
-关闭 mieru 客户端调试日志
-
-```sh
+# OR disable debug logging
 mieru apply config client_disable_debug_logging.json
-```
 
-重新启动 mieru 客户端
-
-```sh
 mieru stop
 
 mieru start
 ```
 
-## 判断客户端与服务器之间的连接是否正常
+## Check connectivity between client and server
 
-如果服务器仅有一个客户端，判断连接是否正常，只需要查看服务器日志。例如，在下面的日志示例中
+When the server has a single client, to determine if the connectivity is OK, you can look at the server logs. For example, in the following log,
 
 ```
 INFO [metrics]
@@ -105,16 +83,16 @@ INFO [metrics - TCP errors] TCPReceiveErrors=0 TCPSendErrors=0
 INFO [metrics - socks5 errors] ConnectionRefused=0 DNSResolveErrors=0 HandshakeErrors=0 HostUnreachable=0 NetworkUnreachable=0 UDPAssociateErrors=0 UnsupportedCommand=0
 ```
 
-如果 `CurrEstablished` 的值不为 0，说明此刻服务器与客户端之间有活跃的连接。如果 `ServerDirectDecrypt` 的值不为 0，说明服务器曾经成功解密了客户端发送的数据包。如果 TCP 或者 UDP 的 `OutBytes` 的值不为 0，说明服务器曾经向客户端发送过数据包。
+if the value of `CurrEstablished` is not 0, there is an active connection between the server and the client at this moment; if the value of `ServerDirectDecrypt` is not 0, the server has successfully decrypted the packets sent by the client; if the value of `OutBytes` for TCP or UDP is not 0, the server has sent a packet to the client.
 
-## 故障诊断与排查
+## Troubleshooting suggestions
 
-mieru 为了防止 GFW 主动探测，增强了服务器端的隐蔽性，但是也增加了调试的难度。如果你的客户端和服务器之间无法建立连接，从以下几个排查方向入手可能会有所帮助。
+mieru enhances server-side stealth in order to prevent GFW active probing, but it also makes debugging more difficult. If you cannot establish a connection between your client and server, it may be helpful to start with the following steps.
 
-1. 服务器是否在正常工作？用 `ping` 指令确认客户端是否可以到达服务器。
-2. mita 代理服务是否已经启动？用 `mita status` 指令查看。
-3. mieru 客户端是否已经启动？用 `mieru status` 指令查看。
-4. 客户端和服务器的设置中，端口号是否相同？用户名是否相同？密码是否相同？用 `mieru describe config` 和 `mita describe config` 查看。
-5. 打开客户端和服务器的调试日志，查看具体的网络连接情况。
+1. Is the server working properly? Use the `ping` command to confirm whether the client can reach the server.
+2. Is the mita proxy service started? Use the `mita status` command to check.
+3. Is the mieru client started? Use the `mieru status` command to check.
+4. Are the port numbers of the client and server settings the same? Is the username the same? Is the password the same? Use `mieru describe config` and `mita describe config` to check.
+5. Open the debug logs for both the client and server to see exactly what is happening with your network connection.
 
-如果未能解决问题，可以提交 GitHub Issue 联系开发者。
+If you can't solve the problem, you can submit a GitHub issue to contact the developers.

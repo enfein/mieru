@@ -26,8 +26,8 @@ PROJECT_NAME=$(shell basename "${ROOT}")
 # - build/package/mita/amd64/rpm/mita.spec
 # - build/package/mita/arm64/debian/DEBIAN/control
 # - build/package/mita/arm64/rpm/mita.spec
-# - docs/client-install.md
 # - docs/server-install.md
+# - docs/server-install.zh_CN.md
 VERSION="1.7.0"
 
 # Build binaries and installation packages.
