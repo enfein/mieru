@@ -79,7 +79,7 @@ mieru apply config <FILE>
                     "domainName": "",
                     "portBindings": [
                         {
-                            "port": 2022,
+                            "port": 2027,
                             "protocol": "TCP"
                         }
                     ]

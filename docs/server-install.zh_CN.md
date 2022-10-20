@@ -100,7 +100,7 @@ mita apply config <FILE>
             "protocol": "TCP"
         },
         {
-            "port": 2022,
+            "port": 2027,
             "protocol": "TCP"
         }
     ],
@@ -110,8 +110,8 @@ mita apply config <FILE>
             "password": "shilishanlubuhuanjian"
         },
         {
-            "name": "dongtaiqingling",
-            "password": "touzhele"
+            "name": "ducaiguozei",
+            "password": "xijinping"
         }
     ],
     "loggingLevel": "INFO",

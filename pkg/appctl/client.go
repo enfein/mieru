@@ -90,9 +90,7 @@ func (c *clientLifecycleService) Exit(ctx context.Context, req *pb.Empty) (*pb.E
 	if socks5Server != nil {
 		log.Infof("stopping socks5 server")
 		if err := socks5Server.Close(); err != nil {
-			if log.IsLevelEnabled(log.DebugLevel) {
-				log.Debugf("socks5 server Close() failed: %v", err)
-			}
+			log.Debugf("socks5 server Close() failed: %v", err)
 		}
 	} else {
 		log.Infof("socks5 server reference not found")
@@ -189,9 +187,7 @@ func LoadClientConfig() (*pb.ClientConfig, error) {
 		return nil, fmt.Errorf("prepareClientConfigDir() failed: %w", err)
 	}
 
-	if log.IsLevelEnabled(log.DebugLevel) {
-		log.Debugf("loading client config from %q", fileName)
-	}
+	log.Debugf("loading client config from %q", fileName)
 	f, err := os.Open(fileName)
 	if err != nil && os.IsNotExist(err) {
 		return nil, stderror.ErrFileNotExist

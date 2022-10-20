@@ -128,6 +128,7 @@ func newUDPSession(conv uint32, conn net.PacketConn, ownConn bool, remote net.Ad
 	sess.block = block
 	sess.idleDuration = maxIdleDuration
 	sess.recvBuf = make([]byte, kcp.MaxBufSize)
+	sess.ackNoDelay = true
 	sess.recordingEnabled = false
 	sess.recordedPackets = recording.NewRecords()
 
@@ -581,9 +582,7 @@ func (s *UDPSession) packetInput(data []byte) {
 		data, err = s.block.Decrypt(data)
 		atomic.AddUint64(&metrics.ClientDirectDecrypt, 1)
 		if err != nil {
-			if log.IsLevelEnabled(log.DebugLevel) {
-				log.Debugf("UDPSession %v: failed to decrypt input with %d bytes", s.LocalAddr(), len(data))
-			}
+			log.Debugf("UDPSession %v: failed to decrypt input with %d bytes", s.LocalAddr(), len(data))
 			atomic.AddUint64(&metrics.ClientFailedDirectDecrypt, 1)
 			return
 		}
@@ -597,14 +596,9 @@ func (s *UDPSession) packetInput(data []byte) {
 
 // Input decrypted packet to KCP.
 func (s *UDPSession) inputToKCP(data []byte) {
-	if log.IsLevelEnabled(log.TraceLevel) {
-		log.Tracef("UDPSession %v: input %d bytes to KCP", s.LocalAddr(), len(data))
-	}
 	s.mu.Lock()
 	if ret := s.kcp.Input(data, s.ackNoDelay); ret != nil {
-		if log.IsLevelEnabled(log.DebugLevel) {
-			log.Debugf("UDPSession %v: KCP input rejected with err %v", s.LocalAddr(), ret)
-		}
+		log.Debugf("UDPSession %v: KCP input rejected with err %v", s.LocalAddr(), ret)
 		atomic.AddUint64(&metrics.KCPInErrors, 1)
 	}
 	s.updateIdleDeadline(s.kcp.LastInputTime())
@@ -671,9 +665,7 @@ func (s *UDPSession) outputCallback(buf []byte) {
 	var err error
 	encrypted, err = s.block.Encrypt(buf)
 	if err != nil {
-		if log.IsLevelEnabled(log.DebugLevel) {
-			log.Debugf("UDPSession %v: failed to encrypt %d bytes.", s.LocalAddr(), len(buf))
-		}
+		log.Debugf("UDPSession %v: failed to encrypt %d bytes.", s.LocalAddr(), len(buf))
 		return
 	}
 
@@ -911,7 +903,7 @@ func (l *Listener) readLoop() {
 // Process raw input packet.
 func (l *Listener) packetInput(raw []byte, addr net.Addr) {
 	if log.IsLevelEnabled(log.TraceLevel) {
-		log.Tracef("Listener %v: read %d bytes from %s %s", l.Addr(), len(raw), addr.Network(), addr.String())
+		log.Tracef("UDPSession Listener %v: read %d bytes from %s %s", l.Addr(), len(raw), addr.Network(), addr.String())
 	}
 
 	decrypted := false
@@ -940,9 +932,7 @@ func (l *Listener) packetInput(raw []byte, addr net.Addr) {
 				var password []byte
 				password, err = hex.DecodeString(user.GetHashedPassword())
 				if err != nil {
-					if log.IsLevelEnabled(log.DebugLevel) {
-						log.Debugf("unable to decode hashed password %q from user %q", user.GetHashedPassword(), user.GetName())
-					}
+					log.Debugf("unable to decode hashed password %q from user %q", user.GetHashedPassword(), user.GetName())
 					continue
 				}
 				if len(password) == 0 {
@@ -981,9 +971,7 @@ func (l *Listener) packetInput(raw []byte, addr net.Addr) {
 			} else if sn == 0 {
 				log.Infof("another connection reused address %v, closing existing session", addr)
 				if err := s.Close(); err != nil {
-					if log.IsLevelEnabled(log.DebugLevel) {
-						log.Debugf("UDP session Close() failed: %v", err)
-					}
+					log.Debugf("UDP session Close() failed: %v", err)
 				}
 				connWithSameAddr = true
 				// The old session will be garbage collected after the reference
@@ -998,9 +986,7 @@ func (l *Listener) packetInput(raw []byte, addr net.Addr) {
 				if replayCache.IsDuplicate(raw[:kcp.OuterHeaderSize]) && s == nil {
 					// Found a replay attack. Don't establish the connection.
 					atomic.AddUint64(&metrics.ReplayNewSession, 1)
-					if log.IsLevelEnabled(log.DebugLevel) {
-						log.Debugf("found possible replay attack from %v", addr)
-					}
+					log.Debugf("found possible replay attack from %v", addr)
 					return
 				}
 				s = newUDPSession(conv, l.conn, false, addr, block)
@@ -1018,17 +1004,13 @@ func (l *Listener) periodCleanTask() {
 	l.sessionLock.Lock()
 	defer l.sessionLock.Unlock()
 	if log.IsLevelEnabled(log.TraceLevel) {
-		log.Tracef("running periodic clean task with %d sessions", len(l.sessions))
+		log.Tracef("UDPSession Listener %v: running periodic clean task with %d sessions", l.Addr(), len(l.sessions))
 	}
 	for addr, s := range l.sessions {
 		if !s.idleDeadline.IsZero() && s.idleDeadline.Before(time.Now()) {
-			if log.IsLevelEnabled(log.DebugLevel) {
-				log.Debugf("closing UDP session [%v - %v] due to timeout", s.conn.LocalAddr(), addr)
-			}
+			log.Debugf("closing UDP session [%v - %v] due to timeout", s.conn.LocalAddr(), addr)
 			if err := s.Close(); err != nil {
-				if log.IsLevelEnabled(log.DebugLevel) {
-					log.Debugf("UDP session Close() failed: %v", err)
-				}
+				log.Debugf("UDP session Close() failed: %v", err)
 			}
 			delete(l.sessions, addr)
 		}

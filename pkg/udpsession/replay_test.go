@@ -26,7 +26,6 @@ import (
 
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
-	"github.com/enfein/mieru/pkg/kcp"
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/recording"
 	"github.com/enfein/mieru/pkg/testtool"
@@ -131,7 +130,6 @@ func runCloseWaitClient(t *testing.T, laddr, raddr string, username, password []
 // the server's response back to the client. The client should drop the replay
 // packet before processing it.
 func TestReplayServerResponseToClient(t *testing.T) {
-	kcp.TestOnlySegmentDropRate = ""
 	serverAddr := "127.0.0.1:12321"
 	clientAddr := "127.0.0.1:12322"
 	attackAddr := "127.0.0.1:12323"
@@ -220,7 +218,6 @@ func TestReplayServerResponseToClient(t *testing.T) {
 // the client's request to the server. The monitor should not get any response
 // from the server.
 func TestReplayClientRequestToServer(t *testing.T) {
-	kcp.TestOnlySegmentDropRate = ""
 	serverAddr := "127.0.0.1:12324"
 	clientAddr := "127.0.0.1:12325"
 	attackAddr := "127.0.0.1:12326"
@@ -328,7 +325,6 @@ func TestReplayClientRequestToServer(t *testing.T) {
 // the server's response back to the server. The server should drop the replay
 // packet before processing it.
 func TestReplayServerResponseToServer(t *testing.T) {
-	kcp.TestOnlySegmentDropRate = ""
 	serverAddr := "127.0.0.1:12327"
 	clientAddr := "127.0.0.1:12328"
 	attackAddr := "127.0.0.1:12329"

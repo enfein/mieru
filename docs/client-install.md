@@ -79,7 +79,7 @@ An example of the above setting is as follows.
                     "domainName": "",
                     "portBindings": [
                         {
-                            "port": 2022,
+                            "port": 2027,
                             "protocol": "TCP"
                         }
                     ]

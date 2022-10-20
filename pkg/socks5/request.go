@@ -290,9 +290,7 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 				addrMap.Store(dstAddr.String(), buf[:10])
 				ws, err := udpConn.WriteToUDP(buf[10:n], dstAddr)
 				if err != nil {
-					if log.IsLevelEnabled(log.DebugLevel) {
-						log.Debugf("UDP associate [%v - %v] WriteToUDP() failed: %v", udpConn.LocalAddr(), dstAddr, err)
-					}
+					log.Debugf("UDP associate [%v - %v] WriteToUDP() failed: %v", udpConn.LocalAddr(), dstAddr, err)
 					atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
 				} else {
 					atomic.AddUint64(&metrics.UDPAssociateInPkts, 1)
@@ -303,18 +301,14 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 				fqdn := string(buf[5 : 5+fqdnLen])
 				dstAddr, err := net.ResolveUDPAddr("udp", fqdn+":"+strconv.Itoa(int(buf[5+fqdnLen])<<8+int(buf[6+fqdnLen])))
 				if err != nil {
-					if log.IsLevelEnabled(log.DebugLevel) {
-						log.Debugf("UDP associate %v ResolveUDPAddr() failed: %v", udpConn.LocalAddr(), err)
-					}
+					log.Debugf("UDP associate %v ResolveUDPAddr() failed: %v", udpConn.LocalAddr(), err)
 					atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
 					break
 				}
 				addrMap.Store(dstAddr.String(), buf[:7+fqdnLen])
 				ws, err := udpConn.WriteToUDP(buf[7+fqdnLen:n], dstAddr)
 				if err != nil {
-					if log.IsLevelEnabled(log.DebugLevel) {
-						log.Debugf("UDP associate [%v - %v] WriteToUDP() failed: %v", udpConn.LocalAddr(), dstAddr, err)
-					}
+					log.Debugf("UDP associate [%v - %v] WriteToUDP() failed: %v", udpConn.LocalAddr(), dstAddr, err)
 					atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
 				} else {
 					atomic.AddUint64(&metrics.UDPAssociateInPkts, 1)
@@ -328,9 +322,7 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 				addrMap.Store(dstAddr.String(), buf[:22])
 				ws, err := udpConn.WriteToUDP(buf[22:n], dstAddr)
 				if err != nil {
-					if log.IsLevelEnabled(log.DebugLevel) {
-						log.Debugf("UDP associate [%v - %v] WriteToUDP() failed: %v", udpConn.LocalAddr(), dstAddr, err)
-					}
+					log.Debugf("UDP associate [%v - %v] WriteToUDP() failed: %v", udpConn.LocalAddr(), dstAddr, err)
 					atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
 				} else {
 					atomic.AddUint64(&metrics.UDPAssociateInPkts, 1)

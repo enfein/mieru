@@ -122,16 +122,12 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *UDPAssociateTunnelConn) error
 
 	var err error
 	err = <-errCh
-	if log.IsLevelEnabled(log.DebugLevel) {
-		log.Debugf("BidiCopyUDP() with endpoint %v failed 1: %v", udpConn.LocalAddr(), err)
-	}
+	log.Debugf("BidiCopyUDP() with endpoint %v failed 1: %v", udpConn.LocalAddr(), err)
 
 	tunnelConn.Close()
 	udpConn.Close()
 
 	err = <-errCh
-	if log.IsLevelEnabled(log.DebugLevel) {
-		log.Debugf("BidiCopyUDP() with endpoint %v failed 2: %v", udpConn.LocalAddr(), err)
-	}
+	log.Debugf("BidiCopyUDP() with endpoint %v failed 2: %v", udpConn.LocalAddr(), err)
 	return nil
 }

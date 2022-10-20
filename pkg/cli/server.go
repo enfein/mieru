@@ -208,9 +208,7 @@ var serverRunFunc = func(s []string) error {
 		rpcAddr := appctl.ServerUDS
 		if err := syscall.Unlink(rpcAddr); err != nil {
 			// Unlink() fails when the file path doesn't exist, which is not a big problem.
-			if log.IsLevelEnabled(log.DebugLevel) {
-				log.Debugf("syscall.Unlink(%q) failed: %v", rpcAddr, err)
-			}
+			log.Debugf("syscall.Unlink(%q) failed: %v", rpcAddr, err)
 		}
 		rpcListener, err := net.Listen("unix", rpcAddr)
 		if err != nil {

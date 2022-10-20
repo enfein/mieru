@@ -100,7 +100,7 @@ In addition to this, mita can listen to several different ports. You can also cr
             "protocol": "TCP"
         },
         {
-            "port": 2022,
+            "port": 2027,
             "protocol": "TCP"
         }
     ],
@@ -110,8 +110,8 @@ In addition to this, mita can listen to several different ports. You can also cr
             "password": "shilishanlubuhuanjian"
         },
         {
-            "name": "dongtaiqingling",
-            "password": "touzhele"
+            "name": "ducaiguozei",
+            "password": "xijinping"
         }
     ],
     "loggingLevel": "INFO",

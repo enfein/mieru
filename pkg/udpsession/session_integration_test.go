@@ -26,7 +26,6 @@ import (
 
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
-	"github.com/enfein/mieru/pkg/kcp"
 	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/testtool"
 	"github.com/enfein/mieru/pkg/udpsession"
@@ -106,7 +105,6 @@ func runClient(t *testing.T, laddr, serverAddr string, username, password []byte
 // some data (in format [A-Za-z]+) to the listener. The listener returns the
 // ROT13 (rotate by 13 places) of the data back to the client.
 func TestKCPSessionsIPv4(t *testing.T) {
-	kcp.TestOnlySegmentDropRate = "5"
 	rng.InitSeed()
 	party, err := udpsession.ListenWithOptions("127.0.0.1:12315", users)
 	if err != nil {
@@ -152,7 +150,6 @@ func TestKCPSessionsIPv4(t *testing.T) {
 
 // TestKCPSessionsIPv6 is similar to TestKCPSessionsIPv4 but running in IPv6.
 func TestKCPSessionsIPv6(t *testing.T) {
-	kcp.TestOnlySegmentDropRate = "5"
 	rng.InitSeed()
 	party, err := udpsession.ListenWithOptions("[::1]:12318", users)
 	if err != nil {

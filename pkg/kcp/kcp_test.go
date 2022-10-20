@@ -59,9 +59,6 @@ func newKCPPipe(t *testing.T) (*net.UDPConn, *net.UDPConn, *kcp.KCP, *kcp.KCP) {
 // TestKCPSendRecv creates two KCP endpoints. One endpoint sends some data to
 // the other endpoint. Verify the received data is the same as the sent data.
 func TestKCPSendRecv(t *testing.T) {
-	// Introduce failure: 5% of packets will be dropped when input to KCP.
-	kcp.TestOnlySegmentDropRate = "5"
-
 	// KCP requires external mutex when calling methods.
 	var mu1, mu2 sync.Mutex
 

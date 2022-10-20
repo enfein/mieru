@@ -338,9 +338,7 @@ func LoadServerConfig() (*pb.ServerConfig, error) {
 		return nil, fmt.Errorf("checkServerConfigDir() failed: %w", err)
 	}
 
-	if log.IsLevelEnabled(log.DebugLevel) {
-		log.Debugf("loading server config from %q", fileName)
-	}
+	log.Debugf("loading server config from %q", fileName)
 	f, err := os.Open(fileName)
 	if err != nil && os.IsNotExist(err) {
 		return nil, stderror.ErrFileNotExist

@@ -121,9 +121,7 @@ func (s *TCPSession) Read(b []byte) (n int, err error) {
 			return n, io.EOF
 		}
 		atomic.AddUint64(&metrics.TCPReceiveErrors, 1)
-		if log.IsLevelEnabled(log.DebugLevel) {
-			log.Debugf("TCP session [%v - %v] Read error: %v", s.LocalAddr(), s.RemoteAddr(), err)
-		}
+		log.Debugf("TCP session [%v - %v] Read error: %v", s.LocalAddr(), s.RemoteAddr(), err)
 		if errType == stderror.CRYPTO_ERROR {
 			// This looks like an attack.
 			// Continue to read some data from the TCP connection before closing.
@@ -141,9 +139,7 @@ func (s *TCPSession) Write(b []byte) (n int, err error) {
 	n, err = s.writeInternal(b)
 	if err != nil {
 		atomic.AddUint64(&metrics.TCPSendErrors, 1)
-		if log.IsLevelEnabled(log.DebugLevel) {
-			log.Debugf("TCP session [%v - %v] Write error: %v", s.LocalAddr(), s.RemoteAddr(), err)
-		}
+		log.Debugf("TCP session [%v - %v] Write error: %v", s.LocalAddr(), s.RemoteAddr(), err)
 		return n, err
 	}
 	return n, nil
@@ -157,10 +153,6 @@ func (s *TCPSession) Close() error {
 }
 
 func (s *TCPSession) readInternal(b []byte) (n int, err error, errType stderror.ErrorType) {
-	if log.IsLevelEnabled(log.TraceLevel) {
-		log.Tracef("TCPSession received request to read maximum %d bytes", len(b))
-	}
-
 	// Read from recvBufPtr if possible.
 	if len(s.recvBufPtr) > 0 {
 		n = copy(b, s.recvBufPtr)
@@ -285,9 +277,6 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error, errType stderror.
 }
 
 func (s *TCPSession) writeInternal(b []byte) (n int, err error) {
-	if log.IsLevelEnabled(log.TraceLevel) {
-		log.Tracef("TCPSession received request to write %d bytes", len(b))
-	}
 	n = len(b)
 	if len(b) <= maxWriteChunkSize {
 		return s.writeChunk(b)
@@ -395,12 +384,10 @@ func (s *TCPSession) readAfterError() {
 	min += rng.FixedInt(256)
 
 	n, err := io.ReadAtLeast(s.Conn, buf, min)
-	if log.IsLevelEnabled(log.DebugLevel) {
-		if err != nil {
-			log.Debugf("TCP session [%v - %v] read after TCP error failed to complete: %v", s.LocalAddr(), s.RemoteAddr(), err)
-		} else {
-			log.Debugf("TCP session [%v - %v] read at least %d bytes after TCP error", s.LocalAddr(), s.RemoteAddr(), n)
-		}
+	if err != nil {
+		log.Debugf("TCP session [%v - %v] read after TCP error failed to complete: %v", s.LocalAddr(), s.RemoteAddr(), err)
+	} else {
+		log.Debugf("TCP session [%v - %v] read at least %d bytes after TCP error", s.LocalAddr(), s.RemoteAddr(), n)
 	}
 }
 
@@ -446,9 +433,7 @@ func (l *TCPSessionListener) WrapConn(conn net.Conn) net.Conn {
 		var password []byte
 		password, err = hex.DecodeString(user.GetHashedPassword())
 		if err != nil {
-			if log.IsLevelEnabled(log.DebugLevel) {
-				log.Debugf("unable to decode hashed password %q from user %q", user.GetHashedPassword(), user.GetName())
-			}
+			log.Debugf("unable to decode hashed password %q from user %q", user.GetHashedPassword(), user.GetName())
 			continue
 		}
 		if len(password) == 0 {
@@ -456,9 +441,7 @@ func (l *TCPSessionListener) WrapConn(conn net.Conn) net.Conn {
 		}
 		blocksFromUser, err := cipher.BlockCipherListFromPassword(password, false)
 		if err != nil {
-			if log.IsLevelEnabled(log.DebugLevel) {
-				log.Debugf("unable to create block cipher of user %q", user.GetName())
-			}
+			log.Debugf("unable to create block cipher of user %q", user.GetName())
 			continue
 		}
 		blocks = append(blocks, blocksFromUser...)
