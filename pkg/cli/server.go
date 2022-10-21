@@ -214,8 +214,10 @@ var serverRunFunc = func(s []string) error {
 		if err != nil {
 			log.Fatalf("listen on RPC address %q failed: %v", rpcAddr, err)
 		}
-		if err = updateServerUDSPermission(); err != nil {
-			log.Fatalf("update server unix domain socket permission failed: %v", err)
+		if _, found := os.LookupEnv("MITA_INSECURE_UDS"); !found {
+			if err = updateServerUDSPermission(); err != nil {
+				log.Fatalf("update server unix domain socket permission failed: %v", err)
+			}
 		}
 		grpcServer := grpc.NewServer()
 		appctl.SetServerRPCServerRef(grpcServer)
