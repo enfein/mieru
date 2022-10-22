@@ -18,8 +18,8 @@
 # Make sure this script has executable permission:
 # git update-index --chmod=+x <file>
 
-# Move to working dir and load test library.
-cd /test && source ./libtest.sh
+# Load test library.
+source ./libtest.sh
 
 # Update mieru server with TCP config.
 ./mita apply config server_tcp.json

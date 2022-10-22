@@ -1,7 +1,7 @@
 name: Presubmit and Postsubmit Tests
 on: [push, pull_request, workflow_dispatch]
 jobs:
-  build:
+  run-test:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
@@ -10,5 +10,9 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: 1.19.2
+      - name: Run go vet
+        run: make vet
       - name: Build libraries
-        run: make bin
+        run: make lib
+      - name: Run integration test
+        run: make run-container-test

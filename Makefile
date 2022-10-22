@@ -270,6 +270,13 @@ test-container:
 		rm mieru mita httpserver sockshttpclient socksudpclient udpserver;\
 	fi
 
+# Run docker integration tests.
+.PHONY: run-container-test
+run-container-test: test-container
+	if [ ! -z $$(command -v docker) ]; then\
+		docker run mieru_httptest:${SHORT_SHA};\
+	fi
+
 # Format source code.
 .PHONY: fmt
 fmt:

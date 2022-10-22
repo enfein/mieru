@@ -20,8 +20,8 @@
 
 set -e
 
-# Move to working dir and load test library.
-cd /test && source ./libtest.sh
+# Load test library.
+source ./libtest.sh
 
 # Start http server.
 ./httpserver &

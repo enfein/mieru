@@ -17,12 +17,12 @@
 
 function print_mieru_client_log() {
     echo "========== BEGIN OF MIERU CLIENT LOG =========="
-    cat /root/.cache/mieru/*.log
+    cat $HOME/.cache/mieru/*.log
     echo "==========  END OF MIERU CLIENT LOG  =========="
 }
 
 function delete_mieru_client_log() {
-    rm -rf /root/.cache/mieru/*.log
+    rm -rf $HOME/.cache/mieru/*.log
 }
 
 function print_mieru_server_thread_dump() {
