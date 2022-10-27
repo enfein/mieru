@@ -29,16 +29,17 @@ import (
 	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/tcpsession"
 	"github.com/enfein/mieru/pkg/testtool"
+	"google.golang.org/protobuf/proto"
 )
 
 var users = map[string]*appctlpb.User{
 	"baozi": {
-		Name:     "baozi",
-		Password: "shilishanlubuhuanjian",
+		Name:     proto.String("baozi"),
+		Password: proto.String("shilishanlubuhuanjian"),
 	},
 	"zongjiasushi": {
-		Name:     "zongjiasushi",
-		Password: "manlianpenfen",
+		Name:     proto.String("zongjiasushi"),
+		Password: proto.String("manlianpenfen"),
 	},
 }
 

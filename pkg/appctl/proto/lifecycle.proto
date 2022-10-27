@@ -39,7 +39,7 @@ enum AppStatus {
 }
 
 message AppStatusMsg {
-    AppStatus status = 1;
+    optional AppStatus status = 1;
 }
 
 service ClientLifecycleService {

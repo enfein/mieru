@@ -62,6 +62,7 @@ var (
 	KCPBytesReceived uint64 // KCP bytes delivered to upper level
 	KCPPaddingSent   uint64 // KCP bytes sent for padding purpose
 
+	// TCP bytes
 	TCPInBytes     uint64 // TCP bytes received
 	TCPOutBytes    uint64 // TCP bytes sent
 	TCPPaddingSent uint64 // TCP bytes sent for padding purpose

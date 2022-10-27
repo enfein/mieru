@@ -26,18 +26,18 @@ enum TransportProtocol {
 }
 
 message PortBinding {
-    int32 port = 1;
-    TransportProtocol protocol = 2;
+    optional int32 port = 1;
+    optional TransportProtocol protocol = 2;
 }
 
 message ServerEndpoint {
     // String representation of IP address.
     // It can be either IPv4 or IPv6.
-    string ipAddress = 1;
+    optional string ipAddress = 1;
 
     // Server's full qualified domain name.
     // When this is set, the `ipAddress` field is ignored.
-    string domainName = 2;
+    optional string domainName = 2;
 
     // Server's port-protocol bindings.
     repeated PortBinding portBindings = 3;

@@ -25,17 +25,17 @@ option go_package = "github.com/enfein/mieru/pkg/appctl/appctlpb";
 
 message ClientProfile {
     // Client profile name.
-    string profileName = 1;
+    optional string profileName = 1;
 
     // User information.
-    User user = 2;
+    optional User user = 2;
 
     // A list of servers to connect.
     repeated ServerEndpoint servers = 3;
 
     // Maximum transmission unit of L2 payload.
     // This setting only applies to UDP protocol.
-    int32 mtu = 4;
+    optional int32 mtu = 4;
 }
 
 message ClientAdvancedSettings {}
@@ -45,19 +45,19 @@ message ClientConfig {
     repeated ClientProfile profiles = 1;
 
     // The active profile name.
-    string activeProfile = 2;
+    optional string activeProfile = 2;
 
     // The management RPC port that client is listening in localhost.
-    int32 rpcPort = 3;
+    optional int32 rpcPort = 3;
 
     // The socks5 port that mieru is listening.
-    int32 socks5Port = 4;
+    optional int32 socks5Port = 4;
 
-    ClientAdvancedSettings advancedSettings = 5;
+    optional ClientAdvancedSettings advancedSettings = 5;
 
     // Client logging level.
-    LoggingLevel loggingLevel = 6;
+    optional LoggingLevel loggingLevel = 6;
 
     // If set, the socks5 port listens to LAN rather than localhost.
-    bool socks5ListenLAN = 7;
+    optional bool socks5ListenLAN = 7;
 }

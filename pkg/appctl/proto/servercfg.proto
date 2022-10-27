@@ -27,7 +27,7 @@ option go_package = "github.com/enfein/mieru/pkg/appctl/appctlpb";
 message ServerAdvancedSettings {
     // Allow using socks5 to access resources served in localhost.
     // This option should be set to false unless required due to testing purpose.
-    bool allowLocalDestination = 1;
+    optional bool allowLocalDestination = 1;
 }
 
 message ServerConfig {
@@ -37,14 +37,14 @@ message ServerConfig {
     // A list of registered users.
     repeated User users = 2;
 
-    ServerAdvancedSettings advancedSettings = 3;
+    optional ServerAdvancedSettings advancedSettings = 3;
 
     // Server logging level.
-    LoggingLevel loggingLevel = 4;
+    optional LoggingLevel loggingLevel = 4;
 
     // Maximum transmission unit of L2 payload.
     // This setting only applies to UDP protocol.
-    int32 mtu = 5;
+    optional int32 mtu = 5;
 }
 
 service ServerConfigService {

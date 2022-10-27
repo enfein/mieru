@@ -77,7 +77,7 @@ type serverLifecycleService struct {
 func (s *serverLifecycleService) GetStatus(ctx context.Context, req *pb.Empty) (*pb.AppStatusMsg, error) {
 	status := GetAppStatus()
 	log.Infof("return app status %s back to RPC caller", status.String())
-	return &pb.AppStatusMsg{Status: status}, nil
+	return &pb.AppStatusMsg{Status: &status}, nil
 }
 
 func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
@@ -199,7 +199,7 @@ func (s *serverLifecycleService) Exit(ctx context.Context, req *pb.Empty) (*pb.E
 }
 
 func (s *serverLifecycleService) GetThreadDump(ctx context.Context, req *pb.Empty) (*pb.ThreadDump, error) {
-	return &pb.ThreadDump{ThreadDump: string(getThreadDump())}, nil
+	return &pb.ThreadDump{ThreadDump: proto.String(string(getThreadDump()))}, nil
 }
 
 func (s *serverLifecycleService) StartCPUProfile(ctx context.Context, req *pb.ProfileSavePath) (*pb.Empty, error) {
@@ -550,19 +550,19 @@ func mergeServerConfig(dst, src *pb.ServerConfig) error {
 	}
 
 	var advancedSettings *pb.ServerAdvancedSettings
-	if src.GetAdvancedSettings() != nil {
+	if src.AdvancedSettings != nil {
 		advancedSettings = src.GetAdvancedSettings()
 	} else {
 		advancedSettings = dst.GetAdvancedSettings()
 	}
 	var loggingLevel pb.LoggingLevel
-	if src.GetLoggingLevel() != pb.LoggingLevel_DEFAULT {
+	if src.LoggingLevel != nil {
 		loggingLevel = src.GetLoggingLevel()
 	} else {
 		loggingLevel = dst.GetLoggingLevel()
 	}
 	var mtu int32
-	if src.GetMtu() != 0 {
+	if src.Mtu != nil {
 		mtu = src.GetMtu()
 	} else {
 		mtu = dst.GetMtu()
@@ -572,8 +572,8 @@ func mergeServerConfig(dst, src *pb.ServerConfig) error {
 	dst.PortBindings = mergedPortBindings
 	dst.Users = mergedUsers
 	dst.AdvancedSettings = advancedSettings
-	dst.LoggingLevel = loggingLevel
-	dst.Mtu = mtu
+	dst.LoggingLevel = &loggingLevel
+	dst.Mtu = proto.Int32(mtu)
 	return nil
 }
 

@@ -472,7 +472,7 @@ var clientGetHeapProfileFunc = func(s []string) error {
 	if err != nil {
 		return fmt.Errorf(stderror.CreateClientLifecycleRPCClientFailedErr, err)
 	}
-	if _, err := client.GetHeapProfile(timedctx, &appctlpb.ProfileSavePath{FilePath: s[3]}); err != nil {
+	if _, err := client.GetHeapProfile(timedctx, &appctlpb.ProfileSavePath{FilePath: proto.String(s[3])}); err != nil {
 		return fmt.Errorf(stderror.GetHeapProfileFailedErr, err)
 	}
 	log.Infof("heap profile is saved to %q", s[3])
@@ -491,7 +491,7 @@ var clientStartCPUProfileFunc = func(s []string) error {
 	if err != nil {
 		return fmt.Errorf(stderror.CreateClientLifecycleRPCClientFailedErr, err)
 	}
-	if _, err := client.StartCPUProfile(timedctx, &appctlpb.ProfileSavePath{FilePath: s[4]}); err != nil {
+	if _, err := client.StartCPUProfile(timedctx, &appctlpb.ProfileSavePath{FilePath: proto.String(s[4])}); err != nil {
 		return fmt.Errorf(stderror.StartCPUProfileFailedErr, err)
 	}
 	log.Infof("CPU profile will be saved to %q", s[4])

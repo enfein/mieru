@@ -7,7 +7,7 @@ StartLimitIntervalSec=60
 
 [Service]
 Type=exec
-Environment="MIERU_CONFIG_JSON_FILE=/root/client_config.json"
+Environment="MIERU_CONFIG_JSON_FILE=/etc/mieru_client_config.json"
 ExecStart=/usr/bin/mieru run
 Nice=-10
 Restart=on-failure

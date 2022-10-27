@@ -20,6 +20,7 @@ import (
 
 	pb "github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
+	"google.golang.org/protobuf/proto"
 )
 
 // UserListToMap convert a slice of User to a map of <name, User>.
@@ -27,7 +28,7 @@ func UserListToMap(users []*pb.User) map[string]*pb.User {
 	m := map[string]*pb.User{}
 	for i := 0; i < len(users); i++ {
 		u := users[i]
-		m[u.Name] = u
+		m[u.GetName()] = u
 	}
 	return m
 }
@@ -37,9 +38,9 @@ func HashUserPassword(user *pb.User, keepPlaintext bool) *pb.User {
 	if user == nil || user.GetPassword() == "" {
 		return user
 	}
-	user.HashedPassword = hex.EncodeToString(cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName())))
+	user.HashedPassword = proto.String(hex.EncodeToString(cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))))
 	if !keepPlaintext {
-		user.Password = ""
+		user.Password = proto.String("")
 	}
 	return user
 }

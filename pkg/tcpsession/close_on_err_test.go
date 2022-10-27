@@ -26,6 +26,7 @@ import (
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/testtool"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestCloseOnErr(t *testing.T) {
@@ -34,8 +35,8 @@ func TestCloseOnErr(t *testing.T) {
 	clientTCPAddr, _ := net.ResolveTCPAddr("tcp", clientAddr)
 	users := map[string]*appctlpb.User{
 		"erbaijin": {
-			Name:     "erbaijin",
-			Password: "buhuanjian",
+			Name:     proto.String("erbaijin"),
+			Password: proto.String("buhuanjian"),
 		},
 	}
 
@@ -128,8 +129,8 @@ func TestErrorMetrics(t *testing.T) {
 	clientTCPAddr, _ := net.ResolveTCPAddr("tcp", clientAddr)
 	users := map[string]*appctlpb.User{
 		"erbaijin": {
-			Name:     "erbaijin",
-			Password: "buhuanjian",
+			Name:     proto.String("erbaijin"),
+			Password: proto.String("buhuanjian"),
 		},
 	}
 

@@ -80,7 +80,7 @@ type clientLifecycleService struct {
 func (c *clientLifecycleService) GetStatus(ctx context.Context, req *pb.Empty) (*pb.AppStatusMsg, error) {
 	status := GetAppStatus()
 	log.Infof("return app status %s back to RPC caller", status.String())
-	return &pb.AppStatusMsg{Status: status}, nil
+	return &pb.AppStatusMsg{Status: &status}, nil
 }
 
 func (c *clientLifecycleService) Exit(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
@@ -107,7 +107,7 @@ func (c *clientLifecycleService) Exit(ctx context.Context, req *pb.Empty) (*pb.E
 }
 
 func (c *clientLifecycleService) GetThreadDump(ctx context.Context, req *pb.Empty) (*pb.ThreadDump, error) {
-	return &pb.ThreadDump{ThreadDump: string(getThreadDump())}, nil
+	return &pb.ThreadDump{ThreadDump: proto.String(string(getThreadDump()))}, nil
 }
 
 func (c *clientLifecycleService) StartCPUProfile(ctx context.Context, req *pb.ProfileSavePath) (*pb.Empty, error) {
@@ -481,37 +481,37 @@ func mergeClientConfigByProfile(dst, src *pb.ClientConfig) {
 	}
 
 	var activeProfile string = ""
-	if src.GetActiveProfile() != "" {
+	if src.ActiveProfile != nil {
 		activeProfile = src.GetActiveProfile()
 	} else {
 		activeProfile = dst.GetActiveProfile()
 	}
 	var rpcPort int32 = 0
-	if src.GetRpcPort() != 0 {
+	if src.RpcPort != nil {
 		rpcPort = src.GetRpcPort()
 	} else {
 		rpcPort = dst.GetRpcPort()
 	}
 	var sock5Port int32 = 0
-	if src.GetSocks5Port() != 0 {
+	if src.Socks5Port != nil {
 		sock5Port = src.GetSocks5Port()
 	} else {
 		sock5Port = dst.GetSocks5Port()
 	}
 	var advancedSettings *pb.ClientAdvancedSettings
-	if src.GetAdvancedSettings() != nil {
+	if src.AdvancedSettings != nil {
 		advancedSettings = src.GetAdvancedSettings()
 	} else {
 		advancedSettings = dst.GetAdvancedSettings()
 	}
 	var loggingLevel pb.LoggingLevel
-	if src.GetLoggingLevel() != pb.LoggingLevel_DEFAULT {
+	if src.LoggingLevel != nil {
 		loggingLevel = src.GetLoggingLevel()
 	} else {
 		loggingLevel = dst.GetLoggingLevel()
 	}
 	var socks5ListenLAN bool
-	if src.GetSocks5ListenLAN() {
+	if src.Socks5ListenLAN != nil {
 		socks5ListenLAN = src.GetSocks5ListenLAN()
 	} else {
 		socks5ListenLAN = dst.GetSocks5ListenLAN()
@@ -536,13 +536,13 @@ func mergeClientConfigByProfile(dst, src *pb.ClientConfig) {
 	}
 
 	proto.Reset(dst)
-	dst.ActiveProfile = activeProfile
+	dst.ActiveProfile = proto.String(activeProfile)
 	dst.Profiles = mergedProfiles
-	dst.RpcPort = rpcPort
-	dst.Socks5Port = sock5Port
+	dst.RpcPort = proto.Int32(rpcPort)
+	dst.Socks5Port = proto.Int32(sock5Port)
 	dst.AdvancedSettings = advancedSettings
-	dst.LoggingLevel = loggingLevel
-	dst.Socks5ListenLAN = socks5ListenLAN
+	dst.LoggingLevel = &loggingLevel
+	dst.Socks5ListenLAN = proto.Bool(socks5ListenLAN)
 }
 
 // deleteClientConfigFile deletes the client config file.

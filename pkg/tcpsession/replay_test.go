@@ -30,6 +30,7 @@ import (
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/recording"
 	"github.com/enfein/mieru/pkg/testtool"
+	"google.golang.org/protobuf/proto"
 )
 
 func runCloseWaitClient(t *testing.T, laddr, raddr string, username, password []byte, clientReq, serverResp *testtool.ReplayRecord) error {
@@ -138,8 +139,8 @@ func TestReplayClientRequestToServer(t *testing.T) {
 	attackTCPAddr, _ := net.ResolveTCPAddr("tcp", attackAddr)
 	users := map[string]*appctlpb.User{
 		"danchaofan": {
-			Name:     "danchaofan",
-			Password: "19501125",
+			Name:     proto.String("danchaofan"),
+			Password: proto.String("19501125"),
 		},
 	}
 
@@ -244,8 +245,8 @@ func TestReplayServerResponseToServer(t *testing.T) {
 	attackTCPAddr, _ := net.ResolveTCPAddr("tcp", attackAddr)
 	users := map[string]*appctlpb.User{
 		"danchaofan": {
-			Name:     "danchaofan",
-			Password: "19501125",
+			Name:     proto.String("danchaofan"),
+			Password: proto.String("19501125"),
 		},
 	}
 
