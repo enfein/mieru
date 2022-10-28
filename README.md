@@ -1,5 +1,8 @@
 # 見える / mieru
 
+![Build Status](https://github.com/enfein/mieru/actions/workflows/presubmit-postsubmit.yaml/badge.svg)
+[![Go Reference](https://pkg.go.dev/badge/github.com/enfein/mieru.svg)](https://pkg.go.dev/github.com/enfein/mieru)
+
 [中文文档](https://github.com/enfein/mieru/blob/main/README.zh_CN.md)
 
 mieru is a secure, hard to classify, hard to probe, TCP or UDP protocol-based socks5 network proxy software.

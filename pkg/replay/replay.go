@@ -20,8 +20,6 @@ import (
 	"encoding/binary"
 	"sync"
 	"time"
-
-	"github.com/enfein/mieru/pkg/log"
 )
 
 // ReplayCache stores the signature of recent decrypted packets to avoid
@@ -51,15 +49,14 @@ type ReplayCache struct {
 // NewCache creates a new replay cache.
 func NewCache(capacity int, expireInterval time.Duration) *ReplayCache {
 	if capacity < 0 {
-		log.Fatalf("replay cache capacity can't be negative")
+		panic("replay cache capacity can't be negative")
 	}
 	if expireInterval.Nanoseconds() <= 0 {
-		log.Fatalf("replay cache expire interval must be a positive time range")
+		panic("replay cache expire interval must be a positive time range")
 	}
 	var salt [8]byte
 	for {
 		if _, err := crand.Read(salt[:]); err != nil {
-			log.Warnf("rand.Read() failed: %v, retrying...", err)
 			time.Sleep(50 * time.Millisecond)
 		} else {
 			break

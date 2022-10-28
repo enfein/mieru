@@ -1,6 +1,6 @@
 # mieru Proxy Protocol
 
-In order to meet the needs of different scenarios, mieru provides two different proxy protocols, TCP and UDP. Using TCP protocol can sometimes be 2~5 times faster than UDP protocol. However, TCP protocol is more likely to be sniffed than UDP protocol.
+In order to meet the needs of different scenarios, mieru provides two different proxy protocols, TCP and UDP. TCP protocol might be faster than UDP protocol. However, TCP protocol is more likely to be sniffed than UDP protocol.
 
 The following is an explanation of the mieru proxy protocol.
 
