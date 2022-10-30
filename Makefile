@@ -18,6 +18,7 @@ SHORT_SHA=$(shell git rev-parse --short HEAD)
 PROJECT_NAME=$(shell basename "${ROOT}")
 
 # If this version is changed, also change the version in
+#
 # - build/package/mieru/amd64/debian/DEBIAN/control
 # - build/package/mieru/amd64/rpm/mieru.spec
 # - build/package/mieru/arm64/debian/DEBIAN/control
@@ -28,7 +29,9 @@ PROJECT_NAME=$(shell basename "${ROOT}")
 # - build/package/mita/arm64/rpm/mita.spec
 # - docs/server-install.md
 # - docs/server-install.zh_CN.md
-VERSION="1.8.0"
+#
+# Use `tools/bump_version.sh` script to change all those files at one shot.
+VERSION="1.8.1"
 
 # Build binaries and installation packages.
 .PHONY: build

@@ -19,6 +19,6 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: mieru release files without installation packages
+          name: mieru
           path: release/
           if-no-files-found: error
