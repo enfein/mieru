@@ -195,6 +195,9 @@ var clientStartFunc = func(s []string) error {
 	}
 
 	cmd := exec.Command(s[0], "run")
+	if errors.Is(cmd.Err, exec.ErrDot) {
+		cmd.Err = nil
+	}
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf(stderror.StartClientFailedErr, err)
 	}

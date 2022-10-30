@@ -1,8 +1,8 @@
 # Client Installation & Configuration
 
-## Download mieru installation package
+## Download mieru client
 
-The mieru client supports Windows, Mac OS, and Linux. Users can download it from the GitHub Releases page.
+The mieru client supports Windows, Mac OS, and Linux. Users can download it from the GitHub Releases page. After unzip, place the mieru executable under the system path `PATH`.
 
 If your client OS is Linux, you can also install mieru using the debian and RPM installers.
 

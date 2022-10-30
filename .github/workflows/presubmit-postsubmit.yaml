@@ -1,4 +1,4 @@
-name: Presubmit and Postsubmit Tests
+name: CI
 on: [push, pull_request, workflow_dispatch]
 jobs:
   run-test:
@@ -12,7 +12,13 @@ jobs:
           go-version: 1.19.2
       - name: Run go vet
         run: make vet
-      - name: Build libraries
-        run: make lib
+      - name: Build binaries
+        run: make bin
       - name: Run integration test
         run: make run-container-test
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: mieru release files without installation packages
+          path: release/
+          if-no-files-found: error

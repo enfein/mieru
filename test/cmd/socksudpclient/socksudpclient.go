@@ -72,8 +72,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("resolve destination UDP address failed: %v", err)
 	}
+	totalRequests := 0
 	for i := 0; i < *numConn; i++ {
 		CreateNewConnAndDoRequest(*numRequest, dstAddr)
+		totalRequests += *numRequest
+		log.Infof("Sent %d UDP requests to proxy address %s", totalRequests, dstAddr.String())
 	}
 }
 
@@ -86,7 +89,6 @@ func CreateNewConnAndDoRequest(nRequest int, dstAddr *net.UDPAddr) {
 	defer ctrlConn.Close()
 	defer udpConn.Close()
 
-	log.Infof("Start sending %d UDP requests to proxy address %s", nRequest, proxyAddr.String())
 	for i := 0; i < nRequest; i++ {
 		DoRequestWithExistingConn(udpConn, proxyAddr, dstAddr)
 		time.Sleep(time.Millisecond * time.Duration(*intervalMs))

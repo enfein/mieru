@@ -1,8 +1,8 @@
 # 客户端安装与配置
 
-## 下载 mieru 安装包
+## 下载 mieru 客户端
 
-mieru 客户端软件支持 Windows，Mac OS 和 Linux 系统。用户可以在 GitHub Releases 页面下载。
+mieru 客户端软件支持 Windows，Mac OS 和 Linux 系统。用户可以在 GitHub Releases 页面下载。解压缩后请将 mieru 可执行文件放置于系统路径 `PATH` 中。
 
 如果你的客户端操作系统是 Linux，也可以使用 debian 和 RPM 安装包安装 mieru。
 
