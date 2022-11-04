@@ -65,7 +65,7 @@ type Config struct {
 	ProxyConf []ProxyConfig
 }
 
-// Server is reponsible for accepting connections and handling
+// Server is responsible for accepting connections and handling
 // the details of the SOCKS5 protocol
 type Server struct {
 	config      *Config

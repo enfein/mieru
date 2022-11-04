@@ -1,18 +1,3 @@
-// Copyright (C) 2021  mieru authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 package log
 
 import (
@@ -21,15 +6,37 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	"github.com/sirupsen/logrus"
 )
+
+// Default key names for the default fields
+const (
+	defaultTimestampFormat = time.RFC3339
+	FieldKeyMsg            = "msg"
+	FieldKeyLevel          = "level"
+	FieldKeyTime           = "time"
+	FieldKeyFunc           = "func"
+	FieldKeyFile           = "file"
+)
+
+// The Formatter interface is used to implement a custom Formatter. It takes an
+// `Entry`. It exposes all the fields, including the default ones:
+//
+// * `entry.Data["msg"]`. The message passed from Info, Warn, Error ..
+// * `entry.Data["time"]`. The timestamp.
+// * `entry.Data["level"]. The level the entry was logged at.
+//
+// Any additional fields added with `WithField` or `WithFields` are also in
+// `entry.Data`. Format is expected to return an array of bytes which are then
+// logged to `logger.Out`.
+type Formatter interface {
+	Format(*Entry) ([]byte, error)
+}
 
 // CliFormatter is a log formatter that works best for command output.
 // It doesn't print time, level, or field data.
 type CliFormatter struct{}
 
-func (f *CliFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+func (f *CliFormatter) Format(entry *Entry) ([]byte, error) {
 	var buf *bytes.Buffer
 	if entry.Buffer != nil {
 		buf = entry.Buffer
@@ -43,10 +50,12 @@ func (f *CliFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 }
 
 // DaemonFormatter is the a log formatter that is suitable for daemon.
-type DaemonFormatter struct{}
+type DaemonFormatter struct {
+	NoTimestamp bool
+}
 
-func (f *DaemonFormatter) Format(entry *logrus.Entry) ([]byte, error) {
-	userData := make(logrus.Fields)
+func (f *DaemonFormatter) Format(entry *Entry) ([]byte, error) {
+	userData := make(Fields)
 	for k, v := range entry.Data {
 		userData[k] = v
 	}
@@ -58,14 +67,16 @@ func (f *DaemonFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	var fileInfo, funcInfo string
 
 	orderedKeys := make([]string, 0, 5+len(userData))
-	orderedKeys = append(orderedKeys, logrus.FieldKeyTime)
-	orderedKeys = append(orderedKeys, logrus.FieldKeyLevel)
-	orderedKeys = append(orderedKeys, logrus.FieldKeyMsg)
+	if !f.NoTimestamp {
+		orderedKeys = append(orderedKeys, FieldKeyTime)
+	}
+	orderedKeys = append(orderedKeys, FieldKeyLevel)
+	orderedKeys = append(orderedKeys, FieldKeyMsg)
 	if entry.HasCaller() {
 		fileInfo = fmt.Sprintf("%s:%d", entry.Caller.File, entry.Caller.Line)
 		funcInfo = entry.Caller.Function
-		orderedKeys = append(orderedKeys, logrus.FieldKeyFile)
-		orderedKeys = append(orderedKeys, logrus.FieldKeyFunc)
+		orderedKeys = append(orderedKeys, FieldKeyFile)
+		orderedKeys = append(orderedKeys, FieldKeyFunc)
 	}
 	sort.Strings(userKeys)
 	orderedKeys = append(orderedKeys, userKeys...)
@@ -80,15 +91,15 @@ func (f *DaemonFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	for _, key := range orderedKeys {
 		var value string
 		switch {
-		case key == logrus.FieldKeyTime:
+		case key == FieldKeyTime:
 			value = entry.Time.Format(time.RFC3339)
-		case key == logrus.FieldKeyLevel:
+		case key == FieldKeyLevel:
 			value = strings.ToUpper(entry.Level.String())
-		case key == logrus.FieldKeyMsg:
+		case key == FieldKeyMsg:
 			value = entry.Message
-		case key == logrus.FieldKeyFile && entry.HasCaller():
+		case key == FieldKeyFile && entry.HasCaller():
 			value = fileInfo
-		case key == logrus.FieldKeyFunc && entry.HasCaller():
+		case key == FieldKeyFunc && entry.HasCaller():
 			value = funcInfo
 		default:
 			value = fmt.Sprintf("%v=%v", key, userData[key])
@@ -107,6 +118,6 @@ func (f *DaemonFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 // NilFormatter prints no log. It disables logging.
 type NilFormatter struct{}
 
-func (f *NilFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+func (f *NilFormatter) Format(entry *Entry) ([]byte, error) {
 	return []byte{}, nil
 }

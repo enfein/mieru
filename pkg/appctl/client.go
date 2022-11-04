@@ -480,19 +480,19 @@ func mergeClientConfigByProfile(dst, src *pb.ClientConfig) {
 		srcMapping[profile.GetProfileName()] = profile
 	}
 
-	var activeProfile string = ""
+	var activeProfile string
 	if src.ActiveProfile != nil {
 		activeProfile = src.GetActiveProfile()
 	} else {
 		activeProfile = dst.GetActiveProfile()
 	}
-	var rpcPort int32 = 0
+	var rpcPort int32
 	if src.RpcPort != nil {
 		rpcPort = src.GetRpcPort()
 	} else {
 		rpcPort = dst.GetRpcPort()
 	}
-	var sock5Port int32 = 0
+	var sock5Port int32
 	if src.Socks5Port != nil {
 		sock5Port = src.GetSocks5Port()
 	} else {

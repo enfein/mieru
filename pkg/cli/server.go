@@ -198,7 +198,11 @@ var serverStartFunc = func(s []string) error {
 }
 
 var serverRunFunc = func(s []string) error {
-	log.SetFormatter(&log.DaemonFormatter{})
+	if _, found := os.LookupEnv("MITA_LOG_NO_TIMESTAMP"); found {
+		log.SetFormatter(&log.DaemonFormatter{NoTimestamp: true})
+	} else {
+		log.SetFormatter(&log.DaemonFormatter{})
+	}
 	appctl.SetAppStatus(appctlpb.AppStatus_IDLE)
 
 	var rpcTasks sync.WaitGroup

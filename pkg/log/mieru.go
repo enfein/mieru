@@ -23,8 +23,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/sirupsen/logrus"
 )
 
 // maxClientLogFiles is the maximum number of client log files stored in the disk.
@@ -42,73 +40,8 @@ var cachedClientLogDir string
 // init modifies the global logger instance with the desired output file (stdout)
 // and customized formatter.
 func init() {
-	logrus.SetOutput(os.Stdout)
-	logrus.SetFormatter(&CliFormatter{})
-}
-
-func Fatalf(format string, args ...interface{}) {
-	logrus.Fatalf(format, args...)
-}
-
-func Errorf(format string, args ...interface{}) {
-	logrus.Errorf(format, args...)
-}
-
-func Warnf(format string, args ...interface{}) {
-	logrus.Warnf(format, args...)
-}
-
-func Infof(format string, args ...interface{}) {
-	logrus.Infof(format, args...)
-}
-
-func Debugf(format string, args ...interface{}) {
-	logrus.Debugf(format, args...)
-}
-
-func Tracef(format string, args ...interface{}) {
-	logrus.Tracef(format, args...)
-}
-
-var DebugLevel = logrus.DebugLevel
-var TraceLevel = logrus.TraceLevel
-
-type Fields = logrus.Fields
-
-func WithFields(fields Fields) *logrus.Entry {
-	return logrus.WithFields(fields)
-}
-
-func IsLevelEnabled(level logrus.Level) bool {
-	return logrus.IsLevelEnabled(level)
-}
-
-func SetLevel(level string) {
-	level = strings.ToUpper(level)
-	switch level {
-	case "FATAL":
-		logrus.SetLevel(logrus.FatalLevel)
-	case "ERROR":
-		logrus.SetLevel(logrus.ErrorLevel)
-	case "WARN":
-		logrus.SetLevel(logrus.WarnLevel)
-	case "INFO":
-		logrus.SetLevel(logrus.InfoLevel)
-	case "DEBUG":
-		logrus.SetLevel(logrus.DebugLevel)
-	case "TRACE":
-		logrus.SetLevel(logrus.TraceLevel)
-	default:
-		logrus.Errorf("Unsupported logging level %s", level)
-	}
-}
-
-func SetOutput(out io.Writer) {
-	logrus.SetOutput(out)
-}
-
-func SetFormatter(formatter logrus.Formatter) {
-	logrus.SetFormatter(formatter)
+	SetOutput(os.Stdout)
+	SetFormatter(&CliFormatter{})
 }
 
 // NewClientLogFile returns a file handler for mieru client to write logs.

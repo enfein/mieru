@@ -3,7 +3,6 @@ module github.com/enfein/mieru
 go 1.19
 
 require (
-	github.com/sirupsen/logrus v1.9.0
 	golang.org/x/crypto v0.0.0-20221005025214-4161e89ecf1b
 	golang.org/x/mobile v0.0.0-20220928052126-fa6bcb076835
 	golang.org/x/net v0.0.0-20221004154528-8021a29435af

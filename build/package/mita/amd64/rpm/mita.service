@@ -7,6 +7,7 @@ StartLimitIntervalSec=60
 
 [Service]
 Type=exec
+Environment="MITA_LOG_NO_TIMESTAMP=true"
 ExecStart=/usr/bin/mita run
 Nice=-10
 Restart=on-failure
