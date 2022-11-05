@@ -6,6 +6,10 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v3
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
@@ -13,12 +17,16 @@ jobs:
       - name: Run go vet
         run: make vet
       - name: Build binaries
-        run: make bin
+        run: make build
       - name: Run integration test
         run: make run-container-test
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
           name: mieru
-          path: release/
+          path: |
+            release/*.deb
+            release/*.rpm
+            release/*.tar.gz
+            release/*.zip
           if-no-files-found: error
