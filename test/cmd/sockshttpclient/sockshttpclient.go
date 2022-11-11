@@ -98,7 +98,7 @@ func main() {
 	if *testCase == NewConnTest {
 		for i := 1; i <= *numRequest; i++ {
 			CreateNewConnAndDoRequest(i)
-			if i%10 == 0 {
+			if i%100 == 0 {
 				printNetworkSpeed(i)
 			}
 			time.Sleep(time.Millisecond * time.Duration(*intervalMs))
@@ -112,7 +112,7 @@ func main() {
 		conn = wrapConn(conn)
 		for i := 1; i <= *numRequest; i++ {
 			DoRequestWithExistingConn(conn, i)
-			if i%10 == 0 {
+			if i%100 == 0 {
 				printNetworkSpeed(i)
 			}
 			time.Sleep(time.Millisecond * time.Duration(*intervalMs))

@@ -222,7 +222,14 @@ var clientStartFunc = func(s []string) error {
 
 var clientRunFunc = func(s []string) error {
 	log.SetFormatter(&log.DaemonFormatter{})
+
+	// Disable server side metrics.
+	if serverDecryptionMetricGroup := metrics.GetMetricGroupByName(cipher.ServerDecryptionMetricGroupName); serverDecryptionMetricGroup != nil {
+		serverDecryptionMetricGroup.DisableLogging()
+	}
+
 	appctl.SetAppStatus(appctlpb.AppStatus_STARTING)
+
 	logFile, err := log.NewClientLogFile()
 	if err == nil {
 		log.SetOutput(logFile)

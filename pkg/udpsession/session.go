@@ -162,9 +162,9 @@ func newUDPSession(conv uint32, conn net.PacketConn, ownConn bool, remote net.Ad
 
 	if sess.IsClient() {
 		go sess.readLoop()
-		atomic.AddUint64(&metrics.ActiveOpens, 1)
+		metrics.ActiveOpens.Add(1)
 	} else {
-		atomic.AddUint64(&metrics.PassiveOpens, 1)
+		metrics.PassiveOpens.Add(1)
 	}
 
 	schedule.System.Put(sess.periodicSendTask, time.Now())
@@ -173,10 +173,10 @@ func newUDPSession(conv uint32, conn net.PacketConn, ownConn bool, remote net.Ad
 		schedule.System.Put(sess.periodicHeartbeatTask, time.Now())
 	}
 
-	currEst := atomic.AddUint64(&metrics.CurrEstablished, 1)
-	maxConn := atomic.LoadUint64(&metrics.MaxConn)
+	currEst := metrics.CurrEstablished.Add(1)
+	maxConn := metrics.MaxConn.Load()
 	if currEst > maxConn {
-		atomic.CompareAndSwapUint64(&metrics.MaxConn, maxConn, currEst)
+		metrics.MaxConn.Store(currEst)
 	}
 
 	return sess
@@ -357,7 +357,7 @@ func (s *UDPSession) Close() error {
 
 	if once {
 		log.Debugf("closing UDPSession [%v - %v]", s.LocalAddr(), s.RemoteAddr())
-		atomic.AddUint64(&metrics.CurrEstablished, ^uint64(0))
+		metrics.CurrEstablished.Add(-1)
 
 		s.mu.Lock()
 
@@ -580,10 +580,10 @@ func (s *UDPSession) packetInput(data []byte) {
 	var err error
 	if len(data) >= kcp.OuterHeaderSize {
 		data, err = s.block.Decrypt(data)
-		atomic.AddUint64(&metrics.ClientDirectDecrypt, 1)
+		cipher.ClientDirectDecrypt.Add(1)
 		if err != nil {
 			log.Debugf("UDPSession %v: failed to decrypt input with %d bytes", s.LocalAddr(), len(data))
-			atomic.AddUint64(&metrics.ClientFailedDirectDecrypt, 1)
+			cipher.ClientFailedDirectDecrypt.Add(1)
 			return
 		}
 		decrypted = true
@@ -919,11 +919,11 @@ func (l *Listener) packetInput(raw []byte, addr net.Addr) {
 			// If this session is known to listener, directly use the cipher block to decrypt.
 			block = s.block
 			data, err = s.block.Decrypt(raw)
-			atomic.AddUint64(&metrics.ServerDirectDecrypt, 1)
+			cipher.ServerDirectDecrypt.Add(1)
 			if err == nil {
 				decrypted = true
 			} else {
-				atomic.AddUint64(&metrics.ServerFailedDirectDecrypt, 1)
+				cipher.ServerFailedDirectDecrypt.Add(1)
 			}
 		}
 		if !decrypted {
@@ -948,7 +948,7 @@ func (l *Listener) packetInput(raw []byte, addr net.Addr) {
 	}
 
 	if !decrypted {
-		atomic.AddUint64(&metrics.ServerFailedIterateDecrypt, 1)
+		cipher.ServerFailedIterateDecrypt.Add(1)
 		return
 	}
 
@@ -964,7 +964,7 @@ func (l *Listener) packetInput(raw []byte, addr net.Addr) {
 			// For an already established session, we need to put every packet into the replay cache.
 			// Since AEAD is used, only the packet prefix is added to the replay cache.
 			if replayCache.IsDuplicate(raw[:kcp.OuterHeaderSize]) {
-				atomic.AddUint64(&metrics.ReplayKnownSession, 1)
+				replay.KnownSession.Add(1)
 			}
 			if conv == s.kcp.ConversationID() {
 				s.inputToKCP(data)
@@ -985,7 +985,7 @@ func (l *Listener) packetInput(raw []byte, addr net.Addr) {
 			if len(l.chAccepts) < cap(l.chAccepts) {
 				if replayCache.IsDuplicate(raw[:kcp.OuterHeaderSize]) && s == nil {
 					// Found a replay attack. Don't establish the connection.
-					atomic.AddUint64(&metrics.ReplayNewSession, 1)
+					replay.NewSession.Add(1)
 					log.Debugf("found possible replay attack from %v", addr)
 					return
 				}

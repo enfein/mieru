@@ -29,6 +29,7 @@ import (
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/recording"
+	"github.com/enfein/mieru/pkg/replay"
 	"github.com/enfein/mieru/pkg/testtool"
 	"google.golang.org/protobuf/proto"
 )
@@ -171,7 +172,7 @@ func TestReplayClientRequestToServer(t *testing.T) {
 		Finish: make(chan struct{}),
 	}
 
-	established := metrics.CurrEstablished
+	established := metrics.CurrEstablished.Load()
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -184,7 +185,7 @@ func TestReplayClientRequestToServer(t *testing.T) {
 
 	// Wait for server to accept the first client request.
 	for i := 0; i < 50; i++ {
-		if metrics.CurrEstablished > established {
+		if metrics.CurrEstablished.Load() > established {
 			break
 		} else {
 			time.Sleep(100 * time.Millisecond)
@@ -192,8 +193,8 @@ func TestReplayClientRequestToServer(t *testing.T) {
 	}
 
 	// Get the current replay counter.
-	replayCnt := metrics.ReplayNewSession
-	t.Logf("metrics.ReplayNewSession value before replay: %d", metrics.ReplayNewSession)
+	replayCnt := replay.NewSession.Load()
+	t.Logf("replay.NewSession value before replay: %d", replayCnt)
 
 	// Replay the client's request to the server.
 	replayConn, err := net.DialTCP("tcp", attackTCPAddr, serverTCPAddr)
@@ -206,16 +207,16 @@ func TestReplayClientRequestToServer(t *testing.T) {
 	// The replay counter should increase.
 	increased := false
 	for i := 0; i < 50; i++ {
-		if metrics.ReplayNewSession > replayCnt {
+		if replay.NewSession.Load() > replayCnt {
 			increased = true
 			break
 		} else {
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
-	t.Logf("metrics.ReplayNewSession value after replay: %d", metrics.ReplayNewSession)
+	t.Logf("replay.NewSession value after replay: %d", replay.NewSession.Load())
 	if !increased {
-		t.Errorf("metrics.ReplayNewSession value %d is not changed after replay client request", metrics.ReplayNewSession)
+		t.Errorf("replay.NewSession value %d is not changed after replay client request", replay.NewSession.Load())
 	}
 
 	// The attacker should not receive any data.
@@ -288,8 +289,8 @@ func TestReplayServerResponseToServer(t *testing.T) {
 	<-serverResp.Ready
 
 	// Get the current replay counter.
-	replayCnt := metrics.ReplayNewSession
-	t.Logf("metrics.ReplayNewSession value before replay: %d", metrics.ReplayNewSession)
+	replayCnt := replay.NewSession.Load()
+	t.Logf("replay.NewSession value before replay: %d", replayCnt)
 
 	// Replay the server's response back to the server.
 	replayConn, err := net.DialTCP("tcp", attackTCPAddr, serverTCPAddr)
@@ -302,16 +303,16 @@ func TestReplayServerResponseToServer(t *testing.T) {
 	// The replay counter should increase.
 	increased := false
 	for i := 0; i < 50; i++ {
-		if metrics.ReplayNewSession > replayCnt {
+		if replay.NewSession.Load() > replayCnt {
 			increased = true
 			break
 		} else {
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
-	t.Logf("metrics.ReplayNewSession value after replay: %d", metrics.ReplayNewSession)
+	t.Logf("replay.NewSession value after replay: %d", replay.NewSession.Load())
 	if !increased {
-		t.Errorf("metrics.ReplayNewSession value %d is not changed after replay client request", metrics.ReplayNewSession)
+		t.Errorf("replay.NewSession value %d is not changed after replay client request", replay.NewSession.Load())
 	}
 
 	// The attacker should not receive any data.

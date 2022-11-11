@@ -20,6 +20,16 @@ import (
 	"encoding/binary"
 	"sync"
 	"time"
+
+	"github.com/enfein/mieru/pkg/metrics"
+)
+
+var (
+	// Number of replay packets sent from a new session.
+	NewSession = metrics.RegisterMetric("replay", "NewSession")
+
+	// Number of replay packets sent from a known session.
+	KnownSession = metrics.RegisterMetric("replay", "KnownSession")
 )
 
 // ReplayCache stores the signature of recent decrypted packets to avoid

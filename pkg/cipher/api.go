@@ -18,12 +18,34 @@ package cipher
 import (
 	"crypto/sha256"
 	"fmt"
+
+	"github.com/enfein/mieru/pkg/metrics"
 )
 
 const (
 	DefaultNonceSize = 12 // 12 bytes
 	DefaultOverhead  = 16 // 16 bytes
 	DefaultKeyLen    = 32 // 256 bits
+
+	ClientDecryptionMetricGroupName = "client decryption"
+	ServerDecryptionMetricGroupName = "server decryption"
+)
+
+var (
+	// Number of decryption using the cipher block associated with the connection.
+	ClientDirectDecrypt = metrics.RegisterMetric(ClientDecryptionMetricGroupName, "DirectDecrypt")
+
+	// Number of decryption using the stored cipher block but failed.
+	ClientFailedDirectDecrypt = metrics.RegisterMetric(ClientDecryptionMetricGroupName, "FailedDirectDecrypt")
+
+	// Number of decryption using the cipher block associated with the connection.
+	ServerDirectDecrypt = metrics.RegisterMetric(ServerDecryptionMetricGroupName, "DirectDecrypt")
+
+	// Number of decryption using the stored cipher block but failed.
+	ServerFailedDirectDecrypt = metrics.RegisterMetric(ServerDecryptionMetricGroupName, "FailedDirectDecrypt")
+
+	// Number of decryption that failed after iterating all possible cipher blocks.
+	ServerFailedIterateDecrypt = metrics.RegisterMetric(ServerDecryptionMetricGroupName, "FailedIterateDecrypt")
 )
 
 // BlockCipher is an interface of block encryption and decryption.

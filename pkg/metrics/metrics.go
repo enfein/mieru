@@ -16,29 +16,24 @@
 package metrics
 
 import (
-	"fmt"
-	"sync"
-	"time"
-
 	"github.com/enfein/mieru/pkg/log"
 )
 
 var (
-	// connections
-	MaxConn         uint64 // max number of connections ever reached
-	ActiveOpens     uint64 // accumulated active open connections
-	PassiveOpens    uint64 // accumulated passive open connections
-	CurrEstablished uint64 // current number of established connections
+	// Max number of connections ever reached.
+	MaxConn *Metric = RegisterMetric("connections", "MaxConn")
 
-	// server decryption
-	ServerDirectDecrypt        uint64 // number of decryption using the cipher block associated with the connection
-	ServerFailedDirectDecrypt  uint64 // number of decryption using the stored cipher block but failed
-	ServerFailedIterateDecrypt uint64 // number of decryption that failed after iterating all possible cipher blocks
+	// Accumulated active open connections.
+	ActiveOpens *Metric = RegisterMetric("connections", "ActiveOpens")
 
-	// client decryption
-	ClientDirectDecrypt       uint64 // number of decryption using the cipher block associated with the connection
-	ClientFailedDirectDecrypt uint64 // number of decryption using the stored cipher block but failed
+	// Accumulated passive open connections.
+	PassiveOpens *Metric = RegisterMetric("connections", "PassiveOpens")
 
+	// Current number of established connections.
+	CurrEstablished *Metric = RegisterMetric("connections", "CurrEstablished")
+)
+
+var (
 	// UDP packets
 	InPkts  uint64 // incoming packets count
 	OutPkts uint64 // outgoing packets count
@@ -67,10 +62,6 @@ var (
 	TCPOutBytes    uint64 // TCP bytes sent
 	TCPPaddingSent uint64 // TCP bytes sent for padding purpose
 
-	// Replay protection
-	ReplayKnownSession uint64 // replay packets sent from a known session
-	ReplayNewSession   uint64 // replay packets sent from a new session
-
 	// Socks5 UDP association
 	UDPAssociateInBytes  uint64 // incoming UDP association bytes
 	UDPAssociateOutBytes uint64 // outgoing UDP association bytes
@@ -96,98 +87,6 @@ var (
 	Socks5ConnectionRefusedErrors  uint64 // Connection is refused
 	Socks5UDPAssociateErrors       uint64 // UDP associate errors
 )
-
-var ticker *time.Ticker
-var logDuration time.Duration
-var done chan struct{}
-var mutex sync.Mutex
-
-func init() {
-	logDuration = time.Minute
-	done = make(chan struct{})
-}
-
-// Enable metrics logging with the given time duration.
-func EnableLogging() {
-	mutex.Lock()
-	defer mutex.Unlock()
-	if ticker == nil {
-		ticker = time.NewTicker(logDuration)
-		go logMetrics()
-		log.Infof("enabled metrics logging with duration %v", logDuration)
-	}
-}
-
-// Disable metrics logging.
-func DisableLogging() {
-	mutex.Lock()
-	defer mutex.Unlock()
-	done <- struct{}{}
-	if ticker != nil {
-		ticker.Stop()
-		ticker = nil
-		log.Infof("disabled metrics logging")
-	}
-}
-
-// Set the metrics logging time duration.
-func SetLoggingDuration(duration time.Duration) error {
-	if duration.Seconds() <= 0 {
-		return fmt.Errorf("duration must be a positive number")
-	}
-	mutex.Lock()
-	defer mutex.Unlock()
-	logDuration = duration
-	return nil
-}
-
-func logMetrics() {
-	for {
-		select {
-		case <-ticker.C:
-			log.Infof("[metrics]")
-			LogConnections()
-			LogServerDecryption()
-			LogClientDecryption()
-			LogUDPPackets()
-			LogKCPSegments()
-			LogUDPBytes()
-			LogKCPBytes()
-			LogTCPBytes()
-			LogUDPAssociation()
-			LogReplay()
-			LogUDPErrors()
-			LogTCPErrors()
-			LogSocks5Errors()
-		case <-done:
-			return
-		}
-	}
-}
-
-func LogConnections() {
-	log.WithFields(log.Fields{
-		"MaxConn":         MaxConn,
-		"ActiveOpens":     ActiveOpens,
-		"PassiveOpens":    PassiveOpens,
-		"CurrEstablished": CurrEstablished,
-	}).Infof("[metrics - connections]")
-}
-
-func LogServerDecryption() {
-	log.WithFields(log.Fields{
-		"ServerDirectDecrypt":        ServerDirectDecrypt,
-		"ServerFailedDirectDecrypt":  ServerFailedDirectDecrypt,
-		"ServerFailedIterateDecrypt": ServerFailedIterateDecrypt,
-	}).Infof("[metrics - server decryption]")
-}
-
-func LogClientDecryption() {
-	log.WithFields(log.Fields{
-		"ClientDirectDecrypt":       ClientDirectDecrypt,
-		"ClientFailedDirectDecrypt": ClientFailedDirectDecrypt,
-	}).Infof("[metrics - client decryption]")
-}
 
 func LogUDPPackets() {
 	log.WithFields(log.Fields{
@@ -239,13 +138,6 @@ func LogUDPAssociation() {
 		"UDPAssociateInPkts":   UDPAssociateInPkts,
 		"UDPAssociateOutPkts":  UDPAssociateOutPkts,
 	}).Infof("[metrics - socks5 UDP association]")
-}
-
-func LogReplay() {
-	log.WithFields(log.Fields{
-		"ReplayKnownSession": ReplayKnownSession,
-		"ReplayNewSession":   ReplayNewSession,
-	}).Infof("[metrics - replay protection]")
 }
 
 func LogUDPErrors() {

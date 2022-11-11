@@ -29,6 +29,7 @@ import (
 
 	"github.com/enfein/mieru/pkg/appctl"
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
+	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/netutil"
@@ -203,6 +204,12 @@ var serverRunFunc = func(s []string) error {
 	} else {
 		log.SetFormatter(&log.DaemonFormatter{})
 	}
+
+	// Disable client side metrics.
+	if clientDecryptionMetricGroup := metrics.GetMetricGroupByName(cipher.ClientDecryptionMetricGroupName); clientDecryptionMetricGroup != nil {
+		clientDecryptionMetricGroup.DisableLogging()
+	}
+
 	appctl.SetAppStatus(appctlpb.AppStatus_IDLE)
 
 	var rpcTasks sync.WaitGroup

@@ -89,15 +89,15 @@ type TCPSession struct {
 func newTCPSession(conn net.Conn, isClient bool, blocks []cipher.BlockCipher) *TCPSession {
 	if isClient {
 		log.Debugf("creating new client TCP session [%v - %v]", conn.LocalAddr(), conn.RemoteAddr())
-		atomic.AddUint64(&metrics.ActiveOpens, 1)
+		metrics.ActiveOpens.Add(1)
 	} else {
 		log.Debugf("creating new server TCP session [%v - %v]", conn.LocalAddr(), conn.RemoteAddr())
-		atomic.AddUint64(&metrics.PassiveOpens, 1)
+		metrics.PassiveOpens.Add(1)
 	}
-	currEst := atomic.AddUint64(&metrics.CurrEstablished, 1)
-	maxConn := atomic.LoadUint64(&metrics.MaxConn)
+	currEst := metrics.CurrEstablished.Add(1)
+	maxConn := metrics.MaxConn.Load()
 	if currEst > maxConn {
-		atomic.CompareAndSwapUint64(&metrics.MaxConn, maxConn, currEst)
+		metrics.MaxConn.Store(currEst)
 	}
 	return &TCPSession{
 		Conn:             conn,
@@ -148,7 +148,7 @@ func (s *TCPSession) Write(b []byte) (n int, err error) {
 // Close overrides the Close() method in the net.Conn interface.
 func (s *TCPSession) Close() error {
 	log.Debugf("closing TCP session [%v - %v]", s.LocalAddr(), s.RemoteAddr())
-	atomic.AddUint64(&metrics.CurrEstablished, ^uint64(0))
+	metrics.CurrEstablished.Add(-1)
 	return s.Conn.Close()
 }
 
@@ -184,7 +184,7 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error, errType stderror.
 		var peerBlock cipher.BlockCipher
 		peerBlock, decryptedLen, err = cipher.SelectDecrypt(encryptedLen, cipher.CloneBlockCiphers(s.candidates))
 		if err != nil {
-			atomic.AddUint64(&metrics.ServerFailedIterateDecrypt, 1)
+			cipher.ServerFailedIterateDecrypt.Add(1)
 			return 0, fmt.Errorf("cipher.SelectDecrypt() failed: %w", err), stderror.CRYPTO_ERROR
 		}
 		s.recv = peerBlock.Clone()
@@ -192,25 +192,25 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error, errType stderror.
 	} else {
 		decryptedLen, err = s.recv.Decrypt(encryptedLen)
 		if s.isClient {
-			atomic.AddUint64(&metrics.ClientDirectDecrypt, 1)
+			cipher.ClientDirectDecrypt.Add(1)
 		} else {
-			atomic.AddUint64(&metrics.ServerDirectDecrypt, 1)
+			cipher.ServerDirectDecrypt.Add(1)
 		}
 		if err != nil {
 			if s.isClient {
-				atomic.AddUint64(&metrics.ClientFailedDirectDecrypt, 1)
+				cipher.ClientFailedDirectDecrypt.Add(1)
 			} else {
-				atomic.AddUint64(&metrics.ServerFailedDirectDecrypt, 1)
+				cipher.ServerFailedDirectDecrypt.Add(1)
 			}
 			return 0, fmt.Errorf("Decrypt() failed: %w", err), stderror.CRYPTO_ERROR
 		}
 	}
 	if !s.isClient && replayCache.IsDuplicate(encryptedLen[:cipher.DefaultOverhead]) {
 		if firstRead {
-			atomic.AddUint64(&metrics.ReplayNewSession, 1)
+			replay.NewSession.Add(1)
 			return 0, fmt.Errorf("found possible replay attack from %v", s.Conn.RemoteAddr()), stderror.REPLAY_ERROR
 		} else {
-			atomic.AddUint64(&metrics.ReplayKnownSession, 1)
+			replay.KnownSession.Add(1)
 		}
 	}
 	readLen = int(binary.LittleEndian.Uint16(decryptedLen))
@@ -230,20 +230,20 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error, errType stderror.
 	atomic.AddUint64(&metrics.TCPInBytes, uint64(readLen))
 	decryptedPayload, err := s.recv.Decrypt(encryptedPayload)
 	if s.isClient {
-		atomic.AddUint64(&metrics.ClientDirectDecrypt, 1)
+		cipher.ClientDirectDecrypt.Add(1)
 	} else {
-		atomic.AddUint64(&metrics.ServerDirectDecrypt, 1)
+		cipher.ServerDirectDecrypt.Add(1)
 	}
 	if err != nil {
 		if s.isClient {
-			atomic.AddUint64(&metrics.ClientFailedDirectDecrypt, 1)
+			cipher.ClientFailedDirectDecrypt.Add(1)
 		} else {
-			atomic.AddUint64(&metrics.ServerFailedDirectDecrypt, 1)
+			cipher.ServerFailedDirectDecrypt.Add(1)
 		}
 		return 0, fmt.Errorf("Decrypt() failed: %w", err), stderror.CRYPTO_ERROR
 	}
 	if !s.isClient && replayCache.IsDuplicate(encryptedPayload[:cipher.DefaultOverhead]) {
-		atomic.AddUint64(&metrics.ReplayKnownSession, 1)
+		replay.KnownSession.Add(1)
 	}
 
 	// Extract useful payload from decrypted payload.
