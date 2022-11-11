@@ -118,13 +118,12 @@ func (l MetricGroupList) Swap(i, j int) {
 // RegisterMetric registers a new metric.
 // The caller should not take the ownership of the returne pointer.
 func RegisterMetric(groupName string, metricName string) *Metric {
-	enableLogging := atomic.Bool{}
-	enableLogging.Store(true)
 	group, _ := metricMap.LoadOrStore(groupName, &MetricGroup{
-		name:          groupName,
-		enableLogging: enableLogging,
+		name: groupName,
 	})
-	metric, _ := group.(*MetricGroup).metrics.LoadOrStore(metricName, &Metric{name: metricName})
+	metricGroup := group.(*MetricGroup)
+	metricGroup.EnableLogging()
+	metric, _ := metricGroup.metrics.LoadOrStore(metricName, &Metric{name: metricName})
 	return metric.(*Metric)
 }
 
