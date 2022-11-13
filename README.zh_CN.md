@@ -2,6 +2,7 @@
 
 [![Build Status](https://github.com/enfein/mieru/actions/workflows/presubmit-postsubmit.yaml/badge.svg)](https://github.com/enfein/mieru/actions/workflows/presubmit-postsubmit.yaml)
 [![Releases](https://img.shields.io/github/release/enfein/mieru/all.svg?style=flat)](https://github.com/enfein/mieru/releases)
+[![Downloads](https://img.shields.io/github/downloads/enfein/mieru/total.svg?style=flat)](https://github.com/enfein/mieru/releases)
 [![LICENSE](https://img.shields.io/github/license/enfein/mieru.svg?style=flat)](https://github.com/enfein/mieru/blob/main/LICENSE)
 [![Go Reference](https://pkg.go.dev/badge/github.com/enfein/mieru.svg)](https://pkg.go.dev/github.com/enfein/mieru)
 [![Go Report Card](https://goreportcard.com/badge/github.com/enfein/mieru)](https://goreportcard.com/report/github.com/enfein/mieru)
