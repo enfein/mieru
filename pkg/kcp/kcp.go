@@ -3,7 +3,6 @@ package kcp
 import (
 	crand "crypto/rand"
 	"fmt"
-	"sync/atomic"
 	"time"
 
 	"github.com/enfein/mieru/pkg/cipher"
@@ -70,6 +69,41 @@ var (
 	maxPaddingSize = 256 + rng.FixedInt(256)
 )
 
+var (
+	// Number of KCP bytes sent for upper level.
+	BytesSent = metrics.RegisterMetric("KCP", "BytesSent")
+
+	// Number of KCP bytes received from lower level.
+	BytesReceived = metrics.RegisterMetric("KCP", "BytesReceived")
+
+	// KCP bytes sent as padding.
+	PaddingBytesSent = metrics.RegisterMetric("KCP", "PaddingBytesSent")
+
+	// Number of incoming segments.
+	InSegs = metrics.RegisterMetric("KCP", "InSegs")
+
+	// Number of outgoing segments.
+	OutSegs = metrics.RegisterMetric("KCP", "OutSegs")
+
+	// Number of repeated segments.
+	RepeatSegs = metrics.RegisterMetric("KCP", "RepeatSegs")
+
+	// Number of lost segments.
+	LostSegs = metrics.RegisterMetric("KCP", "LostSegs")
+
+	// Number of out of window segments.
+	OutOfWindowSegs = metrics.RegisterMetric("KCP", "OutOfWindowSegs")
+
+	// Number of fast retransmission segments.
+	FastRetransSegs = metrics.RegisterMetric("KCP", "FastRetransSegs")
+
+	// Number of early retransmission segments.
+	EarlyRetransSegs = metrics.RegisterMetric("KCP", "EarlyRetransSegs")
+
+	// Number of total retransmission segments.
+	RetransSegs = metrics.RegisterMetric("KCP", "RetransSegs")
+)
+
 func init() {
 	PktCachePool = slicepool.NewSlicePool(MaxBufSize)
 }
@@ -117,7 +151,7 @@ func (seg *segment) encode(ptr []byte) []byte {
 	ptr = encode32u(ptr, seg.una)
 	ptr = encode16u(ptr, uint16(len(seg.data)))
 	ptr = encode16u(ptr, uint16(len(seg.data))) // It will be adjusted when padding is added.
-	atomic.AddUint64(&metrics.OutSegs, 1)
+	OutSegs.Add(1)
 	return ptr
 }
 
@@ -244,7 +278,7 @@ func (kcp *KCP) Input(data []byte, ackNoDelay bool) error {
 	var ourReceiveWindowSizeChanged bool
 	var hasAck bool
 	var ackLatestTimestamp uint32
-	var inSegs uint64
+	var inSegs int64
 
 	// There can be multiple KCP segments in a single UDP packet.
 	for {
@@ -317,13 +351,13 @@ func (kcp *KCP) Input(data []byte, ackNoDelay bool) error {
 					seg.data = data[:dlen]                 // remove the padding
 					repeat := kcp.processReceivedData(seg) // if the segment is repeated
 					if repeat {
-						atomic.AddUint64(&metrics.RepeatSegs, 1)
+						RepeatSegs.Add(1)
 					}
 				} else {
-					atomic.AddUint64(&metrics.OutOfWindowSegs, 1)
+					OutOfWindowSegs.Add(1)
 				}
 			} else {
-				atomic.AddUint64(&metrics.OutOfWindowSegs, 1)
+				OutOfWindowSegs.Add(1)
 			}
 		} else if cmd == IKCP_CMD_WASK {
 			kcp.probe |= IKCP_ASK_TELL
@@ -338,7 +372,7 @@ func (kcp *KCP) Input(data []byte, ackNoDelay bool) error {
 		// Now read the next KCP segment.
 		data = data[tlen:]
 	}
-	atomic.AddUint64(&metrics.InSegs, inSegs)
+	InSegs.Add(inSegs)
 
 	// Update RTT with the latest timestamp in ACK packet.
 	if hasAck {
@@ -554,7 +588,7 @@ func (kcp *KCP) Output(ackOnly bool) uint32 {
 					segTotalLen += uint16(paddingSize)
 					encode16u(lastSegPtr[IKCP_TOTAL_LEN_OFFSET:], segTotalLen)
 					ptr = ptr[paddingSize:]
-					atomic.AddUint64(&metrics.KCPPaddingSent, uint64(paddingSize))
+					PaddingBytesSent.Add(int64(paddingSize))
 				}
 			}
 		}
@@ -681,7 +715,7 @@ func (kcp *KCP) Output(ackOnly bool) uint32 {
 
 	// check for retransmissions
 	current := currentMs()
-	var fastRetransSegs, earlyRetransSegs, lostSegs uint64
+	var fastRetransSegs, earlyRetransSegs, lostSegs int64
 
 	for k := range kcp.sendBuf {
 		segment := &kcp.sendBuf[k]
@@ -750,20 +784,21 @@ func (kcp *KCP) Output(ackOnly bool) uint32 {
 	flushBuffer()
 
 	// Update counters.
-	sum := lostSegs
+	var totalRetransSegs int64
 	if lostSegs > 0 {
-		atomic.AddUint64(&metrics.LostSegs, lostSegs)
+		LostSegs.Add(lostSegs)
+		totalRetransSegs += lostSegs
 	}
 	if fastRetransSegs > 0 {
-		atomic.AddUint64(&metrics.FastRetransSegs, fastRetransSegs)
-		sum += fastRetransSegs
+		FastRetransSegs.Add(fastRetransSegs)
+		totalRetransSegs += fastRetransSegs
 	}
 	if earlyRetransSegs > 0 {
-		atomic.AddUint64(&metrics.EarlyRetransSegs, earlyRetransSegs)
-		sum += earlyRetransSegs
+		EarlyRetransSegs.Add(earlyRetransSegs)
+		totalRetransSegs += earlyRetransSegs
 	}
-	if sum > 0 {
-		atomic.AddUint64(&metrics.RetransSegs, sum)
+	if totalRetransSegs > 0 {
+		RetransSegs.Add(totalRetransSegs)
 	}
 
 	// Update congestion window.

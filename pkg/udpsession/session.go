@@ -195,7 +195,7 @@ func (s *UDPSession) Read(b []byte) (n int, err error) {
 			n = copy(b, s.recvBufPtr)
 			s.recvBufPtr = s.recvBufPtr[n:]
 			s.mu.Unlock()
-			atomic.AddUint64(&metrics.KCPBytesReceived, uint64(n))
+			kcp.BytesReceived.Add(int64(n))
 			return n, nil
 		}
 
@@ -207,7 +207,7 @@ func (s *UDPSession) Read(b []byte) (n int, err error) {
 					atomic.AddUint64(&metrics.KCPReceiveErrors, 1)
 				}
 				s.mu.Unlock()
-				atomic.AddUint64(&metrics.KCPBytesReceived, uint64(size))
+				kcp.BytesReceived.Add(int64(size))
 				return size, nil
 			}
 
@@ -223,7 +223,7 @@ func (s *UDPSession) Read(b []byte) (n int, err error) {
 			n = copy(b, s.recvBuf)
 			s.recvBufPtr = s.recvBuf[n:]
 			s.mu.Unlock()
-			atomic.AddUint64(&metrics.KCPBytesReceived, uint64(n))
+			kcp.BytesReceived.Add(int64(n))
 			return n, nil
 		}
 
@@ -311,7 +311,7 @@ func (s *UDPSession) WriteBuffers(v [][]byte) (n int, err error) {
 				s.uncork()
 			}
 			s.mu.Unlock()
-			atomic.AddUint64(&metrics.KCPBytesSent, uint64(n))
+			kcp.BytesSent.Add(int64(n))
 			return n, nil
 		}
 
@@ -612,7 +612,6 @@ func (s *UDPSession) inputToKCP(data []byte) {
 	s.uncork()
 	s.mu.Unlock()
 
-	atomic.AddUint64(&metrics.InPkts, 1)
 	atomic.AddUint64(&metrics.UDPInBytes, uint64(len(data)))
 }
 
@@ -645,7 +644,6 @@ func (s *UDPSession) tx(txqueue []ipMessage) {
 			break
 		}
 	}
-	atomic.AddUint64(&metrics.OutPkts, uint64(npkts))
 	atomic.AddUint64(&metrics.UDPOutBytes, uint64(nbytes))
 }
 

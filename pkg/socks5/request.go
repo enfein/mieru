@@ -11,7 +11,6 @@ import (
 	"sync/atomic"
 
 	"github.com/enfein/mieru/pkg/log"
-	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/stderror"
 )
@@ -116,7 +115,7 @@ func (s *Server) handleRequest(req *Request, conn io.ReadWriteCloser) error {
 	if dest.FQDN != "" {
 		ctx_, addr, err := s.config.Resolver.Resolve(ctx, dest.FQDN)
 		if err != nil {
-			atomic.AddUint64(&metrics.Socks5DNSResolveErrors, 1)
+			DNSResolveErrors.Add(1)
 			if err := sendReply(conn, hostUnreachable, nil); err != nil {
 				return fmt.Errorf("failed to send reply: %w", err)
 			}
@@ -140,7 +139,7 @@ func (s *Server) handleRequest(req *Request, conn io.ReadWriteCloser) error {
 	case AssociateCommand:
 		return s.handleAssociate(ctx, conn, req)
 	default:
-		atomic.AddUint64(&metrics.Socks5UnsupportedCommandErrors, 1)
+		UnsupportedCommandErrors.Add(1)
 		if err := sendReply(conn, commandNotSupported, nil); err != nil {
 			return fmt.Errorf("failed to send reply: %w", err)
 		}
@@ -157,13 +156,13 @@ func (s *Server) handleConnect(ctx context.Context, conn io.ReadWriteCloser, req
 		var resp uint8
 		if strings.Contains(msg, "refused") {
 			resp = connectionRefused
-			atomic.AddUint64(&metrics.Socks5ConnectionRefusedErrors, 1)
+			ConnectionRefusedErrors.Add(1)
 		} else if strings.Contains(msg, "network is unreachable") {
 			resp = networkUnreachable
-			atomic.AddUint64(&metrics.Socks5NetworkUnreachableErrors, 1)
+			NetworkUnreachableErrors.Add(1)
 		} else {
 			resp = hostUnreachable
-			atomic.AddUint64(&metrics.Socks5HostUnreachableErrors, 1)
+			HostUnreachableErrors.Add(1)
 		}
 		if err := sendReply(conn, resp, nil); err != nil {
 			return fmt.Errorf("failed to send reply: %w", err)
@@ -176,7 +175,7 @@ func (s *Server) handleConnect(ctx context.Context, conn io.ReadWriteCloser, req
 	local := target.LocalAddr().(*net.TCPAddr)
 	bind := AddrSpec{IP: local.IP, Port: local.Port}
 	if err := sendReply(conn, successReply, &bind); err != nil {
-		atomic.AddUint64(&metrics.Socks5HandshakeErrors, 1)
+		HandshakeErrors.Add(1)
 		return fmt.Errorf("failed to send reply: %w", err)
 	}
 
@@ -185,9 +184,9 @@ func (s *Server) handleConnect(ctx context.Context, conn io.ReadWriteCloser, req
 
 // handleBind is used to handle a bind command.
 func (s *Server) handleBind(ctx context.Context, conn io.ReadWriteCloser, req *Request) error {
-	atomic.AddUint64(&metrics.Socks5UnsupportedCommandErrors, 1)
+	UnsupportedCommandErrors.Add(1)
 	if err := sendReply(conn, commandNotSupported, nil); err != nil {
-		atomic.AddUint64(&metrics.Socks5HandshakeErrors, 1)
+		HandshakeErrors.Add(1)
 		return fmt.Errorf("failed to send reply: %w", err)
 	}
 	return nil
@@ -199,12 +198,12 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 	// All the requests associated to this connection will go through this port.
 	udpListenerAddr, err := net.ResolveUDPAddr("udp", netutil.MaybeDecorateIPv6(netutil.AllIPAddr())+":0")
 	if err != nil {
-		atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
+		UDPAssociateErrors.Add(1)
 		return fmt.Errorf("failed to resolve UDP address: %w", err)
 	}
 	udpConn, err := net.ListenUDP("udp", udpListenerAddr)
 	if err != nil {
-		atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
+		UDPAssociateErrors.Add(1)
 		return fmt.Errorf("failed to listen UDP: %w", err)
 	}
 
@@ -214,17 +213,17 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 	// it is OK to use an IPv4 bind address even though the UDP listener is IPv6.
 	_, udpPortStr, err := net.SplitHostPort(udpConn.LocalAddr().String())
 	if err != nil {
-		atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
+		UDPAssociateErrors.Add(1)
 		return fmt.Errorf("net.SplitHostPort() failed: %w", err)
 	}
 	udpPort, err := strconv.Atoi(udpPortStr)
 	if err != nil {
-		atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
+		UDPAssociateErrors.Add(1)
 		return fmt.Errorf("strconv.Atoi() failed: %w", err)
 	}
 	bind := AddrSpec{IP: net.IP{0, 0, 0, 0}, Port: udpPort}
 	if err := sendReply(conn, successReply, &bind); err != nil {
-		atomic.AddUint64(&metrics.Socks5HandshakeErrors, 1)
+		HandshakeErrors.Add(1)
 		return fmt.Errorf("failed to send reply: %w", err)
 	}
 
@@ -254,29 +253,29 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 			// Validate received UDP request.
 			if n <= 6 {
 				udpErr.Store(stderror.ErrNoEnoughData)
-				atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
+				UDPAssociateErrors.Add(1)
 				return
 			}
 			if buf[0] != 0x00 || buf[1] != 0x00 {
 				udpErr.Store(stderror.ErrInvalidArgument)
-				atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
+				UDPAssociateErrors.Add(1)
 				return
 			}
 			if buf[2] != 0x00 {
 				// UDP fragment is not supported.
 				udpErr.Store(stderror.ErrUnsupported)
-				atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
+				UDPAssociateErrors.Add(1)
 				return
 			}
 			addrType := buf[3]
 			if addrType != 0x01 && addrType != 0x03 && addrType != 0x04 {
 				udpErr.Store(stderror.ErrInvalidArgument)
-				atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
+				UDPAssociateErrors.Add(1)
 				return
 			}
 			if (addrType == 0x01 && n <= 10) || (addrType == 0x03 && n <= int(buf[4])+6) || (addrType == 0x04 && n <= 22) {
 				udpErr.Store(stderror.ErrNoEnoughData)
-				atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
+				UDPAssociateErrors.Add(1)
 				return
 			}
 
@@ -291,10 +290,10 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 				ws, err := udpConn.WriteToUDP(buf[10:n], dstAddr)
 				if err != nil {
 					log.Debugf("UDP associate [%v - %v] WriteToUDP() failed: %v", udpConn.LocalAddr(), dstAddr, err)
-					atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
+					UDPAssociateErrors.Add(1)
 				} else {
-					atomic.AddUint64(&metrics.UDPAssociateInPkts, 1)
-					atomic.AddUint64(&metrics.UDPAssociateInBytes, uint64(ws))
+					UDPAssociateOutPkts.Add(1)
+					UDPAssociateOutBytes.Add(int64(ws))
 				}
 			case 0x03:
 				fqdnLen := buf[4]
@@ -302,17 +301,17 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 				dstAddr, err := net.ResolveUDPAddr("udp", fqdn+":"+strconv.Itoa(int(buf[5+fqdnLen])<<8+int(buf[6+fqdnLen])))
 				if err != nil {
 					log.Debugf("UDP associate %v ResolveUDPAddr() failed: %v", udpConn.LocalAddr(), err)
-					atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
+					UDPAssociateErrors.Add(1)
 					break
 				}
 				addrMap.Store(dstAddr.String(), buf[:7+fqdnLen])
 				ws, err := udpConn.WriteToUDP(buf[7+fqdnLen:n], dstAddr)
 				if err != nil {
 					log.Debugf("UDP associate [%v - %v] WriteToUDP() failed: %v", udpConn.LocalAddr(), dstAddr, err)
-					atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
+					UDPAssociateErrors.Add(1)
 				} else {
-					atomic.AddUint64(&metrics.UDPAssociateInPkts, 1)
-					atomic.AddUint64(&metrics.UDPAssociateInBytes, uint64(ws))
+					UDPAssociateOutPkts.Add(1)
+					UDPAssociateOutBytes.Add(int64(ws))
 				}
 			case 0x04:
 				dstAddr := &net.UDPAddr{
@@ -323,10 +322,10 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 				ws, err := udpConn.WriteToUDP(buf[22:n], dstAddr)
 				if err != nil {
 					log.Debugf("UDP associate [%v - %v] WriteToUDP() failed: %v", udpConn.LocalAddr(), dstAddr, err)
-					atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
+					UDPAssociateErrors.Add(1)
 				} else {
-					atomic.AddUint64(&metrics.UDPAssociateInPkts, 1)
-					atomic.AddUint64(&metrics.UDPAssociateInBytes, uint64(ws))
+					UDPAssociateOutPkts.Add(1)
+					UDPAssociateOutBytes.Add(int64(ws))
 				}
 			}
 		}
@@ -343,7 +342,7 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 			n, addr, err = udpConn.ReadFromUDP(buf)
 			if err != nil {
 				// This is typically due to close of UDP listener.
-				// Don't contribute to metrics.Socks5UDPAssociateErrors.
+				// Don't contribute to UDPAssociateErrors.
 				log.Debugf("UDP associate %v Read() failed: %v", udpConn.LocalAddr(), err)
 				if udpErr.Load() == nil {
 					udpErr.Store(err)
@@ -353,7 +352,7 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 			v, ok := addrMap.Load(addr.String())
 			if !ok {
 				log.Debugf("UDP associate %v received packet from unknown remote %v, packet is discarded", udpConn.LocalAddr(), addr)
-				atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
+				UDPAssociateErrors.Add(1)
 				continue
 			}
 			header := v.([]byte)
@@ -365,8 +364,8 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 				}
 				return
 			}
-			atomic.AddUint64(&metrics.UDPAssociateOutPkts, 1)
-			atomic.AddUint64(&metrics.UDPAssociateOutBytes, uint64(n))
+			UDPAssociateInPkts.Add(1)
+			UDPAssociateInBytes.Add(int64(n))
 		}
 	}()
 

@@ -7,7 +7,6 @@ import (
 	"net"
 	"testing"
 
-	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/testtool"
 )
 
@@ -102,7 +101,7 @@ func TestRequestUnsupportedCommand(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		errCnt := metrics.Socks5UnsupportedCommandErrors
+		errCnt := UnsupportedCommandErrors.Load()
 
 		// Create the connect request.
 		clientConn, serverConn := testtool.BufPipe()
@@ -123,8 +122,8 @@ func TestRequestUnsupportedCommand(t *testing.T) {
 		if !bytes.Equal(out, tc.resp) {
 			t.Errorf("got %v, want %v", out, tc.resp)
 		}
-		if metrics.Socks5UnsupportedCommandErrors <= errCnt {
-			t.Errorf("metrics.Socks5UnsupportedCommandErrors value is not changed")
+		if UnsupportedCommandErrors.Load() <= errCnt {
+			t.Errorf("UnsupportedCommandErrors value is not changed")
 		}
 	}
 }

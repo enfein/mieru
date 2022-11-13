@@ -34,39 +34,14 @@ var (
 )
 
 var (
-	// UDP packets
-	InPkts  uint64 // incoming packets count
-	OutPkts uint64 // outgoing packets count
-
-	// KCP segments
-	InSegs           uint64 // incoming KCP segments
-	OutSegs          uint64 // outgoing KCP segments
-	RepeatSegs       uint64 // repeated KCP segments
-	LostSegs         uint64 // lost KCP segments
-	OutOfWindowSegs  uint64 // KCP segments that have sequence number out of receiving window
-	FastRetransSegs  uint64 // fast retransmission KCP segments
-	EarlyRetransSegs uint64 // early retransmission KCP segments
-	RetransSegs      uint64 // retransmission KCP segments
-
 	// UDP bytes
 	UDPInBytes  uint64 // UDP bytes received
 	UDPOutBytes uint64 // UDP bytes sent
-
-	// KCP bytes
-	KCPBytesSent     uint64 // KCP bytes sent from upper level
-	KCPBytesReceived uint64 // KCP bytes delivered to upper level
-	KCPPaddingSent   uint64 // KCP bytes sent for padding purpose
 
 	// TCP bytes
 	TCPInBytes     uint64 // TCP bytes received
 	TCPOutBytes    uint64 // TCP bytes sent
 	TCPPaddingSent uint64 // TCP bytes sent for padding purpose
-
-	// Socks5 UDP association
-	UDPAssociateInBytes  uint64 // incoming UDP association bytes
-	UDPAssociateOutBytes uint64 // outgoing UDP association bytes
-	UDPAssociateInPkts   uint64 // incoming UDP association packets count
-	UDPAssociateOutPkts  uint64 // outgoing UDP association packets count
 
 	// UDP Errors
 	UDPInErrors      uint64 // UDP read errors reported from net.PacketConn
@@ -77,36 +52,7 @@ var (
 	// TCP Errors
 	TCPSendErrors    uint64 // TCP send errors
 	TCPReceiveErrors uint64 // TCP receive errors
-
-	// Socks5 Errors
-	Socks5HandshakeErrors          uint64 // Socks5 handshake errors
-	Socks5DNSResolveErrors         uint64 // Socks5 can't resolve DNS address
-	Socks5UnsupportedCommandErrors uint64 // Socks5 command is not supported
-	Socks5NetworkUnreachableErrors uint64 // Destination network is unreachable
-	Socks5HostUnreachableErrors    uint64 // Destination Host is unreachable
-	Socks5ConnectionRefusedErrors  uint64 // Connection is refused
-	Socks5UDPAssociateErrors       uint64 // UDP associate errors
 )
-
-func LogUDPPackets() {
-	log.WithFields(log.Fields{
-		"InPkts":  InPkts,
-		"OutPkts": OutPkts,
-	}).Infof("[metrics - UDP packets]")
-}
-
-func LogKCPSegments() {
-	log.WithFields(log.Fields{
-		"InSegs":           InSegs,
-		"OutSegs":          OutSegs,
-		"RepeatSegs":       RepeatSegs,
-		"LostSegs":         LostSegs,
-		"OutOfWindowSegs":  OutOfWindowSegs,
-		"FastRetransSegs":  FastRetransSegs,
-		"EarlyRetransSegs": EarlyRetransSegs,
-		"RetransSegs":      RetransSegs,
-	}).Infof("[metrics - KCP segments]")
-}
 
 func LogUDPBytes() {
 	log.WithFields(log.Fields{
@@ -115,29 +61,12 @@ func LogUDPBytes() {
 	}).Infof("[metrics - UDP bytes]")
 }
 
-func LogKCPBytes() {
-	log.WithFields(log.Fields{
-		"BytesSent":     KCPBytesSent,
-		"BytesReceived": KCPBytesReceived,
-		"PaddingSent":   KCPPaddingSent,
-	}).Infof("[metrics - KCP bytes]")
-}
-
 func LogTCPBytes() {
 	log.WithFields(log.Fields{
 		"InBytes":     TCPInBytes,
 		"OutBytes":    TCPOutBytes,
 		"PaddingSent": TCPPaddingSent,
 	}).Infof("[metrics - TCP bytes]")
-}
-
-func LogUDPAssociation() {
-	log.WithFields(log.Fields{
-		"UDPAssociateInBytes":  UDPAssociateInBytes,
-		"UDPAssociateOutBytes": UDPAssociateOutBytes,
-		"UDPAssociateInPkts":   UDPAssociateInPkts,
-		"UDPAssociateOutPkts":  UDPAssociateOutPkts,
-	}).Infof("[metrics - socks5 UDP association]")
 }
 
 func LogUDPErrors() {
@@ -154,16 +83,4 @@ func LogTCPErrors() {
 		"TCPSendErrors":    TCPSendErrors,
 		"TCPReceiveErrors": TCPReceiveErrors,
 	}).Infof("[metrics - TCP errors]")
-}
-
-func LogSocks5Errors() {
-	log.WithFields(log.Fields{
-		"HandshakeErrors":    Socks5HandshakeErrors,
-		"DNSResolveErrors":   Socks5DNSResolveErrors,
-		"UnsupportedCommand": Socks5UnsupportedCommandErrors,
-		"NetworkUnreachable": Socks5NetworkUnreachableErrors,
-		"HostUnreachable":    Socks5HostUnreachableErrors,
-		"ConnectionRefused":  Socks5ConnectionRefusedErrors,
-		"UDPAssociateErrors": Socks5UDPAssociateErrors,
-	}).Infof("[metrics - socks5 errors]")
 }

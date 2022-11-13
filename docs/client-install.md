@@ -70,8 +70,8 @@ An example of the above setting is as follows.
         {
             "profileName": "default",
             "user": {
-                "name": "baozi",
-                "password": "shilishanlubuhuanjian"
+                "name": "ducaiguozei",
+                "password": "xijinping"
             },
             "servers": [
                 {

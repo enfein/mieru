@@ -70,8 +70,8 @@ mieru apply config <FILE>
         {
             "profileName": "default",
             "user": {
-                "name": "baozi",
-                "password": "shilishanlubuhuanjian"
+                "name": "ducaiguozei",
+                "password": "xijinping"
             },
             "servers": [
                 {

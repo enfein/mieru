@@ -22,7 +22,6 @@ import (
 	"sync/atomic"
 
 	"github.com/enfein/mieru/pkg/log"
-	"github.com/enfein/mieru/pkg/metrics"
 )
 
 type closeWriter interface {
@@ -81,14 +80,14 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *UDPAssociateTunnelConn) error
 				errCh <- fmt.Errorf("ReadFrom UDP connection failed: %v", err)
 				break
 			}
-			atomic.AddUint64(&metrics.UDPAssociateInPkts, 1)
-			atomic.AddUint64(&metrics.UDPAssociateInBytes, uint64(n))
+			UDPAssociateOutPkts.Add(1)
+			UDPAssociateOutBytes.Add(int64(n))
 			udpAddr := addr.Load()
 			if udpAddr == nil {
 				addr.Store(a)
 			} else if udpAddr.(net.Addr).String() != a.String() {
 				errCh <- fmt.Errorf("ReadFrom new UDP endpoint %s, first use is %s", a.String(), udpAddr.(net.Addr).String())
-				atomic.AddUint64(&metrics.Socks5UDPAssociateErrors, 1)
+				UDPAssociateErrors.Add(1)
 				break
 			}
 			if _, err = tunnelConn.Write(buf[:n]); err != nil {
@@ -115,8 +114,8 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *UDPAssociateTunnelConn) error
 				errCh <- fmt.Errorf("WriteTo UDP connetion failed: %v", err)
 				break
 			}
-			atomic.AddUint64(&metrics.UDPAssociateOutPkts, 1)
-			atomic.AddUint64(&metrics.UDPAssociateOutBytes, uint64(ws))
+			UDPAssociateInPkts.Add(1)
+			UDPAssociateInBytes.Add(int64(ws))
 		}
 	}()
 

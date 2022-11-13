@@ -8,8 +8,6 @@ import (
 	"strconv"
 	"testing"
 	"time"
-
-	"github.com/enfein/mieru/pkg/metrics"
 )
 
 func TestSocks5Connect(t *testing.T) {
@@ -111,8 +109,8 @@ func TestSocks5Connect(t *testing.T) {
 }
 
 func TestSocks5UDPAssociation(t *testing.T) {
-	udpInPktsCnt := metrics.UDPAssociateInPkts
-	udpOutPktsCnt := metrics.UDPAssociateOutPkts
+	udpInPktsCnt := UDPAssociateInPkts.Load()
+	udpOutPktsCnt := UDPAssociateOutPkts.Load()
 
 	// Create a local listener as the destination target.
 	udpListenerAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
@@ -239,11 +237,11 @@ func TestSocks5UDPAssociation(t *testing.T) {
 	}
 
 	// Verify metrics are updated.
-	if metrics.UDPAssociateInPkts <= udpInPktsCnt {
-		t.Errorf("metrics.UDPAssociateInPkts value %d is not increased", metrics.UDPAssociateInPkts)
+	if UDPAssociateInPkts.Load() <= udpInPktsCnt {
+		t.Errorf("UDPAssociateInPkts value %d is not increased", UDPAssociateInPkts.Load())
 	}
-	if metrics.UDPAssociateOutPkts <= udpOutPktsCnt {
-		t.Errorf("metrics.UDPAssociateOutPkts value %d is not increased", metrics.UDPAssociateOutPkts)
+	if UDPAssociateOutPkts.Load() <= udpOutPktsCnt {
+		t.Errorf("UDPAssociateOutPkts value %d is not increased", UDPAssociateOutPkts.Load())
 	}
 }
 
