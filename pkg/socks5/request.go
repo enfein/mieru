@@ -292,8 +292,8 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 					log.Debugf("UDP associate [%v - %v] WriteToUDP() failed: %v", udpConn.LocalAddr(), dstAddr, err)
 					UDPAssociateErrors.Add(1)
 				} else {
-					UDPAssociateOutPkts.Add(1)
-					UDPAssociateOutBytes.Add(int64(ws))
+					UDPAssociateInPkts.Add(1)
+					UDPAssociateInBytes.Add(int64(ws))
 				}
 			case 0x03:
 				fqdnLen := buf[4]
@@ -310,8 +310,8 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 					log.Debugf("UDP associate [%v - %v] WriteToUDP() failed: %v", udpConn.LocalAddr(), dstAddr, err)
 					UDPAssociateErrors.Add(1)
 				} else {
-					UDPAssociateOutPkts.Add(1)
-					UDPAssociateOutBytes.Add(int64(ws))
+					UDPAssociateInPkts.Add(1)
+					UDPAssociateInBytes.Add(int64(ws))
 				}
 			case 0x04:
 				dstAddr := &net.UDPAddr{
@@ -324,8 +324,8 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 					log.Debugf("UDP associate [%v - %v] WriteToUDP() failed: %v", udpConn.LocalAddr(), dstAddr, err)
 					UDPAssociateErrors.Add(1)
 				} else {
-					UDPAssociateOutPkts.Add(1)
-					UDPAssociateOutBytes.Add(int64(ws))
+					UDPAssociateInPkts.Add(1)
+					UDPAssociateInBytes.Add(int64(ws))
 				}
 			}
 		}
@@ -364,8 +364,8 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 				}
 				return
 			}
-			UDPAssociateInPkts.Add(1)
-			UDPAssociateInBytes.Add(int64(n))
+			UDPAssociateOutPkts.Add(1)
+			UDPAssociateOutBytes.Add(int64(n))
 		}
 	}()
 

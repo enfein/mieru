@@ -80,8 +80,8 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *UDPAssociateTunnelConn) error
 				errCh <- fmt.Errorf("ReadFrom UDP connection failed: %v", err)
 				break
 			}
-			UDPAssociateOutPkts.Add(1)
-			UDPAssociateOutBytes.Add(int64(n))
+			UDPAssociateInPkts.Add(1)
+			UDPAssociateInBytes.Add(int64(n))
 			udpAddr := addr.Load()
 			if udpAddr == nil {
 				addr.Store(a)
@@ -114,8 +114,8 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *UDPAssociateTunnelConn) error
 				errCh <- fmt.Errorf("WriteTo UDP connetion failed: %v", err)
 				break
 			}
-			UDPAssociateInPkts.Add(1)
-			UDPAssociateInBytes.Add(int64(ws))
+			UDPAssociateOutPkts.Add(1)
+			UDPAssociateOutBytes.Add(int64(ws))
 		}
 	}()
 
