@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
-	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/testtool"
 	"google.golang.org/protobuf/proto"
@@ -72,8 +71,8 @@ func TestCloseOnErr(t *testing.T) {
 	defer conn.Close()
 
 	// Get the current TCP error counter.
-	errCnt := metrics.TCPReceiveErrors
-	t.Logf("metrics.TCPReceiveErrors value before client write: %d", metrics.TCPReceiveErrors)
+	errCnt := TCPReceiveErrors.Load()
+	t.Logf("TCPReceiveErrors value before client write: %d", TCPReceiveErrors.Load())
 
 	// Send a very small message. This shouldn't trigger TCP read error in server.
 	data := testtool.TestHelperGenRot13Input(12)
@@ -81,9 +80,9 @@ func TestCloseOnErr(t *testing.T) {
 		t.Fatalf("Write() failed: %v", err)
 	}
 	time.Sleep(1 * time.Second)
-	t.Logf("metrics.TCPReceiveErrors value after 1 client write: %d", metrics.TCPReceiveErrors)
-	if metrics.TCPReceiveErrors > errCnt {
-		t.Errorf("metrics.TCPReceiveErrors value unexpectly increased")
+	t.Logf("TCPReceiveErrors value after 1 client write: %d", TCPReceiveErrors.Load())
+	if TCPReceiveErrors.Load() > errCnt {
+		t.Errorf("TCPReceiveErrors value unexpectly increased")
 	}
 
 	// Send a second small message. Combined with the first message it is larger than decryption unit.
@@ -93,9 +92,9 @@ func TestCloseOnErr(t *testing.T) {
 		t.Fatalf("Write() failed: %v", err)
 	}
 	time.Sleep(1 * time.Second)
-	t.Logf("metrics.TCPReceiveErrors value after 2 client writes: %d", metrics.TCPReceiveErrors)
-	if metrics.TCPReceiveErrors <= errCnt {
-		t.Errorf("metrics.TCPReceiveErrors value is not increased")
+	t.Logf("TCPReceiveErrors value after 2 client writes: %d", TCPReceiveErrors.Load())
+	if TCPReceiveErrors.Load() <= errCnt {
+		t.Errorf("TCPReceiveErrors value is not increased")
 	}
 
 	// Send a larger message for server to drain after error.
@@ -104,7 +103,7 @@ func TestCloseOnErr(t *testing.T) {
 		t.Fatalf("Write() failed: %v", err)
 	}
 	time.Sleep(1 * time.Second)
-	errCnt = metrics.TCPReceiveErrors
+	errCnt = TCPReceiveErrors.Load()
 
 	// Verify the connection has been closed by server.
 	data = testtool.TestHelperGenRot13Input(256)
@@ -113,10 +112,10 @@ func TestCloseOnErr(t *testing.T) {
 		t.Fatalf("unexpected successful Write()")
 	}
 	time.Sleep(1 * time.Second)
-	t.Logf("metrics.TCPReceiveErrors value after 4 client writes: %d", metrics.TCPReceiveErrors)
-	if metrics.TCPReceiveErrors > errCnt {
+	t.Logf("TCPReceiveErrors value after 4 client writes: %d", TCPReceiveErrors.Load())
+	if TCPReceiveErrors.Load() > errCnt {
 		// The number of error should not increase because the conn is already closed by server.
-		t.Errorf("metrics.TCPReceiveErrors value is increased unexpectly")
+		t.Errorf("TCPReceiveErrors value is increased unexpectly")
 	}
 
 	server.Close()
@@ -166,8 +165,8 @@ func TestErrorMetrics(t *testing.T) {
 	defer conn.Close()
 
 	// Get the current TCP error counter.
-	errCnt := metrics.TCPReceiveErrors
-	t.Logf("metrics.TCPReceiveErrors value before client write: %d", metrics.TCPReceiveErrors)
+	errCnt := TCPReceiveErrors.Load()
+	t.Logf("TCPReceiveErrors value before client write: %d", TCPReceiveErrors.Load())
 
 	for i := 0; i < 50; i++ {
 		sleepMillis := 50 + mrand.Intn(50)
@@ -183,9 +182,9 @@ func TestErrorMetrics(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// The TCP error counter should increase.
-	t.Logf("metrics.TCPReceiveErrors value after client writes: %d", metrics.TCPReceiveErrors)
-	if metrics.TCPReceiveErrors < errCnt+1 {
-		t.Errorf("got %d TCPReceiveErrors, want at least %d", metrics.TCPReceiveErrors, errCnt+1)
+	t.Logf("TCPReceiveErrors value after client writes: %d", TCPReceiveErrors.Load())
+	if TCPReceiveErrors.Load() < errCnt+1 {
+		t.Errorf("got %d TCPReceiveErrors, want at least %d", TCPReceiveErrors.Load(), errCnt+1)
 	}
 
 	server.Close()

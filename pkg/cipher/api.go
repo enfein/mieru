@@ -27,8 +27,8 @@ const (
 	DefaultOverhead  = 16 // 16 bytes
 	DefaultKeyLen    = 32 // 256 bits
 
-	ClientDecryptionMetricGroupName = "client decryption"
-	ServerDecryptionMetricGroupName = "server decryption"
+	ClientDecryptionMetricGroupName = "cipher - client"
+	ServerDecryptionMetricGroupName = "cipher - server"
 )
 
 var (

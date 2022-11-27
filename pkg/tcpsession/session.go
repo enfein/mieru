@@ -25,7 +25,6 @@ import (
 	"io"
 	"net"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
@@ -63,6 +62,14 @@ var (
 
 	// maxPaddingSize is the maximum size of padding added to a single TCP payload.
 	maxPaddingSize = 256 + rng.FixedInt(256)
+)
+
+var (
+	// Number of TCP receive errors.
+	TCPReceiveErrors = metrics.RegisterMetric("errors", "TCPReceiveErrors")
+
+	// Number of TCP send errors.
+	TCPSendErrors = metrics.RegisterMetric("errors", "TCPSendErrors")
 )
 
 // TCPSession defines a TCP session.
@@ -120,7 +127,7 @@ func (s *TCPSession) Read(b []byte) (n int, err error) {
 			// EOF must be reported back to caller as is.
 			return n, io.EOF
 		}
-		atomic.AddUint64(&metrics.TCPReceiveErrors, 1)
+		TCPReceiveErrors.Add(1)
 		log.Debugf("TCP session [%v - %v] Read error: %v", s.LocalAddr(), s.RemoteAddr(), err)
 		if errType == stderror.CRYPTO_ERROR {
 			// This looks like an attack.
@@ -138,7 +145,7 @@ func (s *TCPSession) Write(b []byte) (n int, err error) {
 	defer s.sendMutex.Unlock()
 	n, err = s.writeInternal(b)
 	if err != nil {
-		atomic.AddUint64(&metrics.TCPSendErrors, 1)
+		TCPSendErrors.Add(1)
 		log.Debugf("TCP session [%v - %v] Write error: %v", s.LocalAddr(), s.RemoteAddr(), err)
 		return n, err
 	}
@@ -173,7 +180,7 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error, errType stderror.
 	if s.recordingEnabled {
 		s.recordedPackets.Append(encryptedLen, recording.Ingress)
 	}
-	atomic.AddUint64(&metrics.TCPInBytes, uint64(readLen))
+	metrics.InBytes.Add(int64(readLen))
 	var decryptedLen []byte
 	firstRead := false
 	if s.recv == nil && s.isClient {
@@ -227,7 +234,7 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error, errType stderror.
 	if s.recordingEnabled {
 		s.recordedPackets.Append(encryptedPayload, recording.Ingress)
 	}
-	atomic.AddUint64(&metrics.TCPInBytes, uint64(readLen))
+	metrics.InBytes.Add(int64(readLen))
 	decryptedPayload, err := s.recv.Decrypt(encryptedPayload)
 	if s.isClient {
 		cipher.ClientDirectDecrypt.Add(1)
@@ -357,8 +364,8 @@ func (s *TCPSession) writeChunk(b []byte) (n int, err error) {
 		s.recordedPackets.Append(encryptedLen, recording.Egress)
 		s.recordedPackets.Append(encryptedPayload, recording.Egress)
 	}
-	atomic.AddUint64(&metrics.TCPOutBytes, uint64(len(dataToSend)))
-	atomic.AddUint64(&metrics.TCPPaddingSent, uint64(paddingSize))
+	metrics.OutBytes.Add(int64(len(dataToSend)))
+	metrics.OutPaddingBytes.Add(int64(paddingSize))
 	if log.IsLevelEnabled(log.TraceLevel) {
 		log.Tracef("TCPSession wrote %d bytes to the network", len(dataToSend))
 	}

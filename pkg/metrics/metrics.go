@@ -15,72 +15,25 @@
 
 package metrics
 
-import (
-	"github.com/enfein/mieru/pkg/log"
-)
-
 var (
 	// Max number of connections ever reached.
-	MaxConn *Metric = RegisterMetric("connections", "MaxConn")
+	MaxConn = RegisterMetric("connections", "MaxConn")
 
 	// Accumulated active open connections.
-	ActiveOpens *Metric = RegisterMetric("connections", "ActiveOpens")
+	ActiveOpens = RegisterMetric("connections", "ActiveOpens")
 
 	// Accumulated passive open connections.
-	PassiveOpens *Metric = RegisterMetric("connections", "PassiveOpens")
+	PassiveOpens = RegisterMetric("connections", "PassiveOpens")
 
 	// Current number of established connections.
-	CurrEstablished *Metric = RegisterMetric("connections", "CurrEstablished")
+	CurrEstablished = RegisterMetric("connections", "CurrEstablished")
+
+	// Number of bytes receive from proxy connections.
+	InBytes = RegisterMetric("traffic", "InBytes")
+
+	// Number of bytes send to proxy connections.
+	OutBytes = RegisterMetric("traffic", "OutBytes")
+
+	// Number of padding bytes send to proxy connections.
+	OutPaddingBytes = RegisterMetric("traffic", "OutPaddingBytes")
 )
-
-var (
-	// UDP bytes
-	UDPInBytes  uint64 // UDP bytes received
-	UDPOutBytes uint64 // UDP bytes sent
-
-	// TCP bytes
-	TCPInBytes     uint64 // TCP bytes received
-	TCPOutBytes    uint64 // TCP bytes sent
-	TCPPaddingSent uint64 // TCP bytes sent for padding purpose
-
-	// UDP Errors
-	UDPInErrors      uint64 // UDP read errors reported from net.PacketConn
-	KCPInErrors      uint64 // packet input errors reported from KCP
-	KCPSendErrors    uint64 // packet send errors reported from KCP
-	KCPReceiveErrors uint64 // packet receive errors reported from KCP
-
-	// TCP Errors
-	TCPSendErrors    uint64 // TCP send errors
-	TCPReceiveErrors uint64 // TCP receive errors
-)
-
-func LogUDPBytes() {
-	log.WithFields(log.Fields{
-		"InBytes":  UDPInBytes,
-		"OutBytes": UDPOutBytes,
-	}).Infof("[metrics - UDP bytes]")
-}
-
-func LogTCPBytes() {
-	log.WithFields(log.Fields{
-		"InBytes":     TCPInBytes,
-		"OutBytes":    TCPOutBytes,
-		"PaddingSent": TCPPaddingSent,
-	}).Infof("[metrics - TCP bytes]")
-}
-
-func LogUDPErrors() {
-	log.WithFields(log.Fields{
-		"UDPInErrors":      UDPInErrors,
-		"KCPInErrors":      KCPInErrors,
-		"KCPSendErrors":    KCPSendErrors,
-		"KCPReceiveErrors": KCPReceiveErrors,
-	}).Infof("[metrics - UDP errors]")
-}
-
-func LogTCPErrors() {
-	log.WithFields(log.Fields{
-		"TCPSendErrors":    TCPSendErrors,
-		"TCPReceiveErrors": TCPReceiveErrors,
-	}).Infof("[metrics - TCP errors]")
-}

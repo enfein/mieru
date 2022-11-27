@@ -26,7 +26,6 @@ import (
 
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
-	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/recording"
 	"github.com/enfein/mieru/pkg/replay"
 	"github.com/enfein/mieru/pkg/testtool"
@@ -182,8 +181,8 @@ func TestReplayServerResponseToClient(t *testing.T) {
 	<-serverResp.Ready
 
 	// Get the current UDP error counter.
-	errCnt := metrics.UDPInErrors
-	t.Logf("metrics.UDPInErrors value before replay: %d", metrics.UDPInErrors)
+	errCnt := UDPInErrors.Load()
+	t.Logf("UDPInErrors value before replay: %d", UDPInErrors.Load())
 
 	// Replay the server's response to the client.
 	replayConn, err := net.ListenUDP("udp", attackUDPAddr)
@@ -196,16 +195,16 @@ func TestReplayServerResponseToClient(t *testing.T) {
 	// The UDP error counter should increase.
 	increased := false
 	for i := 0; i < 50; i++ {
-		if metrics.UDPInErrors > errCnt {
+		if UDPInErrors.Load() > errCnt {
 			increased = true
 			break
 		} else {
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
-	t.Logf("metrics.UDPInErrors value after replay: %d", metrics.UDPInErrors)
+	t.Logf("UDPInErrors value after replay: %d", UDPInErrors.Load())
 	if !increased {
-		t.Errorf("metrics.UDPInErrors value %d is not changed after replay server response", metrics.UDPInErrors)
+		t.Errorf("UDPInErrors value %d is not changed after replay server response", UDPInErrors.Load())
 	}
 
 	close(serverResp.Finish)

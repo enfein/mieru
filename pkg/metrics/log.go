@@ -85,10 +85,6 @@ func logMetrics() {
 			for _, group := range list {
 				log.WithFields(group.NewLogFields()).Infof(group.NewLogMsg())
 			}
-			LogUDPBytes()
-			LogTCPBytes()
-			LogUDPErrors()
-			LogTCPErrors()
 		case <-done:
 			return
 		}

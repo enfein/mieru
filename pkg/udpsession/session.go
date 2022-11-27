@@ -59,6 +59,20 @@ var (
 	globalMTU int32 = defaultMTU
 )
 
+var (
+	// Number of KCP packet input errors.
+	KCPInErrors = metrics.RegisterMetric("errors", "KCPInErrors")
+
+	// Number of KCP packet receive errors.
+	KCPReceiveErrors = metrics.RegisterMetric("errors", "KCPReceiveErrors")
+
+	// Number of KCP packet send errors.
+	KCPSendErrors = metrics.RegisterMetric("errors", "KCPSendErrors")
+
+	// Number of UDP read errors.
+	UDPInErrors = metrics.RegisterMetric("errors", "UDPInErrors")
+)
+
 type (
 	// UDPSession defines a KCP session implemented by UDP.
 	UDPSession struct {
@@ -204,7 +218,7 @@ func (s *UDPSession) Read(b []byte) (n int, err error) {
 			// When b is large enough, receive data into b directly.
 			if len(b) >= size {
 				if _, err = s.kcp.Recv(b); err != nil {
-					atomic.AddUint64(&metrics.KCPReceiveErrors, 1)
+					KCPReceiveErrors.Add(1)
 				}
 				s.mu.Unlock()
 				kcp.BytesReceived.Add(int64(size))
@@ -218,7 +232,7 @@ func (s *UDPSession) Read(b []byte) (n int, err error) {
 			}
 			s.recvBuf = s.recvBuf[:size]
 			if _, err = s.kcp.Recv(s.recvBuf); err != nil {
-				atomic.AddUint64(&metrics.KCPReceiveErrors, 1)
+				KCPReceiveErrors.Add(1)
 			}
 			n = copy(b, s.recvBuf)
 			s.recvBufPtr = s.recvBuf[n:]
@@ -293,12 +307,12 @@ func (s *UDPSession) WriteBuffers(v [][]byte) (n int, err error) {
 				for {
 					if len(b) <= int(s.kcp.MSS()) {
 						if err := s.kcp.Send(b); err != nil {
-							atomic.AddUint64(&metrics.KCPSendErrors, 1)
+							KCPSendErrors.Add(1)
 						}
 						break
 					} else {
 						if err := s.kcp.Send(b[:s.kcp.MSS()]); err != nil {
-							atomic.AddUint64(&metrics.KCPSendErrors, 1)
+							KCPSendErrors.Add(1)
 						}
 						b = b[s.kcp.MSS():]
 					}
@@ -556,7 +570,7 @@ func (s *UDPSession) readLoop() {
 				// Set source address from the first read.
 				src = addr.String()
 			} else if addr.String() != src {
-				atomic.AddUint64(&metrics.UDPInErrors, 1)
+				UDPInErrors.Add(1)
 				continue
 			}
 			s.packetInput(buf[:n])
@@ -599,7 +613,7 @@ func (s *UDPSession) inputToKCP(data []byte) {
 	s.mu.Lock()
 	if ret := s.kcp.Input(data, s.ackNoDelay); ret != nil {
 		log.Debugf("UDPSession %v: KCP input rejected with err %v", s.LocalAddr(), ret)
-		atomic.AddUint64(&metrics.KCPInErrors, 1)
+		KCPInErrors.Add(1)
 	}
 	s.updateIdleDeadline(s.kcp.LastInputTime())
 	if n := s.kcp.PeekSize(); n >= 0 {
@@ -612,7 +626,7 @@ func (s *UDPSession) inputToKCP(data []byte) {
 	s.uncork()
 	s.mu.Unlock()
 
-	atomic.AddUint64(&metrics.UDPInBytes, uint64(len(data)))
+	metrics.InBytes.Add(int64(len(data)))
 }
 
 // uncork sends data to txqueue (if there is any).
@@ -644,7 +658,7 @@ func (s *UDPSession) tx(txqueue []ipMessage) {
 			break
 		}
 	}
-	atomic.AddUint64(&metrics.UDPOutBytes, uint64(nbytes))
+	metrics.OutBytes.Add(int64(nbytes))
 }
 
 // Post-processing for sending a packet from kcp core, including

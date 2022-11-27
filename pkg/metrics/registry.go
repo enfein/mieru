@@ -17,6 +17,7 @@ package metrics
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -105,7 +106,8 @@ func (l MetricGroupList) Len() int {
 
 // Less implements sort.Interface.
 func (l MetricGroupList) Less(i, j int) bool {
-	return l[i].name < l[j].name
+	// Compare without case.
+	return strings.ToLower(l[i].name) < strings.ToLower(l[j].name)
 }
 
 // Swap implements sort.Interface.

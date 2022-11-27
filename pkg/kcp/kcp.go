@@ -76,9 +76,6 @@ var (
 	// Number of KCP bytes received from lower level.
 	BytesReceived = metrics.RegisterMetric("KCP", "BytesReceived")
 
-	// KCP bytes sent as padding.
-	PaddingBytesSent = metrics.RegisterMetric("KCP", "PaddingBytesSent")
-
 	// Number of incoming segments.
 	InSegs = metrics.RegisterMetric("KCP", "InSegs")
 
@@ -588,7 +585,7 @@ func (kcp *KCP) Output(ackOnly bool) uint32 {
 					segTotalLen += uint16(paddingSize)
 					encode16u(lastSegPtr[IKCP_TOTAL_LEN_OFFSET:], segTotalLen)
 					ptr = ptr[paddingSize:]
-					PaddingBytesSent.Add(int64(paddingSize))
+					metrics.OutPaddingBytes.Add(int64(paddingSize))
 				}
 			}
 		}
