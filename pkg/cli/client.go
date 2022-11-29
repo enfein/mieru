@@ -222,12 +222,6 @@ var clientStartFunc = func(s []string) error {
 
 var clientRunFunc = func(s []string) error {
 	log.SetFormatter(&log.DaemonFormatter{})
-
-	// Disable server side metrics.
-	if serverDecryptionMetricGroup := metrics.GetMetricGroupByName(cipher.ServerDecryptionMetricGroupName); serverDecryptionMetricGroup != nil {
-		serverDecryptionMetricGroup.DisableLogging()
-	}
-
 	appctl.SetAppStatus(appctlpb.AppStatus_STARTING)
 
 	logFile, err := log.NewClientLogFile()
@@ -262,6 +256,11 @@ var clientRunFunc = func(s []string) error {
 		log.SetLevel(loggingLevel)
 	}
 
+	// Disable server side metrics.
+	if serverDecryptionMetricGroup := metrics.GetMetricGroupByName(cipher.ServerDecryptionMetricGroupName); serverDecryptionMetricGroup != nil {
+		serverDecryptionMetricGroup.DisableLogging()
+	}
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 
@@ -291,12 +290,12 @@ var clientRunFunc = func(s []string) error {
 	}
 
 	// Collect remote proxy addresses and password.
+	proxyConfigs := make([]socks5.ProxyConfig, 0)
+	var hashedPassword []byte
 	activeProfile, err := appctl.GetActiveProfileFromConfig(config, config.GetActiveProfile())
 	if err != nil {
 		return fmt.Errorf(stderror.ClientGetActiveProfileFailedErr, err)
 	}
-	proxyConfigs := make([]socks5.ProxyConfig, 0)
-	var hashedPassword []byte
 	user := activeProfile.GetUser()
 	if user.GetHashedPassword() != "" {
 		hashedPassword, err = hex.DecodeString(user.GetHashedPassword())

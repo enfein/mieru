@@ -205,11 +205,6 @@ var serverRunFunc = func(s []string) error {
 		log.SetFormatter(&log.DaemonFormatter{})
 	}
 
-	// Disable client side metrics.
-	if clientDecryptionMetricGroup := metrics.GetMetricGroupByName(cipher.ClientDecryptionMetricGroupName); clientDecryptionMetricGroup != nil {
-		clientDecryptionMetricGroup.DisableLogging()
-	}
-
 	appctl.SetAppStatus(appctlpb.AppStatus_IDLE)
 
 	var rpcTasks sync.WaitGroup
@@ -267,6 +262,11 @@ var serverRunFunc = func(s []string) error {
 	loggingLevel := config.GetLoggingLevel().String()
 	if loggingLevel != appctlpb.LoggingLevel_DEFAULT.String() {
 		log.SetLevel(loggingLevel)
+	}
+
+	// Disable client side metrics.
+	if clientDecryptionMetricGroup := metrics.GetMetricGroupByName(cipher.ClientDecryptionMetricGroupName); clientDecryptionMetricGroup != nil {
+		clientDecryptionMetricGroup.DisableLogging()
 	}
 
 	// Start proxy if server config is valid.
@@ -332,6 +332,9 @@ var serverRunFunc = func(s []string) error {
 		appctl.SetAppStatus(appctlpb.AppStatus_RUNNING)
 		proxyTasks.Wait()
 	}
+	// If fails to validate server configuration, do nothing.
+	// Most likely the server configuration is empty.
+	// It will be set by new RPC calls.
 
 	rpcTasks.Wait()
 

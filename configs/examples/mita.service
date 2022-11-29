@@ -1,5 +1,5 @@
 [Unit]
-Description=Mieru proxy client
+Description=Mieru proxy server
 After=network-online.target network.service networking.service NetworkManager.service systemd-networkd.service
 Wants=network-online.target
 StartLimitBurst=5
@@ -7,8 +7,10 @@ StartLimitIntervalSec=60
 
 [Service]
 Type=exec
-Environment="MIERU_CONFIG_JSON_FILE=/etc/mieru_client_config.json"
-ExecStart=/usr/bin/mieru run
+Environment="MITA_CONFIG_JSON_FILE=/etc/mita_server_config.json"
+Environment="MITA_LOG_NO_TIMESTAMP=true"
+ExecStart=/usr/bin/mita run
+Nice=-10
 Restart=on-failure
 RestartSec=1
 

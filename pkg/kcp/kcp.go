@@ -50,7 +50,7 @@ const (
 	IKCP_INTERVAL         = 20     // event loop interval in milliseconds
 	IKCP_OVERHEAD         = 24     // size of KCP header
 	IKCP_DEADLINK         = 20     // retransmission times before link is dead
-	IKCP_THRESH_MIN       = 16     // minimum slow start threshold (number of packets)
+	IKCP_THRESH_MIN       = 32     // minimum slow start threshold (number of packets)
 	IKCP_PROBE_INIT       = 5000   // initial window probe timeout
 	IKCP_PROBE_LIMIT      = 120000 // maxinum window probe timeout
 	IKCP_SN_OFFSET        = 12     // offset to get sequence number in KCP header
@@ -880,10 +880,6 @@ func (kcp *KCP) SetMtu(mtu int) error {
 	}
 
 	buffer := make([]byte, mtu)
-	if buffer == nil {
-		log.Errorf("fail to create KCP buffer with new MTU")
-		return stderror.ErrInternal
-	}
 	kcp.mtu = uint32(mtu)
 	kcp.mss = kcp.mtu - IKCP_OVERHEAD - uint32(kcp.reserved)
 	kcp.buffer = buffer

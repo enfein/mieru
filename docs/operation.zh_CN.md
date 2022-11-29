@@ -68,22 +68,16 @@ mieru start
 
 ```
 INFO [metrics]
+INFO [metrics - cipher - server] DirectDecrypt=0 FailedDirectDecrypt=0 FailedIterateDecrypt=0
 INFO [metrics - connections] ActiveOpens=0 CurrEstablished=0 MaxConn=0 PassiveOpens=0
-INFO [metrics - server decryption] ServerDirectDecrypt=0 ServerFailedDirectDecrypt=0 ServerFailedIterateDecrypt=0
-INFO [metrics - client decryption] ClientDirectDecrypt=0 ClientFailedDirectDecrypt=0
-INFO [metrics - UDP packets] InPkts=0 OutPkts=0
-INFO [metrics - KCP segments] EarlyRetransSegs=0 FastRetransSegs=0 InSegs=0 LostSegs=0 OutOfWindowSegs=0 OutSegs=0 RepeatSegs=0 RetransSegs=0
-INFO [metrics - UDP bytes] InBytes=0 OutBytes=0
-INFO [metrics - KCP bytes] BytesReceived=0 BytesSent=0 PaddingSent=0
-INFO [metrics - TCP bytes] InBytes=0 OutBytes=0 PaddingSent=0
-INFO [metrics - socks5 UDP association] UDPAssociateInBytes=0 UDPAssociateInPkts=0 UDPAssociateOutBytes=0 UDPAssociateOutPkts=0
-INFO [metrics - replay protection] ReplayKnownSession=0 ReplayNewSession=0
-INFO [metrics - UDP errors] KCPInErrors=0 KCPReceiveErrors=0 KCPSendErrors=0 UDPInErrors=0
-INFO [metrics - TCP errors] TCPReceiveErrors=0 TCPSendErrors=0
-INFO [metrics - socks5 errors] ConnectionRefused=0 DNSResolveErrors=0 HandshakeErrors=0 HostUnreachable=0 NetworkUnreachable=0 UDPAssociateErrors=0 UnsupportedCommand=0
+INFO [metrics - errors] KCPInErrors=0 KCPReceiveErrors=0 KCPSendErrors=0 TCPReceiveErrors=0 TCPSendErrors=0 UDPInErrors=0
+INFO [metrics - KCP] BytesReceived=0 BytesSent=0 EarlyRetransSegs=0 FastRetransSegs=0 InSegs=0 LostSegs=0 OutOfWindowSegs=0 OutSegs=0 RepeatSegs=0 RetransSegs=0
+INFO [metrics - replay] KnownSession=0 NewSession=0
+INFO [metrics - socks5] ConnectionRefusedErrors=0 DNSResolveErrors=0 HandshakeErrors=0 HostUnreachableErrors=0 NetworkUnreachableErrors=0 UDPAssociateErrors=0 UDPAssociateInBytes=0 UDPAssociateInPkts=0 UDPAssociateOutBytes=0 UDPAssociateOutPkts=0 UnsupportedCommandErrors=0
+INFO [metrics - traffic] InBytes=0 OutBytes=0 OutPaddingBytes=0
 ```
 
-如果 `CurrEstablished` 的值不为 0，说明此刻服务器与客户端之间有活跃的连接。如果 `ServerDirectDecrypt` 的值不为 0，说明服务器曾经成功解密了客户端发送的数据包。如果 TCP 或者 UDP 的 `OutBytes` 的值不为 0，说明服务器曾经向客户端发送过数据包。
+如果 `CurrEstablished` 的值不为 0，说明此刻服务器与客户端之间有活跃的连接。如果 `DirectDecrypt` 的值不为 0，说明服务器曾经成功解密了客户端发送的数据包。如果 `OutBytes` 的值不为 0，说明服务器曾经向客户端发送过数据包。
 
 ## 故障诊断与排查
 

@@ -330,7 +330,7 @@ func LoadServerConfig() (*pb.ServerConfig, error) {
 	serverIOLock.Lock()
 	defer serverIOLock.Unlock()
 
-	fileName, err := serverConfigFilePath()
+	fileName, fileType, err := serverConfigFilePath()
 	if err != nil {
 		return nil, fmt.Errorf("serverConfigFilePath() failed: %w", err)
 	}
@@ -353,9 +353,17 @@ func LoadServerConfig() (*pb.ServerConfig, error) {
 	}
 
 	s := &pb.ServerConfig{}
-	err = proto.Unmarshal(b, s)
-	if err != nil {
-		return nil, fmt.Errorf("proto.Unmarshal() failed: %w", err)
+	switch fileType {
+	case PROTOBUF_CONFIG_FILE_TYPE:
+		if err := proto.Unmarshal(b, s); err != nil {
+			return nil, fmt.Errorf("proto.Unmarshal() failed: %w", err)
+		}
+	case JSON_CONFIG_FILE_TYPE:
+		if err := Unmarshal(b, s); err != nil {
+			return nil, fmt.Errorf("Unmarshal() failed: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("config file type is invalid")
 	}
 
 	return s, nil
@@ -371,7 +379,7 @@ func StoreServerConfig(config *pb.ServerConfig) error {
 	}
 	config.Users = HashUserPasswords(config.GetUsers(), false)
 
-	fileName, err := serverConfigFilePath()
+	fileName, fileType, err := serverConfigFilePath()
 	if err != nil {
 		return fmt.Errorf("serverConfigFilePath() failed: %w", err)
 	}
@@ -379,9 +387,18 @@ func StoreServerConfig(config *pb.ServerConfig) error {
 		return fmt.Errorf("checkServerConfigDir() failed: %w", err)
 	}
 
-	b, err := proto.Marshal(config)
-	if err != nil {
-		return fmt.Errorf("proto.Marshal() failed: %w", err)
+	var b []byte
+	switch fileType {
+	case PROTOBUF_CONFIG_FILE_TYPE:
+		if b, err = proto.Marshal(config); err != nil {
+			return fmt.Errorf("proto.Marshal() failed: %w", err)
+		}
+	case JSON_CONFIG_FILE_TYPE:
+		if b, err = Marshal(config); err != nil {
+			return fmt.Errorf("Marshal() failed: %w", err)
+		}
+	default:
+		return fmt.Errorf("config file type is invalid")
 	}
 
 	err = os.WriteFile(fileName, b, 0660)
@@ -511,13 +528,23 @@ func checkServerConfigDir() error {
 }
 
 // serverConfigFilePath returns the server config file path.
-// If environment variable MITA_CONFIG_FILE is specified, that value is returned.
-func serverConfigFilePath() (string, error) {
+// If environment variable MITA_CONFIG_FILE or MITA_CONFIG_JSON_FILE is specified,
+// those values are returned.
+func serverConfigFilePath() (string, ConfigFileType, error) {
 	if v, found := os.LookupEnv("MITA_CONFIG_FILE"); found {
 		cachedServerConfigFilePath = v
 		cachedServerConfigDir = filepath.Dir(v)
+		return cachedServerConfigFilePath, PROTOBUF_CONFIG_FILE_TYPE, nil
 	}
-	return cachedServerConfigFilePath, nil
+	if v, found := os.LookupEnv("MITA_CONFIG_JSON_FILE"); found {
+		cachedServerConfigFilePath = v
+		cachedServerConfigDir = filepath.Dir(v)
+		return cachedServerConfigFilePath, JSON_CONFIG_FILE_TYPE, nil
+	}
+	if cachedServerConfigFilePath != "" {
+		return cachedServerConfigFilePath, FindConfigFileType(cachedServerConfigFilePath), nil
+	}
+	return "", INVALID_CONFIG_FILE_TYPE, fmt.Errorf("server config file path is empty")
 }
 
 // mergeServerConfig merges the source client config into destination.
@@ -579,7 +606,7 @@ func mergeServerConfig(dst, src *pb.ServerConfig) error {
 
 // deleteServerConfigFile deletes the server config file.
 func deleteServerConfigFile() error {
-	path, err := serverConfigFilePath()
+	path, _, err := serverConfigFilePath()
 	if err != nil {
 		return fmt.Errorf("serverConfigFilePath() failed: %w", err)
 	}

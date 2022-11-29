@@ -15,6 +15,14 @@
 
 package metrics
 
+const (
+	// MetricGroup name format for each user.
+	UserMetricGroupFormat = "user - %s"
+
+	UserMetricInBytes  = "InBytes"
+	UserMetricOutBytes = "OutBytes"
+)
+
 var (
 	// Max number of connections ever reached.
 	MaxConn = RegisterMetric("connections", "MaxConn")

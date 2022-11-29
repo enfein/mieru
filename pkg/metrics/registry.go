@@ -118,8 +118,9 @@ func (l MetricGroupList) Swap(i, j int) {
 }
 
 // RegisterMetric registers a new metric.
-// The caller should not take the ownership of the returne pointer.
-func RegisterMetric(groupName string, metricName string) *Metric {
+// The caller should not take the ownership of the returned pointer.
+// If the same metric is registered multiple times, the pointer to the first object is returned.
+func RegisterMetric(groupName, metricName string) *Metric {
 	group, _ := metricMap.LoadOrStore(groupName, &MetricGroup{
 		name: groupName,
 	})
@@ -130,6 +131,7 @@ func RegisterMetric(groupName string, metricName string) *Metric {
 }
 
 // GetMetricGroupByName returns the MetricGroup by name.
+// It returns nil if the MetricGroup is not found.
 func GetMetricGroupByName(groupName string) *MetricGroup {
 	group, ok := metricMap.Load(groupName)
 	if !ok {

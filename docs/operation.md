@@ -68,22 +68,16 @@ When the server has a single client, to determine if the connectivity is OK, you
 
 ```
 INFO [metrics]
+INFO [metrics - cipher - server] DirectDecrypt=0 FailedDirectDecrypt=0 FailedIterateDecrypt=0
 INFO [metrics - connections] ActiveOpens=0 CurrEstablished=0 MaxConn=0 PassiveOpens=0
-INFO [metrics - server decryption] ServerDirectDecrypt=0 ServerFailedDirectDecrypt=0 ServerFailedIterateDecrypt=0
-INFO [metrics - client decryption] ClientDirectDecrypt=0 ClientFailedDirectDecrypt=0
-INFO [metrics - UDP packets] InPkts=0 OutPkts=0
-INFO [metrics - KCP segments] EarlyRetransSegs=0 FastRetransSegs=0 InSegs=0 LostSegs=0 OutOfWindowSegs=0 OutSegs=0 RepeatSegs=0 RetransSegs=0
-INFO [metrics - UDP bytes] InBytes=0 OutBytes=0
-INFO [metrics - KCP bytes] BytesReceived=0 BytesSent=0 PaddingSent=0
-INFO [metrics - TCP bytes] InBytes=0 OutBytes=0 PaddingSent=0
-INFO [metrics - socks5 UDP association] UDPAssociateInBytes=0 UDPAssociateInPkts=0 UDPAssociateOutBytes=0 UDPAssociateOutPkts=0
-INFO [metrics - replay protection] ReplayKnownSession=0 ReplayNewSession=0
-INFO [metrics - UDP errors] KCPInErrors=0 KCPReceiveErrors=0 KCPSendErrors=0 UDPInErrors=0
-INFO [metrics - TCP errors] TCPReceiveErrors=0 TCPSendErrors=0
-INFO [metrics - socks5 errors] ConnectionRefused=0 DNSResolveErrors=0 HandshakeErrors=0 HostUnreachable=0 NetworkUnreachable=0 UDPAssociateErrors=0 UnsupportedCommand=0
+INFO [metrics - errors] KCPInErrors=0 KCPReceiveErrors=0 KCPSendErrors=0 TCPReceiveErrors=0 TCPSendErrors=0 UDPInErrors=0
+INFO [metrics - KCP] BytesReceived=0 BytesSent=0 EarlyRetransSegs=0 FastRetransSegs=0 InSegs=0 LostSegs=0 OutOfWindowSegs=0 OutSegs=0 RepeatSegs=0 RetransSegs=0
+INFO [metrics - replay] KnownSession=0 NewSession=0
+INFO [metrics - socks5] ConnectionRefusedErrors=0 DNSResolveErrors=0 HandshakeErrors=0 HostUnreachableErrors=0 NetworkUnreachableErrors=0 UDPAssociateErrors=0 UDPAssociateInBytes=0 UDPAssociateInPkts=0 UDPAssociateOutBytes=0 UDPAssociateOutPkts=0 UnsupportedCommandErrors=0
+INFO [metrics - traffic] InBytes=0 OutBytes=0 OutPaddingBytes=0
 ```
 
-if the value of `CurrEstablished` is not 0, there is an active connection between the server and the client at this moment; if the value of `ServerDirectDecrypt` is not 0, the server has successfully decrypted the packets sent by the client; if the value of `OutBytes` for TCP or UDP is not 0, the server has sent a packet to the client.
+if the value of `CurrEstablished` is not 0, there is an active connection between the server and the client at this moment; if the value of `DirectDecrypt` is not 0, the server has successfully decrypted the packets sent by the client; if the value of `OutBytes` is not 0, the server has sent a packet to the client.
 
 ## Troubleshooting suggestions
 

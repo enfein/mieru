@@ -117,6 +117,9 @@ type (
 		// txqueue is another queue outside KCP to do additional processing before sending packets on wire.
 		txqueue []ipMessage
 
+		inBytes  *metrics.Metric
+		outBytes *metrics.Metric
+
 		recordingEnabled bool
 		recordedPackets  recording.Records
 	}
@@ -627,6 +630,9 @@ func (s *UDPSession) inputToKCP(data []byte) {
 	s.mu.Unlock()
 
 	metrics.InBytes.Add(int64(len(data)))
+	if s.inBytes != nil {
+		s.inBytes.Add(int64(len(data)))
+	}
 }
 
 // uncork sends data to txqueue (if there is any).
@@ -659,6 +665,9 @@ func (s *UDPSession) tx(txqueue []ipMessage) {
 		}
 	}
 	metrics.OutBytes.Add(int64(nbytes))
+	if s.outBytes != nil {
+		s.outBytes.Add(int64(nbytes))
+	}
 }
 
 // Post-processing for sending a packet from kcp core, including
@@ -953,6 +962,9 @@ func (l *Listener) packetInput(raw []byte, addr net.Addr) {
 				block, data, err = cipher.TryDecrypt(raw, password, true)
 				if err == nil {
 					decrypted = true
+					block.SetBlockContext(cipher.BlockContext{
+						UserName: user.GetName(),
+					})
 					break
 				}
 			}
@@ -1002,6 +1014,10 @@ func (l *Listener) packetInput(raw []byte, addr net.Addr) {
 					return
 				}
 				s = newUDPSession(conv, l.conn, false, addr, block)
+				if block.BlockContext().UserName != "" {
+					s.inBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, block.BlockContext().UserName), metrics.UserMetricInBytes)
+					s.outBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, block.BlockContext().UserName), metrics.UserMetricOutBytes)
+				}
 				s.inputToKCP(data)
 				l.sessionLock.Lock()
 				l.sessions[addr.String()] = s

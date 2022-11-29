@@ -445,10 +445,6 @@ func prepareClientConfigDir() error {
 // If environment variable MIERU_CONFIG_FILE or MIERU_CONFIG_JSON_FILE is specified,
 // those values are returned.
 func clientConfigFilePath() (string, ConfigFileType, error) {
-	if cachedClientConfigFilePath != "" {
-		return cachedClientConfigFilePath, FindConfigFileType(cachedClientConfigFilePath), nil
-	}
-
 	if v, found := os.LookupEnv("MIERU_CONFIG_FILE"); found {
 		cachedClientConfigFilePath = v
 		cachedClientConfigDir = filepath.Dir(v)
@@ -458,6 +454,10 @@ func clientConfigFilePath() (string, ConfigFileType, error) {
 		cachedClientConfigFilePath = v
 		cachedClientConfigDir = filepath.Dir(v)
 		return cachedClientConfigFilePath, JSON_CONFIG_FILE_TYPE, nil
+	}
+
+	if cachedClientConfigFilePath != "" {
+		return cachedClientConfigFilePath, FindConfigFileType(cachedClientConfigFilePath), nil
 	}
 
 	if err := prepareClientConfigDir(); err != nil {

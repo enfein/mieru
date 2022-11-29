@@ -79,6 +79,17 @@ type BlockCipher interface {
 	// IsStateless returns true if the BlockCipher can do arbitrary Encrypt()
 	// and Decrypt() in any sequence.
 	IsStateless() bool
+
+	// BlockContext returns a copy of BlockContext.
+	BlockContext() BlockContext
+
+	// SetBlockContext sets the BlockContext.
+	SetBlockContext(bc BlockContext)
+}
+
+// BlockContext contains optional context associated to a cipher block.
+type BlockContext struct {
+	UserName string
 }
 
 // HashPassword generates a hashed password from

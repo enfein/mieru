@@ -89,6 +89,9 @@ type TCPSession struct {
 	recvBuf    []byte // data received from network but not read by caller
 	recvBufPtr []byte // reading position of received data
 
+	inBytes  *metrics.Metric
+	outBytes *metrics.Metric
+
 	recordingEnabled bool
 	recordedPackets  recording.Records
 }
@@ -186,6 +189,9 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error, errType stderror.
 	if s.recv == nil && s.isClient {
 		s.recv = s.candidates[0].Clone()
 		firstRead = true
+		if s.recv.BlockContext().UserName != "" {
+			s.inBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, s.recv.BlockContext().UserName), metrics.UserMetricInBytes)
+		}
 	}
 	if s.recv == nil {
 		var peerBlock cipher.BlockCipher
@@ -196,6 +202,9 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error, errType stderror.
 		}
 		s.recv = peerBlock.Clone()
 		firstRead = true
+		if s.recv.BlockContext().UserName != "" {
+			s.inBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, s.recv.BlockContext().UserName), metrics.UserMetricInBytes)
+		}
 	} else {
 		decryptedLen, err = s.recv.Decrypt(encryptedLen)
 		if s.isClient {
@@ -211,6 +220,9 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error, errType stderror.
 			}
 			return 0, fmt.Errorf("Decrypt() failed: %w", err), stderror.CRYPTO_ERROR
 		}
+	}
+	if s.inBytes != nil {
+		s.inBytes.Add(int64(readLen))
 	}
 	if !s.isClient && replayCache.IsDuplicate(encryptedLen[:cipher.DefaultOverhead]) {
 		if firstRead {
@@ -235,6 +247,9 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error, errType stderror.
 		s.recordedPackets.Append(encryptedPayload, recording.Ingress)
 	}
 	metrics.InBytes.Add(int64(readLen))
+	if s.inBytes != nil {
+		s.inBytes.Add(int64(readLen))
+	}
 	decryptedPayload, err := s.recv.Decrypt(encryptedPayload)
 	if s.isClient {
 		cipher.ClientDirectDecrypt.Add(1)
@@ -333,6 +348,9 @@ func (s *TCPSession) writeChunk(b []byte) (n int, err error) {
 				return 0, fmt.Errorf("recv cipher is nil")
 			}
 		}
+		if s.send.BlockContext().UserName != "" {
+			s.outBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, s.send.BlockContext().UserName), metrics.UserMetricOutBytes)
+		}
 	}
 
 	// Create encrypted payload length.
@@ -366,6 +384,9 @@ func (s *TCPSession) writeChunk(b []byte) (n int, err error) {
 	}
 	metrics.OutBytes.Add(int64(len(dataToSend)))
 	metrics.OutPaddingBytes.Add(int64(paddingSize))
+	if s.outBytes != nil {
+		s.outBytes.Add(int64(len(dataToSend)))
+	}
 	if log.IsLevelEnabled(log.TraceLevel) {
 		log.Tracef("TCPSession wrote %d bytes to the network", len(dataToSend))
 	}
@@ -450,6 +471,11 @@ func (l *TCPSessionListener) WrapConn(conn net.Conn) net.Conn {
 		if err != nil {
 			log.Debugf("unable to create block cipher of user %q", user.GetName())
 			continue
+		}
+		for _, block := range blocksFromUser {
+			block.SetBlockContext(cipher.BlockContext{
+				UserName: user.GetName(),
+			})
 		}
 		blocks = append(blocks, blocksFromUser...)
 	}

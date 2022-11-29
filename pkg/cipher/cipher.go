@@ -30,6 +30,7 @@ type AESGCMBlockCipher struct {
 	key                 []byte
 	implicitNonce       []byte
 	mu                  sync.Mutex
+	ctx                 BlockContext
 }
 
 // newAESGCMBlockCipher creates a new cipher with the supplied key.
@@ -149,6 +150,7 @@ func (c *AESGCMBlockCipher) Clone() BlockCipher {
 		newCipher.implicitNonce = make([]byte, len(c.implicitNonce))
 		copy(newCipher.implicitNonce, c.implicitNonce)
 	}
+	newCipher.ctx = c.ctx
 	return newCipher
 }
 
@@ -167,14 +169,12 @@ func (c *AESGCMBlockCipher) IsStateless() bool {
 	return !c.enableImplicitNonce
 }
 
-// ImplicitNonce returns the implicit nonce used by the block cipher.
-func (c *AESGCMBlockCipher) ImplicitNonce() []byte {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if !c.enableImplicitNonce {
-		return nil
-	}
-	return c.implicitNonce
+func (c *AESGCMBlockCipher) BlockContext() BlockContext {
+	return c.ctx
+}
+
+func (c *AESGCMBlockCipher) SetBlockContext(bc BlockContext) {
+	c.ctx = bc
 }
 
 // newNonce generates a new nonce.
