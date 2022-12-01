@@ -110,6 +110,13 @@ func RegisterClientCommands() {
 		clientDeleteProfileFunc,
 	)
 	RegisterCallback(
+		[]string{"", "version"},
+		func(s []string) error {
+			return unexpectedArgsError(s, 2)
+		},
+		clientVersionFunc,
+	)
+	RegisterCallback(
 		[]string{"", "get", "thread-dump"},
 		func(s []string) error {
 			return unexpectedArgsError(s, 3)
@@ -158,6 +165,7 @@ var clientHelpFunc = func(s []string) error {
 	applyConfigCmd := fmt.Sprintf(format, "apply config <FILE>", "Apply client configuration from JSON file")
 	describeConfigCmd := fmt.Sprintf(format, "describe config", "Show current client configuration")
 	deleteProfileCmd := fmt.Sprintf(format, "delete profile <PROFILE_NAME>", "Delete a client configuration profile")
+	versionCmd := fmt.Sprintf(format, "version", "Show mieru client version")
 	log.Infof("Usage: %s <COMMAND> [<ARGS>]", binaryName)
 	log.Infof("")
 	log.Infof("Commands:")
@@ -168,6 +176,7 @@ var clientHelpFunc = func(s []string) error {
 	log.Infof("%s", applyConfigCmd)
 	log.Infof("%s", describeConfigCmd)
 	log.Infof("%s", deleteProfileCmd)
+	log.Infof("%s", versionCmd)
 	return nil
 }
 
@@ -447,6 +456,11 @@ var clientDeleteProfileFunc = func(s []string) error {
 		return fmt.Errorf(stderror.LoadClientConfigFailedErr, err)
 	}
 	return appctl.DeleteClientConfigProfile(s[3])
+}
+
+var clientVersionFunc = func(s []string) error {
+	log.Infof(appctl.AppVersion)
+	return nil
 }
 
 var clientGetThreadDumpFunc = func(s []string) error {

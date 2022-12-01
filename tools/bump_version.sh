@@ -41,3 +41,4 @@ sed -i "s/$1/$2/g" build/package/mita/arm64/rpm/mita.spec
 sed -i "s/$1/$2/g" docs/server-install.md
 sed -i "s/$1/$2/g" docs/server-install.zh_CN.md
 sed -i "s/$1/$2/g" Makefile
+sed -i "s/$1/$2/g" pkg/appctl/version.go

@@ -109,6 +109,13 @@ func RegisterServerCommands() {
 		serverDeleteUserFunc,
 	)
 	RegisterCallback(
+		[]string{"", "version"},
+		func(s []string) error {
+			return unexpectedArgsError(s, 2)
+		},
+		serverVersionFunc,
+	)
+	RegisterCallback(
 		[]string{"", "get", "thread-dump"},
 		func(s []string) error {
 			return unexpectedArgsError(s, 3)
@@ -157,6 +164,7 @@ var serverHelpFunc = func(s []string) error {
 	applyConfigCmd := fmt.Sprintf(format, "apply config <FILE>", "Apply server configuration from JSON file")
 	describeConfigCmd := fmt.Sprintf(format, "describe config", "Show current server configuration")
 	deleteUserCmd := fmt.Sprintf(format, "delete user <USER_NAME>", "Delete users from server configuration")
+	versionCmd := fmt.Sprintf(format, "version", "Show mieru server version")
 	log.Infof("Usage: %s <COMMAND> [<ARGS>]", binaryName)
 	log.Infof("")
 	log.Infof("Commands:")
@@ -167,6 +175,7 @@ var serverHelpFunc = func(s []string) error {
 	log.Infof("%s", applyConfigCmd)
 	log.Infof("%s", describeConfigCmd)
 	log.Infof("%s", deleteUserCmd)
+	log.Infof("%s", versionCmd)
 	return nil
 }
 
@@ -499,6 +508,11 @@ var serverDeleteUserFunc = func(s []string) error {
 	if err != nil {
 		return fmt.Errorf(stderror.SetServerConfigFailedErr, err)
 	}
+	return nil
+}
+
+var serverVersionFunc = func(s []string) error {
+	log.Infof(appctl.AppVersion)
 	return nil
 }
 
