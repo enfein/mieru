@@ -47,12 +47,16 @@ type ReplayCache struct {
 	// regardless of the number of entries in the `current` map.
 	expireTime time.Time
 
+	// expireInterval is the interval to reset expireTime.
 	expireInterval time.Duration
 
 	// salt mutates the entry before it is stored.
 	salt []byte
 
-	current  map[uint64]struct{}
+	// current stores the current set of packet signatures.
+	current map[uint64]struct{}
+
+	// previous stores the previous set of packet signatures.
 	previous map[uint64]struct{}
 }
 

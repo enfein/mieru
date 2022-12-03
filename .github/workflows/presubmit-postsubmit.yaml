@@ -30,3 +30,9 @@ jobs:
             release/*.tar.gz
             release/*.zip
           if-no-files-found: error
+      - name: Upload code coverage
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage
+          path: |
+            coverage.html

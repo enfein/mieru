@@ -46,7 +46,8 @@ bin: lib client-mac client-linux client-windows-amd64 server-linux
 .PHONY: lib
 lib: fmt
 	CGO_ENABLED=0 go build -v ./...
-	CGO_ENABLED=0 go test -test.v -timeout=1m0s ./...
+	CGO_ENABLED=0 go test -timeout=1m0s -coverprofile coverage.out ./...
+	go tool cover -html coverage.out -o coverage.html
 
 # Build MacOS clients.
 .PHONY: client-mac

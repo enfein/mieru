@@ -28,3 +28,6 @@
 *.rpm
 
 .vscode/
+
+/coverage.out
+/coverage.html
