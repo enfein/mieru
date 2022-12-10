@@ -79,7 +79,7 @@ client-mac-arm64:
 
 # Build linux clients.
 .PHONY: client-linux
-client-linux: client-linux-amd64 client-linux-arm64
+client-linux: client-linux-amd64 client-linux-arm64 client-linux-armv7
 
 # Build linux amd64 client.
 .PHONY: client-linux-amd64
@@ -104,6 +104,18 @@ client-linux-arm64:
 		sha256sum mieru_${VERSION}_linux_arm64.tar.gz > mieru_${VERSION}_linux_arm64.tar.gz.sha256.txt
 	mv release/linux/arm64/mieru_${VERSION}_linux_arm64.tar.gz release/
 	mv release/linux/arm64/mieru_${VERSION}_linux_arm64.tar.gz.sha256.txt release/
+
+# Build linux armv7 client.
+.PHONY: client-linux-armv7
+client-linux-armv7:
+	mkdir -p release/linux/armv7
+	env GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/linux/armv7/mieru cmd/mieru/mieru.go
+	cd release/linux/armv7;\
+		sha256sum mieru > mieru_${VERSION}_linux_armv7.sha256.txt;\
+		tar -zcvf mieru_${VERSION}_linux_armv7.tar.gz mieru;\
+		sha256sum mieru_${VERSION}_linux_armv7.tar.gz > mieru_${VERSION}_linux_armv7.tar.gz.sha256.txt
+	mv release/linux/armv7/mieru_${VERSION}_linux_armv7.tar.gz release/
+	mv release/linux/armv7/mieru_${VERSION}_linux_armv7.tar.gz.sha256.txt release/
 
 # Build windows amd64 client.
 .PHONY: client-windows-amd64
