@@ -136,18 +136,38 @@ mieru doesn't use socks5 authentication.
 
 For configuring the socks5 proxy in the Tor browser, see the [Security Guide](https://github.com/enfein/mieru/blob/main/docs/security.md).
 
+If you need to forward all application traffic through a proxy, or customize routing rules, use a proxy platform such as clash, and use mieru as the backend of the proxy platform. An example of clash configuration is provided below.
+
 ## Configuring clash
 
-To use mieru as a forwarding agent for clash, you can refer to the following settings.
+In this example, clash listens to port 7890. If the traffic accesses the LAN or if the destination address is in China, then no proxy is used. In other cases, the mieru proxy is used.
 
 ```yaml
+mixed-port: 7890
+
 proxies:
   - name: mieru
     type: socks5
     server: 127.0.0.1
-    port: xxxx
+    port: 1080
     udp: true
 
+dns:
+  enable: true
+  ipv6: true
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  nameserver:
+    - https://1.1.1.1/dns-query
+    - 8.8.8.8
+
 rules:
+  - DOMAIN-KEYWORD,google,mieru
+  - DOMAIN-KEYWORD,gmail,mieru
+  - DOMAIN-KEYWORD,youtube,mieru
+  - IP-CIDR,127.0.0.0/8,DIRECT
+  - IP-CIDR,172.16.0.0/12,DIRECT
+  - IP-CIDR,192.168.0.0/16,DIRECT
+  - GEOIP,CN,DIRECT
   - MATCH,mieru
 ```

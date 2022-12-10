@@ -26,6 +26,7 @@ mieru 的翻墙原理与 shadowsocks / v2ray 等软件类似，在客户端和�
 6. mieru 支持多个用户共享代理服务器。
 7. 支持 IPv4 和 IPv6。
 8. 客户端软件支持 Windows, Mac OS, Linux 和 Android 系统。Android 用户请使用 0.8.1-rc02 版本或以上 SagerNet 客户端并安装 1.6.1 版本或以上 mieru 插件。
+9. 如果需要全局代理或自定义路由规则等高级功能，可以将 mieru 作为 clash 等代理平台的后端。
 
 ## 使用教程
 
