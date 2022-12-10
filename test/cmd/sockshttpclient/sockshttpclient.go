@@ -45,8 +45,9 @@ var (
 	localProxyHost = flag.String("local_proxy_host", "", "The host IP or domain name that local socks proxy is running.")
 	localProxyPort = flag.Int("local_proxy_port", 0, "The TCP port that local socks proxy is listening.")
 	testCase       = flag.String("test_case", "new_conn", fmt.Sprintf("Supported: %q, %q.", NewConnTest, ReuseConnTest))
-	intervalMs     = flag.Int("interval", 0, "Sleep in milliseconds between two requests.")
-	numRequest     = flag.Int("num_request", 1, "Number of HTTP requests send to server before exit.")
+	intervalMs     = flag.Int("interval_ms", 0, "Sleep in milliseconds between two requests.")
+	numRequest     = flag.Int("num_request", 0, "Number of HTTP requests send to server before exit. This option is not compatible with -test_time_sec.")
+	testTimeSec    = flag.Int("test_time_sec", 0, "Number of seconds to run the test before exit. This option is not compatible with -num_request.")
 
 	totalBytes int64
 	startTime  time.Time
@@ -82,26 +83,51 @@ func main() {
 		log.Fatalf("HTTP server host or port is not set")
 	}
 	if *localProxyHost == "" || *localProxyPort == 0 {
-		log.Fatalf("local socks proxy host or port is not set")
+		log.Fatalf("Local socks proxy host or port is not set")
 	}
 	if *testCase != NewConnTest && *testCase != ReuseConnTest {
-		log.Fatalf("test case %q is unknown", *testCase)
+		log.Fatalf("Test case %q is unknown", *testCase)
 	}
 	if *intervalMs < 0 {
-		log.Fatalf("interval can't be a negative number")
+		log.Fatalf("Interval can't be a negative number")
 	}
-	if *numRequest <= 0 {
-		log.Fatalf("number of HTTP request must be bigger than 0")
+	if *numRequest <= 0 && *testTimeSec <= 0 {
+		log.Fatalf("Must specify either -num_request or -test_time_sec")
+	}
+	if *numRequest > 0 && *testTimeSec > 0 {
+		log.Fatalf("Can't specify both -num_request and -test_time_sec")
 	}
 
 	startTime = time.Now()
 	if *testCase == NewConnTest {
-		for i := 1; i <= *numRequest; i++ {
-			CreateNewConnAndDoRequest(i)
-			if i%100 == 0 {
-				printNetworkSpeed(i)
+		if *numRequest > 0 {
+			for i := 1; i <= *numRequest; i++ {
+				CreateNewConnAndDoRequest(i)
+				if i%100 == 0 {
+					printNetworkSpeed(i)
+				}
+				time.Sleep(time.Millisecond * time.Duration(*intervalMs))
 			}
-			time.Sleep(time.Millisecond * time.Duration(*intervalMs))
+		} else {
+			done := make(chan bool)
+			go func() {
+				time.Sleep(time.Duration(*testTimeSec) * time.Second)
+				close(done)
+			}()
+			i := 1
+			for {
+				select {
+				case <-done:
+					return
+				default:
+					CreateNewConnAndDoRequest(i)
+					if i%100 == 0 {
+						printNetworkSpeed(i)
+					}
+					time.Sleep(time.Millisecond * time.Duration(*intervalMs))
+					i++
+				}
+			}
 		}
 	} else if *testCase == ReuseConnTest {
 		socksDialer := socks5client.DialSocksProxy(socks5client.SOCKS5, *localProxyHost+":"+strconv.Itoa(*localProxyPort), socks5client.ConnectCmd)
@@ -110,12 +136,34 @@ func main() {
 			log.Fatalf("dial to socks: %v", err)
 		}
 		conn = wrapConn(conn)
-		for i := 1; i <= *numRequest; i++ {
-			DoRequestWithExistingConn(conn, i)
-			if i%100 == 0 {
-				printNetworkSpeed(i)
+		if *numRequest > 0 {
+			for i := 1; i <= *numRequest; i++ {
+				DoRequestWithExistingConn(conn, i)
+				if i%100 == 0 {
+					printNetworkSpeed(i)
+				}
+				time.Sleep(time.Millisecond * time.Duration(*intervalMs))
 			}
-			time.Sleep(time.Millisecond * time.Duration(*intervalMs))
+		} else {
+			done := make(chan bool)
+			go func() {
+				time.Sleep(time.Duration(*testTimeSec) * time.Second)
+				close(done)
+			}()
+			i := 1
+			for {
+				select {
+				case <-done:
+					return
+				default:
+					DoRequestWithExistingConn(conn, i)
+					if i%100 == 0 {
+						printNetworkSpeed(i)
+					}
+					time.Sleep(time.Millisecond * time.Duration(*intervalMs))
+					i++
+				}
+			}
 		}
 		conn.Close()
 	}

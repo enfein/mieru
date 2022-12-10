@@ -110,7 +110,7 @@ In addition to this, mita can listen to several different ports. You can also cr
             "password": "yaochifan"
         },
         {
-            "name": "buyaofengsuo",
+            "name": "buyaofengkong",
             "password": "yaoziyou"
         },
         {

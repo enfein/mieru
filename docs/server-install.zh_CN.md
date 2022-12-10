@@ -110,7 +110,7 @@ mita apply config <FILE>
             "password": "yaochifan"
         },
         {
-            "name": "buyaofengsuo",
+            "name": "buyaofengkong",
             "password": "yaoziyou"
         },
         {

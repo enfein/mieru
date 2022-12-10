@@ -57,7 +57,7 @@ fi
 sleep 1
 ./socksudpclient -dst_host=127.0.0.1 -dst_port=9090 \
   -local_proxy_host=127.0.0.1 -local_proxy_port=1080 \
-  -interval=20 -num_request=100 -num_conn=30
+  -interval_ms=20 -num_request=100 -num_conn=30
 if [ "$?" -ne "0" ]; then
     print_mieru_client_log
     print_mieru_client_thread_dump
