@@ -10,10 +10,10 @@ Before installation and configuration, connect to the server via SSH and then ex
 
 ```sh
 # Debian / Ubuntu
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.9.0/mita_1.9.0_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.9.1/mita_1.9.1_amd64.deb
 
 # Fedora / CentOS / Red Hat Enterprise Linux
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.9.0/mita-1.9.0-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.9.1/mita-1.9.1-1.x86_64.rpm
 ```
 
 To download the installer for the ARM architecture, replace `amd64` with `arm64`, and `x86_64` with `aarch64` in the link. If the above link is blocked, please use your browser to download and install from the GitHub Releases page.
@@ -22,10 +22,10 @@ To download the installer for the ARM architecture, replace `amd64` with `arm64`
 
 ```sh
 # Debian / Ubuntu
-sudo dpkg -i mita_1.9.0_amd64.deb
+sudo dpkg -i mita_1.9.1_amd64.deb
 
 # Fedora / CentOS / Red Hat Enterprise Linux
-sudo rpm -Uvh --force mita-1.9.0-1.x86_64.rpm
+sudo rpm -Uvh --force mita-1.9.1-1.x86_64.rpm
 ```
 
 ## Grant permissions
