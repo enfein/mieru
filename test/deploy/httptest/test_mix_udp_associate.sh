@@ -57,7 +57,7 @@ fi
 sleep 1
 ./socksudpclient -dst_host=127.0.0.1 -dst_port=9090 \
   -local_proxy_host=127.0.0.1 -local_proxy_port=1080 \
-  -interval_ms=20 -num_request=100 -num_conn=30
+  -interval_ms=10 -num_request=100 -num_conn=60
 if [ "$?" -ne "0" ]; then
     print_mieru_client_log
     print_mieru_client_thread_dump
@@ -65,6 +65,10 @@ if [ "$?" -ne "0" ]; then
     echo "Test UDP associate failed."
     exit 1
 fi
+
+# Collect profile with UDP associate.
+./mieru get heap-profile /test/mieru.associate.heap.gz
+./mita get heap-profile /test/mita.associate.heap.gz
 
 # Stop mieru client.
 ./mieru stop

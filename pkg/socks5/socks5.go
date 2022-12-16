@@ -177,6 +177,7 @@ func (s *Server) Serve(l net.Listener) error {
 
 // ServeConn is used to serve a single connection.
 func (s *Server) ServeConn(conn net.Conn) error {
+	conn = netutil.WrapHierarchyConn(conn)
 	defer conn.Close()
 	if log.IsLevelEnabled(log.TraceLevel) {
 		log.Tracef("socks5 server starts to serve connection [%v - %v]", conn.LocalAddr(), conn.RemoteAddr())
@@ -262,6 +263,11 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 
 	if udpAssociateConn != nil {
 		log.Debugf("UDP association is listening on %v", udpAssociateConn.LocalAddr())
+		conn.(netutil.HierarchyConn).AddSubConnection(udpAssociateConn)
+		go func() {
+			netutil.WaitForClose(conn)
+			conn.Close()
+		}()
 		return BidiCopyUDP(udpAssociateConn, WrapUDPAssociateTunnel(proxyConn))
 	}
 	return BidiCopy(conn, proxyConn, true)
