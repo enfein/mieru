@@ -28,7 +28,7 @@ if [ $uid -ne 0 ]; then
 fi
 
 # Create a separate network namespace "sim" for testing.
-ip add netns sim
+ip netns add sim
 
 # Create a veth pair, attach server part to the namespace, and assign IP addresses.
 ip link add veth-client type veth peer name veth-server

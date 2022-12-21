@@ -1,6 +1,6 @@
 # 見える / mieru
 
-[![Build Status](https://github.com/enfein/mieru/actions/workflows/presubmit-postsubmit.yaml/badge.svg)](https://github.com/enfein/mieru/actions/workflows/presubmit-postsubmit.yaml)
+[![Build Status](https://github.com/enfein/mieru/actions/workflows/ci.yaml/badge.svg)](https://github.com/enfein/mieru/actions/workflows/ci.yaml)
 [![Releases](https://img.shields.io/github/release/enfein/mieru/all.svg?style=flat)](https://github.com/enfein/mieru/releases)
 [![LICENSE](https://img.shields.io/github/license/enfein/mieru.svg?style=flat)](https://github.com/enfein/mieru/blob/main/LICENSE)
 [![Go Reference](https://pkg.go.dev/badge/github.com/enfein/mieru.svg)](https://pkg.go.dev/github.com/enfein/mieru)
