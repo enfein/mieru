@@ -1,0 +1,19 @@
+{
+    "portBindings": [
+        {
+            "port": 8964,
+            "protocol": "UDP"
+        }
+    ],
+    "users": [
+        {
+            "name": "shilishanlu",
+            "password": "buhuanjian"
+        }
+    ],
+    "advancedSettings": {
+        "allowLocalDestination": true
+    },
+    "loggingLevel": "INFO",
+    "mtu": 1460
+}

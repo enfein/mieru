@@ -1,0 +1,18 @@
+{
+    "portBindings": [
+        {
+            "port": 8964,
+            "protocol": "TCP"
+        }
+    ],
+    "users": [
+        {
+            "name": "shilishanlu",
+            "password": "buhuanjian"
+        }
+    ],
+    "advancedSettings": {
+        "allowLocalDestination": true
+    },
+    "loggingLevel": "INFO"
+}

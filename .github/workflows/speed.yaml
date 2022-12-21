@@ -1,0 +1,16 @@
+name: 'speed test'
+on: [workflow_dispatch]
+jobs:
+  run-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.19.2
+      - name: Build test binaries
+        run: make test-binary
+      - name: Run speed test
+        run: sudo ./test/deploy/packetdrop/test.sh

@@ -44,6 +44,7 @@ var (
 	dstPort        = flag.Int("dst_port", 0, "The TCP port that HTTP server is listening.")
 	localProxyHost = flag.String("local_proxy_host", "", "The host IP or domain name that local socks proxy is running.")
 	localProxyPort = flag.Int("local_proxy_port", 0, "The TCP port that local socks proxy is listening.")
+	noProxy        = flag.Bool("no_proxy", false, "Don't use proxy. Directly connect to the destination.")
 	testCase       = flag.String("test_case", "new_conn", fmt.Sprintf("Supported: %q, %q.", NewConnTest, ReuseConnTest))
 	intervalMs     = flag.Int("interval_ms", 0, "Sleep in milliseconds between two requests.")
 	numRequest     = flag.Int("num_request", 0, "Number of HTTP requests send to server before exit. This option is not compatible with -test_time_sec.")
@@ -102,7 +103,7 @@ func main() {
 	if *testCase == NewConnTest {
 		if *numRequest > 0 {
 			for i := 1; i <= *numRequest; i++ {
-				CreateNewConnAndDoRequest(i)
+				CreateNewConnAndDoRequest(i, *noProxy)
 				if i%100 == 0 {
 					printNetworkSpeed(i)
 				}
@@ -120,7 +121,7 @@ func main() {
 				case <-done:
 					return
 				default:
-					CreateNewConnAndDoRequest(i)
+					CreateNewConnAndDoRequest(i, *noProxy)
 					if i%100 == 0 {
 						printNetworkSpeed(i)
 					}
@@ -130,10 +131,16 @@ func main() {
 			}
 		}
 	} else if *testCase == ReuseConnTest {
-		socksDialer := socks5client.DialSocksProxy(socks5client.SOCKS5, *localProxyHost+":"+strconv.Itoa(*localProxyPort), socks5client.ConnectCmd)
-		conn, _, _, err := socksDialer("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
+		var conn net.Conn
+		var err error
+		if *noProxy {
+			conn, err = net.Dial("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
+		} else {
+			socksDialer := socks5client.DialSocksProxy(socks5client.SOCKS5, *localProxyHost+":"+strconv.Itoa(*localProxyPort), socks5client.ConnectCmd)
+			conn, _, _, err = socksDialer("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
+		}
 		if err != nil {
-			log.Fatalf("dial to socks: %v", err)
+			log.Fatalf("dial failed: %v", err)
 		}
 		conn = wrapConn(conn)
 		if *numRequest > 0 {
@@ -169,11 +176,17 @@ func main() {
 	}
 }
 
-func CreateNewConnAndDoRequest(seq int) {
-	socksDialer := socks5client.DialSocksProxy(socks5client.SOCKS5, *localProxyHost+":"+strconv.Itoa(*localProxyPort), socks5client.ConnectCmd)
-	conn, _, _, err := socksDialer("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
+func CreateNewConnAndDoRequest(seq int, noProxy bool) {
+	var conn net.Conn
+	var err error
+	if noProxy {
+		conn, err = net.Dial("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
+	} else {
+		socksDialer := socks5client.DialSocksProxy(socks5client.SOCKS5, *localProxyHost+":"+strconv.Itoa(*localProxyPort), socks5client.ConnectCmd)
+		conn, _, _, err = socksDialer("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
+	}
 	if err != nil {
-		log.Fatalf("dial to socks: %v", err)
+		log.Fatalf("dial failed: %v", err)
 	}
 	defer conn.Close()
 	DoRequestWithExistingConn(wrapConn(conn), seq)

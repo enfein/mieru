@@ -273,18 +273,22 @@ rpm-server-arm64: server-linux-arm64
 		sha256sum mita-${VERSION}-1.aarch64.rpm > mita-${VERSION}-1.aarch64.rpm.sha256.txt;\
 	fi
 
+# Build binaries used in integration tests.
+.PHONY: test-binary
+test-binary:
+	CGO_ENABLED=0 go build cmd/mieru/mieru.go
+	CGO_ENABLED=0 go build cmd/mita/mita.go
+	CGO_ENABLED=0 go build test/cmd/httpserver/httpserver.go
+	CGO_ENABLED=0 go build test/cmd/sockshttpclient/sockshttpclient.go
+	CGO_ENABLED=0 go build test/cmd/socksudpclient/socksudpclient.go
+	CGO_ENABLED=0 go build test/cmd/udpserver/udpserver.go
+
 # Build a docker image to run integration tests.
 .PHONY: test-container
-test-container:
+test-container: test-binary
 	if [ ! -z $$(command -v docker) ]; then\
-		CGO_ENABLED=0 go build cmd/mieru/mieru.go;\
-		CGO_ENABLED=0 go build cmd/mita/mita.go;\
-		CGO_ENABLED=0 go build test/cmd/httpserver/httpserver.go;\
-		CGO_ENABLED=0 go build test/cmd/sockshttpclient/sockshttpclient.go;\
-		CGO_ENABLED=0 go build test/cmd/socksudpclient/socksudpclient.go;\
-		CGO_ENABLED=0 go build test/cmd/udpserver/udpserver.go;\
 		docker build -t mieru_httptest:${SHORT_SHA} -f test/deploy/httptest/Dockerfile .;\
-		rm mieru mita httpserver sockshttpclient socksudpclient udpserver;\
+		rm -f mieru mita httpserver sockshttpclient socksudpclient udpserver;\
 	fi
 
 # Run docker integration tests.
