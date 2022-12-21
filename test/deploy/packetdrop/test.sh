@@ -43,8 +43,32 @@ ip addr show
 echo "==========  END OF HOST NETWORK CONFIGURATION  =========="
 
 echo "========== BEGIN OF NAMESPACED NETWORK CONFIGURATION =========="
-ip netns exec ip addr show
+ip netns exec sim ip addr show
 echo "==========  END OF NAMESPACED NETWORK CONFIGURATION  =========="
 
 # Enable IP forwarding in the host.
 echo 1 > /proc/sys/net/ipv4/ip_forward
+
+# Go to the root directory of the project.
+cd "$(git rev-parse --show-toplevel)"
+
+# Start http server.
+ip netns exec sim ./httpserver &
+sleep 1
+
+# Start mieru server daemon.
+ip netns exec sim ./mita run &
+sleep 1
+
+# Run TCP test.
+echo "========== BEGIN OF TCP TEST =========="
+./test/deploy/packetdrop/test_tcp.sh
+echo "==========  END OF TCP TEST  =========="
+
+# Run UDP test.
+echo "========== BEGIN OF UDP TEST =========="
+./test/deploy/packetdrop/test_udp.sh
+echo "==========  END OF UDP TEST  =========="
+
+echo "Test is successful."
+exit 0
