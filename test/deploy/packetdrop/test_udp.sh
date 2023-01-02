@@ -56,10 +56,10 @@ if [[ "$?" -ne 0 ]]; then
 fi
 
 # Start testing.
-sleep 1
-./sockshttpclient -dst_host=192.168.234.2 -dst_port=8080 \
+sleep 2
+./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
   -local_proxy_host=192.168.234.1 -local_proxy_port=1080 \
-  -test_case=reuse_conn -test_time_sec=120
+  -test_case=reuse_conn -test_time_sec=180
 if [ "$?" -ne "0" ]; then
     print_mieru_client_log
     print_mieru_client_thread_dump

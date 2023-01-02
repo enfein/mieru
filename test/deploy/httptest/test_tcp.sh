@@ -56,7 +56,7 @@ fi
 ./mieru profile cpu start /test/mieru.tcp.cpu.gz
 
 # Start testing.
-sleep 1
+sleep 2
 ./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
   -local_proxy_host=127.0.0.1 -local_proxy_port=1080 \
   -test_case=new_conn -num_request=3000

@@ -21,6 +21,7 @@ import (
 	"bufio"
 	"crypto/sha1"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -133,14 +134,19 @@ func main() {
 	} else if *testCase == ReuseConnTest {
 		var conn net.Conn
 		var err error
-		if *noProxy {
-			conn, err = net.Dial("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
-		} else {
-			socksDialer := socks5client.DialSocksProxy(socks5client.SOCKS5, *localProxyHost+":"+strconv.Itoa(*localProxyPort), socks5client.ConnectCmd)
-			conn, _, _, err = socksDialer("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
-		}
-		if err != nil {
-			log.Fatalf("dial failed: %v", err)
+		for {
+			if *noProxy {
+				conn, err = net.Dial("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
+			} else {
+				socksDialer := socks5client.DialSocksProxy(socks5client.SOCKS5, *localProxyHost+":"+strconv.Itoa(*localProxyPort), socks5client.ConnectCmd)
+				conn, _, _, err = socksDialer("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
+			}
+			if err == nil {
+				break
+			}
+			if !errors.Is(err, io.EOF) {
+				log.Fatalf("dial failed: %v", err)
+			}
 		}
 		conn = wrapConn(conn)
 		if *numRequest > 0 {
@@ -179,14 +185,19 @@ func main() {
 func CreateNewConnAndDoRequest(seq int, noProxy bool) {
 	var conn net.Conn
 	var err error
-	if noProxy {
-		conn, err = net.Dial("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
-	} else {
-		socksDialer := socks5client.DialSocksProxy(socks5client.SOCKS5, *localProxyHost+":"+strconv.Itoa(*localProxyPort), socks5client.ConnectCmd)
-		conn, _, _, err = socksDialer("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
-	}
-	if err != nil {
-		log.Fatalf("dial failed: %v", err)
+	for {
+		if noProxy {
+			conn, err = net.Dial("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
+		} else {
+			socksDialer := socks5client.DialSocksProxy(socks5client.SOCKS5, *localProxyHost+":"+strconv.Itoa(*localProxyPort), socks5client.ConnectCmd)
+			conn, _, _, err = socksDialer("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
+		}
+		if err == nil {
+			break
+		}
+		if !errors.Is(err, io.EOF) {
+			log.Fatalf("dial failed: %v", err)
+		}
 	}
 	defer conn.Close()
 	DoRequestWithExistingConn(wrapConn(conn), seq)

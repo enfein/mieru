@@ -106,32 +106,12 @@ In addition to this, mita can listen to several different ports. You can also cr
     ],
     "users": [
         {
-            "name": "buyaohesuan",
-            "password": "yaochifan"
-        },
-        {
-            "name": "buyaofengkong",
-            "password": "yaoziyou"
-        },
-        {
-            "name": "buyaohuangyan",
-            "password": "yaozunyan"
-        },
-        {
-            "name": "buyaowenge",
-            "password": "yaogaige"
-        },
-        {
-            "name": "buyaolingxiu",
-            "password": "yaoxuanpiao"
-        },
-        {
-            "name": "buzuonucai",
-            "password": "zuogongmin"
-        },
-        {
             "name": "ducaiguozei",
             "password": "xijinping"
+        },
+        {
+            "name": "meiyougongchandang",
+            "password": "caiyouxinzhongguo"
         }
     ],
     "loggingLevel": "INFO",

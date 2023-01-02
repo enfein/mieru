@@ -36,6 +36,7 @@ ip link set veth-server netns sim
 ip addr add 192.168.234.1/24 dev veth-client
 ip netns exec sim ip addr add 192.168.234.2/24 dev veth-server
 ip link set veth-client up
+ip netns exec sim ip link set lo up
 ip netns exec sim ip link set veth-server up
 
 echo "========== BEGIN OF HOST NETWORK CONFIGURATION =========="
@@ -57,8 +58,22 @@ ip netns exec sim ./httpserver &
 sleep 1
 
 # Start mieru server daemon.
+mkdir -p /etc/mita
+export MITA_INSECURE_UDS=1
 ip netns exec sim ./mita run &
 sleep 1
+
+# Add 100ms delay.
+tc qdisc add dev veth-client root netem delay 50ms 10ms distribution normal
+ip netns exec sim tc qdisc add dev veth-server root netem delay 50ms 10ms distribution normal
+
+# Randomly drop 1% of packets.
+# ip netns exec sim iptables -F INPUT
+# ip netns exec sim iptables -F OUTPUT
+# ip netns exec sim iptables -A INPUT -p tcp --dport 8964 -m statistic --mode random --probability 0.01 -j DROP
+# ip netns exec sim iptables -A OUTPUT -p tcp --sport 8964 -m statistic --mode random --probability 0.01 -j DROP
+# ip netns exec sim iptables -A INPUT -p udp --dport 8964 -m statistic --mode random --probability 0.01 -j DROP
+# ip netns exec sim iptables -A OUTPUT -p udp --sport 8964 -m statistic --mode random --probability 0.01 -j DROP
 
 # Run TCP test.
 echo "========== BEGIN OF TCP TEST =========="
