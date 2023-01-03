@@ -68,12 +68,12 @@ tc qdisc add dev veth-client root netem delay 50ms 10ms distribution normal
 ip netns exec sim tc qdisc add dev veth-server root netem delay 50ms 10ms distribution normal
 
 # Randomly drop 1% of packets.
-# ip netns exec sim iptables -F INPUT
-# ip netns exec sim iptables -F OUTPUT
-# ip netns exec sim iptables -A INPUT -p tcp --dport 8964 -m statistic --mode random --probability 0.01 -j DROP
-# ip netns exec sim iptables -A OUTPUT -p tcp --sport 8964 -m statistic --mode random --probability 0.01 -j DROP
-# ip netns exec sim iptables -A INPUT -p udp --dport 8964 -m statistic --mode random --probability 0.01 -j DROP
-# ip netns exec sim iptables -A OUTPUT -p udp --sport 8964 -m statistic --mode random --probability 0.01 -j DROP
+ip netns exec sim iptables -F INPUT
+ip netns exec sim iptables -F OUTPUT
+ip netns exec sim iptables -A INPUT -p tcp --dport 8964 -m statistic --mode random --probability 0.01 -j DROP
+ip netns exec sim iptables -A INPUT -p tcp --sport 8964 -m statistic --mode random --probability 0.01 -j DROP
+ip netns exec sim iptables -A INPUT -p udp --dport 8964 -m statistic --mode random --probability 0.01 -j DROP
+ip netns exec sim iptables -A INPUT -p udp --sport 8964 -m statistic --mode random --probability 0.01 -j DROP
 
 # Run TCP test.
 echo "========== BEGIN OF TCP TEST =========="

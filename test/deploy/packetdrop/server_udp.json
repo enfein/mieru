@@ -14,6 +14,6 @@
     "advancedSettings": {
         "allowLocalDestination": true
     },
-    "loggingLevel": "DEBUG",
+    "loggingLevel": "INFO",
     "mtu": 1400
 }

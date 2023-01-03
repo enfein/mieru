@@ -14,5 +14,5 @@
     "advancedSettings": {
         "allowLocalDestination": true
     },
-    "loggingLevel": "DEBUG"
+    "loggingLevel": "INFO"
 }
