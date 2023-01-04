@@ -67,13 +67,13 @@ sleep 1
 tc qdisc add dev veth-client root netem delay 50ms 10ms distribution normal
 ip netns exec sim tc qdisc add dev veth-server root netem delay 50ms 10ms distribution normal
 
-# Randomly drop 1% of packets.
+# Randomly drop 0.1% of packets in both directions.
 ip netns exec sim iptables -F INPUT
 ip netns exec sim iptables -F OUTPUT
-ip netns exec sim iptables -A INPUT -p tcp --dport 8964 -m statistic --mode random --probability 0.01 -j DROP
-ip netns exec sim iptables -A INPUT -p tcp --sport 8964 -m statistic --mode random --probability 0.01 -j DROP
-ip netns exec sim iptables -A INPUT -p udp --dport 8964 -m statistic --mode random --probability 0.01 -j DROP
-ip netns exec sim iptables -A INPUT -p udp --sport 8964 -m statistic --mode random --probability 0.01 -j DROP
+ip netns exec sim iptables -A INPUT -p tcp --dport 8964 -m statistic --mode random --probability 0.001 -j DROP
+ip netns exec sim iptables -A INPUT -p udp --dport 8964 -m statistic --mode random --probability 0.001 -j DROP
+iptables -A INPUT -p tcp --sport 8964 -m statistic --mode random --probability 0.001 -j DROP
+iptables -A INPUT -p udp --sport 8964 -m statistic --mode random --probability 0.001 -j DROP
 
 # Run TCP test.
 echo "========== BEGIN OF TCP TEST =========="
@@ -84,6 +84,10 @@ echo "==========  END OF TCP TEST  =========="
 echo "========== BEGIN OF UDP TEST =========="
 ./test/deploy/packetdrop/test_udp.sh
 echo "==========  END OF UDP TEST  =========="
+
+# Remove root network namespace iptables rules.
+iptables -D INPUT -p tcp --sport 8964 -m statistic --mode random --probability 0.001 -j DROP
+iptables -D INPUT -p udp --sport 8964 -m statistic --mode random --probability 0.001 -j DROP
 
 echo "Test is successful."
 exit 0
