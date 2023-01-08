@@ -154,7 +154,7 @@ func (s *Server) Serve(l net.Listener) error {
 		case conn := <-s.chAccept:
 			go func() {
 				err := s.ServeConn(conn)
-				if err != nil {
+				if err != nil && !stderror.IsEOF(err) {
 					log.Debugf("socks5 server listener %v ServeConn() failed: %v", s.listener.Addr(), err)
 				}
 			}()

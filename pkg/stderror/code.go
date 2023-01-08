@@ -17,7 +17,6 @@ package stderror
 
 import (
 	"fmt"
-	"strings"
 )
 
 var (
@@ -36,15 +35,3 @@ var (
 	ErrUnknownCommand   = fmt.Errorf("UNKNOWN COMMAND")
 	ErrUnsupported      = fmt.Errorf("UNSUPPORTED")
 )
-
-// IsConnRefused returns true if the cause of error is connection refused.
-func IsConnRefused(err error) bool {
-	s := strings.ToLower(err.Error())
-	return strings.Contains(s, "connection refused") || strings.Contains(s, "no connection could be made because the target machine actively refused it")
-}
-
-// IsPermissionDenied returns true if the cause of error is permission denied.
-func IsPermissionDenied(err error) bool {
-	s := strings.ToLower(err.Error())
-	return strings.Contains(s, "permission denied")
-}

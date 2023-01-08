@@ -31,12 +31,12 @@ type Float interface {
 	~float32 | ~float64
 }
 
-type Ordered interface {
+type Number interface {
 	Integer | Float
 }
 
 // Min returns the minimum value between two input numbers.
-func Min[T Ordered](a, b T) T {
+func Min[T Number](a, b T) T {
 	if a <= b {
 		return a
 	}
@@ -44,7 +44,7 @@ func Min[T Ordered](a, b T) T {
 }
 
 // Max returns the maximum value between two input numbers.
-func Max[T Ordered](a, b T) T {
+func Max[T Number](a, b T) T {
 	if a >= b {
 		return a
 	}
@@ -52,6 +52,14 @@ func Max[T Ordered](a, b T) T {
 }
 
 // Mid returns the median value of three input numbers.
-func Mid[T Ordered](a, b, c T) T {
+func Mid[T Number](a, b, c T) T {
 	return Min(a, Max(b, c))
+}
+
+// Abs returns the absolute value of the input number.
+func Abs[T Number](a T) T {
+	if a >= 0 {
+		return a
+	}
+	return -a
 }

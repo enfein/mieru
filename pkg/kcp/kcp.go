@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/enfein/mieru/pkg/cipher"
+	"github.com/enfein/mieru/pkg/congestion"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/mathext"
 	"github.com/enfein/mieru/pkg/metrics"
@@ -24,11 +25,6 @@ const (
 
 	// Maximum MTU of UDP packet. UDP overhead is 8 bytes, IP overhead is maximum 40 bytes.
 	MaxMTU = MaxBufSize - 48
-
-	IKCP_RTO_NDL = 100   // no delay min retransmission timeout
-	IKCP_RTO_MIN = 500   // normal min retransmission timeout
-	IKCP_RTO_DEF = 1000  // initial retransmission timeout
-	IKCP_RTO_MAX = 60000 // max retransmission timeout
 
 	IKCP_CMD_VER     = 0                   // version of command set
 	IKCP_CMD_MAX_VER = 7                   // maximum version of command set
@@ -123,12 +119,12 @@ type segment struct {
 	// byte 20 - 21: data length
 	// byte 22 - 23: data + padding length
 
-	rto      uint32 // retransmission timeout
-	xmit     uint32 // times of (re)transmission
-	resendTs uint32 // when should we resend the packet
-	fastAck  uint32 // number of out of order ACK received
-	acked    bool   // mark if the seg has acked
-	data     []byte // actual data
+	rto      time.Duration // retransmission timeout
+	xmit     uint32        // times of (re)transmission
+	resendTs uint32        // when should we resend the packet
+	fastAck  uint32        // number of out of order ACK received
+	acked    bool          // mark if the seg has acked
+	data     []byte        // actual data
 }
 
 // String returns a string representation of the segment.
@@ -179,23 +175,19 @@ type KCP struct {
 	disconnected bool   // if connection is down
 
 	// Flow control.
-	sendUna            uint32 // the sequence number of next packet that we have sent but not acknowledged by remote
-	sendNext           uint32 // the sequence number of next packet to send
-	recvNext           uint32 // the sequence number of next packet expected to be received by application
-	ssthresh           uint32 // slow start threshold
-	rxRTO              uint32 // retransmission timeout
-	rxSRTT             int32  // smoothed round trip time (used to calculate rxRTO)
-	rxRTTvar           int32  // round trip time variation (used to calculate rxRTO)
-	rxMinRTO           uint32 // minimum retransmission timeout
-	sendWindow         uint32 // my sending window size
-	recvWindow         uint32 // my receiving window size
-	remoteWindow       uint32 // remote receiving window size
-	congestionWindow   uint32 // congestion window size
-	incrWindowSize     uint32 // increased window length in bytes, which determines cwnd
-	probe              uint32 // whether needs to send window probe
-	nodelay            uint32 // enable or disable no delay mode
-	fastResend         uint32 // the number of out of order ACK to trigger fast retransmission, use 0 to disable this feature
-	noCongestionWindow bool   // do not consider congestion window
+	sendUna            uint32               // the sequence number of next packet that we have sent but not acknowledged by remote
+	sendNext           uint32               // the sequence number of next packet to send
+	recvNext           uint32               // the sequence number of next packet expected to be received by application
+	ssthresh           uint32               // slow start threshold
+	sendWindow         uint32               // my sending window size
+	recvWindow         uint32               // my receiving window size
+	remoteWindow       uint32               // remote receiving window size
+	congestionWindow   uint32               // congestion window size
+	incrWindowSize     uint32               // increased window length in bytes, which determines cwnd
+	probe              uint32               // whether needs to send window probe
+	fastResend         uint32               // the number of out of order ACK to trigger fast retransmission, use 0 to disable this feature
+	noCongestionWindow bool                 // do not consider congestion window
+	rttStat            *congestion.RTTStats // round trip time statistics
 
 	// Operation control.
 	interval  uint32 // output interval
@@ -238,9 +230,9 @@ func NewKCP(conv uint32, output outputCallback) *KCP {
 	kcp.mss = kcp.mtu - IKCP_OVERHEAD
 	kcp.buffer = make([]byte, kcp.mtu)
 	kcp.ssthresh = IKCP_THRESH_MIN
-	kcp.rxRTO = IKCP_RTO_DEF
-	kcp.rxMinRTO = IKCP_RTO_MIN
 	kcp.fastResend = IKCP_ACK_FAST
+	kcp.rttStat = congestion.NewRTTStats()
+	kcp.rttStat.SetMaxAckDelay(10 * IKCP_INTERVAL * time.Millisecond)
 	kcp.interval = IKCP_INTERVAL
 	kcp.deadLink = IKCP_DEADLINK
 	kcp.outputCall = output
@@ -375,7 +367,7 @@ func (kcp *KCP) Input(data []byte, ackNoDelay bool) error {
 	if hasAck {
 		current := currentMs()
 		if timediff(current, ackLatestTimestamp) >= 0 {
-			kcp.calculateRTO(timediff(current, ackLatestTimestamp))
+			kcp.rttStat.UpdateRTT(time.Duration(timediff(current, ackLatestTimestamp)) * time.Millisecond)
 		}
 	}
 
@@ -723,14 +715,14 @@ func (kcp *KCP) Output(ackOnly bool) uint32 {
 		if segment.xmit == 0 {
 			// Initial transmit.
 			needsend = true
-			segment.rto = kcp.rxRTO
-			segment.resendTs = current + segment.rto
+			segment.rto = kcp.rttStat.RTO()
+			segment.resendTs = current + uint32(segment.rto/time.Millisecond)
 		} else if segment.fastAck >= fastResend {
 			// Fast retransmit after received multiple acks with old sequence numbers.
 			needsend = true
 			segment.fastAck = 0
-			segment.rto = kcp.rxRTO
-			segment.resendTs = current + segment.rto
+			segment.rto = kcp.rttStat.RTO()
+			segment.resendTs = current + uint32(segment.rto/time.Millisecond)
 			fastRetransSegs++
 		} else if segment.fastAck > 0 && newSegsCount == 0 {
 			// There is no new segment to be sent in this flush,
@@ -738,19 +730,15 @@ func (kcp *KCP) Output(ackOnly bool) uint32 {
 			// This is known as early retransmit.
 			needsend = true
 			segment.fastAck = 0
-			segment.rto = kcp.rxRTO
-			segment.resendTs = current + segment.rto
+			segment.rto = kcp.rttStat.RTO()
+			segment.resendTs = current + uint32(segment.rto/time.Millisecond)
 			earlyRetransSegs++
 		} else if timediff(current, segment.resendTs) >= 0 {
 			// Retransmit timeout segment.
 			needsend = true
-			if kcp.nodelay == 0 {
-				segment.rto += kcp.rxRTO
-			} else {
-				segment.rto += kcp.rxRTO / 2
-			}
+			segment.rto += kcp.rttStat.RTO()
 			segment.fastAck = 0
-			segment.resendTs = current + segment.rto
+			segment.resendTs = current + uint32(segment.rto/time.Millisecond)
 			lostSegs++
 		}
 
@@ -887,23 +875,19 @@ func (kcp *KCP) SetMtu(mtu int) error {
 }
 
 // NoDelay options.
-// fastest: ikcp_nodelay(kcp, 1, 20, 2, true)
-// nodelay: 0:disable(default), 1:enable
+//
 // interval: internal update timer interval in millisecond
-// resend: 0:disable fast resend(default), 1:enable fast resend
+//
+// resend: 0 -> disable fast resend(default), 1 -> enable fast resend
+//
 // nc: disable congestion control
-func (kcp *KCP) NoDelay(nodelay, interval, resend uint32, nc bool) {
-	kcp.nodelay = nodelay
-	if nodelay != 0 {
-		kcp.rxMinRTO = IKCP_RTO_NDL
-	} else {
-		kcp.rxMinRTO = IKCP_RTO_MIN
-	}
-	if interval > 1000 {
-		interval = 1000
+func (kcp *KCP) NoDelay(interval, resend uint32, nc bool) {
+	if interval > 100 {
+		interval = 100
 	} else if interval < 10 {
 		interval = 10
 	}
+	kcp.rttStat.SetMaxAckDelay(10 * time.Duration(interval) * time.Millisecond)
 	kcp.interval = interval
 	kcp.fastResend = resend
 	kcp.noCongestionWindow = nc
@@ -949,18 +933,6 @@ func (kcp *KCP) MSS() uint32 {
 	return kcp.mss
 }
 
-func (kcp *KCP) RXSRTT() int32 {
-	return kcp.rxSRTT
-}
-
-func (kcp *KCP) RXRTTvar() int32 {
-	return kcp.rxRTTvar
-}
-
-func (kcp *KCP) RXRTO() uint32 {
-	return kcp.rxRTO
-}
-
 func (kcp *KCP) SendWindow() uint32 {
 	return kcp.sendWindow
 }
@@ -995,33 +967,6 @@ func (kcp *KCP) delSegment(seg *segment) {
 		PktCachePool.Put(seg.data)
 		seg.data = nil
 	}
-}
-
-// calculateRTO calculates retransmission timeout based on round trip time.
-// Algorithm used: https://tools.ietf.org/html/rfc6298
-func (kcp *KCP) calculateRTO(rtt int32) {
-	var rto uint32
-	if kcp.rxSRTT == 0 {
-		// Initialize SRTT and RTTVAR based on the first RTT sample.
-		// RTTVAR is half of SRTT.
-		kcp.rxSRTT = rtt
-		kcp.rxRTTvar = rtt >> 1
-	} else {
-		delta := rtt - kcp.rxSRTT
-		kcp.rxSRTT += delta >> 3
-		if delta < 0 {
-			delta = -delta
-		}
-		if rtt < kcp.rxSRTT-kcp.rxRTTvar {
-			// If the new RTT sample is below the bottom of the expected range,
-			// give an 8x reduced weight versus its normal weighting.
-			kcp.rxRTTvar += (delta - kcp.rxRTTvar) >> 5
-		} else {
-			kcp.rxRTTvar += (delta - kcp.rxRTTvar) >> 2
-		}
-	}
-	rto = uint32(kcp.rxSRTT) + mathext.Max(kcp.interval, uint32(kcp.rxRTTvar)<<2)
-	kcp.rxRTO = mathext.Mid(kcp.rxMinRTO, rto, IKCP_RTO_MAX)
 }
 
 // adjustSendUna adjusts our send unacknowledged sequence number based on the next packet

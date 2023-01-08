@@ -501,10 +501,10 @@ func (s *UDPSession) SetACKNoDelay(nodelay bool) {
 }
 
 // SetNoDelay calls KCP NoDelay().
-func (s *UDPSession) SetNoDelay(nodelay, interval, resend uint32, nc bool) {
+func (s *UDPSession) SetNoDelay(interval, resend uint32, nc bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.kcp.NoDelay(nodelay, interval, resend, nc)
+	s.kcp.NoDelay(interval, resend, nc)
 }
 
 // SetDSCP sets the 6bit DSCP field in IPv4 header, or 8bit Traffic Class in IPv6 header.
@@ -536,27 +536,6 @@ func (s *UDPSession) SetDSCP(dscp int) error {
 // GetConv gets conversation id of a session
 func (s *UDPSession) GetConv() uint32 {
 	return s.kcp.ConversationID()
-}
-
-// GetRTO gets current rto of the session
-func (s *UDPSession) GetRTO() uint32 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.kcp.RXRTO()
-}
-
-// GetSRTT gets current srtt of the session
-func (s *UDPSession) GetSRTT() int32 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.kcp.RXSRTT()
-}
-
-// GetRTTVar gets current rtt variance of the session
-func (s *UDPSession) GetSRTTVar() int32 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.kcp.RXRTTvar()
 }
 
 // -------- UDPSession private methods --------
@@ -993,7 +972,7 @@ func (l *Listener) packetInput(raw []byte, addr net.Addr) {
 			if conv == s.kcp.ConversationID() {
 				s.inputToKCP(data)
 			} else if sn == 0 {
-				log.Infof("another connection reused address %v, closing existing session", addr)
+				log.Debugf("another connection reused address %v, closing existing session", addr)
 				if err := s.Close(); err != nil {
 					log.Debugf("UDP session Close() failed: %v", err)
 				}

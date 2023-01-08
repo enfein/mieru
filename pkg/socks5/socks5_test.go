@@ -62,7 +62,7 @@ func TestSocks5Connect(t *testing.T) {
 			return
 		}
 	}()
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	// Dial to socks server.
 	conn, err := net.Dial("tcp", "127.0.0.1:12345")
@@ -173,7 +173,7 @@ func TestSocks5UDPAssociation(t *testing.T) {
 			return
 		}
 	}()
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	// Dial to socks server.
 	conn, err := net.Dial("tcp", "127.0.0.1:12346")
