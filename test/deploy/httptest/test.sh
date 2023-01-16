@@ -25,7 +25,7 @@ source ./libtest.sh
 
 # Start http server.
 ./httpserver &
-sleep 1
+sleep 2
 
 # Start UDP server.
 ./udpserver &

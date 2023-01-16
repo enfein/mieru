@@ -309,12 +309,12 @@ func (s *UDPSession) WriteBuffers(v [][]byte) (n int, err error) {
 				n += len(b)
 				for {
 					if len(b) <= int(s.kcp.MSS()) {
-						if err := s.kcp.Send(b); err != nil {
+						if err = s.kcp.Send(b); err != nil {
 							KCPSendErrors.Add(1)
 						}
 						break
 					} else {
-						if err := s.kcp.Send(b[:s.kcp.MSS()]); err != nil {
+						if err = s.kcp.Send(b[:s.kcp.MSS()]); err != nil {
 							KCPSendErrors.Add(1)
 						}
 						b = b[s.kcp.MSS():]
@@ -329,7 +329,7 @@ func (s *UDPSession) WriteBuffers(v [][]byte) (n int, err error) {
 			}
 			s.mu.Unlock()
 			kcp.BytesSent.Add(int64(n))
-			return n, nil
+			return n, err
 		}
 
 		var timeout *time.Timer
@@ -459,13 +459,6 @@ func (s *UDPSession) SetWriteDelay(delay bool) {
 	s.writeDelay = delay
 }
 
-// SetWindowSize set maximum window size.
-func (s *UDPSession) SetWindowSize(sndwnd, rcvwnd int) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.kcp.SetWindowSize(sndwnd, rcvwnd)
-}
-
 // SetMtu sets the maximum transmission unit (not including UDP header).
 func (s *UDPSession) SetMtu(mtu int) bool {
 	if mtu > kcp.MaxMTU {
@@ -498,13 +491,6 @@ func (s *UDPSession) SetACKNoDelay(nodelay bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.ackNoDelay = nodelay
-}
-
-// SetNoDelay calls KCP NoDelay().
-func (s *UDPSession) SetNoDelay(interval, resend uint32, nc bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.kcp.NoDelay(interval, resend, nc)
 }
 
 // SetDSCP sets the 6bit DSCP field in IPv4 header, or 8bit Traffic Class in IPv6 header.

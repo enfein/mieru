@@ -57,11 +57,12 @@ func TestUpdateRTT(t *testing.T) {
 func TestRTO(t *testing.T) {
 	s := NewRTTStats()
 	s.SetMaxAckDelay(2 * time.Second)
+	s.SetRTOMultiplier(2)
 
 	// First measurement.
 	s.UpdateRTT(300 * time.Millisecond)
-	if s.RTO() != 2900*time.Millisecond {
-		t.Errorf("RTO() = %v, want %v", s.RTO(), 2900*time.Millisecond)
+	if s.RTO() != 5800*time.Millisecond {
+		t.Errorf("RTO() = %v, want %v", s.RTO(), 5800*time.Millisecond)
 	}
 
 	// Reset measurement.

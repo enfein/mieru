@@ -23,6 +23,10 @@ import (
 	"sync"
 )
 
+var (
+	_ BlockCipher = &AESGCMBlockCipher{}
+)
+
 // AESGCMBlockCipher implements BlockCipher interface with AES-GCM algorithm.
 type AESGCMBlockCipher struct {
 	aead                cipher.AEAD

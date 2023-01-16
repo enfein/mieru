@@ -47,12 +47,15 @@ type RTTStats struct {
 	smoothedRTT   time.Duration
 	meanDeviation time.Duration
 
-	maxAckDelay time.Duration
+	maxAckDelay   time.Duration
+	rtoMultiplier float64
 }
 
 // NewRTTStats makes a properly initialized RTTStats object
 func NewRTTStats() *RTTStats {
-	return &RTTStats{}
+	return &RTTStats{
+		rtoMultiplier: 1.0,
+	}
 }
 
 // MinRTT Returns the minRTT for the entire connection.
@@ -80,7 +83,7 @@ func (r *RTTStats) RTO() time.Duration {
 	}
 	rto := r.SmoothedRTT() + mathext.Max(4*r.MeanDeviation(), 10*time.Millisecond)
 	rto += r.MaxAckDelay()
-	return rto
+	return time.Duration(float64(rto) * r.rtoMultiplier)
 }
 
 // UpdateRTT updates the RTT based on a new sample.
@@ -107,6 +110,14 @@ func (r *RTTStats) UpdateRTT(sample time.Duration) {
 // SetMaxAckDelay sets the max_ack_delay
 func (r *RTTStats) SetMaxAckDelay(mad time.Duration) {
 	r.maxAckDelay = mad
+}
+
+// SetRTOMultiplier sets the retransmission timeout multiplier.
+func (r *RTTStats) SetRTOMultiplier(n float64) {
+	if n <= 0 {
+		panic("retransmission timeout multiplier must be greater than 0")
+	}
+	r.rtoMultiplier = n
 }
 
 // SetInitialRTT sets the initial RTT.

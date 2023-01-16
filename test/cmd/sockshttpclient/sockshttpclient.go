@@ -49,6 +49,7 @@ var (
 	testCase       = flag.String("test_case", "new_conn", fmt.Sprintf("Supported: %q, %q.", NewConnTest, ReuseConnTest))
 	intervalMs     = flag.Int("interval_ms", 0, "Sleep in milliseconds between two requests.")
 	numRequest     = flag.Int("num_request", 0, "Number of HTTP requests send to server before exit. This option is not compatible with -test_time_sec.")
+	printSpeed     = flag.Int("print_speed", 100, "Number of HTTP requests to print the network speed.")
 	testTimeSec    = flag.Int("test_time_sec", 0, "Number of seconds to run the test before exit. This option is not compatible with -num_request.")
 
 	totalBytes int64
@@ -105,7 +106,7 @@ func main() {
 		if *numRequest > 0 {
 			for i := 1; i <= *numRequest; i++ {
 				CreateNewConnAndDoRequest(i, *noProxy)
-				if i%100 == 0 {
+				if *printSpeed > 0 && i%*printSpeed == 0 {
 					printNetworkSpeed(i)
 				}
 				time.Sleep(time.Millisecond * time.Duration(*intervalMs))
@@ -123,7 +124,7 @@ func main() {
 					return
 				default:
 					CreateNewConnAndDoRequest(i, *noProxy)
-					if i%100 == 0 {
+					if *printSpeed > 0 && i%*printSpeed == 0 {
 						printNetworkSpeed(i)
 					}
 					time.Sleep(time.Millisecond * time.Duration(*intervalMs))
@@ -152,7 +153,7 @@ func main() {
 		if *numRequest > 0 {
 			for i := 1; i <= *numRequest; i++ {
 				DoRequestWithExistingConn(conn, i)
-				if i%100 == 0 {
+				if *printSpeed > 0 && i%*printSpeed == 0 {
 					printNetworkSpeed(i)
 				}
 				time.Sleep(time.Millisecond * time.Duration(*intervalMs))
@@ -170,7 +171,7 @@ func main() {
 					return
 				default:
 					DoRequestWithExistingConn(conn, i)
-					if i%100 == 0 {
+					if *printSpeed > 0 && i%*printSpeed == 0 {
 						printNetworkSpeed(i)
 					}
 					time.Sleep(time.Millisecond * time.Duration(*intervalMs))

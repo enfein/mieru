@@ -22,6 +22,7 @@ import (
 var (
 	ErrAlreadyExist     = fmt.Errorf("ALREADY EXIST")
 	ErrAlreadyStarted   = fmt.Errorf("ALREADY STARTED")
+	ErrDisconnected     = fmt.Errorf("DISCONNECTED")
 	ErrFileNotExist     = fmt.Errorf("FILE NOT EXIST")
 	ErrIDNotMatch       = fmt.Errorf("ID NOT MATCH")
 	ErrInternal         = fmt.Errorf("INTERNAL")

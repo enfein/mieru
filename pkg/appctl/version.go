@@ -16,5 +16,5 @@
 package appctl
 
 const (
-	AppVersion = "1.9.1"
+	AppVersion = "1.10.0"
 )

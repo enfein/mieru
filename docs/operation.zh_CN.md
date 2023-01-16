@@ -64,20 +64,20 @@ mieru start
 
 ## 判断客户端与服务器之间的连接是否正常
 
-如果服务器仅有一个客户端，判断连接是否正常，只需要查看服务器日志。例如，在下面的日志示例中
+判断连接是否正常，只需要查看客户端日志。例如，在下面的日志中
 
 ```
 INFO [metrics]
-INFO [metrics - cipher - server] DirectDecrypt=0 FailedDirectDecrypt=0 FailedIterateDecrypt=0
-INFO [metrics - connections] ActiveOpens=0 CurrEstablished=0 MaxConn=0 PassiveOpens=0
+INFO [metrics - cipher - client] DirectDecrypt=7241 FailedDirectDecrypt=0
+INFO [metrics - connections] ActiveOpens=42 CurrEstablished=20 MaxConn=26 PassiveOpens=0
 INFO [metrics - errors] KCPInErrors=0 KCPReceiveErrors=0 KCPSendErrors=0 TCPReceiveErrors=0 TCPSendErrors=0 UDPInErrors=0
-INFO [metrics - KCP] BytesReceived=0 BytesSent=0 EarlyRetransSegs=0 FastRetransSegs=0 InSegs=0 LostSegs=0 OutOfWindowSegs=0 OutSegs=0 RepeatSegs=0 RetransSegs=0
+INFO [metrics - KCP] BytesReceived=8115713 BytesSent=113291 FastRetransSegs=0 InSegs=7168 LostSegs=0 OutOfWindowSegs=166 OutSegs=7168 RepeatSegs=0 RetransSegs=0
 INFO [metrics - replay] KnownSession=0 NewSession=0
 INFO [metrics - socks5] ConnectionRefusedErrors=0 DNSResolveErrors=0 HandshakeErrors=0 HostUnreachableErrors=0 NetworkUnreachableErrors=0 UDPAssociateErrors=0 UDPAssociateInBytes=0 UDPAssociateInPkts=0 UDPAssociateOutBytes=0 UDPAssociateOutPkts=0 UnsupportedCommandErrors=0
-INFO [metrics - traffic] InBytes=0 OutBytes=0 OutPaddingBytes=0
+INFO [metrics - traffic] InBytes=8645909 OutBytes=941739 OutPaddingBytes=444693
 ```
 
-如果 `CurrEstablished` 的值不为 0，说明此刻服务器与客户端之间有活跃的连接。如果 `DirectDecrypt` 的值不为 0，说明服务器曾经成功解密了客户端发送的数据包。如果 `OutBytes` 的值不为 0，说明服务器曾经向客户端发送过数据包。
+如果 `CurrEstablished` 的值不为 0，说明此刻客户端与服务器之间有活跃的连接。如果 `DirectDecrypt` 的值不为 0，说明客户端曾经成功解密了服务器返回的数据包。
 
 ## 故障诊断与排查
 

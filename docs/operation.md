@@ -64,20 +64,20 @@ mieru start
 
 ## Check connectivity between client and server
 
-When the server has a single client, to determine if the connectivity is OK, you can look at the server logs. For example, in the following log,
+To determine if the connectivity is OK, you can look at the client logs. For example, in this log,
 
 ```
 INFO [metrics]
-INFO [metrics - cipher - server] DirectDecrypt=0 FailedDirectDecrypt=0 FailedIterateDecrypt=0
-INFO [metrics - connections] ActiveOpens=0 CurrEstablished=0 MaxConn=0 PassiveOpens=0
+INFO [metrics - cipher - client] DirectDecrypt=7241 FailedDirectDecrypt=0
+INFO [metrics - connections] ActiveOpens=42 CurrEstablished=20 MaxConn=26 PassiveOpens=0
 INFO [metrics - errors] KCPInErrors=0 KCPReceiveErrors=0 KCPSendErrors=0 TCPReceiveErrors=0 TCPSendErrors=0 UDPInErrors=0
-INFO [metrics - KCP] BytesReceived=0 BytesSent=0 EarlyRetransSegs=0 FastRetransSegs=0 InSegs=0 LostSegs=0 OutOfWindowSegs=0 OutSegs=0 RepeatSegs=0 RetransSegs=0
+INFO [metrics - KCP] BytesReceived=8115713 BytesSent=113291 FastRetransSegs=0 InSegs=7168 LostSegs=0 OutOfWindowSegs=166 OutSegs=7168 RepeatSegs=0 RetransSegs=0
 INFO [metrics - replay] KnownSession=0 NewSession=0
 INFO [metrics - socks5] ConnectionRefusedErrors=0 DNSResolveErrors=0 HandshakeErrors=0 HostUnreachableErrors=0 NetworkUnreachableErrors=0 UDPAssociateErrors=0 UDPAssociateInBytes=0 UDPAssociateInPkts=0 UDPAssociateOutBytes=0 UDPAssociateOutPkts=0 UnsupportedCommandErrors=0
-INFO [metrics - traffic] InBytes=0 OutBytes=0 OutPaddingBytes=0
+INFO [metrics - traffic] InBytes=8645909 OutBytes=941739 OutPaddingBytes=444693
 ```
 
-if the value of `CurrEstablished` is not 0, there is an active connection between the server and the client at this moment; if the value of `DirectDecrypt` is not 0, the server has successfully decrypted the packets sent by the client; if the value of `OutBytes` is not 0, the server has sent a packet to the client.
+if the value of `CurrEstablished` is not 0, there is an active connection between the client and the server at this moment; if the value of `DirectDecrypt` is not 0, the client has successfully decrypted the response packets sent by the server.
 
 ## Troubleshooting suggestions
 

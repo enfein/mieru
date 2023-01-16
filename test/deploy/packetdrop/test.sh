@@ -54,8 +54,8 @@ echo 1 > /proc/sys/net/ipv4/ip_forward
 cd "$(git rev-parse --show-toplevel)"
 
 # Start http server.
-ip netns exec sim ./httpserver &
-sleep 1
+ip netns exec sim ./httpserver -huge &
+sleep 2
 
 # Start mieru server daemon.
 mkdir -p /etc/mita

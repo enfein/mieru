@@ -3,6 +3,7 @@ package kcp
 import (
 	crand "crypto/rand"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/enfein/mieru/pkg/cipher"
@@ -37,20 +38,20 @@ const (
 	IKCP_ASK_SEND = 1 // need to send IKCP_CMD_WASK
 	IKCP_ASK_TELL = 2 // need to send IKCP_CMD_WINS
 
-	IKCP_WND_SND = 1024 // send window size (number of packets)
-	IKCP_WND_RCV = 1024 // receive window size (number of packets)
+	IKCP_WND_SND_MIN = 32    // minimum send window size (number of packets)
+	IKCP_WND_SND_MAX = 65535 // maximum send window size (number of packets)
+	IKCP_WND_RCV     = 65535 // maximum receive window size (number of packets)
 
 	IKCP_MTU_DEF = MaxMTU - OuterHeaderSize // KCP MTU
 
-	IKCP_ACK_FAST         = 3      // do retransmission after receiving the number of out of order ACK
-	IKCP_INTERVAL         = 20     // event loop interval in milliseconds
-	IKCP_OVERHEAD         = 24     // size of KCP header
-	IKCP_DEADLINK         = 20     // retransmission times before link is dead
-	IKCP_THRESH_MIN       = 32     // minimum slow start threshold (number of packets)
-	IKCP_PROBE_INIT       = 5000   // initial window probe timeout
-	IKCP_PROBE_LIMIT      = 120000 // maxinum window probe timeout
-	IKCP_SN_OFFSET        = 12     // offset to get sequence number in KCP header
-	IKCP_TOTAL_LEN_OFFSET = 22     // offset to get segment total length (data + padding)
+	IKCP_ACK_FAST       = 3    // do retransmission after receiving the number of out of order ACK
+	IKCP_INTERVAL       = 10   // event loop interval in milliseconds
+	IKCP_PROBE_INTERVAL = 1000 // window probe interval in milliseconds
+	IKCP_DEADLINK       = 30   // number of retransmissions before link is dead
+
+	IKCP_OVERHEAD         = 24 // size of KCP header
+	IKCP_SN_OFFSET        = 12 // offset to get sequence number in KCP header
+	IKCP_TOTAL_LEN_OFFSET = 22 // offset to get segment total length (data + padding)
 )
 
 var (
@@ -89,9 +90,6 @@ var (
 
 	// Number of fast retransmission segments.
 	FastRetransSegs = metrics.RegisterMetric("KCP", "FastRetransSegs")
-
-	// Number of early retransmission segments.
-	EarlyRetransSegs = metrics.RegisterMetric("KCP", "EarlyRetransSegs")
 
 	// Number of total retransmission segments.
 	RetransSegs = metrics.RegisterMetric("KCP", "RetransSegs")
@@ -175,31 +173,26 @@ type KCP struct {
 	disconnected bool   // if connection is down
 
 	// Flow control.
-	sendUna            uint32               // the sequence number of next packet that we have sent but not acknowledged by remote
-	sendNext           uint32               // the sequence number of next packet to send
-	recvNext           uint32               // the sequence number of next packet expected to be received by application
-	ssthresh           uint32               // slow start threshold
-	sendWindow         uint32               // my sending window size
-	recvWindow         uint32               // my receiving window size
-	remoteWindow       uint32               // remote receiving window size
-	congestionWindow   uint32               // congestion window size
-	incrWindowSize     uint32               // increased window length in bytes, which determines cwnd
-	probe              uint32               // whether needs to send window probe
-	fastResend         uint32               // the number of out of order ACK to trigger fast retransmission, use 0 to disable this feature
-	noCongestionWindow bool                 // do not consider congestion window
-	rttStat            *congestion.RTTStats // round trip time statistics
+	sendUna       uint32                         // the sequence number of next packet that we have sent but not acknowledged by remote
+	sendNext      uint32                         // the sequence number of next packet to send
+	recvNext      uint32                         // the sequence number of next packet expected to be received by application
+	recvWindow    uint16                         // our receiving window size
+	remoteWindow  uint16                         // remote receiving window size
+	fastResend    uint32                         // the number of out of order ACK to trigger fast retransmission, use 0 to disable this feature
+	rttStat       *congestion.RTTStats           // round trip time statistics
+	sendAlgorithm *congestion.CubicSendAlgorithm // congestion control algorithm
 
 	// Operation control.
-	interval  uint32 // output interval
-	tsProbe   uint32 // time to send probe
-	probeWait uint32 // delay before sending the probe
-	deadLink  uint32 // number of retry before mark the link as disconnected
+	interval uint32 // output interval
+	probe    uint32 // whether needs to send window probe
+	tsProbe  uint32 // time to send probe
+	deadLink uint32 // number of retry before mark the link as disconnected
 
 	lastInputTime  time.Time // last timestamp when Input() is called
 	lastOutputTime time.Time // last timestamp when Output() is called
 
 	sendQueue []segment // segments that waiting to be sent over the network
-	recvQueue []segment // segments that waiting to be read by upper layer application
+	recvQueue []segment // segments that waiting to be read by application
 	sendBuf   []segment // segments that are sent but not acknowledged by remote
 	recvBuf   []segment // segments that are received from the network
 
@@ -223,16 +216,16 @@ type ackItem struct {
 func NewKCP(conv uint32, output outputCallback) *KCP {
 	kcp := new(KCP)
 	kcp.conv = conv
-	kcp.sendWindow = IKCP_WND_SND
 	kcp.recvWindow = IKCP_WND_RCV
 	kcp.remoteWindow = IKCP_WND_RCV
 	kcp.mtu = IKCP_MTU_DEF
 	kcp.mss = kcp.mtu - IKCP_OVERHEAD
 	kcp.buffer = make([]byte, kcp.mtu)
-	kcp.ssthresh = IKCP_THRESH_MIN
 	kcp.fastResend = IKCP_ACK_FAST
 	kcp.rttStat = congestion.NewRTTStats()
-	kcp.rttStat.SetMaxAckDelay(10 * IKCP_INTERVAL * time.Millisecond)
+	kcp.rttStat.SetMaxAckDelay(2 * IKCP_INTERVAL * time.Millisecond)
+	kcp.rttStat.SetRTOMultiplier(1.5)
+	kcp.sendAlgorithm = congestion.NewCubicSendAlgorithm(IKCP_WND_SND_MIN, IKCP_WND_SND_MAX)
 	kcp.interval = IKCP_INTERVAL
 	kcp.deadLink = IKCP_DEADLINK
 	kcp.outputCall = output
@@ -258,7 +251,6 @@ func (kcp *KCP) ReserveBytes(n int) bool {
 //
 // 'ackNoDelay' will trigger immediate ACK, but surely it will not be efficient in bandwidth.
 func (kcp *KCP) Input(data []byte, ackNoDelay bool) error {
-	originalSendUna := kcp.sendUna
 	if len(data) < IKCP_OVERHEAD {
 		log.Warnf("data size %d is smaller than KCP header size %d", len(data), IKCP_OVERHEAD)
 		return stderror.ErrNoEnoughData
@@ -310,7 +302,7 @@ func (kcp *KCP) Input(data []byte, ackNoDelay bool) error {
 		kcp.lastInputTime = time.Now()
 
 		// The remote receiving window size is sent with each KCP segment.
-		kcp.remoteWindow = uint32(wnd)
+		kcp.remoteWindow = wnd
 
 		// The unacknowledged sequence number is also sent with each KCP segment.
 		if kcp.removeAckedPktsFromSendBuf(una) > 0 {
@@ -325,7 +317,12 @@ func (kcp *KCP) Input(data []byte, ackNoDelay bool) error {
 			kcp.processAck(sn)
 			kcp.processFastAck(sn, ts)
 		} else if cmd == IKCP_CMD_PUSH {
-			if timediff(sn, kcp.recvNext+kcp.recvWindow) < 0 {
+			if len(kcp.recvBuf) >= IKCP_WND_RCV {
+				kcp.recvWindow = 0
+			} else {
+				kcp.recvWindow = uint16(IKCP_WND_RCV - len(kcp.recvBuf))
+			}
+			if timediff(sn, kcp.recvNext+uint32(kcp.recvWindow)) < 0 {
 				// Append ack even for already received packets.
 				kcp.appendToAckList(sn, ts)
 				if timediff(sn, kcp.recvNext) >= 0 {
@@ -371,36 +368,6 @@ func (kcp *KCP) Input(data []byte, ackNoDelay bool) error {
 		}
 	}
 
-	// Update congestion window size, if enabled.
-	if !kcp.noCongestionWindow {
-		// The congestion window can be increased when we received ACK/UNA and removed
-		// some segments at the beginning of send buf.
-		if timediff(kcp.sendUna, originalSendUna) > 0 {
-			// The congestion window can be increased when it is smaller than remote advertised window size.
-			if kcp.congestionWindow < kcp.remoteWindow {
-				mss := kcp.mss
-				if kcp.congestionWindow < kcp.ssthresh {
-					// In slow start mode, grow 1 MSS for 1 ACK of packet.
-					kcp.congestionWindow++
-					kcp.incrWindowSize += mss
-				} else {
-					// Otherwise growth rate is inverse proportional to the window size.
-					if kcp.incrWindowSize < mss {
-						kcp.incrWindowSize = mss
-					}
-					kcp.incrWindowSize += (mss*mss)/kcp.incrWindowSize + (mss / 16)
-					if (kcp.congestionWindow+1)*mss <= kcp.incrWindowSize {
-						kcp.congestionWindow = (kcp.incrWindowSize + mss - 1) / mss
-					}
-				}
-				if kcp.congestionWindow > kcp.remoteWindow {
-					kcp.congestionWindow = kcp.remoteWindow
-					kcp.incrWindowSize = kcp.remoteWindow * mss
-				}
-			}
-		}
-	}
-
 	if ourReceiveWindowSizeChanged {
 		// Send out data along with our window size.
 		kcp.Output(false)
@@ -413,7 +380,9 @@ func (kcp *KCP) Input(data []byte, ackNoDelay bool) error {
 
 // Upper layer sends data to kcp state machine.
 func (kcp *KCP) Send(buffer []byte) error {
-	var nfrg int // number of fragments needed
+	if kcp.disconnected {
+		return stderror.ErrDisconnected
+	}
 	if len(buffer) == 0 {
 		log.Warnf("data to send is empty")
 		return stderror.ErrInvalidArgument
@@ -444,6 +413,7 @@ func (kcp *KCP) Send(buffer []byte) error {
 	}
 
 	// Calculate number of fragments needed to send the data.
+	var nfrg int
 	if len(buffer) <= int(kcp.mss) {
 		nfrg = 1
 	} else {
@@ -520,18 +490,16 @@ func (kcp *KCP) Recv(buffer []byte) (n int, err error) {
 	}
 
 	// Move available data from receive buf to receive queue.
-	mvCount := 0 // number of packets to move from receive buf to receive queue
+	mvCount := 0
 	for k := range kcp.recvBuf {
 		seg := &kcp.recvBuf[k]
-		// Only move packets out of receive buf if the sequence number matches next receiving number.
-		if seg.sn == kcp.recvNext && len(kcp.recvQueue)+mvCount < int(kcp.recvWindow) {
+		if seg.sn == kcp.recvNext {
 			kcp.recvNext++
 			mvCount++
 		} else {
 			break
 		}
 	}
-
 	if mvCount > 0 {
 		kcp.recvQueue = append(kcp.recvQueue, kcp.recvBuf[:mvCount]...)
 		kcp.recvBuf = kcp.removeFront(kcp.recvBuf, mvCount)
@@ -552,7 +520,7 @@ func (kcp *KCP) Output(ackOnly bool) uint32 {
 	var seg segment
 	seg.conv = kcp.conv
 	seg.cmd = IKCP_CMD_ACK
-	seg.wnd = kcp.receiveWindowSize()
+	seg.wnd = kcp.recvWindow
 	seg.sn = kcp.sendNext
 	seg.una = kcp.recvNext
 
@@ -627,29 +595,21 @@ func (kcp *KCP) Output(ackOnly bool) uint32 {
 		return kcp.interval
 	}
 
-	// Probe remote window size if it is unknown (0).
+	// Probe remote window size if it is zero.
 	if kcp.remoteWindow == 0 {
 		current := currentMs()
-		if kcp.probeWait == 0 {
-			kcp.probeWait = IKCP_PROBE_INIT
-			kcp.tsProbe = current + kcp.probeWait
+		if kcp.tsProbe == 0 {
+			kcp.tsProbe = current
+			kcp.probe |= IKCP_ASK_SEND
 		} else {
-			if timediff(current, kcp.tsProbe) >= 0 {
-				if kcp.probeWait < IKCP_PROBE_INIT {
-					kcp.probeWait = IKCP_PROBE_INIT
-				}
-				// If last probe is not successful, increase the probe interval to 1.5x.
-				kcp.probeWait += kcp.probeWait / 2
-				if kcp.probeWait > IKCP_PROBE_LIMIT {
-					kcp.probeWait = IKCP_PROBE_LIMIT
-				}
-				kcp.tsProbe = current + kcp.probeWait
+			// Last probe is not successful.
+			if timediff(current, kcp.tsProbe) > IKCP_PROBE_INTERVAL {
+				kcp.tsProbe = current
 				kcp.probe |= IKCP_ASK_SEND
 			}
 		}
 	} else {
 		kcp.tsProbe = 0
-		kcp.probeWait = 0
 	}
 
 	if (kcp.probe & IKCP_ASK_SEND) != 0 {
@@ -672,10 +632,7 @@ func (kcp *KCP) Output(ackOnly bool) uint32 {
 
 	// The initial congestion window size is set to the smaller of
 	// our send window size and remote receive window size.
-	cwnd := mathext.Min(kcp.sendWindow, kcp.remoteWindow)
-	if !kcp.noCongestionWindow {
-		cwnd = mathext.Min(kcp.congestionWindow, cwnd)
-	}
+	cwnd := mathext.Min(kcp.sendAlgorithm.CongestionWindowSize(), uint32(kcp.remoteWindow))
 
 	// Prepare sending data by moving data from send queue to send buf,
 	// up to send una + cwnd.
@@ -704,7 +661,7 @@ func (kcp *KCP) Output(ackOnly bool) uint32 {
 
 	// check for retransmissions
 	current := currentMs()
-	var fastRetransSegs, earlyRetransSegs, lostSegs int64
+	var fastRetransSegs, lostSegs int64
 
 	for k := range kcp.sendBuf {
 		segment := &kcp.sendBuf[k]
@@ -724,15 +681,6 @@ func (kcp *KCP) Output(ackOnly bool) uint32 {
 			segment.rto = kcp.rttStat.RTO()
 			segment.resendTs = current + uint32(segment.rto/time.Millisecond)
 			fastRetransSegs++
-		} else if segment.fastAck > 0 && newSegsCount == 0 {
-			// There is no new segment to be sent in this flush,
-			// but some old segments might need retransmission.
-			// This is known as early retransmit.
-			needsend = true
-			segment.fastAck = 0
-			segment.rto = kcp.rttStat.RTO()
-			segment.resendTs = current + uint32(segment.rto/time.Millisecond)
-			earlyRetransSegs++
 		} else if timediff(current, segment.resendTs) >= 0 {
 			// Retransmit timeout segment.
 			needsend = true
@@ -778,42 +726,13 @@ func (kcp *KCP) Output(ackOnly bool) uint32 {
 		FastRetransSegs.Add(fastRetransSegs)
 		totalRetransSegs += fastRetransSegs
 	}
-	if earlyRetransSegs > 0 {
-		EarlyRetransSegs.Add(earlyRetransSegs)
-		totalRetransSegs += earlyRetransSegs
-	}
 	if totalRetransSegs > 0 {
 		RetransSegs.Add(totalRetransSegs)
 	}
 
 	// Update congestion window.
-	if !kcp.noCongestionWindow {
-		// rate halving, https://tools.ietf.org/html/rfc6937
-		if fastRetransSegs > 0 || earlyRetransSegs > 0 {
-			inflight := kcp.sendNext - kcp.sendUna
-			kcp.ssthresh = inflight / 2
-			if kcp.ssthresh < IKCP_THRESH_MIN {
-				kcp.ssthresh = IKCP_THRESH_MIN
-			}
-			kcp.congestionWindow = kcp.ssthresh + kcp.fastResend
-			kcp.incrWindowSize = kcp.congestionWindow * kcp.mss
-		}
-
-		// congestion control, https://tools.ietf.org/html/rfc5681
-		if lostSegs > 0 {
-			kcp.ssthresh = cwnd / 2
-			if kcp.ssthresh < IKCP_THRESH_MIN {
-				kcp.ssthresh = IKCP_THRESH_MIN
-			}
-			kcp.congestionWindow = kcp.ssthresh
-			kcp.incrWindowSize = kcp.congestionWindow * kcp.mss
-		}
-
-		// Initialize congestionWindow value.
-		if kcp.congestionWindow < 1 {
-			kcp.congestionWindow = 1
-			kcp.incrWindowSize = kcp.mss
-		}
+	if totalRetransSegs > 0 {
+		kcp.sendAlgorithm.OnLoss()
 	}
 
 	return kcp.interval
@@ -874,36 +793,6 @@ func (kcp *KCP) SetMtu(mtu int) error {
 	return nil
 }
 
-// NoDelay options.
-//
-// interval: internal update timer interval in millisecond
-//
-// resend: 0 -> disable fast resend(default), 1 -> enable fast resend
-//
-// nc: disable congestion control
-func (kcp *KCP) NoDelay(interval, resend uint32, nc bool) {
-	if interval > 100 {
-		interval = 100
-	} else if interval < 10 {
-		interval = 10
-	}
-	kcp.rttStat.SetMaxAckDelay(10 * time.Duration(interval) * time.Millisecond)
-	kcp.interval = interval
-	kcp.fastResend = resend
-	kcp.noCongestionWindow = nc
-}
-
-// SetWindowSize sets send and receive window size.
-func (kcp *KCP) SetWindowSize(sndwnd, rcvwnd int) int {
-	if sndwnd > 0 {
-		kcp.sendWindow = uint32(sndwnd)
-	}
-	if rcvwnd > 0 {
-		kcp.recvWindow = uint32(rcvwnd)
-	}
-	return 0
-}
-
 // WaitSendSize gets how many packet is waiting to be sent.
 func (kcp *KCP) WaitSendSize() int {
 	return len(kcp.sendBuf) + len(kcp.sendQueue)
@@ -934,15 +823,15 @@ func (kcp *KCP) MSS() uint32 {
 }
 
 func (kcp *KCP) SendWindow() uint32 {
-	return kcp.sendWindow
+	return kcp.sendAlgorithm.CongestionWindowSize()
 }
 
 func (kcp *KCP) RecvWindow() uint32 {
-	return kcp.recvWindow
+	return uint32(kcp.recvWindow)
 }
 
 func (kcp *KCP) RemoteWindow() uint32 {
-	return kcp.remoteWindow
+	return uint32(kcp.remoteWindow)
 }
 
 func (kcp *KCP) StreamMode() bool {
@@ -1001,12 +890,16 @@ func (kcp *KCP) processAck(sn uint32) {
 			// which is an expensive operation for large window.
 			seg.acked = true
 			kcp.delSegment(seg)
+
+			// Update congestion window.
+			kcp.sendAlgorithm.OnAck()
+
 			break
 		}
 	}
 }
 
-// processFastAck iterates each segment in send buf. If a segment is older than
+// processFastAck iterates each segment in send buf. If a segment is after
 // the ACK sequence number, then increase its `fastAck` counter by 1.
 func (kcp *KCP) processFastAck(sn, ts uint32) {
 	// If sequence number is either too old or too new, drop it.
@@ -1014,6 +907,8 @@ func (kcp *KCP) processFastAck(sn, ts uint32) {
 		return
 	}
 
+	fastAckLimit := int(math.Sqrt(float64(len(kcp.sendBuf)))) + 1
+	fastAckCount := 0
 	for k := range kcp.sendBuf {
 		seg := &kcp.sendBuf[k]
 		if timediff(seg.sn, sn) > 0 {
@@ -1022,6 +917,10 @@ func (kcp *KCP) processFastAck(sn, ts uint32) {
 		}
 		if sn != seg.sn && timediff(seg.ts, ts) <= 0 {
 			seg.fastAck++
+			fastAckCount++
+		}
+		if fastAckCount >= fastAckLimit {
+			break
 		}
 	}
 }
@@ -1058,7 +957,7 @@ func (kcp *KCP) appendToAckList(sn, ts uint32) {
 func (kcp *KCP) processReceivedData(newseg segment) bool {
 	sn := newseg.sn
 	// If sequence number is either too old or too new, drop it.
-	if timediff(sn, kcp.recvNext+kcp.recvWindow) >= 0 || timediff(sn, kcp.recvNext) < 0 {
+	if timediff(sn, kcp.recvNext+uint32(kcp.recvWindow)) >= 0 || timediff(sn, kcp.recvNext) < 0 {
 		return true
 	}
 
@@ -1097,7 +996,7 @@ func (kcp *KCP) processReceivedData(newseg segment) bool {
 	rmCount := 0
 	for k := range kcp.recvBuf {
 		seg := &kcp.recvBuf[k]
-		if seg.sn == kcp.recvNext && len(kcp.recvQueue)+rmCount < int(kcp.recvWindow) {
+		if seg.sn == kcp.recvNext {
 			kcp.recvNext++
 			rmCount++
 		} else {
@@ -1110,14 +1009,6 @@ func (kcp *KCP) processReceivedData(newseg segment) bool {
 	}
 
 	return repeat
-}
-
-// receiveWindowSize returns number of slots still available in receive queue.
-func (kcp *KCP) receiveWindowSize() uint16 {
-	if len(kcp.recvQueue) < int(kcp.recvWindow) {
-		return uint16(int(kcp.recvWindow) - len(kcp.recvQueue))
-	}
-	return 0
 }
 
 // removeFront removes front n elements from the given segment buf / queue.

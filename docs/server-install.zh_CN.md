@@ -10,10 +10,10 @@
 
 ```sh
 # Debian / Ubuntu
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.9.1/mita_1.9.1_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.10.0/mita_1.10.0_amd64.deb
 
 # Fedora / CentOS / Red Hat Enterprise Linux
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.9.1/mita-1.9.1-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.10.0/mita-1.10.0-1.x86_64.rpm
 ```
 
 下载 ARM 架构的安装包，将链接中的 `amd64` 替换成 `arm64`，`x86_64` 替换成 `aarch64` 即可。如果上述链接被墙，请翻墙后使用浏览器从 GitHub Releases 页面下载安装。
@@ -22,10 +22,10 @@ curl -LSO https://github.com/enfein/mieru/releases/download/v1.9.1/mita-1.9.1-1.
 
 ```sh
 # Debian / Ubuntu
-sudo dpkg -i mita_1.9.1_amd64.deb
+sudo dpkg -i mita_1.10.0_amd64.deb
 
 # Fedora / CentOS / Red Hat Enterprise Linux
-sudo rpm -Uvh --force mita-1.9.1-1.x86_64.rpm
+sudo rpm -Uvh --force mita-1.10.0-1.x86_64.rpm
 ```
 
 ## 赋予当前用户操作 mita 的权限，需要重启服务器使此设置生效

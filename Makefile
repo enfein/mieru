@@ -32,7 +32,7 @@ PROJECT_NAME=$(shell basename "${ROOT}")
 # - pkg/appctl/version.go
 #
 # Use `tools/bump_version.sh` script to change all those files at one shot.
-VERSION="1.9.1"
+VERSION="1.10.0"
 
 # Build binaries and installation packages.
 .PHONY: build
