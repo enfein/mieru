@@ -30,16 +30,16 @@ var (
 	UDPAssociateErrors       = metrics.RegisterMetric("socks5", "UDPAssociateErrors")
 
 	// Incoming UDP association bytes.
-	UDPAssociateInBytes = metrics.RegisterMetric("socks5", "UDPAssociateInBytes")
+	UDPAssociateInBytes = metrics.RegisterMetric("socks5 UDP associate", "InBytes")
 
 	// Outgoing UDP association bytes.
-	UDPAssociateOutBytes = metrics.RegisterMetric("socks5", "UDPAssociateOutBytes")
+	UDPAssociateOutBytes = metrics.RegisterMetric("socks5 UDP associate", "OutBytes")
 
 	// Incoming UDP association packets.
-	UDPAssociateInPkts = metrics.RegisterMetric("socks5", "UDPAssociateInPkts")
+	UDPAssociateInPkts = metrics.RegisterMetric("socks5 UDP associate", "InPkts")
 
 	// Outgoing UDP association packets.
-	UDPAssociateOutPkts = metrics.RegisterMetric("socks5", "UDPAssociateOutPkts")
+	UDPAssociateOutPkts = metrics.RegisterMetric("socks5 UDP associate", "OutPkts")
 )
 
 // ProxyConfig is used to configure mieru proxy options.
@@ -270,7 +270,7 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 		}()
 		return BidiCopyUDP(udpAssociateConn, WrapUDPAssociateTunnel(proxyConn))
 	}
-	return BidiCopy(conn, proxyConn, true)
+	return netutil.BidiCopy(conn, proxyConn, true)
 }
 
 func (s *Server) serverServeConn(conn net.Conn) error {

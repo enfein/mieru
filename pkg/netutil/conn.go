@@ -15,7 +15,10 @@
 
 package netutil
 
-import "net"
+import (
+	"context"
+	"net"
+)
 
 // WaitForClose blocks the go routine. It returns when the peer closes the connection.
 // In the meanwhile, everything send by the peer is discarded.
@@ -27,4 +30,19 @@ func WaitForClose(conn net.Conn) {
 			return
 		}
 	}
+}
+
+// SendReceive sends a request to the connection and returns the response.
+// The maxinum size of response is 4096 bytes.
+func SendReceive(ctx context.Context, conn net.Conn, req []byte) (resp []byte, err error) {
+	_, err = conn.Write(req)
+	if err != nil {
+		return
+	}
+
+	resp = make([]byte, 4096)
+	var n int
+	n, err = conn.Read(resp)
+	resp = resp[:n]
+	return
 }

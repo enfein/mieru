@@ -44,7 +44,9 @@ mieru apply config <FILE>
     "rpcPort": -1,
     "socks5Port": -1,
     "loggingLevel": "INFO",
-    "socks5ListenLAN": false
+    "socks5ListenLAN": false,
+    "httpProxyPort": -1,
+    "httpProxyListenLAN": false
 }
 ```
 
@@ -56,9 +58,10 @@ mieru apply config <FILE>
 4. 如果你为代理服务器注册了域名，请在 `profiles` -> `servers` -> `domainName` 中填写域名。否则，请勿修改这个属性。
 5. 在 `profiles` -> `servers` -> `portBindings` -> `port` 中填写 mita 监听的 TCP 或 UDP 端口号。这个端口号必须与代理服务器中的设置相同。
 6. 请为 `profiles` -> `mtu` 属性中指定一个从 1280 到 1500 之间的值。默认值为 1400。这个值可以与代理服务器中的设置不同。
-7. 请为 `rpcPort` 属性指定一个从 1025 到 65535 之间的数值。**请确保防火墙允许使用该端口进行通信。**
-8. 请为 `socks5Port` 属性指定一个从 1025 到 65535 之间的数值。该端口不能与 `rpcPort` 相同。**请确保防火墙允许使用该端口进行通信。**
+7. 请为 `rpcPort` 属性指定一个从 1025 到 65535 之间的数值。
+8. 请为 `socks5Port` 属性指定一个从 1025 到 65535 之间的数值。该端口不能与 `rpcPort` 相同。
 9. 如果客户端需要为局域网中的其他设备提供代理服务，请将 `socks5ListenLAN` 属性设置为 `true`。
+10. 如果要启动 HTTP / HTTPS 代理，请为 `httpProxyPort` 属性指定一个从 1025 到 65535 之间的数值。该端口不能与 `rpcPort` 和 `socks5Port` 相同。如果需要为局域网中的其他设备提供 HTTP / HTTPS 代理，请将 `httpProxyListenLAN` 属性设置为 `true`。如果不需要 HTTP / HTTPS 代理，请删除 `httpProxyPort` 和 `httpProxyListenLAN` 属性。
 
 如果你安装了多台代理服务器，或者一台服务器监听多个端口，可以把它们都添加到客户端设置中。每次发起新的连接时，mieru 会随机选取其中的一台服务器和一个端口。**如果使用了多台服务器，请确保每一台服务器都启动了 mita 代理服务。**
 
@@ -92,7 +95,9 @@ mieru apply config <FILE>
     "rpcPort": 8964,
     "socks5Port": 1080,
     "loggingLevel": "INFO",
-    "socks5ListenLAN": false
+    "socks5ListenLAN": false,
+    "httpProxyPort": 8080,
+    "httpProxyListenLAN": false
 }
 ```
 

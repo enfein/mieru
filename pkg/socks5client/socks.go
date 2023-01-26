@@ -8,13 +8,7 @@ package socks5client
 import (
 	"fmt"
 	"net"
-)
-
-// Socks protocol versions.
-const (
-	SOCKS4 = iota
-	SOCKS4A
-	SOCKS5
+	"time"
 )
 
 // Socks5 command types.
@@ -31,9 +25,25 @@ const (
 	IPv6   byte = 4
 )
 
+type (
+	// Config contains socks5 client configuration.
+	Config struct {
+		Host    string
+		Auth    *Auth
+		Timeout time.Duration
+		CmdType byte
+	}
+
+	// Auth contains socks5 client username and password.
+	Auth struct {
+		Username string
+		Password string
+	}
+)
+
 // Dial returns the dial function to be used in http.Transport object.
 // Argument proxyURI should be in the format: "socks5://user:password@127.0.0.1:1080?timeout=5s".
-// The protocol could be socks5, socks4 and socks4a.
+// Only socks5 protocol is supported.
 func Dial(proxyURI string, cmdType byte) func(string, string) (net.Conn, error) {
 	if cmdType != ConnectCmd && cmdType != BindCmd && cmdType != UDPAssociateCmd {
 		return dialError(fmt.Errorf("command type %d is invalid", cmdType))
@@ -43,14 +53,25 @@ func Dial(proxyURI string, cmdType byte) func(string, string) (net.Conn, error) 
 		return dialError(err)
 	}
 	cfg.CmdType = cmdType
-	return cfg.dialFunc()
+	return func(_, targetAddr string) (conn net.Conn, err error) {
+		return cfg.dialSocks5(targetAddr)
+	}
 }
 
-func DialSocksProxy(socksType int, proxy string, cmdType byte) func(string, string) (net.Conn, *net.UDPConn, *net.UDPAddr, error) {
-	if cmdType != ConnectCmd && cmdType != BindCmd && cmdType != UDPAssociateCmd {
-		return dialErrorLong(fmt.Errorf("command type %d is invalid", cmdType))
+// DialSocks5Proxy returns two connections that can be used to send TCP and UDP traffic.
+func DialSocks5Proxy(cfg *Config) func(string, string) (net.Conn, *net.UDPConn, *net.UDPAddr, error) {
+	if cfg == nil {
+		return dialErrorLong(fmt.Errorf("socks5 client configuration is nil"))
 	}
-	return (&config{Proto: socksType, Host: proxy, CmdType: cmdType}).dialFuncLong()
+	if cfg.Host == "" {
+		return dialErrorLong(fmt.Errorf("socks5 client configuration has no proxy host"))
+	}
+	if cfg.CmdType != ConnectCmd && cfg.CmdType != BindCmd && cfg.CmdType != UDPAssociateCmd {
+		return dialErrorLong(fmt.Errorf("socks5 client configuration command type %v is invalid", cfg.CmdType))
+	}
+	return func(_, targetAddr string) (net.Conn, *net.UDPConn, *net.UDPAddr, error) {
+		return cfg.dialSocks5Long(targetAddr)
+	}
 }
 
 // SendUDP sends a UDP associate message and returns the response.
@@ -91,30 +112,6 @@ func SendUDP(conn *net.UDPConn, proxyAddr, dstAddr *net.UDPAddr, payload []byte)
 	} else {
 		return nil, fmt.Errorf("UDP assciate unsupport address type")
 	}
-}
-
-func (c *config) dialFunc() func(string, string) (net.Conn, error) {
-	switch c.Proto {
-	case SOCKS5:
-		return func(_, targetAddr string) (conn net.Conn, err error) {
-			return c.dialSocks5(targetAddr)
-		}
-	case SOCKS4, SOCKS4A:
-		return dialError(fmt.Errorf("unsupported SOCKS protocol %v", c.Proto))
-	}
-	return dialError(fmt.Errorf("unknown SOCKS protocol %v", c.Proto))
-}
-
-func (c *config) dialFuncLong() func(string, string) (net.Conn, *net.UDPConn, *net.UDPAddr, error) {
-	switch c.Proto {
-	case SOCKS5:
-		return func(_, targetAddr string) (net.Conn, *net.UDPConn, *net.UDPAddr, error) {
-			return c.dialSocks5Long(targetAddr)
-		}
-	case SOCKS4, SOCKS4A:
-		return dialErrorLong(fmt.Errorf("unsupported SOCKS protocol %v", c.Proto))
-	}
-	return dialErrorLong(fmt.Errorf("unknown SOCKS protocol %v", c.Proto))
 }
 
 func dialError(err error) func(string, string) (net.Conn, error) {

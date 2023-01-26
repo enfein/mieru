@@ -24,9 +24,10 @@ mieru 的翻墙原理与 shadowsocks / v2ray 等软件类似，在客户端和�
 4. 在使用 UDP 传输协议时，mieru 不需要客户端和服务器进行握手，即可直接发送数据。
 5. 当服务器无法解密客户端发送的数据时，不会返回任何内容。GFW 很难通过主动探测发现 mieru 服务。
 6. mieru 支持多个用户共享代理服务器。
-7. 支持 IPv4 和 IPv6。
-8. 客户端软件支持 Windows, Mac OS, Linux 和 Android 系统。Android 用户请使用 0.8.1-rc02 版本或以上 SagerNet 客户端并安装 1.6.1 版本或以上 mieru 插件。
-9. 如果需要全局代理或自定义路由规则等高级功能，可以将 mieru 作为 clash 等代理平台的后端。
+7. mieru 支持 IPv4 和 IPv6。
+8. mieru 提供 socks5, HTTP 和 HTTPS 代理。
+9. 客户端软件支持 Windows, Mac OS, Linux 和 Android 系统。Android 用户请使用 0.8.1-rc02 版本或以上 SagerNet 客户端并安装 1.6.1 版本或以上 mieru 插件。
+10. 如果需要全局代理或自定义路由规则等高级功能，可以将 mieru 作为 clash 等代理平台的后端。
 
 ## 使用教程
 

@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"os/exec"
 	"runtime/pprof"
 	"strconv"
@@ -30,6 +31,7 @@ import (
 	"github.com/enfein/mieru/pkg/appctl"
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
+	"github.com/enfein/mieru/pkg/http2socks"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/netutil"
@@ -114,7 +116,14 @@ func RegisterClientCommands() {
 		func(s []string) error {
 			return unexpectedArgsError(s, 2)
 		},
-		clientVersionFunc,
+		versionFunc,
+	)
+	RegisterCallback(
+		[]string{"", "check", "update"},
+		func(s []string) error {
+			return unexpectedArgsError(s, 3)
+		},
+		checkUpdateFunc,
 	)
 	RegisterCallback(
 		[]string{"", "get", "thread-dump"},
@@ -166,6 +175,7 @@ var clientHelpFunc = func(s []string) error {
 	describeConfigCmd := fmt.Sprintf(format, "describe config", "Show current client configuration")
 	deleteProfileCmd := fmt.Sprintf(format, "delete profile <PROFILE_NAME>", "Delete a client configuration profile")
 	versionCmd := fmt.Sprintf(format, "version", "Show mieru client version")
+	checkUpdateCmd := fmt.Sprintf(format, "check update", "Check mieru client update")
 	log.Infof("Usage: %s <COMMAND> [<ARGS>]", binaryName)
 	log.Infof("")
 	log.Infof("Commands:")
@@ -177,6 +187,7 @@ var clientHelpFunc = func(s []string) error {
 	log.Infof("%s", describeConfigCmd)
 	log.Infof("%s", deleteProfileCmd)
 	log.Infof("%s", versionCmd)
+	log.Infof("%s", checkUpdateCmd)
 	return nil
 }
 
@@ -271,7 +282,6 @@ var clientRunFunc = func(s []string) error {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(1)
 
 	// RPC port is allowed to set to 0. In that case, don't run RPC server.
 	// When RPC server is not running, mieru commands can't be used to control the proxy client.
@@ -358,13 +368,14 @@ var clientRunFunc = func(s []string) error {
 	appctl.SetClientSocks5ServerRef(socks5Server)
 
 	// Run the local socks5 server in the background.
-	go func() {
-		var socks5Addr string
-		if config.GetSocks5ListenLAN() {
-			socks5Addr = netutil.MaybeDecorateIPv6(netutil.AllIPAddr()) + ":" + strconv.Itoa(int(config.GetSocks5Port()))
-		} else {
-			socks5Addr = netutil.MaybeDecorateIPv6(netutil.LocalIPAddr()) + ":" + strconv.Itoa(int(config.GetSocks5Port()))
-		}
+	var socks5Addr string
+	if config.GetSocks5ListenLAN() {
+		socks5Addr = netutil.MaybeDecorateIPv6(netutil.AllIPAddr()) + ":" + strconv.Itoa(int(config.GetSocks5Port()))
+	} else {
+		socks5Addr = netutil.MaybeDecorateIPv6(netutil.LocalIPAddr()) + ":" + strconv.Itoa(int(config.GetSocks5Port()))
+	}
+	wg.Add(1)
+	go func(socks5Addr string) {
 		l, err := net.Listen("tcp", socks5Addr)
 		if err != nil {
 			log.Fatalf("listen on socks5 address tcp %q failed: %v", socks5Addr, err)
@@ -376,7 +387,29 @@ var clientRunFunc = func(s []string) error {
 		}
 		log.Infof("mieru client socks5 server is stopped")
 		wg.Done()
-	}()
+	}(socks5Addr)
+
+	// If HTTP proxy is enabled, run the local HTTP server in the background.
+	if config.GetHttpProxyPort() != 0 {
+		wg.Add(1)
+		go func(socks5Addr string) {
+			var httpServerAddr string
+			if config.GetHttpProxyListenLAN() {
+				httpServerAddr = netutil.MaybeDecorateIPv6(netutil.AllIPAddr()) + ":" + strconv.Itoa(int(config.GetHttpProxyPort()))
+			} else {
+				httpServerAddr = netutil.MaybeDecorateIPv6(netutil.LocalIPAddr()) + ":" + strconv.Itoa(int(config.GetHttpProxyPort()))
+			}
+			httpServer := http2socks.NewHTTPServer(httpServerAddr, &http2socks.Proxy{
+				ProxyURI: "socks5://" + socks5Addr + "?timeout=10s",
+			})
+			log.Infof("mieru client HTTP proxy server is running")
+			wg.Done()
+			if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Fatalf("run HTTP proxy server failed: %v", err)
+			}
+		}(socks5Addr)
+	}
+
 	<-appctl.ClientSocks5ServerStarted
 	metrics.EnableLogging()
 
@@ -456,11 +489,6 @@ var clientDeleteProfileFunc = func(s []string) error {
 		return fmt.Errorf(stderror.LoadClientConfigFailedErr, err)
 	}
 	return appctl.DeleteClientConfigProfile(s[3])
-}
-
-var clientVersionFunc = func(s []string) error {
-	log.Infof(appctl.AppVersion)
-	return nil
 }
 
 var clientGetThreadDumpFunc = func(s []string) error {

@@ -1,18 +1,29 @@
 package socks5client
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"net"
+	"strconv"
+
+	"github.com/enfein/mieru/pkg/netutil"
 )
 
-func (cfg *config) dialSocks5(targetAddr string) (conn net.Conn, err error) {
+func (cfg *Config) dialSocks5(targetAddr string) (conn net.Conn, err error) {
 	conn, _, _, err = cfg.dialSocks5Long(targetAddr)
 	return
 }
 
-func (cfg *config) dialSocks5Long(targetAddr string) (conn net.Conn, udpConn *net.UDPConn, proxyUDPAddr *net.UDPAddr, err error) {
-	proxy := cfg.Host
-	conn, err = net.DialTimeout("tcp", proxy, cfg.Timeout)
+func (cfg *Config) dialSocks5Long(targetAddr string) (conn net.Conn, udpConn *net.UDPConn, proxyUDPAddr *net.UDPAddr, err error) {
+	ctx := context.Background()
+	var cancelFunc context.CancelFunc
+	if cfg.Timeout != 0 {
+		ctx, cancelFunc = context.WithTimeout(ctx, cfg.Timeout)
+		defer cancelFunc()
+	}
+	dialer := &net.Dialer{}
+	conn, err = dialer.DialContext(ctx, "tcp", cfg.Host)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -22,22 +33,22 @@ func (cfg *config) dialSocks5Long(targetAddr string) (conn net.Conn, udpConn *ne
 		}
 	}()
 
-	var req requestBuilder
+	// Prepare the first request.
+	var req bytes.Buffer
 	version := byte(5) // socks version 5
 	method := byte(0)  // method 0: no authentication (only anonymous access supported for now)
 	if cfg.Auth != nil {
 		method = 2 // method 2: username/password
 	}
-
-	// version identifier/method selection request
-	req.add(
+	req.Write([]byte{
 		version, // socks version
 		1,       // number of methods
 		method,
-	)
+	})
 
+	// Process the first response.
 	var resp []byte
-	resp, err = cfg.sendReceive(conn, req.Bytes())
+	resp, err = netutil.SendReceive(ctx, conn, req.Bytes())
 	if err != nil {
 		return nil, nil, nil, err
 	} else if len(resp) != 2 {
@@ -50,14 +61,15 @@ func (cfg *config) dialSocks5Long(targetAddr string) (conn net.Conn, udpConn *ne
 	if cfg.Auth != nil {
 		version := byte(1) // user/password version 1
 		req.Reset()
-		req.add(
+		req.Write([]byte{
 			version,                      // user/password version
 			byte(len(cfg.Auth.Username)), // length of username
-		)
-		req.add([]byte(cfg.Auth.Username)...)
-		req.add(byte(len(cfg.Auth.Password)))
-		req.add([]byte(cfg.Auth.Password)...)
-		resp, err = cfg.sendReceive(conn, req.Bytes())
+		})
+		req.Write([]byte(cfg.Auth.Username))
+		req.Write([]byte{byte(len(cfg.Auth.Password))})
+		req.Write([]byte(cfg.Auth.Password))
+
+		resp, err = netutil.SendReceive(ctx, conn, req.Bytes())
 		if err != nil {
 			return nil, nil, nil, err
 		} else if len(resp) != 2 {
@@ -69,27 +81,48 @@ func (cfg *config) dialSocks5Long(targetAddr string) (conn net.Conn, udpConn *ne
 		}
 	}
 
-	// detail request
-	var host string
-	var port uint16
-	host, port, err = splitHostPort(targetAddr)
+	// Prepare the second request.
+	host, portStr, err := net.SplitHostPort(targetAddr)
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	portInt, err := strconv.ParseUint(portStr, 10, 16)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	port := uint16(portInt)
+
 	req.Reset()
-	req.add(
-		5,               // version number
-		cfg.CmdType,     // command
-		0,               // reserved, must be zero
-		3,               // address type, 3 means domain name
-		byte(len(host)), // address length
-	)
-	req.add([]byte(host)...)
-	req.add(
-		byte(port>>8), // higher byte of destination port
-		byte(port),    // lower byte of destination port (big endian)
-	)
-	resp, err = cfg.sendReceive(conn, req.Bytes())
+	req.Write([]byte{
+		5,           // version number
+		cfg.CmdType, // command
+		0,           // reserved, must be zero
+	})
+
+	hostIP := net.ParseIP(host)
+	if hostIP == nil {
+		// Domain name.
+		req.Write([]byte{3, byte(len(host))})
+		req.Write([]byte(host))
+	} else {
+		hostIPv4 := hostIP.To4()
+		if hostIPv4 != nil {
+			// IPv4
+			req.Write([]byte{1})
+			req.Write(hostIPv4)
+		} else {
+			// IPv6
+			req.Write([]byte{4})
+			req.Write(hostIP)
+		}
+	}
+	req.Write([]byte{
+		byte(port >> 8), // higher byte of destination port
+		byte(port),      // lower byte of destination port (big endian)
+	})
+
+	// Process the second response.
+	resp, err = netutil.SendReceive(ctx, conn, req.Bytes())
 	if err != nil {
 		return
 	} else if len(resp) < 10 {

@@ -30,6 +30,7 @@ import (
 	"github.com/enfein/mieru/pkg/appctl"
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
+	"github.com/enfein/mieru/pkg/http2socks"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/netutil"
@@ -113,7 +114,14 @@ func RegisterServerCommands() {
 		func(s []string) error {
 			return unexpectedArgsError(s, 2)
 		},
-		serverVersionFunc,
+		versionFunc,
+	)
+	RegisterCallback(
+		[]string{"", "check", "update"},
+		func(s []string) error {
+			return unexpectedArgsError(s, 3)
+		},
+		checkUpdateFunc,
 	)
 	RegisterCallback(
 		[]string{"", "get", "thread-dump"},
@@ -165,6 +173,7 @@ var serverHelpFunc = func(s []string) error {
 	describeConfigCmd := fmt.Sprintf(format, "describe config", "Show current server configuration")
 	deleteUserCmd := fmt.Sprintf(format, "delete user <USER_NAME>", "Delete users from server configuration")
 	versionCmd := fmt.Sprintf(format, "version", "Show mieru server version")
+	checkUpdateCmd := fmt.Sprintf(format, "check update", "Check mieru server update")
 	log.Infof("Usage: %s <COMMAND> [<ARGS>]", binaryName)
 	log.Infof("")
 	log.Infof("Commands:")
@@ -176,6 +185,7 @@ var serverHelpFunc = func(s []string) error {
 	log.Infof("%s", describeConfigCmd)
 	log.Infof("%s", deleteUserCmd)
 	log.Infof("%s", versionCmd)
+	log.Infof("%s", checkUpdateCmd)
 	return nil
 }
 
@@ -276,6 +286,9 @@ var serverRunFunc = func(s []string) error {
 	// Disable client side metrics.
 	if clientDecryptionMetricGroup := metrics.GetMetricGroupByName(cipher.ClientDecryptionMetricGroupName); clientDecryptionMetricGroup != nil {
 		clientDecryptionMetricGroup.DisableLogging()
+	}
+	if httpMetricGroup := metrics.GetMetricGroupByName(http2socks.HTTPMetricGroupName); httpMetricGroup != nil {
+		httpMetricGroup.DisableLogging()
 	}
 
 	// Start proxy if server config is valid.
@@ -508,11 +521,6 @@ var serverDeleteUserFunc = func(s []string) error {
 	if err != nil {
 		return fmt.Errorf(stderror.SetServerConfigFailedErr, err)
 	}
-	return nil
-}
-
-var serverVersionFunc = func(s []string) error {
-	log.Infof(appctl.AppVersion)
 	return nil
 }
 

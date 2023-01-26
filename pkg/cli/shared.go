@@ -1,4 +1,4 @@
-// Copyright (C) 2022  mieru authors
+// Copyright (C) 2023  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,8 +13,25 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package appctl
+package cli
 
-const (
-	AppVersion = "1.10.0"
+import (
+	"fmt"
+
+	"github.com/enfein/mieru/pkg/log"
+	"github.com/enfein/mieru/pkg/version"
 )
+
+var versionFunc = func(s []string) error {
+	log.Infof(version.AppVersion)
+	return nil
+}
+
+var checkUpdateFunc = func(s []string) error {
+	_, msg, err := version.CheckUpdate()
+	if err != nil {
+		return fmt.Errorf("check update failed: %w", err)
+	}
+	log.Infof("%s", msg)
+	return nil
+}

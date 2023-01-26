@@ -92,7 +92,8 @@ type ServerConfig struct {
 	// Server's port-protocol bindings.
 	PortBindings []*PortBinding `protobuf:"bytes,1,rep,name=portBindings,proto3" json:"portBindings,omitempty"`
 	// A list of registered users.
-	Users            []*User                 `protobuf:"bytes,2,rep,name=users,proto3" json:"users,omitempty"`
+	Users []*User `protobuf:"bytes,2,rep,name=users,proto3" json:"users,omitempty"`
+	// Server advanced settings.
 	AdvancedSettings *ServerAdvancedSettings `protobuf:"bytes,3,opt,name=advancedSettings,proto3,oneof" json:"advancedSettings,omitempty"`
 	// Server logging level.
 	LoggingLevel *LoggingLevel `protobuf:"varint,4,opt,name=loggingLevel,proto3,enum=appctl.LoggingLevel,oneof" json:"loggingLevel,omitempty"`

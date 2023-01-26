@@ -37,6 +37,7 @@ message ServerConfig {
     // A list of registered users.
     repeated User users = 2;
 
+    // Server advanced settings.
     optional ServerAdvancedSettings advancedSettings = 3;
 
     // Server logging level.

@@ -179,7 +179,7 @@ func (s *Server) handleConnect(ctx context.Context, conn io.ReadWriteCloser, req
 		return fmt.Errorf("failed to send reply: %w", err)
 	}
 
-	return BidiCopy(conn, target, false)
+	return netutil.BidiCopy(conn, target, false)
 }
 
 // handleBind is used to handle a bind command.

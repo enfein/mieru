@@ -53,6 +53,7 @@ message ClientConfig {
     // The socks5 port that mieru is listening.
     optional int32 socks5Port = 4;
 
+    // Client advanced settings.
     optional ClientAdvancedSettings advancedSettings = 5;
 
     // Client logging level.
@@ -60,4 +61,10 @@ message ClientConfig {
 
     // If set, the socks5 port listens to LAN rather than localhost.
     optional bool socks5ListenLAN = 7;
+
+    // The port mieru is listening to provide HTTP / HTTPS proxy.
+    optional int32 httpProxyPort = 8;
+
+    // If set, the HTTP proxy port listens to LAN rather than localhost.
+    optional bool httpProxyListenLAN = 9;
 }

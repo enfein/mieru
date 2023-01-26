@@ -11,14 +11,13 @@ func TestParse(t *testing.T) {
 	testcases := []struct {
 		name string
 		uri  string
-		cfg  config
+		cfg  Config
 	}{
 		{
 			name: "full config",
 			uri:  "socks5://u1:p1@127.0.0.1:8080?timeout=2s",
-			cfg: config{
-				Proto: SOCKS5,
-				Auth: &auth{
+			cfg: Config{
+				Auth: &Auth{
 					Username: "u1",
 					Password: "p1",
 				},
@@ -29,9 +28,8 @@ func TestParse(t *testing.T) {
 		{
 			name: "simple socks5",
 			uri:  "socks5://127.0.0.1:8080",
-			cfg: config{
-				Proto: SOCKS5,
-				Host:  "127.0.0.1:8080",
+			cfg: Config{
+				Host: "127.0.0.1:8080",
 			},
 		},
 	}

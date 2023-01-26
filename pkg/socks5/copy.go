@@ -17,52 +17,11 @@ package socks5
 
 import (
 	"fmt"
-	"io"
 	"net"
 	"sync/atomic"
 
 	"github.com/enfein/mieru/pkg/log"
 )
-
-type closeWriter interface {
-	CloseWrite() error
-}
-
-// BidiCopy does bi-directional data copy.
-func BidiCopy(conn1, conn2 io.ReadWriteCloser, isClient bool) error {
-	errCh := make(chan error, 2)
-	go func() {
-		_, err := io.Copy(conn1, conn2)
-		if isClient {
-			// Must call Close() to make sure counter is updated.
-			conn1.Close()
-		} else {
-			// Avoid counter updated twice due to twice Close(), use CloseWrite().
-			// The connection still needs to close here to unblock the other side.
-			if tcpConn1, ok := conn1.(closeWriter); ok {
-				tcpConn1.CloseWrite()
-			}
-		}
-		errCh <- err
-	}()
-	go func() {
-		_, err := io.Copy(conn2, conn1)
-		if isClient {
-			conn2.Close()
-		} else {
-			if tcpConn2, ok := conn2.(closeWriter); ok {
-				tcpConn2.CloseWrite()
-			}
-		}
-		errCh <- err
-	}()
-	for i := 0; i < 2; i++ {
-		if err := <-errCh; err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 // BidiCopyUDP does bi-directional data copy between a proxy client UDP endpoint
 // and the proxy tunnel.

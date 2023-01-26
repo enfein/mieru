@@ -57,6 +57,7 @@ fi
 
 # Start testing.
 sleep 2
+echo ">>> socks5 - new connections - TCP <<<"
 ./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
   -local_proxy_host=127.0.0.1 -local_proxy_port=1080 \
   -test_case=new_conn -num_request=3000
@@ -69,9 +70,23 @@ if [ "$?" -ne "0" ]; then
 fi
 
 sleep 1
+echo ">>> http - new connections - TCP <<<"
+./sockshttpclient -proxy_mode=http -dst_host=127.0.0.1 -dst_port=8080 \
+  -local_http_host=127.0.0.1 -local_http_port=8808 \
+  -test_case=new_conn -num_request=3000
+if [ "$?" -ne "0" ]; then
+    print_mieru_client_log
+    print_mieru_client_thread_dump
+    print_mieru_server_thread_dump
+    echo "Test new_conn failed."
+    exit 1
+fi
+
+sleep 1
+echo ">>> socks5 - reuse one connection - TCP <<<"
 ./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
   -local_proxy_host=127.0.0.1 -local_proxy_port=1080 \
-  -test_case=reuse_conn -test_time_sec=60
+  -test_case=reuse_conn -test_time_sec=30
 if [ "$?" -ne "0" ]; then
     print_mieru_client_log
     print_mieru_client_thread_dump

@@ -375,6 +375,7 @@ func ValidateClientConfigPatch(patch *pb.ClientConfig) error {
 // 2. the active profile is available
 // 3. RPC port is valid
 // 4. socks5 port is valid
+// 5. RPC port, socks5 port, http proxy port are different
 func ValidateFullClientConfig(config *pb.ClientConfig) error {
 	if err := ValidateClientConfigPatch(config); err != nil {
 		return err
@@ -395,12 +396,26 @@ func ValidateFullClientConfig(config *pb.ClientConfig) error {
 	if !foundActiveProfile {
 		return fmt.Errorf("active profile is not found in the profile list")
 	}
-	// RPC port is allowed to set to 0, which means disable RPC.
+	// RPC port is allowed to be 0, which means disable RPC.
 	if config.GetRpcPort() < 0 || config.GetRpcPort() > 65535 {
 		return fmt.Errorf("RPC port number %d is invalid", config.GetRpcPort())
 	}
 	if config.GetSocks5Port() < 1 || config.GetSocks5Port() > 65535 {
 		return fmt.Errorf("socks5 port number %d is invalid", config.GetSocks5Port())
+	}
+	if config.GetRpcPort() == config.GetSocks5Port() {
+		return fmt.Errorf("RPC port number %d is the same as socks5 port number", config.GetRpcPort())
+	}
+	if config.HttpProxyPort != nil {
+		if config.GetHttpProxyPort() < 1 || config.GetHttpProxyPort() > 65535 {
+			return fmt.Errorf("HTTP proxy port number %d is invalid", config.GetHttpProxyPort())
+		}
+		if config.GetHttpProxyPort() == config.GetRpcPort() {
+			return fmt.Errorf("HTTP proxy port number %d is the same as RPC port number", config.GetHttpProxyPort())
+		}
+		if config.GetHttpProxyPort() == config.GetSocks5Port() {
+			return fmt.Errorf("HTTP proxy port number %d is the same as socks5 port number", config.GetHttpProxyPort())
+		}
 	}
 	return nil
 }
@@ -471,6 +486,7 @@ func clientConfigFilePath() (string, ConfigFileType, error) {
 // If a profile is specified in source, it is added to destination,
 // or replacing existing profile in destination.
 func mergeClientConfigByProfile(dst, src *pb.ClientConfig) {
+	// Merge src profiles into dst profiles.
 	dstMapping := map[string]*pb.ClientProfile{}
 	srcMapping := map[string]*pb.ClientProfile{}
 	for _, profile := range dst.GetProfiles() {
@@ -479,45 +495,6 @@ func mergeClientConfigByProfile(dst, src *pb.ClientConfig) {
 	for _, profile := range src.GetProfiles() {
 		srcMapping[profile.GetProfileName()] = profile
 	}
-
-	var activeProfile string
-	if src.ActiveProfile != nil {
-		activeProfile = src.GetActiveProfile()
-	} else {
-		activeProfile = dst.GetActiveProfile()
-	}
-	var rpcPort int32
-	if src.RpcPort != nil {
-		rpcPort = src.GetRpcPort()
-	} else {
-		rpcPort = dst.GetRpcPort()
-	}
-	var sock5Port int32
-	if src.Socks5Port != nil {
-		sock5Port = src.GetSocks5Port()
-	} else {
-		sock5Port = dst.GetSocks5Port()
-	}
-	var advancedSettings *pb.ClientAdvancedSettings
-	if src.AdvancedSettings != nil {
-		advancedSettings = src.GetAdvancedSettings()
-	} else {
-		advancedSettings = dst.GetAdvancedSettings()
-	}
-	var loggingLevel pb.LoggingLevel
-	if src.LoggingLevel != nil {
-		loggingLevel = src.GetLoggingLevel()
-	} else {
-		loggingLevel = dst.GetLoggingLevel()
-	}
-	var socks5ListenLAN bool
-	if src.Socks5ListenLAN != nil {
-		socks5ListenLAN = src.GetSocks5ListenLAN()
-	} else {
-		socks5ListenLAN = dst.GetSocks5ListenLAN()
-	}
-
-	// Merge src into dst.
 	mergedProfileMapping := map[string]*pb.ClientProfile{}
 	for name, profile := range dstMapping {
 		mergedProfileMapping[name] = profile
@@ -535,14 +512,60 @@ func mergeClientConfigByProfile(dst, src *pb.ClientConfig) {
 		mergedProfiles = append(mergedProfiles, mergedProfileMapping[name])
 	}
 
+	// Required fields.
+	var activeProfile string
+	if src.ActiveProfile != nil {
+		activeProfile = src.GetActiveProfile()
+	} else {
+		activeProfile = dst.GetActiveProfile()
+	}
+	var sock5Port int32
+	if src.Socks5Port != nil {
+		sock5Port = src.GetSocks5Port()
+	} else {
+		sock5Port = dst.GetSocks5Port()
+	}
+	var loggingLevel pb.LoggingLevel
+	if src.LoggingLevel != nil {
+		loggingLevel = src.GetLoggingLevel()
+	} else {
+		loggingLevel = dst.GetLoggingLevel()
+	}
+
+	// Optional fields.
+	var rpcPort *int32 = dst.RpcPort
+	if src.RpcPort != nil {
+		rpcPort = src.RpcPort
+	}
+	var advancedSettings *pb.ClientAdvancedSettings = dst.AdvancedSettings
+	if src.AdvancedSettings != nil {
+		advancedSettings = src.AdvancedSettings
+	}
+	var socks5ListenLAN *bool = dst.Socks5ListenLAN
+	if src.Socks5ListenLAN != nil {
+		socks5ListenLAN = src.Socks5ListenLAN
+	}
+	var httpProxyPort *int32 = dst.HttpProxyPort
+	if src.HttpProxyPort != nil {
+		httpProxyPort = src.HttpProxyPort
+	}
+	var httpProxyListenLAN *bool = dst.HttpProxyListenLAN
+	if src.HttpProxyListenLAN != nil {
+		httpProxyListenLAN = src.HttpProxyListenLAN
+	}
+
 	proto.Reset(dst)
+
 	dst.ActiveProfile = proto.String(activeProfile)
 	dst.Profiles = mergedProfiles
-	dst.RpcPort = proto.Int32(rpcPort)
 	dst.Socks5Port = proto.Int32(sock5Port)
-	dst.AdvancedSettings = advancedSettings
 	dst.LoggingLevel = &loggingLevel
-	dst.Socks5ListenLAN = proto.Bool(socks5ListenLAN)
+
+	dst.RpcPort = rpcPort
+	dst.AdvancedSettings = advancedSettings
+	dst.Socks5ListenLAN = socks5ListenLAN
+	dst.HttpProxyPort = httpProxyPort
+	dst.HttpProxyListenLAN = httpProxyListenLAN
 }
 
 // deleteClientConfigFile deletes the client config file.

@@ -27,8 +27,9 @@ For an explanation of the mieru protocol, see [mieru Proxy Protocol](https://git
 5. When the server can not decrypt the data sent by the client, no content is returned. it is difficult for GFW to discover the mieru service through active probing.
 6. mieru supports multiple users sharing a single proxy server.
 7. mieru supports IPv4 and IPv6.
-8. The client software supports Windows, Mac OS, Linux and Android systems. Android users should use SagerNet client version 0.8.1-rc02 or above, and install mieru plugin version 1.6.1 or above.
-9. If you need advanced features like global proxy or customized routing rules, you can use mieru as the backend of a proxy platform such as clash.
+8. mieru provides socks5, HTTP and HTTPS proxy.
+9. The client software supports Windows, Mac OS, Linux and Android systems. Android users should use SagerNet client version 0.8.1-rc02 or above, and install mieru plugin version 1.6.1 or above.
+10. If you need advanced features like global proxy or customized routing rules, you can use mieru as the backend of a proxy platform such as clash.
 
 ## User Guide
 

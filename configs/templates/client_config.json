@@ -25,5 +25,7 @@
     "rpcPort": -1,
     "socks5Port": -1,
     "loggingLevel": "INFO",
-    "socks5ListenLAN": false
+    "socks5ListenLAN": false,
+    "httpProxyPort": -1,
+    "httpProxyListenLAN": false
 }

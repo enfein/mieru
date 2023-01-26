@@ -36,5 +36,7 @@
     "rpcPort": 8989,
     "socks5Port": 1080,
     "loggingLevel": "INFO",
-    "socks5ListenLAN": true
+    "socks5ListenLAN": true,
+    "httpProxyPort": 8808,
+    "httpProxyListenLAN": true
 }

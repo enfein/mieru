@@ -78,6 +78,9 @@ func TestClientApplyReject(t *testing.T) {
 		"testdata/client_reject_no_server_addr.json",
 		"testdata/client_reject_no_socks5_port.json",
 		"testdata/client_reject_no_user_name.json",
+		"testdata/client_reject_same_port_http_rpc.json",
+		"testdata/client_reject_same_port_http_socks5.json",
+		"testdata/client_reject_same_port_rpc_socks5.json",
 		"testdata/client_reject_wrong_ipv4_address.json",
 		"testdata/client_reject_wrong_ipv6_address.json",
 	}

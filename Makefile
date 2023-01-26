@@ -29,10 +29,10 @@ PROJECT_NAME=$(shell basename "${ROOT}")
 # - build/package/mita/arm64/rpm/mita.spec
 # - docs/server-install.md
 # - docs/server-install.zh_CN.md
-# - pkg/appctl/version.go
+# - pkg/version/current.go
 #
 # Use `tools/bump_version.sh` script to change all those files at one shot.
-VERSION="1.10.0"
+VERSION="1.11.0"
 
 # Build binaries and installation packages.
 .PHONY: build
