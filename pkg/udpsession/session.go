@@ -53,7 +53,7 @@ var (
 	zeroTime = time.Time{}
 
 	// replayCache records possible replay in UDP sessions.
-	replayCache = replay.NewCache(600_000, 10*time.Minute)
+	replayCache = replay.NewCache(1024*1024*1024, 8*time.Minute)
 
 	// globalMTU is the L2 MTU used by all the UDP sessions.
 	globalMTU int32 = defaultMTU

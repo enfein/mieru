@@ -8,7 +8,7 @@
 
 [中文文档](https://github.com/enfein/mieru/blob/main/README.zh_CN.md)
 
-mieru is a secure, hard to classify, hard to probe, TCP or UDP protocol-based socks5 network proxy software.
+mieru is a secure, hard to classify, hard to probe, TCP or UDP protocol-based socks5 / HTTP / HTTPS network proxy software.
 
 The mieru proxy software suite consists of two parts, a client software called mieru, and a proxy server software called mita.
 

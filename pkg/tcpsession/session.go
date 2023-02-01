@@ -58,7 +58,7 @@ const (
 
 var (
 	// replayCache records possible replay in TCP sessions.
-	replayCache = replay.NewCache(1200_000, 10*time.Minute)
+	replayCache = replay.NewCache(1024*1024*1024, 8*time.Minute)
 
 	// maxPaddingSize is the maximum size of padding added to a single TCP payload.
 	maxPaddingSize = 256 + rng.FixedInt(256)

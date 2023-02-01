@@ -6,7 +6,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/enfein/mieru.svg)](https://pkg.go.dev/github.com/enfein/mieru)
 [![Go Report Card](https://goreportcard.com/badge/github.com/enfein/mieru)](https://goreportcard.com/report/github.com/enfein/mieru)
 
-mieru【見える】是一款安全的、无流量特征、难以主动探测的，基于 TCP 或 UDP 协议的 socks5 网络代理软件。
+mieru【見える】是一款安全的、无流量特征、难以主动探测的，基于 TCP 或 UDP 协议的 socks5 / HTTP / HTTPS 网络代理软件。
 
 mieru 代理软件由称为 mieru【見える】的客户端软件和称为 mita【見た】的代理服务器软件这两部分组成。
 
