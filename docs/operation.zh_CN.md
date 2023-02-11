@@ -68,13 +68,15 @@ mieru start
 
 ```
 INFO [metrics]
-INFO [metrics - cipher - client] DirectDecrypt=7241 FailedDirectDecrypt=0
-INFO [metrics - connections] ActiveOpens=42 CurrEstablished=20 MaxConn=26 PassiveOpens=0
+INFO [metrics - cipher - client] DirectDecrypt=9012 FailedDirectDecrypt=0
+INFO [metrics - connections] ActiveOpens=2 CurrEstablished=2 MaxConn=2 PassiveOpens=0
 INFO [metrics - errors] KCPInErrors=0 KCPReceiveErrors=0 KCPSendErrors=0 TCPReceiveErrors=0 TCPSendErrors=0 UDPInErrors=0
-INFO [metrics - KCP] BytesReceived=8115713 BytesSent=113291 FastRetransSegs=0 InSegs=7168 LostSegs=0 OutOfWindowSegs=166 OutSegs=7168 RepeatSegs=0 RetransSegs=0
+INFO [metrics - HTTP proxy] ConnErrors=0 Requests=2 SchemeErrors=0
+INFO [metrics - KCP] BytesReceived=7844876 BytesSent=1262416 FastRetransSegs=0 InSegs=9014 LostSegs=10 OutOfWindowSegs=64 OutSegs=9016 RepeatSegs=25 RetransSegs=10
 INFO [metrics - replay] KnownSession=0 NewSession=0
-INFO [metrics - socks5] ConnectionRefusedErrors=0 DNSResolveErrors=0 HandshakeErrors=0 HostUnreachableErrors=0 NetworkUnreachableErrors=0 UDPAssociateErrors=0 UDPAssociateInBytes=0 UDPAssociateInPkts=0 UDPAssociateOutBytes=0 UDPAssociateOutPkts=0 UnsupportedCommandErrors=0
-INFO [metrics - traffic] InBytes=8645909 OutBytes=941739 OutPaddingBytes=444693
+INFO [metrics - socks5] ConnectionRefusedErrors=0 DNSResolveErrors=0 HandshakeErrors=0 HostUnreachableErrors=0 NetworkUnreachableErrors=0 UDPAssociateErrors=0 UnsupportedCommandErrors=0
+INFO [metrics - socks5 UDP associate] InBytes=0 InPkts=0 OutBytes=0 OutPkts=0
+INFO [metrics - traffic] InBytes=8326343 OutBytes=2252569 OutPaddingBytes=515475
 ```
 
 如果 `CurrEstablished` 的值不为 0，说明此刻客户端与服务器之间有活跃的连接。如果 `DirectDecrypt` 的值不为 0，说明客户端曾经成功解密了服务器返回的数据包。
