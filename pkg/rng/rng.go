@@ -18,16 +18,19 @@ package rng
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"math"
 	mrand "math/rand"
 	"os"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/enfein/mieru/pkg/version"
 )
 
 var once sync.Once
 
-var hostFixedValue atomic.Value
+var fixedValue atomic.Value
 
 // InitSeed initializes the random seed.
 func InitSeed() {
@@ -66,21 +69,23 @@ func RandTime(begin, end time.Time) time.Time {
 	return time.Unix(randSec, randNano)
 }
 
-// FixedInt returns an integer in [0, n) that always stays the same within one machine.
+// FixedInt returns an integer in [0, n) that stays the same within one machine.
+// This value may change in different mieru versions.
 func FixedInt(n int) int {
 	if n <= 0 {
 		return 0
 	}
-	v, ok := hostFixedValue.Load().(int)
+	v, ok := fixedValue.Load().(int)
 	if !ok {
 		name, err := os.Hostname()
 		if err != nil {
 			name = ""
 		}
+		name = name + " " + version.AppVersion
 		b := sha256.Sum256([]byte(name))
 		b[0] = b[0] & 0b01111111
 		v = int(binary.BigEndian.Uint32(b[:4]))
-		hostFixedValue.Store(v)
+		fixedValue.Store(v)
 	}
 	return v % n
 }
@@ -89,5 +94,5 @@ func FixedInt(n int) int {
 // a smaller number has higher probability to occur compared to a bigger number.
 func scaleDown() float64 {
 	base := mrand.Float64()
-	return base * base
+	return math.Sqrt(base * base * base)
 }

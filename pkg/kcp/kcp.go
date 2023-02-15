@@ -247,6 +247,14 @@ func (kcp *KCP) ReserveBytes(n int) bool {
 	return true
 }
 
+// SetPollIntervalMs set KCP polling interval in milliseconds.
+func (kcp *KCP) SetPollIntervalMs(interval uint32) {
+	if interval == 0 {
+		log.Fatalf("KCP poll interval can't be 0")
+	}
+	kcp.interval = interval
+}
+
 // Input a packet into kcp state machine, by underlay protocol.
 //
 // 'ackNoDelay' will trigger immediate ACK, but surely it will not be efficient in bandwidth.

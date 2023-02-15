@@ -7,7 +7,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	mrand "math/rand"
 	"net"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -145,7 +147,7 @@ func newUDPSession(conv uint32, conn net.PacketConn, ownConn bool, remote net.Ad
 	sess.block = block
 	sess.idleDuration = maxIdleDuration
 	sess.recvBuf = make([]byte, kcp.MaxBufSize)
-	sess.ackNoDelay = true
+	sess.ackNoDelay = false
 	sess.recordingEnabled = false
 	sess.recordedPackets = recording.NewRecords()
 
@@ -493,6 +495,13 @@ func (s *UDPSession) SetACKNoDelay(nodelay bool) {
 	s.ackNoDelay = nodelay
 }
 
+// SetPollIntervalMs set KCP polling interval in milliseconds.
+func (s *UDPSession) SetPollIntervalMs(interval uint32) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.kcp.SetPollIntervalMs(interval)
+}
+
 // SetDSCP sets the 6bit DSCP field in IPv4 header, or 8bit Traffic Class in IPv6 header.
 //
 // It has no effect if it's accepted from Listener.
@@ -621,6 +630,10 @@ func (s *UDPSession) tx(txqueue []ipMessage) {
 	nbytes := 0
 	npkts := 0
 	for k := range txqueue {
+		// For 1% of packets, yield CPU to disturb the timing.
+		if mrand.Intn(100) == 0 {
+			runtime.Gosched()
+		}
 		if n, err := s.conn.WriteTo(txqueue[k].buffer, txqueue[k].addr); err == nil {
 			nbytes += n
 			npkts++
@@ -979,6 +992,7 @@ func (l *Listener) packetInput(raw []byte, addr net.Addr) {
 					return
 				}
 				s = newUDPSession(conv, l.conn, false, addr, block)
+				s.SetPollIntervalMs(1)
 				if block.BlockContext().UserName != "" {
 					s.inBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, block.BlockContext().UserName), metrics.UserMetricInBytes)
 					s.outBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, block.BlockContext().UserName), metrics.UserMetricOutBytes)

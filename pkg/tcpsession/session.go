@@ -23,7 +23,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	mrand "math/rand"
 	"net"
+	"runtime"
 	"sync"
 	"time"
 
@@ -374,7 +376,11 @@ func (s *TCPSession) writeChunk(b []byte) (n int, err error) {
 	}
 
 	// Send encrypted payload length + encrypted payload.
+	// For 1% of packets, yield CPU to disturb the timing.
 	dataToSend := append(encryptedLen, encryptedPayload...)
+	if mrand.Intn(100) == 0 {
+		runtime.Gosched()
+	}
 	if _, err := io.WriteString(s.Conn, string(dataToSend)); err != nil {
 		return 0, fmt.Errorf("io.WriteString() failed: %w", err)
 	}

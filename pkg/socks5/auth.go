@@ -3,6 +3,7 @@ package socks5
 import (
 	"fmt"
 	"io"
+	"runtime"
 )
 
 const (
@@ -43,6 +44,9 @@ func (a NoAuthAuthenticator) GetCode() uint8 {
 }
 
 func (a NoAuthAuthenticator) Authenticate(conn io.ReadWriter) (*AuthContext, error) {
+	// Yield CPU to disturb the timing.
+	runtime.Gosched()
+
 	_, err := conn.Write([]byte{socks5Version, NoAuth})
 	return &AuthContext{NoAuth, nil}, err
 }
@@ -58,6 +62,9 @@ func (a UserPassAuthenticator) GetCode() uint8 {
 }
 
 func (a UserPassAuthenticator) Authenticate(conn io.ReadWriter) (*AuthContext, error) {
+	// Yield CPU to disturb the timing.
+	runtime.Gosched()
+
 	// Tell the client to use user/pass auth
 	if _, err := conn.Write([]byte{socks5Version, UserPassAuth}); err != nil {
 		return nil, err
