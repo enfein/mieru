@@ -13,25 +13,29 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// udpserver listens to UDP port 9090.
 // For each incoming UDP packet, if the data satisfy [A-Za-z]+, a rot13
 // of the input is send back. Otherwise, there is no response.
 package main
 
 import (
+	"flag"
 	"net"
 	"os"
+	"strconv"
 
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/testtool"
 )
 
-func init() {
-	log.SetFormatter(&log.DaemonFormatter{})
-}
+var port = flag.Int("port", 0, "UDP server listening port.")
 
 func main() {
-	addr, err := net.ResolveUDPAddr("udp", ":9090")
+	log.SetFormatter(&log.DaemonFormatter{})
+	flag.Parse()
+	if *port <= 0 || *port >= 65536 {
+		log.Fatalf("Invalid UDP listening port %d", *port)
+	}
+	addr, err := net.ResolveUDPAddr("udp", ":"+strconv.Itoa(*port))
 	if err != nil {
 		log.Fatalf("net.ResolveUDPAddr() failed: %v", err)
 	}

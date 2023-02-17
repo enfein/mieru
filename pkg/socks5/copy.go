@@ -21,6 +21,7 @@ import (
 	"sync/atomic"
 
 	"github.com/enfein/mieru/pkg/log"
+	"github.com/enfein/mieru/pkg/stderror"
 )
 
 // BidiCopyUDP does bi-directional data copy between a proxy client UDP endpoint
@@ -80,12 +81,16 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *UDPAssociateTunnelConn) error
 
 	var err error
 	err = <-errCh
-	log.Debugf("BidiCopyUDP() with endpoint %v failed 1: %v", udpConn.LocalAddr(), err)
+	if !stderror.IsEOF(err) && !stderror.IsClosed(err) {
+		log.Debugf("BidiCopyUDP() with endpoint %v failed 1: %v", udpConn.LocalAddr(), err)
+	}
 
 	tunnelConn.Close()
 	udpConn.Close()
 
 	err = <-errCh
-	log.Debugf("BidiCopyUDP() with endpoint %v failed 2: %v", udpConn.LocalAddr(), err)
+	if !stderror.IsEOF(err) && !stderror.IsClosed(err) {
+		log.Debugf("BidiCopyUDP() with endpoint %v failed 2: %v", udpConn.LocalAddr(), err)
+	}
 	return nil
 }

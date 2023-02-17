@@ -28,7 +28,7 @@ source ./libtest.sh
 sleep 2
 
 # Start UDP server.
-./udpserver &
+./udpserver -port=9090 &
 sleep 1
 
 # Start mieru server daemon.

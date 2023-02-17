@@ -16,6 +16,8 @@
 package socks5
 
 import (
+	"bytes"
+	"net"
 	"testing"
 
 	"github.com/enfein/mieru/pkg/testtool"
@@ -49,5 +51,28 @@ func TestUDPAssociateTunnelConn(t *testing.T) {
 	}
 	if err = outConn.Close(); err != nil {
 		t.Errorf("Close() failed: %v", err)
+	}
+}
+
+func TestUDPAddrToHeader(t *testing.T) {
+	testcases := []struct {
+		addr   *net.UDPAddr
+		header []byte
+	}{
+		{
+			&net.UDPAddr{IP: net.ParseIP("192.168.1.2"), Port: 258},
+			[]byte{0, 0, 0, 1, 192, 168, 1, 2, 1, 2},
+		},
+		{
+			&net.UDPAddr{IP: net.ParseIP("::1"), Port: 515},
+			[]byte{0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3},
+		},
+	}
+
+	for _, tc := range testcases {
+		got := udpAddrToHeader(tc.addr)
+		if !bytes.Equal(got, tc.header) {
+			t.Errorf("udpAddrToHeader(%v) = %v, want %v", tc.addr, got, tc.header)
+		}
 	}
 }

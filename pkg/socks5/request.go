@@ -343,19 +343,22 @@ func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, r
 			if err != nil {
 				// This is typically due to close of UDP listener.
 				// Don't contribute to UDPAssociateErrors.
-				log.Debugf("UDP associate %v Read() failed: %v", udpConn.LocalAddr(), err)
+				if !stderror.IsEOF(err) && !stderror.IsClosed(err) {
+					log.Debugf("UDP associate %v Read() failed: %v", udpConn.LocalAddr(), err)
+				}
 				if udpErr.Load() == nil {
 					udpErr.Store(err)
 				}
 				return
 			}
+			var header []byte
 			v, ok := addrMap.Load(addr.String())
-			if !ok {
-				log.Debugf("UDP associate %v received packet from unknown remote %v, packet is discarded", udpConn.LocalAddr(), addr)
-				UDPAssociateErrors.Add(1)
-				continue
+			if ok {
+				header = v.([]byte)
+			} else {
+				header = udpAddrToHeader(addr)
+				addrMap.Store(addr.String(), header)
 			}
-			header := v.([]byte)
 			_, err = conn.Write(append(header, buf[:n]...))
 			if err != nil {
 				log.Debugf("UDP associate %v Write() to proxy client failed: %v", udpConn.LocalAddr(), err)

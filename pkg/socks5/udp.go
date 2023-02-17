@@ -18,7 +18,9 @@ package socks5
 import (
 	"encoding/binary"
 	"io"
+	"net"
 
+	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/stderror"
 )
 
@@ -88,4 +90,22 @@ func (c *UDPAssociateTunnelConn) Close() error {
 // WrapUDPAssociateTunnel wraps an existing connection with UDPAssociateTunnelConn.
 func WrapUDPAssociateTunnel(conn io.ReadWriteCloser) *UDPAssociateTunnelConn {
 	return &UDPAssociateTunnelConn{ReadWriteCloser: conn}
+}
+
+// udpAddrToHeader returns a UDP associate header with the given
+// destination address.
+func udpAddrToHeader(addr *net.UDPAddr) []byte {
+	if addr == nil {
+		log.Fatalf("When translating UDP address to UDP associate header, the UDP address is nil")
+	}
+	res := []byte{0, 0, 0}
+	ip := addr.IP
+	if ip.To4() != nil {
+		res = append(res, 1)
+		res = append(res, ip.To4()...)
+	} else {
+		res = append(res, 4)
+		res = append(res, ip.To16()...)
+	}
+	return binary.BigEndian.AppendUint16(res, uint16(addr.Port))
 }
