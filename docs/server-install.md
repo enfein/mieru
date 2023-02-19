@@ -1,6 +1,6 @@
 # Server Installation & Configuration
 
-We recommend that users with adequate money choose large foreign cloud service providers such as Amazon and Azure, which generally do not have their IPs blocked. Do not use cloud computing services from unknown sources. Proxy servers take up very little CPU and memory resources, and the final network speed depends mainly on the server's network bandwidth and line quality.
+We recommend that users with adequate money choose large foreign cloud service providers such as AWS (except Lightsail), Azure, and GCP, which generally do not have their IPs blocked. Do not use cloud computing services from unknown sources. Proxy servers take up very little CPU and memory resources, and the final network speed depends mainly on the server's network bandwidth and line quality.
 
 The proxy server software mita needs to run on Linux. We provide both debian and RPM installers for installing mita on Debian / Ubuntu and Fedora / CentOS / Red Hat Enterprise Linux series distributions.
 
@@ -90,7 +90,11 @@ Please download or copy this template to your server, open it in a text editor, 
 3. Fill in the `users` -> `password` property with the user's password.
 4. The `mtu` property is the maximum data link layer payload size when using the UDP proxy protocol. The default value is 1400. You can choose a value between 1280 and 1500.
 
-In addition to this, mita can listen to several different ports. You can also create multiple users if you want to share the proxy for others to use. Here is an example of the server configuration file, for reference only.
+In addition to this, mita can listen to several different ports. We recommend using multiple ports in both server and client configurations to mitigate blocking.
+
+You can also create multiple users if you want to share the proxy for others to use.
+
+Here is an example of the server configuration file.
 
 ```js
 {
