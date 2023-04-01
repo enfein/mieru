@@ -30,14 +30,14 @@ func TestDuplicate(t *testing.T) {
 		t.Fatalf("rand.Read() failed: %v", err)
 	}
 
-	if res := cache.IsDuplicate(data); res == true {
+	if res := cache.IsDuplicate(data, replay.EmptyTag); res == true {
 		t.Errorf("IsDuplicate() = true, want false")
 	}
 	if curr, prev := cache.Sizes(); curr != 1 || prev != 0 {
 		t.Errorf("cache sizes are %d %d, want 1 0.", curr, prev)
 	}
 
-	if res := cache.IsDuplicate(data); res == false {
+	if res := cache.IsDuplicate(data, replay.EmptyTag); res == false {
 		t.Errorf("IsDuplicate() = false, want true")
 	}
 	if curr, prev := cache.Sizes(); curr != 1 || prev != 0 {
@@ -56,18 +56,61 @@ func TestNoDuplicate(t *testing.T) {
 		t.Fatalf("rand.Read() failed: %v", err)
 	}
 
-	if res := cache.IsDuplicate(a); res == true {
+	if res := cache.IsDuplicate(a, replay.EmptyTag); res == true {
 		t.Errorf("IsDuplicate() = true, want false")
 	}
 	if curr, prev := cache.Sizes(); curr != 1 || prev != 0 {
 		t.Errorf("cache sizes are %d %d, want 1 0.", curr, prev)
 	}
 
-	if res := cache.IsDuplicate(b); res == true {
+	if res := cache.IsDuplicate(b, replay.EmptyTag); res == true {
 		t.Errorf("IsDuplicate() = true, want false")
 	}
 	if curr, prev := cache.Sizes(); curr != 2 || prev != 0 {
 		t.Errorf("cache sizes are %d %d, want 2 0.", curr, prev)
+	}
+}
+
+func TestTag(t *testing.T) {
+	cache := replay.NewCache(10, 1*time.Minute)
+	data := make([]byte, 32)
+	if _, err := crand.Read(data); err != nil {
+		t.Fatalf("rand.Read() failed: %v", err)
+	}
+
+	if res := cache.IsDuplicate(data, "tag1"); res == true {
+		t.Errorf("IsDuplicate() = true, want false")
+	}
+	if curr, prev := cache.Sizes(); curr != 1 || prev != 0 {
+		t.Errorf("cache sizes are %d %d, want 1 0.", curr, prev)
+	}
+
+	if res := cache.IsDuplicate(data, "tag1"); res == true {
+		t.Errorf("IsDuplicate() = true, want false")
+	}
+	if curr, prev := cache.Sizes(); curr != 1 || prev != 0 {
+		t.Errorf("cache sizes are %d %d, want 1 0.", curr, prev)
+	}
+
+	if res := cache.IsDuplicate(data, "tag2"); res == false {
+		t.Errorf("IsDuplicate() = false, want true")
+	}
+	if curr, prev := cache.Sizes(); curr != 1 || prev != 0 {
+		t.Errorf("cache sizes are %d %d, want 1 0.", curr, prev)
+	}
+
+	if res := cache.IsDuplicate(data, "tag1"); res == true {
+		t.Errorf("IsDuplicate() = true, want false")
+	}
+	if curr, prev := cache.Sizes(); curr != 1 || prev != 0 {
+		t.Errorf("cache sizes are %d %d, want 1 0.", curr, prev)
+	}
+
+	if res := cache.IsDuplicate(data, replay.EmptyTag); res == false {
+		t.Errorf("IsDuplicate() = false, want true")
+	}
+	if curr, prev := cache.Sizes(); curr != 1 || prev != 0 {
+		t.Errorf("cache sizes are %d %d, want 1 0.", curr, prev)
 	}
 }
 
@@ -82,25 +125,30 @@ func TestCapacity(t *testing.T) {
 		t.Fatalf("rand.Read() failed: %v", err)
 	}
 
-	if res := cache.IsDuplicate(a); res == true {
+	if res := cache.IsDuplicate(a, replay.EmptyTag); res == true {
 		t.Errorf("IsDuplicate() = true, want false")
 	}
 	if curr, prev := cache.Sizes(); curr != 1 || prev != 0 {
 		t.Errorf("cache sizes are %d %d, want 1 0.", curr, prev)
 	}
 
-	if res := cache.IsDuplicate(a); res == false {
+	if res := cache.IsDuplicate(a, replay.EmptyTag); res == false {
 		t.Errorf("IsDuplicate() = false, want true")
 	}
 	if curr, prev := cache.Sizes(); curr != 1 || prev != 1 {
 		t.Errorf("cache sizes are %d %d, want 1 1.", curr, prev)
 	}
 
-	if res := cache.IsDuplicate(b); res == true {
+	if res := cache.IsDuplicate(b, replay.EmptyTag); res == true {
 		t.Errorf("IsDuplicate() = true, want false")
 	}
 	if curr, prev := cache.Sizes(); curr != 1 || prev != 1 {
 		t.Errorf("cache sizes are %d %d, want 1 1.", curr, prev)
+	}
+
+	cache.Clear()
+	if curr, prev := cache.Sizes(); curr != 0 || prev != 0 {
+		t.Errorf("cache sizes are %d %d, want 0 0.", curr, prev)
 	}
 }
 
@@ -115,7 +163,7 @@ func TestExpireInterval(t *testing.T) {
 		t.Fatalf("rand.Read() failed: %v", err)
 	}
 
-	if res := cache.IsDuplicate(a); res == true {
+	if res := cache.IsDuplicate(a, replay.EmptyTag); res == true {
 		t.Errorf("IsDuplicate() = true, want false")
 	}
 	if curr, prev := cache.Sizes(); curr != 1 || prev != 0 {
@@ -124,7 +172,7 @@ func TestExpireInterval(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	if res := cache.IsDuplicate(a); res == false {
+	if res := cache.IsDuplicate(a, replay.EmptyTag); res == false {
 		t.Errorf("IsDuplicate() = false, want true")
 	}
 	if curr, prev := cache.Sizes(); curr != 1 || prev != 1 {
@@ -133,7 +181,7 @@ func TestExpireInterval(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	if res := cache.IsDuplicate(b); res == true {
+	if res := cache.IsDuplicate(b, replay.EmptyTag); res == true {
 		t.Errorf("IsDuplicate() = true, want false")
 	}
 	if curr, prev := cache.Sizes(); curr != 1 || prev != 1 {

@@ -250,7 +250,7 @@ func (kcp *KCP) ReserveBytes(n int) bool {
 // SetPollIntervalMs set KCP polling interval in milliseconds.
 func (kcp *KCP) SetPollIntervalMs(interval uint32) {
 	if interval == 0 {
-		log.Fatalf("KCP poll interval can't be 0")
+		panic("KCP poll interval can't be 0")
 	}
 	kcp.interval = interval
 }

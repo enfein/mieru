@@ -84,9 +84,9 @@ func RegisterClientCommands() {
 		[]string{"", "apply", "config"},
 		func(s []string) error {
 			if len(s) < 4 {
-				return fmt.Errorf("usage: mieru apply config <FILE>. no config file is provided")
+				return fmt.Errorf("usage: mieru apply config <FILE>. No config file is provided")
 			} else if len(s) > 4 {
-				return fmt.Errorf("usage: mieru apply config <FILE>. more than 1 config file is provided")
+				return fmt.Errorf("usage: mieru apply config <FILE>. More than 1 config file is provided")
 			}
 			return nil
 		},
@@ -98,6 +98,25 @@ func RegisterClientCommands() {
 			return unexpectedArgsError(s, 3)
 		},
 		clientDescribeConfigFunc,
+	)
+	RegisterCallback(
+		[]string{"", "import", "config"},
+		func(s []string) error {
+			if len(s) < 4 {
+				return fmt.Errorf("usage: mieru import config <URL>. No URL is provided")
+			} else if len(s) > 4 {
+				return fmt.Errorf("usage: mieru import config <URL>. More than 1 URL is provided")
+			}
+			return nil
+		},
+		clientImportConfigFunc,
+	)
+	RegisterCallback(
+		[]string{"", "export", "config"},
+		func(s []string) error {
+			return unexpectedArgsError(s, 3)
+		},
+		clientExportConfigFunc,
 	)
 	RegisterCallback(
 		[]string{"", "delete", "profile"},
@@ -173,6 +192,8 @@ var clientHelpFunc = func(s []string) error {
 	statusCmd := fmt.Sprintf(format, "status", "Check mieru client status")
 	applyConfigCmd := fmt.Sprintf(format, "apply config <FILE>", "Apply client configuration from JSON file")
 	describeConfigCmd := fmt.Sprintf(format, "describe config", "Show current client configuration")
+	importConfigCmd := fmt.Sprintf(format, "import config <URL>", "Import client configuration from URL")
+	exportConfigCmd := fmt.Sprintf(format, "export config", "Export client configuration as URL")
 	deleteProfileCmd := fmt.Sprintf(format, "delete profile <PROFILE_NAME>", "Delete a client configuration profile")
 	versionCmd := fmt.Sprintf(format, "version", "Show mieru client version")
 	checkUpdateCmd := fmt.Sprintf(format, "check update", "Check mieru client update")
@@ -185,6 +206,8 @@ var clientHelpFunc = func(s []string) error {
 	log.Infof("%s", statusCmd)
 	log.Infof("%s", applyConfigCmd)
 	log.Infof("%s", describeConfigCmd)
+	log.Infof("%s", importConfigCmd)
+	log.Infof("%s", exportConfigCmd)
 	log.Infof("%s", deleteProfileCmd)
 	log.Infof("%s", versionCmd)
 	log.Infof("%s", checkUpdateCmd)
@@ -476,6 +499,31 @@ var clientDescribeConfigFunc = func(s []string) error {
 		}
 	}
 	out, err := appctl.GetJSONClientConfig()
+	if err != nil {
+		return fmt.Errorf(stderror.GetClientConfigFailedErr, err)
+	}
+	log.Infof("%s", out)
+	return nil
+}
+
+var clientImportConfigFunc = func(s []string) error {
+	_, err := appctl.LoadClientConfig()
+	if err == stderror.ErrFileNotExist {
+		if err = appctl.StoreClientConfig(&appctlpb.ClientConfig{}); err != nil {
+			return fmt.Errorf(stderror.StoreClientConfigFailedErr, err)
+		}
+	}
+	return appctl.ApplyURLClientConfig(s[3])
+}
+
+var clientExportConfigFunc = func(s []string) error {
+	_, err := appctl.LoadClientConfig()
+	if err == stderror.ErrFileNotExist {
+		if err = appctl.StoreClientConfig(&appctlpb.ClientConfig{}); err != nil {
+			return fmt.Errorf(stderror.StoreClientConfigFailedErr, err)
+		}
+	}
+	out, err := appctl.GetURLClientConfig()
 	if err != nil {
 		return fmt.Errorf(stderror.GetClientConfigFailedErr, err)
 	}

@@ -24,9 +24,9 @@ func TestGetIPVersion(t *testing.T) {
 		input string
 		want  IPVersion
 	}{
-		{"google.com", IP_VERSION_UNKNOWN},
-		{"127.0.0.1", IP_VERSION_4},
-		{"1234::0", IP_VERSION_6},
+		{"google.com", IPVersionUnknown},
+		{"127.0.0.1", IPVersion4},
+		{"1234::0", IPVersion6},
 	}
 
 	for _, tc := range testcases {

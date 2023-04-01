@@ -1,4 +1,4 @@
-// Copyright (C) 2022  mieru authors
+// Copyright (C) 2023  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,10 +13,30 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//go:build tools
-
-package mobile
+package protocolv2
 
 import (
-	_ "golang.org/x/mobile/cmd/gomobile"
+	"fmt"
+	"net"
+
+	"github.com/enfein/mieru/pkg/stderror"
 )
+
+// Mux manages the sessions and underlays.
+type Mux struct {
+	isClient          bool
+	underlays         []Underlay
+	serverListenAddrs []net.Addr
+}
+
+// ListenAndServeAll listens on all the server addresses and serves
+// incoming requests. Call this method in client results in an error.
+func (m *Mux) ListenAndServeAll() error {
+	if m.isClient {
+		return stderror.ErrInvalidOperation
+	}
+	if len(m.serverListenAddrs) == 0 {
+		return fmt.Errorf("no server listen address found")
+	}
+	return nil
+}

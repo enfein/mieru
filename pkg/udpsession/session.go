@@ -173,7 +173,7 @@ func newUDPSession(conv uint32, conn net.PacketConn, ownConn bool, remote net.Ad
 
 	sess.kcp.ReserveBytes(kcpReservedSize)
 
-	if netutil.GetIPVersion(sess.remote.String()) == netutil.IP_VERSION_4 {
+	if netutil.GetIPVersion(sess.remote.String()) == netutil.IPVersion4 {
 		sess.SetMtu(int(globalMTU) - 20 - 8 - kcp.OuterHeaderSize)
 	} else {
 		sess.SetMtu(int(globalMTU) - 40 - 8 - kcp.OuterHeaderSize)
@@ -678,7 +678,7 @@ func (s *UDPSession) outputCallback(buf []byte) {
 
 	// Add egress packet to replay cache.
 	if s.IsServer() {
-		replayCache.IsDuplicate(bts[:kcp.OuterHeaderSize])
+		replayCache.IsDuplicate(bts[:kcp.OuterHeaderSize], replay.EmptyTag)
 	}
 
 	if s.recordingEnabled {
@@ -965,16 +965,14 @@ func (l *Listener) packetInput(raw []byte, addr net.Addr) {
 		if isKnownSession {
 			// For an already established session, we need to put every packet into the replay cache.
 			// Since AEAD is used, only the packet prefix is added to the replay cache.
-			if replayCache.IsDuplicate(raw[:kcp.OuterHeaderSize]) {
+			if replayCache.IsDuplicate(raw[:kcp.OuterHeaderSize], replay.EmptyTag) {
 				replay.KnownSession.Add(1)
 			}
 			if conv == s.kcp.ConversationID() {
 				s.inputToKCP(data)
 			} else if sn == 0 {
 				log.Debugf("another connection reused address %v, closing existing session", addr)
-				if err := s.Close(); err != nil {
-					log.Debugf("UDP session Close() failed: %v", err)
-				}
+				s.Close()
 				connWithSameAddr = true
 				// The old session will be garbage collected after the reference
 				// in l.sessions is replaced by the new session.
@@ -985,7 +983,7 @@ func (l *Listener) packetInput(raw []byte, addr net.Addr) {
 		if s == nil || connWithSameAddr {
 			// Do not let the new sessions overwhelm accept queue.
 			if len(l.chAccepts) < cap(l.chAccepts) {
-				if replayCache.IsDuplicate(raw[:kcp.OuterHeaderSize]) && s == nil {
+				if replayCache.IsDuplicate(raw[:kcp.OuterHeaderSize], replay.EmptyTag) && s == nil {
 					// Found a replay attack. Don't establish the connection.
 					replay.NewSession.Add(1)
 					log.Debugf("found possible replay attack from %v", addr)
@@ -1016,9 +1014,7 @@ func (l *Listener) periodCleanTask() {
 	for addr, s := range l.sessions {
 		if !s.idleDeadline.IsZero() && s.idleDeadline.Before(time.Now()) {
 			log.Debugf("closing UDP session [%v - %v] due to timeout", s.conn.LocalAddr(), addr)
-			if err := s.Close(); err != nil {
-				log.Debugf("UDP session Close() failed: %v", err)
-			}
+			s.Close()
 			delete(l.sessions, addr)
 		}
 	}

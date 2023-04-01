@@ -26,6 +26,7 @@ import (
 
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
+	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/testtool"
 	"github.com/enfein/mieru/pkg/udpsession"
@@ -107,7 +108,11 @@ func runClient(t *testing.T, laddr, serverAddr string, username, password []byte
 // ROT13 (rotate by 13 places) of the data back to the client.
 func TestKCPSessionsIPv4(t *testing.T) {
 	rng.InitSeed()
-	party, err := udpsession.ListenWithOptions("127.0.0.1:12315", users)
+	serverPort, err := netutil.UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+	}
+	party, err := udpsession.ListenWithOptions(fmt.Sprintf("127.0.0.1:%d", serverPort), users)
 	if err != nil {
 		t.Fatalf("udpsession.ListenWithOptions() failed: %v", err)
 	}
@@ -129,16 +134,28 @@ func TestKCPSessionsIPv4(t *testing.T) {
 	}()
 	time.Sleep(1 * time.Second)
 
+	clientPort1, err := netutil.UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+	}
+	clientPort2, err := netutil.UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+	}
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
-		if err := runClient(t, "127.0.0.1:12316", "127.0.0.1:12315", []byte("jiangzemin"), []byte("20001027"), 1024*64, 9000); err != nil {
+		clientAddr := fmt.Sprintf("127.0.0.1:%d", clientPort1)
+		serverAddr := fmt.Sprintf("127.0.0.1:%d", serverPort)
+		if err := runClient(t, clientAddr, serverAddr, []byte("jiangzemin"), []byte("20001027"), 1024*64, 9000); err != nil {
 			t.Errorf("[%s] jiangzemin failed: %v", time.Now().Format(testtool.TimeLayout), err)
 		}
 		wg.Done()
 	}()
 	go func() {
-		if err := runClient(t, "127.0.0.1:12317", "127.0.0.1:12315", []byte("xijinping"), []byte("20200630"), 9000, 1024*64); err != nil {
+		clientAddr := fmt.Sprintf("127.0.0.1:%d", clientPort2)
+		serverAddr := fmt.Sprintf("127.0.0.1:%d", serverPort)
+		if err := runClient(t, clientAddr, serverAddr, []byte("xijinping"), []byte("20200630"), 9000, 1024*64); err != nil {
 			t.Errorf("[%s] xijinping failed: %v", time.Now().Format(testtool.TimeLayout), err)
 		}
 		wg.Done()
@@ -152,7 +169,11 @@ func TestKCPSessionsIPv4(t *testing.T) {
 // TestKCPSessionsIPv6 is similar to TestKCPSessionsIPv4 but running in IPv6.
 func TestKCPSessionsIPv6(t *testing.T) {
 	rng.InitSeed()
-	party, err := udpsession.ListenWithOptions("[::1]:12318", users)
+	serverPort, err := netutil.UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+	}
+	party, err := udpsession.ListenWithOptions(fmt.Sprintf("[::1]:%d", serverPort), users)
 	if err != nil {
 		t.Fatalf("udpsession.ListenWithOptions() failed: %v", err)
 	}
@@ -174,16 +195,28 @@ func TestKCPSessionsIPv6(t *testing.T) {
 	}()
 	time.Sleep(1 * time.Second)
 
+	clientPort1, err := netutil.UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+	}
+	clientPort2, err := netutil.UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+	}
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
-		if err := runClient(t, "[::1]:12319", "[::1]:12318", []byte("jiangzemin"), []byte("20001027"), 1024*64, 9000); err != nil {
+		clientAddr := fmt.Sprintf("[::1]:%d", clientPort1)
+		serverAddr := fmt.Sprintf("[::1]:%d", serverPort)
+		if err := runClient(t, clientAddr, serverAddr, []byte("jiangzemin"), []byte("20001027"), 1024*64, 9000); err != nil {
 			t.Errorf("[%s] jiangzemin failed: %v", time.Now().Format(testtool.TimeLayout), err)
 		}
 		wg.Done()
 	}()
 	go func() {
-		if err := runClient(t, "[::1]:12320", "[::1]:12318", []byte("xijinping"), []byte("20200630"), 9000, 1024*64); err != nil {
+		clientAddr := fmt.Sprintf("[::1]:%d", clientPort2)
+		serverAddr := fmt.Sprintf("[::1]:%d", serverPort)
+		if err := runClient(t, clientAddr, serverAddr, []byte("xijinping"), []byte("20200630"), 9000, 1024*64); err != nil {
 			t.Errorf("[%s] xijinping failed: %v", time.Now().Format(testtool.TimeLayout), err)
 		}
 		wg.Done()

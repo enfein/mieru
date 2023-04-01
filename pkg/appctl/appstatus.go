@@ -19,7 +19,6 @@ import (
 	"sync/atomic"
 
 	pb "github.com/enfein/mieru/pkg/appctl/appctlpb"
-	"github.com/enfein/mieru/pkg/log"
 )
 
 // currentAppStatus stores the current application running status.
@@ -37,7 +36,7 @@ func GetAppStatus() pb.AppStatus {
 // SetAppStatus sets the application running status.
 func SetAppStatus(status pb.AppStatus) {
 	if status == pb.AppStatus_UNKNOWN {
-		log.Fatalf("can't set app status to UNKNOWN")
+		panic("can't set app status to UNKNOWN")
 	}
 	currentAppStatus.Store(status)
 }

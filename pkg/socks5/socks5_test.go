@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/enfein/mieru/pkg/netutil"
 )
 
 func TestSocks5Connect(t *testing.T) {
@@ -56,8 +58,12 @@ func TestSocks5Connect(t *testing.T) {
 	}
 
 	// Socks server start listening.
+	serverPort, err := netutil.UnusedTCPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+	}
 	go func() {
-		if err := serv.ListenAndServe("tcp", "127.0.0.1:12345"); err != nil {
+		if err := serv.ListenAndServe("tcp", "127.0.0.1:"+strconv.Itoa(serverPort)); err != nil {
 			t.Errorf("ListenAndServe() failed: %v", err)
 			return
 		}
@@ -65,7 +71,7 @@ func TestSocks5Connect(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Dial to socks server.
-	conn, err := net.Dial("tcp", "127.0.0.1:12345")
+	conn, err := net.Dial("tcp", "127.0.0.1:"+strconv.Itoa(serverPort))
 	if err != nil {
 		t.Fatalf("net.Dial() failed: %v", err)
 	}
@@ -167,8 +173,12 @@ func TestSocks5UDPAssociation(t *testing.T) {
 	}
 
 	// Socks server start listening.
+	serverPort, err := netutil.UnusedTCPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+	}
 	go func() {
-		if err := serv.ListenAndServe("tcp", "127.0.0.1:12346"); err != nil {
+		if err := serv.ListenAndServe("tcp", "127.0.0.1:"+strconv.Itoa(serverPort)); err != nil {
 			t.Errorf("ListenAndServe() failed: %v", err)
 			return
 		}
@@ -176,7 +186,7 @@ func TestSocks5UDPAssociation(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Dial to socks server.
-	conn, err := net.Dial("tcp", "127.0.0.1:12346")
+	conn, err := net.Dial("tcp", "127.0.0.1:"+strconv.Itoa(serverPort))
 	if err != nil {
 		t.Fatalf("net.Dial() failed: %v", err)
 	}
@@ -252,7 +262,11 @@ func TestServerGroup(t *testing.T) {
 		t.Fatalf("New() failed: %v", err)
 	}
 	g := NewGroup()
-	if err := g.Add("UDP", 12347, s1); err != nil {
+	port, err := netutil.UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+	}
+	if err := g.Add("UDP", port, s1); err != nil {
 		t.Fatalf("Add() failed: %v", err)
 	}
 	if g.IsEmpty() {

@@ -16,12 +16,15 @@
 package replay
 
 import (
-	crand "crypto/rand"
 	"encoding/binary"
 	"sync"
 	"time"
 
 	"github.com/enfein/mieru/pkg/metrics"
+)
+
+const (
+	EmptyTag = ""
 )
 
 var (
@@ -50,14 +53,11 @@ type ReplayCache struct {
 	// expireInterval is the interval to reset expireTime.
 	expireInterval time.Duration
 
-	// salt mutates the entry before it is stored.
-	salt []byte
-
 	// current stores the current set of packet signatures.
-	current map[uint64]struct{}
+	current map[uint64]string
 
 	// previous stores the previous set of packet signatures.
-	previous map[uint64]struct{}
+	previous map[uint64]string
 }
 
 // NewCache creates a new replay cache.
@@ -68,26 +68,20 @@ func NewCache(capacity int, expireInterval time.Duration) *ReplayCache {
 	if expireInterval.Nanoseconds() <= 0 {
 		panic("replay cache expire interval must be a positive time range")
 	}
-	var salt [8]byte
-	for {
-		if _, err := crand.Read(salt[:]); err != nil {
-			time.Sleep(50 * time.Millisecond)
-		} else {
-			break
-		}
-	}
 	return &ReplayCache{
 		capacity:       capacity,
 		expireTime:     time.Now().Add(expireInterval),
 		expireInterval: expireInterval,
-		salt:           salt[:],
-		current:        make(map[uint64]struct{}),
-		previous:       make(map[uint64]struct{}),
+		current:        make(map[uint64]string),
+		previous:       make(map[uint64]string),
 	}
 }
 
 // IsDuplicate checks if the given data is present in the replay cache.
-func (c *ReplayCache) IsDuplicate(data []byte) bool {
+// If a non-empty tag is provided, it is not considered as a duplicate
+// when the same tag is used. This can allow retransmit exact content
+// from the same network address. Use an empty tag disables this feature.
+func (c *ReplayCache) IsDuplicate(data []byte, tag string) bool {
 	if c == nil || c.capacity == 0 {
 		// The replay cache is disabled.
 		return false
@@ -98,16 +92,23 @@ func (c *ReplayCache) IsDuplicate(data []byte) bool {
 
 	if len(c.current) >= c.capacity || time.Now().After(c.expireTime) {
 		c.previous = c.current
-		c.current = make(map[uint64]struct{})
+		c.current = make(map[uint64]string)
 		c.expireTime = time.Now().Add(c.expireInterval)
 	}
 
-	if _, ok := c.current[signature]; ok {
-		return true
+	if existingTag, ok := c.current[signature]; ok {
+		if existingTag == EmptyTag || tag == EmptyTag {
+			return true
+		}
+		return existingTag != tag
+	} else {
+		c.current[signature] = tag
 	}
-	c.current[signature] = struct{}{}
-	if _, ok := c.previous[signature]; ok {
-		return true
+	if existingTag, ok := c.previous[signature]; ok {
+		if existingTag == EmptyTag || tag == EmptyTag {
+			return true
+		}
+		return existingTag != tag
 	}
 	return false
 }
@@ -123,15 +124,12 @@ func (c *ReplayCache) Sizes() (int, int) {
 func (c *ReplayCache) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.current = make(map[uint64]struct{})
-	c.previous = make(map[uint64]struct{})
+	c.current = make(map[uint64]string)
+	c.previous = make(map[uint64]string)
 }
 
 func (c *ReplayCache) computeSignature(data []byte) uint64 {
 	signature := [8]byte{}
-	for i, v := range c.salt {
-		signature[i&0x7] ^= v
-	}
 	for i, v := range data {
 		signature[i&0x7] ^= v
 	}

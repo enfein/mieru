@@ -20,7 +20,6 @@ import (
 	"io"
 	"net"
 
-	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/stderror"
 )
 
@@ -96,7 +95,7 @@ func WrapUDPAssociateTunnel(conn io.ReadWriteCloser) *UDPAssociateTunnelConn {
 // destination address.
 func udpAddrToHeader(addr *net.UDPAddr) []byte {
 	if addr == nil {
-		log.Fatalf("When translating UDP address to UDP associate header, the UDP address is nil")
+		panic("When translating UDP address to UDP associate header, the UDP address is nil")
 	}
 	res := []byte{0, 0, 0}
 	ip := addr.IP

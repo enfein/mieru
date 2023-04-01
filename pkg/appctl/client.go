@@ -90,7 +90,7 @@ func (c *clientLifecycleService) Exit(ctx context.Context, req *pb.Empty) (*pb.E
 	if socks5Server != nil {
 		log.Infof("stopping socks5 server")
 		if err := socks5Server.Close(); err != nil {
-			log.Debugf("socks5 server Close() failed: %v", err)
+			log.Infof("socks5 server Close() failed: %v", err)
 		}
 	} else {
 		log.Infof("socks5 server reference not found")
@@ -172,6 +172,19 @@ func GetJSONClientConfig() (string, error) {
 		return "", fmt.Errorf("protojson.Marshal() failed: %w", err)
 	}
 	return string(b), nil
+}
+
+// GetURLClientConfig returns the client config as a URL.
+func GetURLClientConfig() (string, error) {
+	config, err := LoadClientConfig()
+	if err != nil {
+		return "", fmt.Errorf("LoadClientConfig() failed: %w", err)
+	}
+	u, err := ClientConfigToURL(config)
+	if err != nil {
+		return "", fmt.Errorf("ClientConfigToURL() failed: %w", err)
+	}
+	return u, nil
 }
 
 // LoadClientConfig reads client config from disk.
@@ -267,21 +280,16 @@ func ApplyJSONClientConfig(path string) error {
 	if err = jsonUnmarshalOption.Unmarshal(b, c); err != nil {
 		return fmt.Errorf("protojson.Unmarshal() failed: %w", err)
 	}
-	if err = ValidateClientConfigPatch(c); err != nil {
-		return fmt.Errorf("ValidateClientConfigPatch() failed: %w", err)
-	}
-	config, err := LoadClientConfig()
+	return applyClientConfig(c)
+}
+
+// ApplyJSONClientConfig applies user provided client config URL.
+func ApplyURLClientConfig(u string) error {
+	c, err := URLToClientConfig(u)
 	if err != nil {
-		return fmt.Errorf("LoadClientConfig() failed: %w", err)
+		return fmt.Errorf("URLToClientConfig() failed: %w", err)
 	}
-	mergeClientConfigByProfile(config, c)
-	if err = ValidateFullClientConfig(config); err != nil {
-		return fmt.Errorf("ValidateFullClientConfig() failed: %w", err)
-	}
-	if err = StoreClientConfig(config); err != nil {
-		return fmt.Errorf("StoreClientConfig() failed: %w", err)
-	}
-	return nil
+	return applyClientConfig(c)
 }
 
 // DeleteClientConfigProfile deletes a profile stored in client config.
@@ -480,6 +488,24 @@ func clientConfigFilePath() (string, ConfigFileType, error) {
 	}
 	cachedClientConfigFilePath = cachedClientConfigDir + string(os.PathSeparator) + "client.conf.pb"
 	return cachedClientConfigFilePath, FindConfigFileType(cachedClientConfigFilePath), nil
+}
+
+func applyClientConfig(c *pb.ClientConfig) error {
+	if err := ValidateClientConfigPatch(c); err != nil {
+		return fmt.Errorf("ValidateClientConfigPatch() failed: %w", err)
+	}
+	config, err := LoadClientConfig()
+	if err != nil {
+		return fmt.Errorf("LoadClientConfig() failed: %w", err)
+	}
+	mergeClientConfigByProfile(config, c)
+	if err = ValidateFullClientConfig(config); err != nil {
+		return fmt.Errorf("ValidateFullClientConfig() failed: %w", err)
+	}
+	if err = StoreClientConfig(config); err != nil {
+		return fmt.Errorf("StoreClientConfig() failed: %w", err)
+	}
+	return nil
 }
 
 // mergeClientConfigByProfile merges the source client config into destination.

@@ -92,3 +92,14 @@ mieru 为了防止 GFW 主动探测，增强了服务器端的隐蔽性，但是
 5. 打开客户端和服务器的调试日志，查看具体的网络连接情况。
 
 如果未能解决问题，可以提交 GitHub Issue 联系开发者。
+
+## 环境变量
+
+如有必要，用户可以使用环境变量控制服务器和客户端的行为。
+
+- `MITA_CONFIG_JSON_FILE` 从这个路径加载 JSON 格式的服务器配置文件。
+- `MITA_CONFIG_FILE` 从这个路径加载 protocol buffer 格式的服务器配置文件。
+- `MIERU_CONFIG_JSON_FILE` 从这个路径加载 JSON 格式的客户端配置文件。通常用于同时运行多个客户端进程。
+- `MIERU_CONFIG_FILE` 从这个路径加载 protocol buffer 格式的客户端配置文件。
+- `MITA_LOG_NO_TIMESTAMP` 这个值非空时，服务器日志不打印时间戳。因为 journald 已经提供了时间戳，我们默认开启这项设置，以避免打印重复的时间戳。
+- `MITA_INSECURE_UDS` 这个值非空时，不强制修改服务器 UNIX domain socket 文件 `/var/run/mita.sock` 的用户和访问权限。这个设置可以用于某些非常受限（例如不能创建新用户）的系统中。

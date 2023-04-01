@@ -28,6 +28,7 @@ import (
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/metrics"
+	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/recording"
 	"github.com/enfein/mieru/pkg/replay"
 	"github.com/enfein/mieru/pkg/testtool"
@@ -133,9 +134,21 @@ func runCloseWaitClient(t *testing.T, laddr, raddr string, username, password []
 // the client's request to the server. The monitor should not get any response
 // from the server.
 func TestReplayClientRequestToServer(t *testing.T) {
-	serverAddr := "127.0.0.1:12356"
-	clientAddr := "127.0.0.1:12357"
-	attackAddr := "127.0.0.1:12358"
+	serverPort, err := netutil.UnusedTCPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+	}
+	clientPort, err := netutil.UnusedTCPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+	}
+	attackPort, err := netutil.UnusedTCPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+	}
+	serverAddr := fmt.Sprintf("127.0.0.1:%d", serverPort)
+	clientAddr := fmt.Sprintf("127.0.0.1:%d", clientPort)
+	attackAddr := fmt.Sprintf("127.0.0.1:%d", attackPort)
 	serverTCPAddr, _ := net.ResolveTCPAddr("tcp", serverAddr)
 	attackTCPAddr, _ := net.ResolveTCPAddr("tcp", attackAddr)
 	users := map[string]*appctlpb.User{
@@ -239,9 +252,21 @@ func TestReplayClientRequestToServer(t *testing.T) {
 // the server's response back to the server. The monitor should not get any
 // response from the server.
 func TestReplayServerResponseToServer(t *testing.T) {
-	serverAddr := "127.0.0.1:12363"
-	clientAddr := "127.0.0.1:12364"
-	attackAddr := "127.0.0.1:12365"
+	serverPort, err := netutil.UnusedTCPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+	}
+	clientPort, err := netutil.UnusedTCPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+	}
+	attackPort, err := netutil.UnusedTCPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+	}
+	serverAddr := fmt.Sprintf("127.0.0.1:%d", serverPort)
+	clientAddr := fmt.Sprintf("127.0.0.1:%d", clientPort)
+	attackAddr := fmt.Sprintf("127.0.0.1:%d", attackPort)
 	serverTCPAddr, _ := net.ResolveTCPAddr("tcp", serverAddr)
 	attackTCPAddr, _ := net.ResolveTCPAddr("tcp", attackAddr)
 	users := map[string]*appctlpb.User{

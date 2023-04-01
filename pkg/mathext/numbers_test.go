@@ -32,6 +32,10 @@ func TestMin(t *testing.T) {
 	if min != oneSecond {
 		t.Errorf("min = %v, want %v", min, oneSecond)
 	}
+	min = Min(twoSeconds, oneSecond)
+	if min != oneSecond {
+		t.Errorf("min = %v, want %v", min, oneSecond)
+	}
 }
 
 func TestMax(t *testing.T) {
@@ -39,10 +43,18 @@ func TestMax(t *testing.T) {
 	if max != twoSeconds {
 		t.Errorf("max = %v, want %v", max, twoSeconds)
 	}
+	max = Max(twoSeconds, oneSecond)
+	if max != twoSeconds {
+		t.Errorf("max = %v, want %v", max, twoSeconds)
+	}
 }
 
 func TestMid(t *testing.T) {
 	mid := Mid(threeSeconds, twoSeconds, oneSecond)
+	if mid != twoSeconds {
+		t.Errorf("mid = %v, want %v", mid, twoSeconds)
+	}
+	mid = Mid(oneSecond, twoSeconds, threeSeconds)
 	if mid != twoSeconds {
 		t.Errorf("mid = %v, want %v", mid, twoSeconds)
 	}
@@ -54,5 +66,14 @@ func TestAbs(t *testing.T) {
 	}
 	if Abs(negativeOneSecond) != oneSecond {
 		t.Errorf("abs = %v, want %v", Abs(negativeOneSecond), oneSecond)
+	}
+}
+
+func TestWithinRange(t *testing.T) {
+	if WithinRange(threeSeconds, twoSeconds, oneSecond) == false {
+		t.Errorf("WithinRange(3, 2, 1) = %v, want %v", false, true)
+	}
+	if WithinRange(negativeOneSecond, twoSeconds, oneSecond) == true {
+		t.Errorf("WithinRange(-1, 2, 1) = %v, want %v", true, false)
 	}
 }

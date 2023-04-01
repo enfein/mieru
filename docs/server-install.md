@@ -9,23 +9,35 @@ Before installation and configuration, connect to the server via SSH and then ex
 ## Download mita installation package
 
 ```sh
-# Debian / Ubuntu
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.12.0/mita_1.12.0_amd64.deb
+# Debian / Ubuntu - X86_64
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.13.0/mita_1.13.0_amd64.deb
 
-# Fedora / CentOS / Red Hat Enterprise Linux
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.12.0/mita-1.12.0-1.x86_64.rpm
+# Debian / Ubuntu - ARM 64
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.13.0/mita_1.13.0_arm64.deb
+
+# Fedora / CentOS / Red Hat Enterprise Linux - X86_64
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.13.0/mita-1.13.0-1.x86_64.rpm
+
+# Fedora / CentOS / Red Hat Enterprise Linux - ARM 64
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.13.0/mita-1.13.0-1.aarch64.rpm
 ```
 
-To download the installer for the ARM architecture, replace `amd64` with `arm64`, and `x86_64` with `aarch64` in the link. If the above link is blocked, please use your browser to download and install from the GitHub Releases page.
+If the above link is blocked, please use your browser to download and install from the GitHub Releases page.
 
 ## Install mita package
 
 ```sh
-# Debian / Ubuntu
-sudo dpkg -i mita_1.12.0_amd64.deb
+# Debian / Ubuntu - X86_64
+sudo dpkg -i mita_1.13.0_amd64.deb
 
-# Fedora / CentOS / Red Hat Enterprise Linux
-sudo rpm -Uvh --force mita-1.12.0-1.x86_64.rpm
+# Debian / Ubuntu - ARM 64
+sudo dpkg -i mita_1.13.0_arm64.deb
+
+# Fedora / CentOS / Red Hat Enterprise Linux - X86_64
+sudo rpm -Uvh --force mita-1.13.0-1.x86_64.rpm
+
+# Fedora / CentOS / Red Hat Enterprise Linux - ARM 64
+sudo rpm -Uvh --force mita-1.13.0-1.aarch64.rpm
 ```
 
 ## Grant permissions

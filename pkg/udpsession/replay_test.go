@@ -26,6 +26,7 @@ import (
 
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
+	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/recording"
 	"github.com/enfein/mieru/pkg/replay"
 	"github.com/enfein/mieru/pkg/testtool"
@@ -131,9 +132,21 @@ func runCloseWaitClient(t *testing.T, laddr, raddr string, username, password []
 // the server's response back to the client. The client should drop the replay
 // packet before processing it.
 func TestReplayServerResponseToClient(t *testing.T) {
-	serverAddr := "127.0.0.1:12321"
-	clientAddr := "127.0.0.1:12322"
-	attackAddr := "127.0.0.1:12323"
+	serverPort, err := netutil.UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+	}
+	clientPort, err := netutil.UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+	}
+	attackPort, err := netutil.UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+	}
+	serverAddr := fmt.Sprintf("127.0.0.1:%d", serverPort)
+	clientAddr := fmt.Sprintf("127.0.0.1:%d", clientPort)
+	attackAddr := fmt.Sprintf("127.0.0.1:%d", attackPort)
 	clientUDPAddr, _ := net.ResolveUDPAddr("udp", clientAddr)
 	attackUDPAddr, _ := net.ResolveUDPAddr("udp", attackAddr)
 	users := map[string]*appctlpb.User{
@@ -219,9 +232,21 @@ func TestReplayServerResponseToClient(t *testing.T) {
 // the client's request to the server. The monitor should not get any response
 // from the server.
 func TestReplayClientRequestToServer(t *testing.T) {
-	serverAddr := "127.0.0.1:12324"
-	clientAddr := "127.0.0.1:12325"
-	attackAddr := "127.0.0.1:12326"
+	serverPort, err := netutil.UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+	}
+	clientPort, err := netutil.UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+	}
+	attackPort, err := netutil.UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+	}
+	serverAddr := fmt.Sprintf("127.0.0.1:%d", serverPort)
+	clientAddr := fmt.Sprintf("127.0.0.1:%d", clientPort)
+	attackAddr := fmt.Sprintf("127.0.0.1:%d", attackPort)
 	serverUDPAddr, _ := net.ResolveUDPAddr("udp", serverAddr)
 	attackUDPAddr, _ := net.ResolveUDPAddr("udp", attackAddr)
 	users := map[string]*appctlpb.User{
@@ -326,9 +351,21 @@ func TestReplayClientRequestToServer(t *testing.T) {
 // the server's response back to the server. The server should drop the replay
 // packet before processing it.
 func TestReplayServerResponseToServer(t *testing.T) {
-	serverAddr := "127.0.0.1:12327"
-	clientAddr := "127.0.0.1:12328"
-	attackAddr := "127.0.0.1:12329"
+	serverPort, err := netutil.UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+	}
+	clientPort, err := netutil.UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+	}
+	attackPort, err := netutil.UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+	}
+	serverAddr := fmt.Sprintf("127.0.0.1:%d", serverPort)
+	clientAddr := fmt.Sprintf("127.0.0.1:%d", clientPort)
+	attackAddr := fmt.Sprintf("127.0.0.1:%d", attackPort)
 	serverUDPAddr, _ := net.ResolveUDPAddr("udp", serverAddr)
 	attackUDPAddr, _ := net.ResolveUDPAddr("udp", attackAddr)
 	users := map[string]*appctlpb.User{

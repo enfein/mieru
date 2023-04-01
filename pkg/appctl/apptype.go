@@ -17,8 +17,6 @@ package appctl
 
 import (
 	"sync"
-
-	"github.com/enfein/mieru/pkg/log"
 )
 
 type AppType int
@@ -35,7 +33,7 @@ var appTypeOnce sync.Once
 // SetAppType sets the application type. This method is only effective on the first call.
 func SetAppType(t AppType) {
 	if t == UNKNOWN_APP {
-		log.Fatalf("can't set AppType to UNKNOWN")
+		panic("can't set AppType to UNKNOWN")
 	}
 	appTypeOnce.Do(func() {
 		appType = t

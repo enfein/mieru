@@ -43,7 +43,13 @@ if [[ "$?" -ne 0 ]]; then
     echo "command 'mieru apply config client_mix.json' failed"
     exit 1
 fi
-echo "mieru client config:"
+./mieru export config > client.url.txt
+rm ~/.config/mieru/client.conf.pb
+echo "mieru client config before import:"
+./mieru describe config
+sleep 1
+./mieru import config $(cat client.url.txt)
+echo "mieru client config after import:"
 ./mieru describe config
 
 # Start mieru client.

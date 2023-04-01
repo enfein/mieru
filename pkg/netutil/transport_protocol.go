@@ -1,4 +1,4 @@
-// Copyright (C) 2022  mieru authors
+// Copyright (C) 2023  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,6 +13,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package tcpsession
+package netutil
 
-// Testing port range: [12350, 12370).
+type TransportProtocol int
+
+const (
+	UnknownTransport TransportProtocol = iota
+	UDPTransport
+	TCPTransport
+)

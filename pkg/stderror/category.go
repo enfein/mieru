@@ -23,8 +23,11 @@ import (
 
 // IsClosed returns true if the cause of error is connection close.
 func IsClosed(err error) bool {
+	if errors.Is(err, io.ErrClosedPipe) {
+		return true
+	}
 	s := strings.ToLower(err.Error())
-	return strings.Contains(s, "read/write on closed pipe") || strings.Contains(s, "use of closed network connection")
+	return strings.Contains(s, "use of closed network connection")
 }
 
 // IsConnRefused returns true if the cause of error is connection refused.

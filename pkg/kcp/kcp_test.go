@@ -20,23 +20,36 @@ import (
 	crand "crypto/rand"
 	mrand "math/rand"
 	"net"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/enfein/mieru/pkg/kcp"
+	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/stderror"
 )
 
 func newKCPPipe(t *testing.T) (*net.UDPConn, *net.UDPConn, *kcp.KCP, *kcp.KCP) {
+	t.Helper()
 	mrand.Seed(time.Now().UnixNano())
+
+	port1, err := netutil.UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+	}
+	port2, err := netutil.UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+	}
+
 	convId := uint32(mrand.Int31())
-	addr1, _ := net.ResolveUDPAddr("udp", "127.0.0.1:12305")
+	addr1, _ := net.ResolveUDPAddr("udp", "127.0.0.1:"+strconv.Itoa(port1))
 	c1, err := net.ListenUDP("udp", addr1)
 	if err != nil {
 		t.Fatalf("net.ListenUDP() on %v failed: %v", addr1, err)
 	}
-	addr2, _ := net.ResolveUDPAddr("udp", "127.0.0.1:12306")
+	addr2, _ := net.ResolveUDPAddr("udp", "127.0.0.1:"+strconv.Itoa(port2))
 	c2, err := net.ListenUDP("udp", addr2)
 	if err != nil {
 		t.Fatalf("net.ListenUDP() on %v failed: %v", addr2, err)

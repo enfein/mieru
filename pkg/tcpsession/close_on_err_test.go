@@ -17,20 +17,30 @@ package tcpsession
 
 import (
 	"context"
+	"fmt"
 	mrand "math/rand"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
+	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/testtool"
 	"google.golang.org/protobuf/proto"
 )
 
 func TestCloseOnErr(t *testing.T) {
-	serverAddr := "127.0.0.1:12359"
-	clientAddr := "127.0.0.1:12360"
+	serverPort, err := netutil.UnusedTCPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+	}
+	clientPort, err := netutil.UnusedTCPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+	}
+	serverAddr := fmt.Sprintf("127.0.0.1:%d", serverPort)
+	clientAddr := fmt.Sprintf("127.0.0.1:%d", clientPort)
 	clientTCPAddr, _ := net.ResolveTCPAddr("tcp", clientAddr)
 	users := map[string]*appctlpb.User{
 		"erbaijin": {
@@ -123,8 +133,16 @@ func TestCloseOnErr(t *testing.T) {
 }
 
 func TestErrorMetrics(t *testing.T) {
-	serverAddr := "127.0.0.1:12361"
-	clientAddr := "127.0.0.1:12362"
+	serverPort, err := netutil.UnusedTCPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+	}
+	clientPort, err := netutil.UnusedTCPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+	}
+	serverAddr := fmt.Sprintf("127.0.0.1:%d", serverPort)
+	clientAddr := fmt.Sprintf("127.0.0.1:%d", clientPort)
 	clientTCPAddr, _ := net.ResolveTCPAddr("tcp", clientAddr)
 	users := map[string]*appctlpb.User{
 		"erbaijin": {

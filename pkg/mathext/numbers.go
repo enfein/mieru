@@ -53,7 +53,20 @@ func Max[T Number](a, b T) T {
 
 // Mid returns the median value of three input numbers.
 func Mid[T Number](a, b, c T) T {
-	return Min(a, Max(b, c))
+	values := make([]T, 3)
+	values[0] = a
+	values[1] = b
+	values[2] = c
+	if values[0] > values[1] {
+		values[0], values[1] = values[1], values[0]
+	}
+	if values[0] > values[2] {
+		values[0], values[2] = values[2], values[0]
+	}
+	if values[1] > values[2] {
+		values[1], values[2] = values[2], values[1]
+	}
+	return values[1]
 }
 
 // Abs returns the absolute value of the input number.
@@ -62,4 +75,9 @@ func Abs[T Number](a T) T {
 		return a
 	}
 	return -a
+}
+
+// WithinRange returns true if v is within [target-margin, target+margin].
+func WithinRange[T Number](v, target, margin T) bool {
+	return Mid(v, target-margin, target+margin) == v
 }

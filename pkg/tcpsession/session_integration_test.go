@@ -26,6 +26,7 @@ import (
 
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
+	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/tcpsession"
 	"github.com/enfein/mieru/pkg/testtool"
@@ -96,7 +97,11 @@ func runClient(t *testing.T, laddr, serverAddr string, username, password []byte
 
 func TestTCPSessionIPv4(t *testing.T) {
 	rng.InitSeed()
-	party, err := tcpsession.ListenWithOptions("127.0.0.1:12350", users)
+	serverPort, err := netutil.UnusedTCPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+	}
+	party, err := tcpsession.ListenWithOptions(fmt.Sprintf("127.0.0.1:%d", serverPort), users)
 	if err != nil {
 		t.Fatalf("tcpsession.ListenWithOptions() failed: %v", err)
 	}
@@ -118,16 +123,28 @@ func TestTCPSessionIPv4(t *testing.T) {
 	}()
 	time.Sleep(1 * time.Second)
 
+	clientPort1, err := netutil.UnusedTCPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+	}
+	clientPort2, err := netutil.UnusedTCPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+	}
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
-		if err := runClient(t, "127.0.0.1:12351", "127.0.0.1:12350", []byte("baozi"), []byte("shilishanlubuhuanjian"), 1024*64, 9000); err != nil {
+		clientAddr := fmt.Sprintf("127.0.0.1:%d", clientPort1)
+		serverAddr := fmt.Sprintf("127.0.0.1:%d", serverPort)
+		if err := runClient(t, clientAddr, serverAddr, []byte("baozi"), []byte("shilishanlubuhuanjian"), 1024*64, 9000); err != nil {
 			t.Errorf("[%s] baozi failed: %v", time.Now().Format(testtool.TimeLayout), err)
 		}
 		wg.Done()
 	}()
 	go func() {
-		if err := runClient(t, "127.0.0.1:12352", "127.0.0.1:12350", []byte("zongjiasushi"), []byte("manlianpenfen"), 9000, 1024*64); err != nil {
+		clientAddr := fmt.Sprintf("127.0.0.1:%d", clientPort2)
+		serverAddr := fmt.Sprintf("127.0.0.1:%d", serverPort)
+		if err := runClient(t, clientAddr, serverAddr, []byte("zongjiasushi"), []byte("manlianpenfen"), 9000, 1024*64); err != nil {
 			t.Errorf("[%s] zongjiasushi failed: %v", time.Now().Format(testtool.TimeLayout), err)
 		}
 		wg.Done()
@@ -140,7 +157,11 @@ func TestTCPSessionIPv4(t *testing.T) {
 
 func TestTCPSessionIPv6(t *testing.T) {
 	rng.InitSeed()
-	party, err := tcpsession.ListenWithOptions("[::1]:12353", users)
+	serverPort, err := netutil.UnusedTCPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+	}
+	party, err := tcpsession.ListenWithOptions(fmt.Sprintf("[::1]:%d", serverPort), users)
 	if err != nil {
 		t.Fatalf("tcpsession.ListenWithOptions() failed: %v", err)
 	}
@@ -162,16 +183,28 @@ func TestTCPSessionIPv6(t *testing.T) {
 	}()
 	time.Sleep(1 * time.Second)
 
+	clientPort1, err := netutil.UnusedTCPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+	}
+	clientPort2, err := netutil.UnusedTCPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+	}
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
-		if err := runClient(t, "[::1]:12354", "[::1]:12353", []byte("baozi"), []byte("shilishanlubuhuanjian"), 1024*64, 9000); err != nil {
+		clientAddr := fmt.Sprintf("[::1]:%d", clientPort1)
+		serverAddr := fmt.Sprintf("[::1]:%d", serverPort)
+		if err := runClient(t, clientAddr, serverAddr, []byte("baozi"), []byte("shilishanlubuhuanjian"), 1024*64, 9000); err != nil {
 			t.Errorf("[%s] baozi failed: %v", time.Now().Format(testtool.TimeLayout), err)
 		}
 		wg.Done()
 	}()
 	go func() {
-		if err := runClient(t, "[::1]:12355", "[::1]:12353", []byte("zongjiasushi"), []byte("manlianpenfen"), 9000, 1024*64); err != nil {
+		clientAddr := fmt.Sprintf("[::1]:%d", clientPort2)
+		serverAddr := fmt.Sprintf("[::1]:%d", serverPort)
+		if err := runClient(t, clientAddr, serverAddr, []byte("zongjiasushi"), []byte("manlianpenfen"), 9000, 1024*64); err != nil {
 			t.Errorf("[%s] zongjiasushi failed: %v", time.Now().Format(testtool.TimeLayout), err)
 		}
 		wg.Done()

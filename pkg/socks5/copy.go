@@ -37,7 +37,7 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *UDPAssociateTunnelConn) error
 			if err != nil {
 				// This is typically due to close of UDP listener.
 				// Don't contribute to metrics.Socks5UDPAssociateErrors.
-				errCh <- fmt.Errorf("ReadFrom UDP connection failed: %v", err)
+				errCh <- fmt.Errorf("ReadFrom UDP connection failed: %w", err)
 				break
 			}
 			UDPAssociateInPkts.Add(1)
@@ -51,7 +51,7 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *UDPAssociateTunnelConn) error
 				break
 			}
 			if _, err = tunnelConn.Write(buf[:n]); err != nil {
-				errCh <- fmt.Errorf("Write tunnel failed: %v", err)
+				errCh <- fmt.Errorf("Write tunnel failed: %w", err)
 				break
 			}
 		}
@@ -61,7 +61,7 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *UDPAssociateTunnelConn) error
 		for {
 			n, err := tunnelConn.Read(buf)
 			if err != nil {
-				errCh <- fmt.Errorf("Read tunnel failed: %v", err)
+				errCh <- fmt.Errorf("Read tunnel failed: %w", err)
 				break
 			}
 			udpAddr := addr.Load()
@@ -71,7 +71,7 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *UDPAssociateTunnelConn) error
 			}
 			ws, err := udpConn.WriteTo(buf[:n], udpAddr.(net.Addr))
 			if err != nil {
-				errCh <- fmt.Errorf("WriteTo UDP connetion failed: %v", err)
+				errCh <- fmt.Errorf("WriteTo UDP connetion failed: %w", err)
 				break
 			}
 			UDPAssociateOutPkts.Add(1)

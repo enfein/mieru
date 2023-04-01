@@ -9,23 +9,35 @@
 ## 下载 mita 安装包
 
 ```sh
-# Debian / Ubuntu
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.12.0/mita_1.12.0_amd64.deb
+# Debian / Ubuntu - X86_64
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.13.0/mita_1.13.0_amd64.deb
 
-# Fedora / CentOS / Red Hat Enterprise Linux
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.12.0/mita-1.12.0-1.x86_64.rpm
+# Debian / Ubuntu - ARM 64
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.13.0/mita_1.13.0_arm64.deb
+
+# Fedora / CentOS / Red Hat Enterprise Linux - X86_64
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.13.0/mita-1.13.0-1.x86_64.rpm
+
+# Fedora / CentOS / Red Hat Enterprise Linux - ARM 64
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.13.0/mita-1.13.0-1.aarch64.rpm
 ```
 
-下载 ARM 架构的安装包，将链接中的 `amd64` 替换成 `arm64`，`x86_64` 替换成 `aarch64` 即可。如果上述链接被墙，请翻墙后使用浏览器从 GitHub Releases 页面下载安装。
+如果上述链接被墙，请翻墙后使用浏览器从 GitHub Releases 页面下载安装。
 
 ## 安装 mita 软件包
 
 ```sh
-# Debian / Ubuntu
-sudo dpkg -i mita_1.12.0_amd64.deb
+# Debian / Ubuntu - X86_64
+sudo dpkg -i mita_1.13.0_amd64.deb
 
-# Fedora / CentOS / Red Hat Enterprise Linux
-sudo rpm -Uvh --force mita-1.12.0-1.x86_64.rpm
+# Debian / Ubuntu - ARM 64
+sudo dpkg -i mita_1.13.0_arm64.deb
+
+# Fedora / CentOS / Red Hat Enterprise Linux - X86_64
+sudo rpm -Uvh --force mita-1.13.0-1.x86_64.rpm
+
+# Fedora / CentOS / Red Hat Enterprise Linux - ARM 64
+sudo rpm -Uvh --force mita-1.13.0-1.aarch64.rpm
 ```
 
 ## 赋予当前用户操作 mita 的权限，需要重启服务器使此设置生效
