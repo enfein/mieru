@@ -23,14 +23,14 @@ import (
 
 func TestCloseSessionStruct(t *testing.T) {
 	s := &sessionStruct{
-		BaseStruct: BaseStruct{
-			Protocol: closeSessionRequest,
-			Epoch:    uint8(mrand.Uint32()),
+		baseStruct: baseStruct{
+			protocol: closeSessionRequest,
+			epoch:    uint8(mrand.Uint32()),
 		},
-		RequestID:  mrand.Uint32(),
-		SessionID:  mrand.Uint32(),
-		StatusCode: uint8(mrand.Uint32()),
-		PaddingLen: uint8(mrand.Uint32()),
+		requestID:  mrand.Uint32(),
+		sessionID:  mrand.Uint32(),
+		statusCode: uint8(mrand.Uint32()),
+		paddingLen: uint8(mrand.Uint32()),
 	}
 	b, err := s.Marshal()
 	if err != nil {
@@ -47,18 +47,18 @@ func TestCloseSessionStruct(t *testing.T) {
 
 func TestDataAckStruct(t *testing.T) {
 	s := &dataAckStruct{
-		BaseStruct: BaseStruct{
-			Protocol: dataServerToClient,
-			Epoch:    uint8(mrand.Uint32()),
+		baseStruct: baseStruct{
+			protocol: dataServerToClient,
+			epoch:    uint8(mrand.Uint32()),
 		},
-		SessionID:  mrand.Uint32(),
-		Seq:        mrand.Uint32(),
-		UnAckSeq:   mrand.Uint32(),
-		WindowSize: uint16(mrand.Uint32()),
-		Fragment:   uint8(mrand.Uint32()),
-		PrefixLen:  uint8(mrand.Uint32()),
-		PayloadLen: uint16(mrand.Uint32()),
-		SuffixLen:  uint8(mrand.Uint32()),
+		sessionID:  mrand.Uint32(),
+		seq:        mrand.Uint32(),
+		unAckSeq:   mrand.Uint32(),
+		windowSize: uint16(mrand.Uint32()),
+		fragment:   uint8(mrand.Uint32()),
+		prefixLen:  uint8(mrand.Uint32()),
+		payloadLen: uint16(mrand.Uint32()),
+		suffixLen:  uint8(mrand.Uint32()),
 	}
 	b, err := s.Marshal()
 	if err != nil {

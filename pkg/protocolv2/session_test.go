@@ -19,71 +19,42 @@ import (
 	"bytes"
 	crand "crypto/rand"
 	mrand "math/rand"
+	"sync"
 	"testing"
-
-	"github.com/enfein/mieru/pkg/netutil"
-	"github.com/enfein/mieru/pkg/stderror"
 )
 
 type simpleInMemoryUnderlay struct {
-	session *Session
-	die     chan struct{}
+	baseUnderlay
 }
 
 var (
 	_ Underlay = &simpleInMemoryUnderlay{}
 )
 
-func (u *simpleInMemoryUnderlay) MTU() int {
-	return 4096
-}
-
-func (u *simpleInMemoryUnderlay) IPVersion() netutil.IPVersion {
-	return netutil.IPVersionUnknown
-}
-
-func (u *simpleInMemoryUnderlay) TransportProtocol() netutil.TransportProtocol {
-	return netutil.UnknownTransport
-}
-
-func (u *simpleInMemoryUnderlay) AddSession(s *Session) error {
-	if u.session != nil {
-		return stderror.ErrAlreadyExist
-	}
-	u.session = s
-	s.conn = u
-	return nil
-}
-
-func (u *simpleInMemoryUnderlay) RemoveSession(sessionID uint32) error {
-	// Always remove the current session regardless of session ID.
-	u.session = nil
-	return nil
-}
-
 func (u *simpleInMemoryUnderlay) RunEventLoop() error {
-	if u.session == nil {
-		return stderror.ErrNullPointer
+	var wg sync.WaitGroup
+	for _, session := range u.sessionMap {
+		wg.Add(1)
+		go func(s *Session) {
+			for {
+				select {
+				case <-s.die:
+					wg.Done()
+					return
+				default:
+				}
+				seg := s.sendQueue.DeleteMinBlocking()
+				s.recvQueue.InsertBlocking(seg)
+			}
+		}(session)
 	}
-	for {
-		select {
-		case <-u.die:
-			return nil
-		default:
-		}
-		seg := u.session.sendQueue.DeleteMinBlocking()
-		u.session.recvQueue.InsertBlocking(seg)
-	}
-}
-
-func (u *simpleInMemoryUnderlay) Close() error {
-	close(u.die)
+	wg.Wait()
 	return nil
 }
 
 func TestSessionWriteRead(t *testing.T) {
 	underlay := &simpleInMemoryUnderlay{
-		die: make(chan struct{}),
+		baseUnderlay: *newBaseUnderlay(true, 4096),
 	}
 	session := NewSession(mrand.Uint32(), true, underlay.MTU())
 	if err := underlay.AddSession(session); err != nil {

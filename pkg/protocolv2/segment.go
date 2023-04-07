@@ -50,37 +50,37 @@ func MaxFragmentSize(mtu int, ipVersion netutil.IPVersion, transport netutil.Tra
 	return mathext.Max(0, res)
 }
 
-// Segment contains metadata and actual payload.
-type Segment struct {
-	Metadata Metadata
-	Payload  []byte // also can be a fragment
+// segment contains metadata and actual payload.
+type segment struct {
+	metadata metadata
+	payload  []byte // also can be a fragment
 }
 
 // Protocol returns the protocol of the segment.
-func (s *Segment) Protocol() byte {
-	return s.Metadata.Protocol()
+func (s *segment) Protocol() byte {
+	return s.metadata.Protocol()
 }
 
 // Seq returns the sequence number of the segment, if possible.
-func (s *Segment) Seq() (uint32, error) {
-	das, ok := s.Metadata.(*dataAckStruct)
+func (s *segment) Seq() (uint32, error) {
+	das, ok := s.metadata.(*dataAckStruct)
 	if !ok {
 		return 0, stderror.ErrUnsupported
 	}
-	return das.Seq, nil
+	return das.seq, nil
 }
 
 // Fragment returns the fragment number of the segment, if possible.
-func (s *Segment) Fragment() (uint8, error) {
-	das, ok := s.Metadata.(*dataAckStruct)
+func (s *segment) Fragment() (uint8, error) {
+	das, ok := s.metadata.(*dataAckStruct)
 	if !ok {
 		return 0, stderror.ErrUnsupported
 	}
-	return das.Fragment, nil
+	return das.fragment, nil
 }
 
 // Less tests whether the current item is less than the given argument.
-func (s *Segment) Less(than *Segment) bool {
+func (s *segment) Less(than *segment) bool {
 	mySeq, err := s.Seq()
 	if err != nil {
 		return false
@@ -92,24 +92,24 @@ func (s *Segment) Less(than *Segment) bool {
 	return mySeq < otherSeq
 }
 
-func segmentLessFunc(a, b *Segment) bool {
+func segmentLessFunc(a, b *segment) bool {
 	return a.Less(b)
 }
 
-// SegmentTree is a B-tree to store multiple Segment in order.
-type SegmentTree struct {
-	tr    *btree.BTreeG[*Segment]
+// segmentTree is a B-tree to store multiple Segment in order.
+type segmentTree struct {
+	tr    *btree.BTreeG[*segment]
 	cap   int
 	mu    sync.Mutex
 	full  sync.Cond
 	empty sync.Cond
 }
 
-func newSegmentTree(capacity int) *SegmentTree {
+func newSegmentTree(capacity int) *segmentTree {
 	if capacity <= 0 {
 		panic("SegmentTree capacity is <= 0")
 	}
-	st := &SegmentTree{
+	st := &segmentTree{
 		tr:  btree.NewG(4, segmentLessFunc),
 		cap: capacity,
 	}
@@ -119,7 +119,7 @@ func newSegmentTree(capacity int) *SegmentTree {
 }
 
 // Insert adds a new segment to the tree.
-func (t *SegmentTree) Insert(seg *Segment) error {
+func (t *segmentTree) Insert(seg *segment) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -132,7 +132,7 @@ func (t *SegmentTree) Insert(seg *Segment) error {
 }
 
 // InsertBlocking is same as Insert, but blocks when the tree is full.
-func (t *SegmentTree) InsertBlocking(seg *Segment) {
+func (t *segmentTree) InsertBlocking(seg *segment) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -144,7 +144,7 @@ func (t *SegmentTree) InsertBlocking(seg *Segment) {
 }
 
 // DeleteMin removes the smallest item from the tree.
-func (t *SegmentTree) DeleteMin() (*Segment, error) {
+func (t *segmentTree) DeleteMin() (*segment, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -157,7 +157,7 @@ func (t *SegmentTree) DeleteMin() (*Segment, error) {
 }
 
 // DeleteMinBlocking is the same as DeleteMin, but blocks when the tree is empty.
-func (t *SegmentTree) DeleteMinBlocking() *Segment {
+func (t *segmentTree) DeleteMinBlocking() *segment {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -170,7 +170,7 @@ func (t *SegmentTree) DeleteMinBlocking() *Segment {
 }
 
 // MinSeq return the minimum sequence number in the SegmentTree.
-func (t *SegmentTree) MinSeq() (uint32, error) {
+func (t *segmentTree) MinSeq() (uint32, error) {
 	seg, ok := t.tr.Min()
 	if !ok {
 		return 0, stderror.ErrEmpty
@@ -179,7 +179,7 @@ func (t *SegmentTree) MinSeq() (uint32, error) {
 }
 
 // MinSeq return the maximum sequence number in the SegmentTree.
-func (t *SegmentTree) MaxSeq() (uint32, error) {
+func (t *segmentTree) MaxSeq() (uint32, error) {
 	seg, ok := t.tr.Max()
 	if !ok {
 		return 0, stderror.ErrEmpty
@@ -188,11 +188,11 @@ func (t *SegmentTree) MaxSeq() (uint32, error) {
 }
 
 // Len returns the current size of the tree.
-func (t *SegmentTree) Len() int {
+func (t *segmentTree) Len() int {
 	return t.tr.Len()
 }
 
 // Remaining returns the remaining space of the tree before it is full.
-func (t *SegmentTree) Remaining() int {
+func (t *segmentTree) Remaining() int {
 	return t.cap - t.tr.Len()
 }

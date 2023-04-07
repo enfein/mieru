@@ -16,6 +16,7 @@
 package protocolv2
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/enfein/mieru/pkg/cipher"
@@ -27,11 +28,19 @@ const (
 )
 
 type UDPUnderlay struct {
+	baseUnderlay
 	conn  *net.UDPConn
 	block cipher.BlockCipher
 }
 
 var _ Underlay = &UDPUnderlay{}
+
+func (u *UDPUnderlay) String() string {
+	if u.conn == nil {
+		return "UDPUnderlay[]"
+	}
+	return fmt.Sprintf("UDPUnderlay[%v - %v]", u.conn.LocalAddr(), u.conn.RemoteAddr())
+}
 
 func (u *UDPUnderlay) MTU() int {
 	return 1500
@@ -48,18 +57,11 @@ func (u *UDPUnderlay) TransportProtocol() netutil.TransportProtocol {
 	return netutil.UDPTransport
 }
 
-func (u *UDPUnderlay) AddSession(s *Session) error {
-	return nil
-}
-
-func (u *UDPUnderlay) RemoveSession(sessionID uint32) error {
-	return nil
-}
-
 func (u *UDPUnderlay) RunEventLoop() error {
 	return nil
 }
 
 func (u *UDPUnderlay) Close() error {
+	u.baseUnderlay.Close()
 	return u.conn.Close()
 }

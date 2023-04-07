@@ -22,7 +22,6 @@ import (
 	"net"
 	"sync"
 
-	"github.com/enfein/mieru/pkg/bimap"
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/netutil"
@@ -36,8 +35,9 @@ const (
 )
 
 type TCPUnderlay struct {
-	conn     *net.TCPConn
-	isClient bool
+	baseUnderlay
+
+	conn *net.TCPConn
 
 	send cipher.BlockCipher
 	recv cipher.BlockCipher
@@ -48,18 +48,6 @@ type TCPUnderlay struct {
 
 	// sendMutex is used when write data to the connection.
 	sendMutex sync.Mutex
-
-	// Map<sessionID, *Session>.
-	sessionMap sync.Map
-
-	// Map<requestID, *Session>.
-	pendingSessionMap sync.Map
-
-	// BiMap<requestID, sessionID>.
-	sessionIDMap *bimap.BiMap[uint32, uint32]
-
-	// If the TCP underlay is closed.
-	die chan struct{}
 }
 
 var _ Underlay = &TCPUnderlay{}
@@ -91,15 +79,8 @@ func (t *TCPUnderlay) RunEventLoop() (err error) {
 }
 
 func (t *TCPUnderlay) Close() error {
+	t.baseUnderlay.Close()
 	return t.conn.Close()
-}
-
-func (t *TCPUnderlay) AddSession(s *Session) error {
-	return nil
-}
-
-func (t *TCPUnderlay) RemoveSession(sessionID uint32) error {
-	return nil
 }
 
 func (t *TCPUnderlay) runInputLoop() (err error) {
@@ -117,17 +98,19 @@ func (t *TCPUnderlay) runInputLoop() (err error) {
 		if err != nil {
 			return fmt.Errorf("readOneSegment() failed: %w", err)
 		}
-		if isSessionProtocol(seg.Metadata.Protocol()) {
+		if isSessionProtocol(seg.metadata.Protocol()) {
 			// TODO: handle session lifecycle.
-		} else if isDataAckProtocol(seg.Metadata.Protocol()) {
-			das, _ := toDataAckStruct(seg.Metadata)
-			session, ok := t.sessionMap.Load(das.SessionID)
+		} else if isDataAckProtocol(seg.metadata.Protocol()) {
+			das, _ := toDataAckStruct(seg.metadata)
+			t.sessionLock.Lock()
+			session, ok := t.sessionMap[das.sessionID]
+			t.sessionLock.Unlock()
 			if !ok {
-				log.Debugf("session %d is not registered to this %s", das.SessionID, t.String())
+				log.Debugf("session %d is not registered to this %s", das.sessionID, t.String())
 				continue
 			}
-			if err := session.(*Session).input(seg); err != nil {
-				log.Debugf("input from %s to session %d failed: %v", t.String(), das.SessionID, err)
+			if err := session.input(seg); err != nil {
+				log.Debugf("input from %s to session %d failed: %v", t.String(), das.sessionID, err)
 				continue
 			}
 		}
@@ -145,15 +128,17 @@ func (t *TCPUnderlay) onOpenSessionRequest(ss *sessionStruct) error {
 	// TODO: filter repeated requests.
 
 	// Create a new session.
+	t.sessionLock.Lock()
 	var sessionID uint32
 	for {
 		sessionID = mrand.Uint32()
-		if _, inEstablished := t.sessionMap.Load(sessionID); !inEstablished {
+		if _, inEstablished := t.sessionMap[sessionID]; !inEstablished {
 			break
 		}
 	}
 	session := NewSession(sessionID, t.isClient, t.MTU())
-	t.pendingSessionMap.Store(sessionID, session)
+	t.pendingSessionMap[sessionID] = session
+	t.sessionLock.Unlock()
 
 	// TODO: send open session response.
 	return nil
@@ -164,13 +149,15 @@ func (t *TCPUnderlay) onOpenSessionResponse(ss *sessionStruct) error {
 		return stderror.ErrInvalidOperation
 	}
 
-	v, loaded := t.pendingSessionMap.LoadAndDelete(ss.RequestID)
-	if !loaded {
+	t.sessionLock.Lock()
+	defer t.sessionLock.Unlock()
+	session, ok := t.pendingSessionMap[ss.requestID]
+	if !ok {
 		return stderror.ErrNotFound
 	}
-	session := v.(*Session)
-	session.id = ss.SessionID
-	t.sessionMap.Store(ss.SessionID, session)
+	delete(t.pendingSessionMap, ss.requestID)
+	session.id = ss.sessionID
+	t.sessionMap[ss.sessionID] = session
 	return nil
 }
 
@@ -182,7 +169,7 @@ func (t *TCPUnderlay) onCloseSessionResponse(ss *sessionStruct) error {
 	return nil
 }
 
-func (t *TCPUnderlay) readOneSegment() (*Segment, error) {
+func (t *TCPUnderlay) readOneSegment() (*segment, error) {
 	var err error
 
 	// Read encrypted metadata.
@@ -237,44 +224,44 @@ func (t *TCPUnderlay) readOneSegment() (*Segment, error) {
 	return nil, fmt.Errorf("unable to handle protocol %d", p)
 }
 
-func (t *TCPUnderlay) readSessionSegment(ss *sessionStruct) (*Segment, error) {
-	padding := make([]byte, ss.PaddingLen)
+func (t *TCPUnderlay) readSessionSegment(ss *sessionStruct) (*segment, error) {
+	padding := make([]byte, ss.paddingLen)
 	if len(padding) > 0 {
 		if _, err := io.ReadFull(t.conn, padding); err != nil {
-			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", ss.PaddingLen, err)
+			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", ss.paddingLen, err)
 		}
 	}
-	return &Segment{Metadata: ss}, nil
+	return &segment{metadata: ss}, nil
 }
 
-func (t *TCPUnderlay) readDataAckSegment(das *dataAckStruct) (*Segment, error) {
-	padding1 := make([]byte, das.PrefixLen)
+func (t *TCPUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error) {
+	padding1 := make([]byte, das.prefixLen)
 	if len(padding1) > 0 {
 		if _, err := io.ReadFull(t.conn, padding1); err != nil {
-			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", das.PrefixLen, err)
+			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", das.prefixLen, err)
 		}
 	}
 
-	encryptedPayload := make([]byte, das.PayloadLen+cipher.DefaultOverhead)
+	encryptedPayload := make([]byte, das.payloadLen+cipher.DefaultOverhead)
 	if _, err := io.ReadFull(t.conn, encryptedPayload); err != nil {
-		return nil, fmt.Errorf("payload: read %d bytes from TCPUnderlay failed: %w", das.PayloadLen+cipher.DefaultOverhead, err)
+		return nil, fmt.Errorf("payload: read %d bytes from TCPUnderlay failed: %w", das.payloadLen+cipher.DefaultOverhead, err)
 	}
 	decryptedPayload, err := t.recv.Decrypt(encryptedPayload)
 	if err != nil {
 		return nil, fmt.Errorf("Decrypt() failed: %w", err)
 	}
 
-	padding2 := make([]byte, das.SuffixLen)
+	padding2 := make([]byte, das.suffixLen)
 	if len(padding2) > 0 {
 		if _, err := io.ReadFull(t.conn, padding2); err != nil {
-			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", das.SuffixLen, err)
+			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", das.suffixLen, err)
 		}
 	}
 
-	return &Segment{Metadata: das, Payload: decryptedPayload}, nil
+	return &segment{metadata: das, payload: decryptedPayload}, nil
 }
 
-func (t *TCPUnderlay) writeOneSegment(seg *Segment) error {
+func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 	if seg == nil {
 		return stderror.ErrNullPointer
 	}
@@ -282,9 +269,9 @@ func (t *TCPUnderlay) writeOneSegment(seg *Segment) error {
 	t.sendMutex.Lock()
 	defer t.sendMutex.Unlock()
 
-	if ss, ok := toSessionStruct(seg.Metadata); ok {
+	if ss, ok := toSessionStruct(seg.metadata); ok {
 		paddingLen := rng.Intn(255)
-		ss.PaddingLen = uint8(paddingLen)
+		ss.paddingLen = uint8(paddingLen)
 		padding := newPadding(paddingLen)
 
 		plaintextMetadata, err := ss.Marshal()
@@ -303,11 +290,11 @@ func (t *TCPUnderlay) writeOneSegment(seg *Segment) error {
 		if _, err := t.conn.Write(dataToSend); err != nil {
 			return fmt.Errorf("Write() failed: %w", err)
 		}
-	} else if das, ok := toDataAckStruct(seg.Metadata); ok {
+	} else if das, ok := toDataAckStruct(seg.metadata); ok {
 		paddingLen1 := rng.Intn(255)
 		paddingLen2 := rng.Intn(255)
-		das.PrefixLen = uint8(paddingLen1)
-		das.SuffixLen = uint8(paddingLen2)
+		das.prefixLen = uint8(paddingLen1)
+		das.suffixLen = uint8(paddingLen2)
 		padding1 := newPadding(paddingLen1)
 		padding2 := newPadding(paddingLen2)
 
@@ -322,7 +309,7 @@ func (t *TCPUnderlay) writeOneSegment(seg *Segment) error {
 		if err != nil {
 			return fmt.Errorf("Encrypt() failed: %w", err)
 		}
-		encryptedPayload, err := t.send.Encrypt(seg.Payload)
+		encryptedPayload, err := t.send.Encrypt(seg.payload)
 		if err != nil {
 			return fmt.Errorf("Encrypt() failed: %w", err)
 		}

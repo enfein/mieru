@@ -34,7 +34,7 @@ type Underlay interface {
 	AddSession(*Session) error
 
 	// Remove a session from the underlay connection.
-	RemoveSession(sessionID uint32) error
+	RemoveSession(*Session) error
 
 	// Run input and output loop.
 	RunEventLoop() error

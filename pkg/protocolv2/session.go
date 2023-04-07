@@ -31,14 +31,15 @@ const (
 type Session struct {
 	conn Underlay // underlay connection
 
-	id       uint32 // session ID number
-	isClient bool   // if this session is owned by client
-	mtu      int    // L2 maxinum transmission unit
+	id       uint32        // session ID number
+	isClient bool          // if this session is owned by client
+	mtu      int           // L2 maxinum transmission unit
+	die      chan struct{} // indicate the session is dead
 
-	sendQueue *SegmentTree // segments waiting to send
-	sendBuf   *SegmentTree // segments sent but not acknowledged
-	recvBuf   *SegmentTree // segments received but acknowledge is not sent
-	recvQueue *SegmentTree // segments waiting to be read by application
+	sendQueue *segmentTree // segments waiting to send
+	sendBuf   *segmentTree // segments sent but not acknowledged
+	recvBuf   *segmentTree // segments received but acknowledge is not sent
+	recvQueue *segmentTree // segments waiting to be read by application
 
 	nextSeq   uint32 // next sequence number to send a segment
 	unackSeq  uint32 // unacknowledged sequence number
@@ -58,6 +59,7 @@ func NewSession(id uint32, isClient bool, mtu int) *Session {
 		id:        id,
 		isClient:  isClient,
 		mtu:       mtu,
+		die:       make(chan struct{}),
 		sendQueue: newSegmentTree(segmentTreeCapacity),
 		sendBuf:   newSegmentTree(segmentTreeCapacity),
 		recvBuf:   newSegmentTree(segmentTreeCapacity),
@@ -86,9 +88,9 @@ func (s *Session) Read(b []byte) (n int, err error) {
 	for {
 		seg := s.recvQueue.DeleteMinBlocking()
 		if len(s.unreadBuf) == 0 {
-			s.unreadBuf = seg.Payload
+			s.unreadBuf = seg.payload
 		} else {
-			s.unreadBuf = append(s.unreadBuf, seg.Payload...)
+			s.unreadBuf = append(s.unreadBuf, seg.payload...)
 		}
 
 		fragment, err := seg.Fragment()
@@ -126,16 +128,16 @@ func (s *Session) Write(b []byte) (n int, err error) {
 	for i := nFragment - 1; i >= 0; i-- {
 		partLen := mathext.Min(fragmentSize, len(ptr))
 		part := ptr[:partLen]
-		seg := &Segment{
-			Metadata: &dataAckStruct{
-				SessionID:  s.id,
-				Seq:        s.nextSeq,
-				UnAckSeq:   s.unackSeq,
-				WindowSize: uint16(s.recvBuf.Remaining()),
-				Fragment:   uint8(i),
-				PayloadLen: uint16(partLen),
+		seg := &segment{
+			metadata: &dataAckStruct{
+				sessionID:  s.id,
+				seq:        s.nextSeq,
+				unAckSeq:   s.unackSeq,
+				windowSize: uint16(s.recvBuf.Remaining()),
+				fragment:   uint8(i),
+				payloadLen: uint16(partLen),
 			},
-			Payload: part,
+			payload: part,
 		}
 		s.nextSeq++
 		s.sendQueue.InsertBlocking(seg)
@@ -152,13 +154,14 @@ func (s *Session) Close() error {
 	defer s.rLock.Unlock()
 	defer s.wLock.Unlock()
 
-	// TODO: close the session.
+	// TODO: send packets to gracefully close the session.
+	close(s.die)
 	return nil
 }
 
 // input reads incoming packets from network and assemble
 // them in the receive buffer and receive queue.
-func (s *Session) input(seg *Segment) error {
+func (s *Session) input(seg *segment) error {
 	protocol := seg.Protocol()
 	if s.isClient {
 		if protocol != dataServerToClient && protocol != ackServerToClient && protocol != closeSessionRequest && protocol != closeSessionResponse {
@@ -178,7 +181,7 @@ func (s *Session) input(seg *Segment) error {
 	return nil
 }
 
-func (s *Session) inputData(seg *Segment) error {
+func (s *Session) inputData(seg *segment) error {
 	seq, err := seg.Seq()
 	if err != nil {
 		return fmt.Errorf("Seq() failed: %w", err)
@@ -191,6 +194,6 @@ func (s *Session) inputData(seg *Segment) error {
 	return nil
 }
 
-func (s *Session) inputAck(seg *Segment) error {
+func (s *Session) inputAck(seg *segment) error {
 	return nil
 }

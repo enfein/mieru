@@ -61,14 +61,14 @@ func TestMaxFragmentSize(t *testing.T) {
 }
 
 func TestSegmentLessFunc(t *testing.T) {
-	seg1 := &Segment{
-		Metadata: &dataAckStruct{
-			Seq: 1,
+	seg1 := &segment{
+		metadata: &dataAckStruct{
+			seq: 1,
 		},
 	}
-	seg2 := &Segment{
-		Metadata: &dataAckStruct{
-			Seq: 2,
+	seg2 := &segment{
+		metadata: &dataAckStruct{
+			seq: 2,
 		},
 	}
 	if !segmentLessFunc(seg1, seg2) {
@@ -77,11 +77,11 @@ func TestSegmentLessFunc(t *testing.T) {
 }
 
 func TestSegmentTree(t *testing.T) {
-	seg := &Segment{
-		Metadata: &dataAckStruct{
-			Seq: 100,
+	seg := &segment{
+		metadata: &dataAckStruct{
+			seq: 100,
 		},
-		Payload: []byte{0},
+		payload: []byte{0},
 	}
 	st := newSegmentTree(1)
 
@@ -143,11 +143,11 @@ func TestSegmentTreeBlocking(t *testing.T) {
 	go func() {
 		var i uint32 = 0
 		for ; i < 100; i++ {
-			seg := &Segment{
-				Metadata: &dataAckStruct{
-					Seq: i,
+			seg := &segment{
+				metadata: &dataAckStruct{
+					seq: i,
 				},
-				Payload: []byte{0},
+				payload: []byte{0},
 			}
 			s := rand.Intn(10)
 			time.Sleep(time.Duration(s) * time.Millisecond)
