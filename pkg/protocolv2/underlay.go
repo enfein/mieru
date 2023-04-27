@@ -16,6 +16,8 @@
 package protocolv2
 
 import (
+	"context"
+
 	"github.com/enfein/mieru/pkg/netutil"
 )
 
@@ -37,7 +39,7 @@ type Underlay interface {
 	RemoveSession(*Session) error
 
 	// Run input and output loop.
-	RunEventLoop() error
+	RunEventLoop(context.Context) error
 
 	// Close the underlay connection.
 	Close() error

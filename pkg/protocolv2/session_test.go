@@ -17,6 +17,7 @@ package protocolv2
 
 import (
 	"bytes"
+	"context"
 	crand "crypto/rand"
 	mrand "math/rand"
 	"sync"
@@ -31,7 +32,7 @@ var (
 	_ Underlay = &simpleInMemoryUnderlay{}
 )
 
-func (u *simpleInMemoryUnderlay) RunEventLoop() error {
+func (u *simpleInMemoryUnderlay) RunEventLoop(ctx context.Context) error {
 	var wg sync.WaitGroup
 	for _, session := range u.sessionMap {
 		wg.Add(1)
@@ -56,11 +57,18 @@ func TestSessionWriteRead(t *testing.T) {
 	underlay := &simpleInMemoryUnderlay{
 		baseUnderlay: *newBaseUnderlay(true, 4096),
 	}
-	session := NewSession(mrand.Uint32(), true, underlay.MTU())
+	var id uint32
+	for {
+		id = mrand.Uint32()
+		if id != 0 {
+			break
+		}
+	}
+	session := NewSession(id, true, underlay.MTU())
 	if err := underlay.AddSession(session); err != nil {
 		t.Fatalf("AddSession() failed: %v", err)
 	}
-	go underlay.RunEventLoop()
+	go underlay.RunEventLoop(context.Background())
 
 	smallData := make([]byte, 256)
 	if _, err := crand.Read(smallData); err != nil {

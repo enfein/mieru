@@ -27,10 +27,10 @@ func TestCloseSessionStruct(t *testing.T) {
 			protocol: closeSessionRequest,
 			epoch:    uint8(mrand.Uint32()),
 		},
-		requestID:  mrand.Uint32(),
 		sessionID:  mrand.Uint32(),
 		statusCode: uint8(mrand.Uint32()),
-		paddingLen: uint8(mrand.Uint32()),
+		payloadLen: uint16(mrand.Uint32()),
+		suffixLen:  uint8(mrand.Uint32()),
 	}
 	b, err := s.Marshal()
 	if err != nil {

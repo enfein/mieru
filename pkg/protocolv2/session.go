@@ -28,12 +28,24 @@ const (
 	segmentTreeCapacity = 4096
 )
 
+type sessionState int
+
+const (
+	sessionInit sessionState = iota
+	sessionAttached
+	sessionOpening
+	sessionEstablished
+	sessionClosing
+	sessionClosed
+)
+
 type Session struct {
 	conn Underlay // underlay connection
 
 	id       uint32        // session ID number
 	isClient bool          // if this session is owned by client
 	mtu      int           // L2 maxinum transmission unit
+	state    sessionState  // session state
 	die      chan struct{} // indicate the session is dead
 
 	sendQueue *segmentTree // segments waiting to send
@@ -45,6 +57,7 @@ type Session struct {
 	unackSeq  uint32 // unacknowledged sequence number
 	unreadBuf []byte // payload removed from the recvQueue that haven't been read by application
 
+	wg    sync.WaitGroup
 	rLock sync.Mutex
 	wLock sync.Mutex
 }
@@ -56,9 +69,11 @@ var (
 // NewSession creates a new session.
 func NewSession(id uint32, isClient bool, mtu int) *Session {
 	return &Session{
+		conn:      nil,
 		id:        id,
 		isClient:  isClient,
 		mtu:       mtu,
+		state:     sessionInit,
 		die:       make(chan struct{}),
 		sendQueue: newSegmentTree(segmentTreeCapacity),
 		sendBuf:   newSegmentTree(segmentTreeCapacity),

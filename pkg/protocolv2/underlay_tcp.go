@@ -16,6 +16,7 @@
 package protocolv2
 
 import (
+	"context"
 	"fmt"
 	"io"
 	mrand "math/rand"
@@ -59,10 +60,6 @@ func (t *TCPUnderlay) String() string {
 	return fmt.Sprintf("TCPUnderlay[%v - %v]", t.conn.LocalAddr(), t.conn.RemoteAddr())
 }
 
-func (t *TCPUnderlay) MTU() int {
-	return 1500
-}
-
 func (t *TCPUnderlay) IPVersion() netutil.IPVersion {
 	if t.conn == nil {
 		return netutil.IPVersionUnknown
@@ -74,8 +71,20 @@ func (t *TCPUnderlay) TransportProtocol() netutil.TransportProtocol {
 	return netutil.TCPTransport
 }
 
-func (t *TCPUnderlay) RunEventLoop() (err error) {
+func (t *TCPUnderlay) AddSession(s *Session) error {
+	if err := t.baseUnderlay.AddSession(s); err != nil {
+		return err
+	}
+	s.wg.Add(1)
+	go func() {
+		t.sessionOutputLoop(context.Background(), s)
+		s.wg.Done()
+	}()
 	return nil
+}
+
+func (t *TCPUnderlay) RunEventLoop(ctx context.Context) (err error) {
+	return t.runInputLoop()
 }
 
 func (t *TCPUnderlay) Close() error {
@@ -106,19 +115,31 @@ func (t *TCPUnderlay) runInputLoop() (err error) {
 			session, ok := t.sessionMap[das.sessionID]
 			t.sessionLock.Unlock()
 			if !ok {
-				log.Debugf("session %d is not registered to this %s", das.sessionID, t.String())
+				log.Debugf("Session %d is not registered to %s", das.sessionID, t.String())
 				continue
 			}
 			if err := session.input(seg); err != nil {
-				log.Debugf("input from %s to session %d failed: %v", t.String(), das.sessionID, err)
+				log.Debugf("Input from %s to session %d failed: %v", t.String(), das.sessionID, err)
 				continue
 			}
 		}
 	}
 }
 
-func (t *TCPUnderlay) runOutputLoop(s *Session) (err error) {
-	return nil
+func (t *TCPUnderlay) sessionOutputLoop(ctx context.Context, s *Session) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-t.die:
+			return nil
+		default:
+			seg := s.sendQueue.DeleteMinBlocking()
+			if err := t.writeOneSegment(seg); err != nil {
+				return fmt.Errorf("writeOneSegment() failed: %w", err)
+			}
+		}
+	}
 }
 
 func (t *TCPUnderlay) onOpenSessionRequest(ss *sessionStruct) error {
@@ -132,12 +153,16 @@ func (t *TCPUnderlay) onOpenSessionRequest(ss *sessionStruct) error {
 	var sessionID uint32
 	for {
 		sessionID = mrand.Uint32()
+		if sessionID == 0 {
+			// 0 is not a valid session ID
+			continue
+		}
 		if _, inEstablished := t.sessionMap[sessionID]; !inEstablished {
 			break
 		}
 	}
 	session := NewSession(sessionID, t.isClient, t.MTU())
-	t.pendingSessionMap[sessionID] = session
+	t.sessionMap[sessionID] = session
 	t.sessionLock.Unlock()
 
 	// TODO: send open session response.
@@ -148,16 +173,6 @@ func (t *TCPUnderlay) onOpenSessionResponse(ss *sessionStruct) error {
 	if !t.isClient {
 		return stderror.ErrInvalidOperation
 	}
-
-	t.sessionLock.Lock()
-	defer t.sessionLock.Unlock()
-	session, ok := t.pendingSessionMap[ss.requestID]
-	if !ok {
-		return stderror.ErrNotFound
-	}
-	delete(t.pendingSessionMap, ss.requestID)
-	session.id = ss.sessionID
-	t.sessionMap[ss.sessionID] = session
 	return nil
 }
 
@@ -225,18 +240,18 @@ func (t *TCPUnderlay) readOneSegment() (*segment, error) {
 }
 
 func (t *TCPUnderlay) readSessionSegment(ss *sessionStruct) (*segment, error) {
-	padding := make([]byte, ss.paddingLen)
-	if len(padding) > 0 {
+	if ss.suffixLen > 0 {
+		padding := make([]byte, ss.suffixLen)
 		if _, err := io.ReadFull(t.conn, padding); err != nil {
-			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", ss.paddingLen, err)
+			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", ss.suffixLen, err)
 		}
 	}
 	return &segment{metadata: ss}, nil
 }
 
 func (t *TCPUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error) {
-	padding1 := make([]byte, das.prefixLen)
-	if len(padding1) > 0 {
+	if das.prefixLen > 0 {
+		padding1 := make([]byte, das.prefixLen)
 		if _, err := io.ReadFull(t.conn, padding1); err != nil {
 			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", das.prefixLen, err)
 		}
@@ -251,8 +266,8 @@ func (t *TCPUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error) {
 		return nil, fmt.Errorf("Decrypt() failed: %w", err)
 	}
 
-	padding2 := make([]byte, das.suffixLen)
-	if len(padding2) > 0 {
+	if das.suffixLen > 0 {
+		padding2 := make([]byte, das.suffixLen)
 		if _, err := io.ReadFull(t.conn, padding2); err != nil {
 			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", das.suffixLen, err)
 		}
@@ -270,9 +285,9 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 	defer t.sendMutex.Unlock()
 
 	if ss, ok := toSessionStruct(seg.metadata); ok {
-		paddingLen := rng.Intn(255)
-		ss.paddingLen = uint8(paddingLen)
-		padding := newPadding(paddingLen)
+		suffixLen := rng.Intn(255)
+		ss.suffixLen = uint8(suffixLen)
+		padding := newPadding(suffixLen)
 
 		plaintextMetadata, err := ss.Marshal()
 		if err != nil {

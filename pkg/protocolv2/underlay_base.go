@@ -16,9 +16,10 @@
 package protocolv2
 
 import (
+	"context"
+	"fmt"
 	"sync"
 
-	"github.com/enfein/mieru/pkg/bimap"
 	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/stderror"
 )
@@ -30,14 +31,7 @@ type baseUnderlay struct {
 	die      chan struct{} // if the underlay is closed
 
 	// Map<sessionID, *Session>.
-	sessionMap map[uint32]*Session
-
-	// Map<requestID, *Session>.
-	pendingSessionMap map[uint32]*Session
-
-	// BiMap<requestID, sessionID>.
-	sessionIDMap *bimap.BiMap[uint32, uint32]
-
+	sessionMap  map[uint32]*Session
 	sessionLock sync.Mutex
 }
 
@@ -47,12 +41,10 @@ var (
 
 func newBaseUnderlay(isClient bool, mtu int) *baseUnderlay {
 	return &baseUnderlay{
-		isClient:          isClient,
-		mtu:               mtu,
-		die:               make(chan struct{}),
-		sessionMap:        make(map[uint32]*Session),
-		pendingSessionMap: make(map[uint32]*Session),
-		sessionIDMap:      bimap.NewBiMap[uint32, uint32](),
+		isClient:   isClient,
+		mtu:        mtu,
+		die:        make(chan struct{}),
+		sessionMap: make(map[uint32]*Session),
 	}
 }
 
@@ -72,20 +64,32 @@ func (b *baseUnderlay) AddSession(s *Session) error {
 	if s == nil {
 		return stderror.ErrNullPointer
 	}
+	if s.id == 0 {
+		return fmt.Errorf("session ID can't be 0")
+	}
+	if s.state >= sessionAttached {
+		return fmt.Errorf("session %d is already attached to a underlay", s.id)
+	}
 	b.sessionLock.Lock()
 	defer b.sessionLock.Unlock()
-	_, found := b.sessionMap[s.id]
-	if found {
-		return stderror.ErrAlreadyExist
+	if s.id != 0 {
+		_, found := b.sessionMap[s.id]
+		if found {
+			return stderror.ErrAlreadyExist
+		}
+		b.sessionMap[s.id] = s
 	}
-	b.sessionMap[s.id] = s
 	s.conn = b
+	s.state = sessionAttached
 	return nil
 }
 
 func (b *baseUnderlay) RemoveSession(s *Session) error {
 	if s == nil {
 		return stderror.ErrNullPointer
+	}
+	if s.state < sessionAttached {
+		return fmt.Errorf("session %d is not attached to this underlay", s.id)
 	}
 	b.sessionLock.Lock()
 	defer b.sessionLock.Unlock()
@@ -94,18 +98,16 @@ func (b *baseUnderlay) RemoveSession(s *Session) error {
 	return nil
 }
 
-func (b *baseUnderlay) RunEventLoop() error {
+func (b *baseUnderlay) RunEventLoop(ctx context.Context) error {
 	return stderror.ErrUnsupported
 }
 
 func (b *baseUnderlay) Close() error {
 	b.sessionLock.Lock()
 	defer b.sessionLock.Unlock()
-	for _, p := range b.pendingSessionMap {
-		p.Close()
-	}
 	for _, s := range b.sessionMap {
 		s.Close()
 	}
+	close(b.die)
 	return nil
 }

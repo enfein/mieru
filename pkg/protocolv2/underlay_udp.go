@@ -16,6 +16,7 @@
 package protocolv2
 
 import (
+	"context"
 	"fmt"
 	"net"
 
@@ -57,7 +58,7 @@ func (u *UDPUnderlay) TransportProtocol() netutil.TransportProtocol {
 	return netutil.UDPTransport
 }
 
-func (u *UDPUnderlay) RunEventLoop() error {
+func (u *UDPUnderlay) RunEventLoop(ctx context.Context) error {
 	return nil
 }
 

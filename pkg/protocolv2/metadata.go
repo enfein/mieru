@@ -69,11 +69,10 @@ type baseStruct struct {
 // sessionStruct is used to open or close a session.
 type sessionStruct struct {
 	baseStruct
-	requestID  uint32 // byte 6 - 9: request ID number
-	sessionID  uint32 // byte 10 - 13: session ID number
-	statusCode uint8  // byte 14: reason of closing a session
-	paddingLen uint8  // byte 15: length of padding
-	// TODO: allow carry extra data to complete socks5 handshake.
+	sessionID  uint32 // byte 6 - 9: session ID number
+	statusCode uint8  // byte 10: status of opening or closing session
+	payloadLen uint16 // byte 11 - 12: length of encapsulated payload, not including auth tag
+	suffixLen  uint8  // byte 13: length of suffix padding
 }
 
 func (ss *sessionStruct) Protocol() byte {
@@ -86,10 +85,10 @@ func (ss *sessionStruct) Marshal() ([]byte, error) {
 	b[1] = ss.baseStruct.epoch
 	ss.baseStruct.timestamp = uint32(time.Now().Unix() / 60)
 	binary.BigEndian.PutUint32(b[2:], ss.baseStruct.timestamp)
-	binary.BigEndian.PutUint32(b[6:], ss.requestID)
-	binary.BigEndian.PutUint32(b[10:], ss.sessionID)
-	b[14] = ss.statusCode
-	b[15] = ss.paddingLen
+	binary.BigEndian.PutUint32(b[6:], ss.sessionID)
+	b[10] = ss.statusCode
+	binary.BigEndian.PutUint16(b[11:], ss.payloadLen)
+	b[13] = ss.suffixLen
 	return b, nil
 }
 
@@ -111,10 +110,10 @@ func (ss *sessionStruct) Unmarshal(b []byte) error {
 	ss.baseStruct.protocol = b[0]
 	ss.baseStruct.epoch = b[1]
 	ss.baseStruct.timestamp = originalTimestamp
-	ss.requestID = binary.BigEndian.Uint32(b[6:])
-	ss.sessionID = binary.BigEndian.Uint32(b[10:])
-	ss.statusCode = b[14]
-	ss.paddingLen = b[15]
+	ss.sessionID = binary.BigEndian.Uint32(b[6:])
+	ss.statusCode = b[10]
+	ss.payloadLen = binary.BigEndian.Uint16(b[11:])
+	ss.suffixLen = b[13]
 	return nil
 }
 

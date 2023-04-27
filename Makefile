@@ -310,19 +310,28 @@ vet:
 
 # Generate source code from protobuf.
 # Call this after proto files are changed.
+PROTOC_ARCH =
+ifeq ($(shell uname -m), x86_64)
+PROTOC_ARCH = amd64
+endif
+ifeq ($(shell uname -m), arm64)
+PROTOC_ARCH = arm64
+endif
 .PHONY: protobuf
 protobuf:
-	# This protobuf compiler only works for linux amd64 machine.
+	# Download location: https://github.com/protocolbuffers/protobuf/releases
 	if [ ! -x "${ROOT}/tools/build/protoc" ]; then\
-		curl -o "${ROOT}/tools/build/protoc" https://raw.githubusercontent.com/enfein/buildtools/main/protoc/3.15.8/linux_amd64/bin/protoc;\
+		curl -o "${ROOT}/tools/build/protoc" https://raw.githubusercontent.com/enfein/buildtools/main/protoc/22.3/linux_${PROTOC_ARCH}/bin/protoc;\
 		chmod 755 "${ROOT}/tools/build/protoc";\
 	fi
+	# Download location: https://github.com/protocolbuffers/protobuf-go/releases
 	if [ ! -x "${ROOT}/tools/build/protoc-gen-go" ]; then\
-		curl -o "${ROOT}/tools/build/protoc-gen-go" https://raw.githubusercontent.com/enfein/buildtools/main/protoc-gen-go/1.26.0/linux_amd64/protoc-gen-go;\
+		curl -o "${ROOT}/tools/build/protoc-gen-go" https://raw.githubusercontent.com/enfein/buildtools/main/protoc-gen-go/1.30.0/linux_${PROTOC_ARCH}/protoc-gen-go;\
 		chmod 755 "${ROOT}/tools/build/protoc-gen-go";\
 	fi
+	# Download location: https://github.com/grpc/grpc-go/releases
 	if [ ! -x "${ROOT}/tools/build/protoc-gen-go-grpc" ]; then\
-		curl -o "${ROOT}/tools/build/protoc-gen-go-grpc" https://raw.githubusercontent.com/enfein/buildtools/main/protoc-gen-go-grpc/1.37.1/linux_amd64/protoc-gen-go-grpc;\
+		curl -o "${ROOT}/tools/build/protoc-gen-go-grpc" https://raw.githubusercontent.com/enfein/buildtools/main/protoc-gen-go-grpc/1.3.0/linux_${PROTOC_ARCH}/protoc-gen-go-grpc;\
 		chmod 755 "${ROOT}/tools/build/protoc-gen-go-grpc";\
 	fi
 
