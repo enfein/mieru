@@ -201,6 +201,31 @@ func TestAESGCMBlockCipherIncreaseNonce(t *testing.T) {
 	}
 }
 
+func TestAESGCMBlockCipherNewNonce(t *testing.T) {
+	key := make([]byte, 32)
+	if _, err := crand.Read(key); err != nil {
+		t.Fatalf("fail to generate key: %v", err)
+	}
+	c, err := newAESGCMBlockCipher(key)
+	if err != nil {
+		t.Fatalf("newAESGCMBlockCipher() failed: %v", err)
+	}
+	for i := 0; i < 1000; i++ {
+		nonce, err := c.newNonce()
+		if err != nil {
+			t.Fatalf("newNonce() failed: %v", err)
+		}
+		for j, b := range nonce {
+			if j >= noncePrintablePrefixLen {
+				break
+			}
+			if b < printableCharSub || b > printableCharSup {
+				t.Fatalf("Byte %v in position %d is not a printable ASCII character", b, j)
+			}
+		}
+	}
+}
+
 func TestAESGCMBlockCipherValidateKeySize(t *testing.T) {
 	testdata := []struct {
 		key []byte

@@ -20,11 +20,20 @@ import (
 	"crypto/cipher"
 	crand "crypto/rand"
 	"fmt"
+	"math/big"
 	"sync"
+)
+
+const (
+	noncePrintablePrefixLen = 8
+	printableCharSub        = 0x20 // 0x20, e.g. ' ', is the first printable ASCII character
+	printableCharSup        = 0x7E // 0x7E, e.g. '~', is the last printable ASCII character
 )
 
 var (
 	_ BlockCipher = &AESGCMBlockCipher{}
+
+	printableCharRange = big.NewInt(printableCharSup - printableCharSub + 1)
 )
 
 // AESGCMBlockCipher implements BlockCipher interface with AES-GCM algorithm.
@@ -186,6 +195,21 @@ func (c *AESGCMBlockCipher) newNonce() ([]byte, error) {
 	nonce := make([]byte, c.NonceSize())
 	if _, err := crand.Read(nonce); err != nil {
 		return nil, err
+	}
+
+	// Adjust the nonce such that the first a few bytes are printable ASCII characters.
+	rewriteLen := noncePrintablePrefixLen
+	if rewriteLen > c.NonceSize() {
+		rewriteLen = c.NonceSize()
+	}
+	for i := 0; i < rewriteLen; i++ {
+		if nonce[i] < printableCharSub || nonce[i] > printableCharSup {
+			randBigInt, err := crand.Int(crand.Reader, printableCharRange)
+			if err != nil {
+				return nil, err
+			}
+			nonce[i] = byte(randBigInt.Int64() + printableCharSub)
+		}
 	}
 	return nonce, nil
 }
