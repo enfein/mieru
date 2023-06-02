@@ -452,7 +452,7 @@ var clientStopFunc = func(s []string) error {
 		return nil
 	}
 
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout())
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
 	client, err := appctl.NewClientLifecycleRPCClient(timedctx)
 	if err != nil {
@@ -545,7 +545,7 @@ var clientGetThreadDumpFunc = func(s []string) error {
 		return nil
 	}
 
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout())
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
 	client, err := appctl.NewClientLifecycleRPCClient(timedctx)
 	if err != nil {
@@ -565,7 +565,7 @@ var clientGetHeapProfileFunc = func(s []string) error {
 		return nil
 	}
 
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout())
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
 	client, err := appctl.NewClientLifecycleRPCClient(timedctx)
 	if err != nil {
@@ -584,7 +584,7 @@ var clientStartCPUProfileFunc = func(s []string) error {
 		return nil
 	}
 
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout())
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
 	client, err := appctl.NewClientLifecycleRPCClient(timedctx)
 	if err != nil {
@@ -603,7 +603,7 @@ var clientStopCPUProfileFunc = func(s []string) error {
 		return nil
 	}
 
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout())
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
 	client, err := appctl.NewClientLifecycleRPCClient(timedctx)
 	if err != nil {

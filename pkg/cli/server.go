@@ -207,7 +207,7 @@ var serverStartFunc = func(s []string) error {
 	if err != nil {
 		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
 	}
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout())
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
 	_, err = client.Start(timedctx, &appctlpb.Empty{})
 	if err != nil {
@@ -384,7 +384,7 @@ var serverStopFunc = func(s []string) error {
 	if err != nil {
 		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
 	}
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout())
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
 	if _, err = client.Stop(timedctx, &appctlpb.Empty{}); err != nil {
 		return fmt.Errorf(stderror.StopServerProxyFailedErr, err)
@@ -447,7 +447,7 @@ var serverApplyConfigFunc = func(s []string) error {
 	if err != nil {
 		return fmt.Errorf(stderror.CreateServerConfigRPCClientFailedErr, err)
 	}
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout())
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
 	_, err = client.SetConfig(timedctx, patch)
 	if err != nil {
@@ -469,7 +469,7 @@ var serverDescribeConfigFunc = func(s []string) error {
 	if err != nil {
 		return fmt.Errorf(stderror.CreateServerConfigRPCClientFailedErr, err)
 	}
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout())
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
 	config, err := client.GetConfig(timedctx, &appctlpb.Empty{})
 	if err != nil {
@@ -496,7 +496,7 @@ var serverDeleteUserFunc = func(s []string) error {
 	if err != nil {
 		return fmt.Errorf(stderror.CreateServerConfigRPCClientFailedErr, err)
 	}
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout())
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
 	config, err := client.GetConfig(timedctx, &appctlpb.Empty{})
 	if err != nil {
@@ -537,7 +537,7 @@ var serverGetThreadDumpFunc = func(s []string) error {
 	if err != nil {
 		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
 	}
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout())
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
 	dump, err := client.GetThreadDump(timedctx, &appctlpb.Empty{})
 	if err != nil {
@@ -560,7 +560,7 @@ var serverGetHeapProfileFunc = func(s []string) error {
 	if err != nil {
 		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
 	}
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout())
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
 	if _, err := client.GetHeapProfile(timedctx, &appctlpb.ProfileSavePath{FilePath: proto.String(s[3])}); err != nil {
 		return fmt.Errorf(stderror.GetHeapProfileFailedErr, err)
@@ -582,7 +582,7 @@ var serverStartCPUProfileFunc = func(s []string) error {
 	if err != nil {
 		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
 	}
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout())
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
 	if _, err := client.StartCPUProfile(timedctx, &appctlpb.ProfileSavePath{FilePath: proto.String(s[4])}); err != nil {
 		return fmt.Errorf(stderror.StartCPUProfileFailedErr, err)
@@ -604,7 +604,7 @@ var serverStopCPUProfileFunc = func(s []string) error {
 	if err != nil {
 		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
 	}
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout())
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
 	client.StopCPUProfile(timedctx, &appctlpb.Empty{})
 	return nil

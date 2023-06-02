@@ -16,16 +16,25 @@
 package protocolv2
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/enfein/mieru/pkg/mathext"
+	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/stderror"
 )
 
 const (
 	segmentTreeCapacity = 4096
+	segmentChanCapacity = 256
+)
+
+var (
+	segmentPollInterval = 10 * time.Millisecond
 )
 
 type sessionState int
@@ -46,12 +55,13 @@ type Session struct {
 	isClient bool          // if this session is owned by client
 	mtu      int           // L2 maxinum transmission unit
 	state    sessionState  // session state
-	die      chan struct{} // indicate the session is dead
+	done     chan struct{} // indicate the session is complete
 
-	sendQueue *segmentTree // segments waiting to send
-	sendBuf   *segmentTree // segments sent but not acknowledged
-	recvBuf   *segmentTree // segments received but acknowledge is not sent
-	recvQueue *segmentTree // segments waiting to be read by application
+	sendQueue *segmentTree  // segments waiting to send
+	sendBuf   *segmentTree  // segments sent but not acknowledged
+	recvBuf   *segmentTree  // segments received but acknowledge is not sent
+	recvQueue *segmentTree  // segments waiting to be read by application
+	recvChan  chan *segment // channel to receive segment from underlay
 
 	nextSeq   uint32 // next sequence number to send a segment
 	unackSeq  uint32 // unacknowledged sequence number
@@ -74,11 +84,12 @@ func NewSession(id uint32, isClient bool, mtu int) *Session {
 		isClient:  isClient,
 		mtu:       mtu,
 		state:     sessionInit,
-		die:       make(chan struct{}),
+		done:      make(chan struct{}),
 		sendQueue: newSegmentTree(segmentTreeCapacity),
 		sendBuf:   newSegmentTree(segmentTreeCapacity),
 		recvBuf:   newSegmentTree(segmentTreeCapacity),
 		recvQueue: newSegmentTree(segmentTreeCapacity),
+		recvChan:  make(chan *segment, segmentChanCapacity),
 	}
 }
 
@@ -168,10 +179,54 @@ func (s *Session) Close() error {
 	s.wLock.Lock()
 	defer s.rLock.Unlock()
 	defer s.wLock.Unlock()
-
-	// TODO: send packets to gracefully close the session.
-	close(s.die)
+	close(s.done)
 	return nil
+}
+
+func (s *Session) runInputLoop(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-s.done:
+			return nil
+		case seg := <-s.recvChan:
+			if err := s.input(seg); err != nil {
+				return fmt.Errorf("input() failed: %v", err)
+			}
+		}
+	}
+}
+
+func (s *Session) runOutputLoop(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-s.done:
+			return nil
+		default:
+			switch s.conn.TransportProtocol() {
+			case netutil.TCPTransport:
+				for {
+					seg, err := s.sendQueue.DeleteMin()
+					if err != nil {
+						if errors.Is(err, stderror.ErrEmpty) {
+							time.Sleep(segmentPollInterval)
+							break
+						} else {
+							return fmt.Errorf("sendQueue.DeleteMin() failed: %v", err)
+						}
+					}
+					if err := s.output(seg); err != nil {
+						return fmt.Errorf("output() failed: %v", err)
+					}
+				}
+			default:
+				return fmt.Errorf("unsupported transport protocol %v", s.conn.TransportProtocol())
+			}
+		}
+	}
 }
 
 // input reads incoming packets from network and assemble
@@ -197,18 +252,34 @@ func (s *Session) input(seg *segment) error {
 }
 
 func (s *Session) inputData(seg *segment) error {
-	seq, err := seg.Seq()
-	if err != nil {
-		return fmt.Errorf("Seq() failed: %w", err)
-	}
-	if seq < s.unackSeq {
-		// We have acked this before.
-		// TODO: may need to resend the ack.
+	switch s.conn.TransportProtocol() {
+	case netutil.TCPTransport:
+		// Deliver the segment directly to recvQueue.
+		s.recvQueue.InsertBlocking(seg)
 		return nil
+	default:
+		return fmt.Errorf("unsupported transport protocol %v", s.conn.TransportProtocol())
 	}
-	return nil
 }
 
 func (s *Session) inputAck(seg *segment) error {
+	switch s.conn.TransportProtocol() {
+	case netutil.TCPTransport:
+		// Do nothing when receive ACK from TCP protocol.
+		return nil
+	default:
+		return fmt.Errorf("unsupported transport protocol %v", s.conn.TransportProtocol())
+	}
+}
+
+func (s *Session) output(seg *segment) error {
+	switch s.conn.TransportProtocol() {
+	case netutil.TCPTransport:
+		if err := s.conn.(*TCPUnderlay).writeOneSegment(seg); err != nil {
+			return fmt.Errorf("TCPUnderlay.writeOneSegment() failed: %v", err)
+		}
+	default:
+		return fmt.Errorf("unsupported transport protocol %v", s.conn.TransportProtocol())
+	}
 	return nil
 }

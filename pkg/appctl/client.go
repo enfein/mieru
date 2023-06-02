@@ -149,7 +149,7 @@ func NewClientLifecycleRPCClient(ctx context.Context) (pb.ClientLifecycleService
 
 // IsClientDaemonRunning detects if client daemon is running by using ClientLifecycleService.GetStatus() RPC.
 func IsClientDaemonRunning(ctx context.Context) error {
-	timedctx, cancelFunc := context.WithTimeout(ctx, RPCTimeout())
+	timedctx, cancelFunc := context.WithTimeout(ctx, RPCTimeout)
 	defer cancelFunc()
 	client, err := NewClientLifecycleRPCClient(timedctx)
 	if err != nil {

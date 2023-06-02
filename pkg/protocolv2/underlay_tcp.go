@@ -17,22 +17,19 @@ package protocolv2
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io"
-	mrand "math/rand"
 	"net"
 	"sync"
+	"time"
 
+	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/stderror"
-)
-
-const (
-	tcpOverhead       = metadataLength + cipher.DefaultOverhead*2
-	tcpOverhead1stPkt = cipher.DefaultNonceSize + tcpOverhead
 )
 
 type TCPUnderlay struct {
@@ -51,13 +48,82 @@ type TCPUnderlay struct {
 	sendMutex sync.Mutex
 }
 
-var _ Underlay = &TCPUnderlay{}
+type TCPUnderlayListener struct {
+	net.Listener
 
-func (t *TCPUnderlay) String() string {
-	if t.conn == nil {
-		return "TCPUnderlay[]"
+	mtu   int
+	users map[string]*appctlpb.User // registered users
+
+	startOnce   sync.Once
+	chAccept    chan net.Conn
+	chAcceptErr chan error
+	done        chan struct{}
+}
+
+var (
+	_ Underlay = &TCPUnderlay{}
+	_ net.Conn = &TCPUnderlay{}
+)
+
+// DialTCP connects to the remote address "raddr" on the network "tcp"
+// with packet encryption. If "laddr" is empty, an automatic address is used.
+// "block" is the block encryption algorithm to encrypt packets.
+func DialTCP(ctx context.Context, network, laddr, raddr string, mtu int, block cipher.BlockCipher) (*TCPUnderlay, error) {
+	switch network {
+	case "tcp", "tcp4", "tcp6":
+	default:
+		return nil, fmt.Errorf("network %s not supported", network)
 	}
-	return fmt.Sprintf("TCPUnderlay[%v - %v]", t.conn.LocalAddr(), t.conn.RemoteAddr())
+	if block.IsStateless() {
+		return nil, fmt.Errorf("block cipher should not be stateless")
+	}
+	dialer := net.Dialer{}
+	if laddr != "" {
+		tcpLocalAddr, err := net.ResolveTCPAddr(network, laddr)
+		if err != nil {
+			return nil, fmt.Errorf("net.ResolveTCPAddr() failed: %w", err)
+		}
+		dialer.LocalAddr = tcpLocalAddr
+	}
+
+	conn, err := dialer.DialContext(ctx, network, raddr)
+	if err != nil {
+		return nil, fmt.Errorf("DialContext() failed: %w", err)
+	}
+	return newTCPUnderlay(conn, true, mtu, []cipher.BlockCipher{block}), nil
+}
+
+// ListenTCP creates a new TCPUnderlay listener.
+func ListenTCP(laddr string, users map[string]*appctlpb.User) (*TCPUnderlayListener, error) {
+	listenConfig := net.ListenConfig{
+		Control: netutil.ReuseAddrPort,
+	}
+	l, err := listenConfig.Listen(context.Background(), "tcp", laddr)
+	if err != nil {
+		return nil, fmt.Errorf("net.ListenTCP() failed: %w", err)
+	}
+	listener := &TCPUnderlayListener{
+		Listener:    l,
+		users:       users,
+		chAccept:    make(chan net.Conn, 64),
+		chAcceptErr: make(chan error),
+		done:        make(chan struct{}),
+	}
+	listener.Start()
+	return listener, nil
+}
+
+func newTCPUnderlay(conn net.Conn, isClient bool, mtu int, blocks []cipher.BlockCipher) *TCPUnderlay {
+	if isClient {
+		log.Debugf("Creating new client TCP underlay [%v - %v]", conn.LocalAddr(), conn.RemoteAddr())
+	} else {
+		log.Debugf("Creating new server TCP underlay [%v - %v]", conn.LocalAddr(), conn.RemoteAddr())
+	}
+	return &TCPUnderlay{
+		baseUnderlay: *newBaseUnderlay(isClient, mtu),
+		conn:         conn.(*net.TCPConn),
+		candidates:   blocks,
+	}
 }
 
 func (t *TCPUnderlay) IPVersion() netutil.IPVersion {
@@ -75,16 +141,20 @@ func (t *TCPUnderlay) AddSession(s *Session) error {
 	if err := t.baseUnderlay.AddSession(s); err != nil {
 		return err
 	}
-	s.wg.Add(1)
+	s.wg.Add(2)
 	go func() {
-		t.sessionOutputLoop(context.Background(), s)
+		s.runInputLoop(context.Background())
+		s.wg.Done()
+	}()
+	go func() {
+		s.runOutputLoop(context.Background())
 		s.wg.Done()
 	}()
 	return nil
 }
 
 func (t *TCPUnderlay) RunEventLoop(ctx context.Context) (err error) {
-	return t.runInputLoop()
+	return t.runInputLoop(ctx)
 }
 
 func (t *TCPUnderlay) Close() error {
@@ -92,14 +162,51 @@ func (t *TCPUnderlay) Close() error {
 	return t.conn.Close()
 }
 
-func (t *TCPUnderlay) runInputLoop() (err error) {
+func (t *TCPUnderlay) String() string {
+	if t.conn == nil {
+		return "TCPUnderlay[]"
+	}
+	return fmt.Sprintf("TCPUnderlay[%v - %v]", t.conn.LocalAddr(), t.conn.RemoteAddr())
+}
+
+func (t *TCPUnderlay) Read(b []byte) (int, error) {
+	return 0, stderror.ErrUnsupported
+}
+
+func (t *TCPUnderlay) Write(b []byte) (int, error) {
+	return 0, stderror.ErrUnsupported
+}
+
+func (t *TCPUnderlay) LocalAddr() net.Addr {
+	return t.conn.LocalAddr()
+}
+
+func (t *TCPUnderlay) RemoteAddr() net.Addr {
+	return t.conn.RemoteAddr()
+}
+
+func (t *TCPUnderlay) SetDeadline(d time.Time) error {
+	return stderror.ErrUnsupported
+}
+
+func (t *TCPUnderlay) SetReadDeadline(d time.Time) error {
+	return stderror.ErrUnsupported
+}
+
+func (t *TCPUnderlay) SetWriteDeadline(d time.Time) error {
+	return stderror.ErrUnsupported
+}
+
+func (t *TCPUnderlay) runInputLoop(ctx context.Context) (err error) {
 	if t.conn == nil {
 		return stderror.ErrNullPointer
 	}
 
 	for {
 		select {
-		case <-t.die:
+		case <-ctx.Done():
+			return nil
+		case <-t.done:
 			return nil
 		default:
 		}
@@ -108,7 +215,31 @@ func (t *TCPUnderlay) runInputLoop() (err error) {
 			return fmt.Errorf("readOneSegment() failed: %w", err)
 		}
 		if isSessionProtocol(seg.metadata.Protocol()) {
-			// TODO: handle session lifecycle.
+			ss, _ := toSessionStruct(seg.metadata)
+			switch seg.Protocol() {
+			case openSessionRequest:
+				if err := t.onOpenSessionRequest(ss); err != nil {
+					return fmt.Errorf("onOpenSessionRequest() failed: %v", err)
+				}
+			case openSessionResponse:
+				if err := t.onOpenSessionResponse(ss); err != nil {
+					return fmt.Errorf("onOpenSessionResponse() failed: %v", err)
+				}
+			case closeSessionRequest:
+				if err := t.onCloseSessionRequest(ss); err != nil {
+					return fmt.Errorf("onCloseSessionRequest() failed: %v", err)
+				}
+			case closeSessionResponse:
+				if err := t.onCloseSessionResponse(ss); err != nil {
+					return fmt.Errorf("onCloseSessionResponse() failed: %v", err)
+				}
+			case closeConnRequest:
+				// Ignore. Expect to close TCP connection directly.
+			case closeConnResponse:
+				// Ignore. Expect to close TCP connection directly.
+			default:
+				// Ignore unknown protocol from a future version.
+			}
 		} else if isDataAckProtocol(seg.metadata.Protocol()) {
 			das, _ := toDataAckStruct(seg.metadata)
 			t.sessionLock.Lock()
@@ -118,26 +249,7 @@ func (t *TCPUnderlay) runInputLoop() (err error) {
 				log.Debugf("Session %d is not registered to %s", das.sessionID, t.String())
 				continue
 			}
-			if err := session.input(seg); err != nil {
-				log.Debugf("Input from %s to session %d failed: %v", t.String(), das.sessionID, err)
-				continue
-			}
-		}
-	}
-}
-
-func (t *TCPUnderlay) sessionOutputLoop(ctx context.Context, s *Session) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-t.die:
-			return nil
-		default:
-			seg := s.sendQueue.DeleteMinBlocking()
-			if err := t.writeOneSegment(seg); err != nil {
-				return fmt.Errorf("writeOneSegment() failed: %w", err)
-			}
+			session.recvChan <- seg
 		}
 	}
 }
@@ -146,26 +258,38 @@ func (t *TCPUnderlay) onOpenSessionRequest(ss *sessionStruct) error {
 	if t.isClient {
 		return stderror.ErrInvalidOperation
 	}
-	// TODO: filter repeated requests.
 
 	// Create a new session.
+	sessionID := ss.sessionID
+	if sessionID == 0 {
+		// 0 is reserved and can't be used.
+		return fmt.Errorf("reserved session ID %d is used", sessionID)
+	}
 	t.sessionLock.Lock()
-	var sessionID uint32
-	for {
-		sessionID = mrand.Uint32()
-		if sessionID == 0 {
-			// 0 is not a valid session ID
-			continue
-		}
-		if _, inEstablished := t.sessionMap[sessionID]; !inEstablished {
-			break
-		}
+	_, found := t.sessionMap[sessionID]
+	t.sessionLock.Unlock()
+	if found {
+		return fmt.Errorf("session ID %d is already used", sessionID)
 	}
 	session := NewSession(sessionID, t.isClient, t.MTU())
-	t.sessionMap[sessionID] = session
-	t.sessionLock.Unlock()
+	t.AddSession(session)
+	session.state = sessionOpening
 
-	// TODO: send open session response.
+	// Send open session response.
+	seg := &segment{
+		metadata: &sessionStruct{
+			baseStruct: baseStruct{
+				protocol: openSessionResponse,
+				epoch:    ss.epoch,
+			},
+			sessionID:  ss.sessionID,
+			statusCode: 0,
+			payloadLen: 0,
+		},
+	}
+	if err := t.writeOneSegment(seg); err != nil {
+		return fmt.Errorf("write openSessionResponse failed: %v", err)
+	}
 	return nil
 }
 
@@ -173,14 +297,59 @@ func (t *TCPUnderlay) onOpenSessionResponse(ss *sessionStruct) error {
 	if !t.isClient {
 		return stderror.ErrInvalidOperation
 	}
+
+	sessionID := ss.sessionID
+	t.sessionLock.Lock()
+	session, found := t.sessionMap[sessionID]
+	t.sessionLock.Unlock()
+	if !found {
+		return fmt.Errorf("session ID %d is not found", sessionID)
+	}
+	session.state = sessionEstablished
 	return nil
 }
 
 func (t *TCPUnderlay) onCloseSessionRequest(ss *sessionStruct) error {
+	sessionID := ss.sessionID
+	t.sessionLock.Lock()
+	session, found := t.sessionMap[sessionID]
+	t.sessionLock.Unlock()
+	if !found {
+		return fmt.Errorf("session ID %d is not found", sessionID)
+	}
+	session.state = sessionClosed
+
+	// Send open session response.
+	seg := &segment{
+		metadata: &sessionStruct{
+			baseStruct: baseStruct{
+				protocol: closeSessionResponse,
+				epoch:    ss.epoch,
+			},
+			sessionID:  ss.sessionID,
+			statusCode: 0,
+			payloadLen: 0,
+		},
+	}
+	if err := t.writeOneSegment(seg); err != nil {
+		return fmt.Errorf("write closeSessionResponse failed: %v", err)
+	}
+	session.Close()
+	session.wg.Wait()
 	return nil
 }
 
 func (t *TCPUnderlay) onCloseSessionResponse(ss *sessionStruct) error {
+	sessionID := ss.sessionID
+	t.sessionLock.Lock()
+	session, found := t.sessionMap[sessionID]
+	t.sessionLock.Unlock()
+	if !found {
+		return fmt.Errorf("session ID %d is not found", sessionID)
+	}
+	session.state = sessionClosed
+	session.Close()
+	session.wg.Wait()
 	return nil
 }
 
@@ -357,4 +526,70 @@ func (t *TCPUnderlay) maybeInitSendBlockCipher() error {
 		}
 	}
 	return nil
+}
+
+// Start starts to accept incoming TCP connections.
+func (l *TCPUnderlayListener) Start() {
+	l.startOnce.Do(func() {
+		go l.acceptLoop()
+	})
+}
+
+// WrapConn adds TCPUnderlay into a raw network connection.
+func (l *TCPUnderlayListener) WrapConn(conn net.Conn) net.Conn {
+	var err error
+	var blocks []cipher.BlockCipher
+	for _, user := range l.users {
+		var password []byte
+		password, err = hex.DecodeString(user.GetHashedPassword())
+		if err != nil {
+			log.Warnf("Unable to decode hashed password %q from user %q. Skip.", user.GetHashedPassword(), user.GetName())
+			continue
+		}
+		if len(password) == 0 {
+			password = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
+		}
+		blocksFromUser, err := cipher.BlockCipherListFromPassword(password, false)
+		if err != nil {
+			log.Warnf("Unable to create block cipher of user %q. Skip.", user.GetName())
+			continue
+		}
+		for _, block := range blocksFromUser {
+			block.SetBlockContext(cipher.BlockContext{
+				UserName: user.GetName(),
+			})
+		}
+		blocks = append(blocks, blocksFromUser...)
+	}
+	return newTCPUnderlay(conn, false, l.mtu, blocks)
+}
+
+func (l *TCPUnderlayListener) Accept() (net.Conn, error) {
+	select {
+	case c := <-l.chAccept:
+		return l.WrapConn(c), nil
+	case <-l.done:
+		// Use raw io.ErrClosedPipe here so consumer can compare the error type.
+		return nil, io.ErrClosedPipe
+	}
+}
+
+func (l *TCPUnderlayListener) Close() error {
+	close(l.done)
+	return nil
+}
+
+func (l *TCPUnderlayListener) Addr() net.Addr {
+	return l.Listener.Addr()
+}
+
+func (l *TCPUnderlayListener) acceptLoop() {
+	for {
+		conn, err := l.Listener.Accept()
+		if err != nil {
+			l.chAcceptErr <- err
+			return
+		}
+		l.chAccept <- conn
+	}
 }

@@ -39,7 +39,7 @@ func (u *simpleInMemoryUnderlay) RunEventLoop(ctx context.Context) error {
 		go func(s *Session) {
 			for {
 				select {
-				case <-s.die:
+				case <-s.done:
 					wg.Done()
 					return
 				default:

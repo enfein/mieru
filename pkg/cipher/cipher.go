@@ -26,8 +26,8 @@ import (
 
 const (
 	noncePrintablePrefixLen = 8
-	printableCharSub        = 0x20 // 0x20, e.g. ' ', is the first printable ASCII character
-	printableCharSup        = 0x7E // 0x7E, e.g. '~', is the last printable ASCII character
+	printableCharSub        = 0x20 // 0x20, i.e. ' ', is the first printable ASCII character
+	printableCharSup        = 0x7E // 0x7E, i.e. '~', is the last printable ASCII character
 )
 
 var (

@@ -28,7 +28,7 @@ import (
 type baseUnderlay struct {
 	isClient bool
 	mtu      int
-	die      chan struct{} // if the underlay is closed
+	done     chan struct{} // if the underlay is closed
 
 	// Map<sessionID, *Session>.
 	sessionMap  map[uint32]*Session
@@ -43,7 +43,7 @@ func newBaseUnderlay(isClient bool, mtu int) *baseUnderlay {
 	return &baseUnderlay{
 		isClient:   isClient,
 		mtu:        mtu,
-		die:        make(chan struct{}),
+		done:       make(chan struct{}),
 		sessionMap: make(map[uint32]*Session),
 	}
 }
@@ -108,6 +108,6 @@ func (b *baseUnderlay) Close() error {
 	for _, s := range b.sessionMap {
 		s.Close()
 	}
-	close(b.die)
+	close(b.done)
 	return nil
 }

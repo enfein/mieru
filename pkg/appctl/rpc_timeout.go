@@ -16,22 +16,12 @@
 package appctl
 
 import (
-	"runtime"
 	"time"
 )
 
-var rpcTimeout = time.Millisecond * 1000
-
-func init() {
-	if runtime.GOOS == "windows" {
-		// When anti-virus software is installed in windows, this application is typically executed
-		// in a sandbox environment. In such environment, RPC response can be super slow.
-		// Set RPC timeout to 10 seconds in windows system to reduce the frequency of this problem.
-		rpcTimeout = time.Millisecond * 10000
-	}
-}
-
-// RPCTimeout is the timeout to complete a RPC call.
-func RPCTimeout() time.Duration {
-	return rpcTimeout
-}
+const (
+	// RPCTimeout is the timeout to complete a RPC call.
+	// We use a very large timeout that works for embedded computer
+	// and anti-virus sandbox environment.
+	RPCTimeout = time.Second * 10
+)

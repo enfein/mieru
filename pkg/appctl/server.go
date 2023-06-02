@@ -225,7 +225,7 @@ func NewServerLifecycleService() *serverLifecycleService {
 // NewServerLifecycleRPCClient creates a new ServerLifecycleService RPC client.
 func NewServerLifecycleRPCClient() (pb.ServerLifecycleServiceClient, error) {
 	rpcAddr := "unix://" + ServerUDS
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), RPCTimeout())
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), RPCTimeout)
 	defer cancelFunc()
 	conn, err := grpc.DialContext(timedctx, rpcAddr, grpc.WithInsecure())
 	if err != nil {
@@ -266,7 +266,7 @@ func NewServerConfigService() *serverConfigService {
 // NewServerConfigRPCClient creates a new ServerConfigService RPC client.
 func NewServerConfigRPCClient() (pb.ServerConfigServiceClient, error) {
 	rpcAddr := "unix://" + ServerUDS
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), RPCTimeout())
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), RPCTimeout)
 	defer cancelFunc()
 	conn, err := grpc.DialContext(timedctx, rpcAddr, grpc.WithInsecure())
 	if err != nil {
@@ -281,7 +281,7 @@ func GetServerStatusWithRPC(ctx context.Context) (*pb.AppStatusMsg, error) {
 	if err != nil {
 		return nil, fmt.Errorf("NewServerLifecycleRPCClient() failed: %w", err)
 	}
-	timedctx, cancelFunc := context.WithTimeout(ctx, RPCTimeout())
+	timedctx, cancelFunc := context.WithTimeout(ctx, RPCTimeout)
 	defer cancelFunc()
 	status, err := client.GetStatus(timedctx, &pb.Empty{})
 	if err != nil {
