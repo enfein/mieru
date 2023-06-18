@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"sync"
 	"time"
 
@@ -72,9 +73,8 @@ type Session struct {
 	wLock sync.Mutex
 }
 
-var (
-	_ io.ReadWriteCloser = &Session{}
-)
+// Session must implement net.Conn interface.
+var _ net.Conn = &Session{}
 
 // NewSession creates a new session.
 func NewSession(id uint32, isClient bool, mtu int) *Session {
@@ -181,6 +181,26 @@ func (s *Session) Close() error {
 	defer s.wLock.Unlock()
 	close(s.done)
 	return nil
+}
+
+func (s *Session) LocalAddr() net.Addr {
+	return s.conn.LocalAddr()
+}
+
+func (s *Session) RemoteAddr() net.Addr {
+	return s.conn.RemoteAddr()
+}
+
+func (s *Session) SetDeadline(t time.Time) error {
+	return stderror.ErrUnsupported
+}
+
+func (s *Session) SetReadDeadline(t time.Time) error {
+	return stderror.ErrUnsupported
+}
+
+func (s *Session) SetWriteDeadline(t time.Time) error {
+	return stderror.ErrUnsupported
 }
 
 func (s *Session) runInputLoop(ctx context.Context) error {

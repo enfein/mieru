@@ -17,12 +17,13 @@ package protocolv2
 
 import (
 	"context"
+	"net"
 
 	"github.com/enfein/mieru/pkg/netutil"
 )
 
-// Underlay contains methods implemented by a underlay network connection.
-type Underlay interface {
+// UnderlayProperties defines network properties of a underlay.
+type UnderlayProperties interface {
 	// Layer 2 MTU of this network connection.
 	MTU() int
 
@@ -31,6 +32,17 @@ type Underlay interface {
 
 	// The transport protocol used to implement the underlay.
 	TransportProtocol() netutil.TransportProtocol
+
+	// Implement the LocalAddr() method in net.Conn interface.
+	LocalAddr() net.Addr
+
+	// Implemeent the RemoteAddr() method in the net.Conn interface.
+	RemoteAddr() net.Addr
+}
+
+// Underlay contains methods implemented by a underlay network connection.
+type Underlay interface {
+	UnderlayProperties
 
 	// Add a session to the underlay connection.
 	AddSession(*Session) error
@@ -43,4 +55,33 @@ type Underlay interface {
 
 	// Close the underlay connection.
 	Close() error
+}
+
+type underlayDescriptor struct {
+	mtu               int
+	ipVersion         netutil.IPVersion
+	transportProtocol netutil.TransportProtocol
+	remoteAddr        net.Addr
+}
+
+var _ UnderlayProperties = underlayDescriptor{}
+
+func (d underlayDescriptor) MTU() int {
+	return d.mtu
+}
+
+func (d underlayDescriptor) IPVersion() netutil.IPVersion {
+	return d.ipVersion
+}
+
+func (d underlayDescriptor) TransportProtocol() netutil.TransportProtocol {
+	return d.transportProtocol
+}
+
+func (d underlayDescriptor) LocalAddr() net.Addr {
+	return netutil.NilNetAddr
+}
+
+func (d underlayDescriptor) RemoteAddr() net.Addr {
+	return d.remoteAddr
 }

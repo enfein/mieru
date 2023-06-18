@@ -17,14 +17,11 @@ package protocolv2
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
 	"sync"
-	"time"
 
-	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/netutil"
@@ -48,27 +45,12 @@ type TCPUnderlay struct {
 	sendMutex sync.Mutex
 }
 
-type TCPUnderlayListener struct {
-	net.Listener
+var _ Underlay = &TCPUnderlay{}
 
-	mtu   int
-	users map[string]*appctlpb.User // registered users
-
-	startOnce   sync.Once
-	chAccept    chan net.Conn
-	chAcceptErr chan error
-	done        chan struct{}
-}
-
-var (
-	_ Underlay = &TCPUnderlay{}
-	_ net.Conn = &TCPUnderlay{}
-)
-
-// DialTCP connects to the remote address "raddr" on the network "tcp"
+// NewTCPUnderlay connects to the remote address "raddr" on the network "tcp"
 // with packet encryption. If "laddr" is empty, an automatic address is used.
 // "block" is the block encryption algorithm to encrypt packets.
-func DialTCP(ctx context.Context, network, laddr, raddr string, mtu int, block cipher.BlockCipher) (*TCPUnderlay, error) {
+func NewTCPUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, block cipher.BlockCipher) (*TCPUnderlay, error) {
 	switch network {
 	case "tcp", "tcp4", "tcp6":
 	default:
@@ -90,40 +72,12 @@ func DialTCP(ctx context.Context, network, laddr, raddr string, mtu int, block c
 	if err != nil {
 		return nil, fmt.Errorf("DialContext() failed: %w", err)
 	}
-	return newTCPUnderlay(conn, true, mtu, []cipher.BlockCipher{block}), nil
-}
-
-// ListenTCP creates a new TCPUnderlay listener.
-func ListenTCP(laddr string, users map[string]*appctlpb.User) (*TCPUnderlayListener, error) {
-	listenConfig := net.ListenConfig{
-		Control: netutil.ReuseAddrPort,
-	}
-	l, err := listenConfig.Listen(context.Background(), "tcp", laddr)
-	if err != nil {
-		return nil, fmt.Errorf("net.ListenTCP() failed: %w", err)
-	}
-	listener := &TCPUnderlayListener{
-		Listener:    l,
-		users:       users,
-		chAccept:    make(chan net.Conn, 64),
-		chAcceptErr: make(chan error),
-		done:        make(chan struct{}),
-	}
-	listener.Start()
-	return listener, nil
-}
-
-func newTCPUnderlay(conn net.Conn, isClient bool, mtu int, blocks []cipher.BlockCipher) *TCPUnderlay {
-	if isClient {
-		log.Debugf("Creating new client TCP underlay [%v - %v]", conn.LocalAddr(), conn.RemoteAddr())
-	} else {
-		log.Debugf("Creating new server TCP underlay [%v - %v]", conn.LocalAddr(), conn.RemoteAddr())
-	}
+	log.Debugf("Creating new client TCP underlay [%v - %v]", conn.LocalAddr(), conn.RemoteAddr())
 	return &TCPUnderlay{
-		baseUnderlay: *newBaseUnderlay(isClient, mtu),
+		baseUnderlay: *newBaseUnderlay(true, mtu),
 		conn:         conn.(*net.TCPConn),
-		candidates:   blocks,
-	}
+		candidates:   []cipher.BlockCipher{block},
+	}, nil
 }
 
 func (t *TCPUnderlay) IPVersion() netutil.IPVersion {
@@ -183,18 +137,6 @@ func (t *TCPUnderlay) LocalAddr() net.Addr {
 
 func (t *TCPUnderlay) RemoteAddr() net.Addr {
 	return t.conn.RemoteAddr()
-}
-
-func (t *TCPUnderlay) SetDeadline(d time.Time) error {
-	return stderror.ErrUnsupported
-}
-
-func (t *TCPUnderlay) SetReadDeadline(d time.Time) error {
-	return stderror.ErrUnsupported
-}
-
-func (t *TCPUnderlay) SetWriteDeadline(d time.Time) error {
-	return stderror.ErrUnsupported
 }
 
 func (t *TCPUnderlay) runInputLoop(ctx context.Context) (err error) {
@@ -526,70 +468,4 @@ func (t *TCPUnderlay) maybeInitSendBlockCipher() error {
 		}
 	}
 	return nil
-}
-
-// Start starts to accept incoming TCP connections.
-func (l *TCPUnderlayListener) Start() {
-	l.startOnce.Do(func() {
-		go l.acceptLoop()
-	})
-}
-
-// WrapConn adds TCPUnderlay into a raw network connection.
-func (l *TCPUnderlayListener) WrapConn(conn net.Conn) net.Conn {
-	var err error
-	var blocks []cipher.BlockCipher
-	for _, user := range l.users {
-		var password []byte
-		password, err = hex.DecodeString(user.GetHashedPassword())
-		if err != nil {
-			log.Warnf("Unable to decode hashed password %q from user %q. Skip.", user.GetHashedPassword(), user.GetName())
-			continue
-		}
-		if len(password) == 0 {
-			password = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
-		}
-		blocksFromUser, err := cipher.BlockCipherListFromPassword(password, false)
-		if err != nil {
-			log.Warnf("Unable to create block cipher of user %q. Skip.", user.GetName())
-			continue
-		}
-		for _, block := range blocksFromUser {
-			block.SetBlockContext(cipher.BlockContext{
-				UserName: user.GetName(),
-			})
-		}
-		blocks = append(blocks, blocksFromUser...)
-	}
-	return newTCPUnderlay(conn, false, l.mtu, blocks)
-}
-
-func (l *TCPUnderlayListener) Accept() (net.Conn, error) {
-	select {
-	case c := <-l.chAccept:
-		return l.WrapConn(c), nil
-	case <-l.done:
-		// Use raw io.ErrClosedPipe here so consumer can compare the error type.
-		return nil, io.ErrClosedPipe
-	}
-}
-
-func (l *TCPUnderlayListener) Close() error {
-	close(l.done)
-	return nil
-}
-
-func (l *TCPUnderlayListener) Addr() net.Addr {
-	return l.Listener.Addr()
-}
-
-func (l *TCPUnderlayListener) acceptLoop() {
-	for {
-		conn, err := l.Listener.Accept()
-		if err != nil {
-			l.chAcceptErr <- err
-			return
-		}
-		l.chAccept <- conn
-	}
 }

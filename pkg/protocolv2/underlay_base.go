@@ -18,6 +18,7 @@ package protocolv2
 import (
 	"context"
 	"fmt"
+	"net"
 	"sync"
 
 	"github.com/enfein/mieru/pkg/netutil"
@@ -58,6 +59,14 @@ func (b *baseUnderlay) IPVersion() netutil.IPVersion {
 
 func (b *baseUnderlay) TransportProtocol() netutil.TransportProtocol {
 	return netutil.UnknownTransport
+}
+
+func (b *baseUnderlay) LocalAddr() net.Addr {
+	return netutil.NilNetAddr
+}
+
+func (b *baseUnderlay) RemoteAddr() net.Addr {
+	return netutil.NilNetAddr
 }
 
 func (b *baseUnderlay) AddSession(s *Session) error {

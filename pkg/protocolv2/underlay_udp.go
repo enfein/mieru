@@ -58,6 +58,14 @@ func (u *UDPUnderlay) TransportProtocol() netutil.TransportProtocol {
 	return netutil.UDPTransport
 }
 
+func (u *UDPUnderlay) LocalAddr() net.Addr {
+	return u.conn.LocalAddr()
+}
+
+func (u *UDPUnderlay) RemoteAddr() net.Addr {
+	return u.conn.RemoteAddr()
+}
+
 func (u *UDPUnderlay) RunEventLoop(ctx context.Context) error {
 	return nil
 }
