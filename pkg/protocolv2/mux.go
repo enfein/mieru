@@ -17,44 +17,121 @@ package protocolv2
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io"
 	mrand "math/rand"
 	"net"
+	"sync"
 
+	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
+	"github.com/enfein/mieru/pkg/mathext"
 	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/stderror"
 )
 
 // Mux manages the sessions and underlays.
 type Mux struct {
-	isClient        bool
-	password        []byte // to construct cipher block
-	underlays       []Underlay
-	listenEndpoints []UnderlayProperties
-	multiplexFactor int // to decide if reusing a underlay
+	isClient bool
 
+	// ---- client fields ----
+	password        []byte
+	multiplexFactor int
+
+	// ---- server fields ----
+	users         map[string]*appctlpb.User
+	serverHandler netutil.ConnHandler
+
+	// ---- common fields ----
+	endpoints   []UnderlayProperties
+	underlays   []Underlay
 	chAccept    chan net.Conn
 	chAcceptErr chan error
+	used        bool
 	done        chan struct{}
+	mu          sync.Mutex
 }
 
 var _ net.Listener = &Mux{}
 
 // NewMux creates a new mieru v2 multiplex controller.
-func NewMux(isClinet bool, password []byte, listenEndpoints []UnderlayProperties, multiplexFactor int) *Mux {
-	return &Mux{
-		isClient:        isClinet,
-		password:        password,
-		underlays:       make([]Underlay, 0),
-		listenEndpoints: listenEndpoints,
-		multiplexFactor: multiplexFactor,
-		chAccept:        make(chan net.Conn, 256),
-		chAcceptErr:     make(chan error, 1), // non-blocking
-		done:            make(chan struct{}),
+func NewMux(isClinet bool) *Mux {
+	if isClinet {
+		log.Infof("Initializing client multiplexer")
+	} else {
+		log.Infof("Initializing server multiplexer")
 	}
+	return &Mux{
+		isClient:    isClinet,
+		underlays:   make([]Underlay, 0),
+		chAccept:    make(chan net.Conn, 256),
+		chAcceptErr: make(chan error, 1), // non-blocking
+		done:        make(chan struct{}),
+	}
+}
+
+func (m *Mux) SetClientPassword(password []byte) *Mux {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if !m.isClient {
+		log.Fatalf("Can't set client password in server mux")
+	}
+	if m.used {
+		log.Fatalf("Can't set client password after mux is used")
+	}
+	m.password = password
+	return m
+}
+
+func (m *Mux) SetClientMultiplexFactor(n int) *Mux {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if !m.isClient {
+		log.Fatalf("Can't set multiplex factor in server mux")
+	}
+	if m.used {
+		log.Fatalf("Can't set multiplex factor after mux is used")
+	}
+	m.multiplexFactor = mathext.Max(n, 0)
+	return m
+}
+
+func (m *Mux) SetServerUsers(users map[string]*appctlpb.User) *Mux {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.isClient {
+		log.Fatalf("Can't set server users in client mux")
+	}
+	if m.used {
+		log.Fatalf("Can't set server users after mux is used")
+	}
+	m.users = users
+	return m
+}
+
+func (m *Mux) SetServerHandler(handler netutil.ConnHandler) *Mux {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.isClient {
+		log.Fatalf("Can't set server handler in client mux")
+	}
+	if m.used {
+		log.Fatalf("Can't set server handler after mux is used")
+	}
+	m.serverHandler = handler
+	return m
+}
+
+func (m *Mux) SetEndpoints(endpoints []UnderlayProperties) *Mux {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.used {
+		log.Fatalf("Can't set endpoints after mux is used")
+	}
+	m.endpoints = endpoints
+	return m
 }
 
 func (m *Mux) Accept() (net.Conn, error) {
@@ -69,9 +146,23 @@ func (m *Mux) Accept() (net.Conn, error) {
 }
 
 func (m *Mux) Close() error {
+	select {
+	case <-m.done:
+		return nil
+	default:
+	}
+
+	if m.isClient {
+		log.Infof("Closing client multiplexer")
+	} else {
+		log.Infof("Closing server multiplexer")
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	for _, underlay := range m.underlays {
 		underlay.Close()
 	}
+	close(m.done)
 	return nil
 }
 
@@ -86,10 +177,49 @@ func (m *Mux) ListenAndServeAll() error {
 	if m.isClient {
 		return stderror.ErrInvalidOperation
 	}
-	if len(m.listenEndpoints) == 0 {
+	if len(m.users) == 0 {
+		return fmt.Errorf("no user found")
+	}
+	if m.serverHandler == nil {
+		return fmt.Errorf("no server handler found")
+	}
+	if len(m.endpoints) == 0 {
 		return fmt.Errorf("no server listening endpoint found")
 	}
-	return nil
+	for _, p := range m.endpoints {
+		if netutil.IsNilNetAddr(p.LocalAddr()) {
+			return fmt.Errorf("endpoint local address is not set")
+		}
+	}
+
+	m.mu.Lock()
+	m.used = true
+	for _, p := range m.endpoints {
+		go m.acceptUnderlayLoop(p)
+	}
+	m.mu.Unlock()
+
+	for {
+		session, err := m.Accept()
+		if err != nil {
+			if stderror.IsClosed(err) {
+				return nil
+			}
+			return fmt.Errorf("Accept() failed: %v", err)
+		}
+		if log.IsLevelEnabled(log.TraceLevel) {
+			log.Tracef("Mux accepted %v", session)
+		}
+		go func() {
+			closed, err := m.serverHandler.Take(session)
+			if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
+				log.Debugf("Server handler got error for %v: %v", session, err)
+			}
+			if !closed {
+				session.Close()
+			}
+		}()
+	}
 }
 
 // DialContext returns a network connection for the client to consume.
@@ -98,9 +228,26 @@ func (m *Mux) DialContext(ctx context.Context) (net.Conn, error) {
 	if !m.isClient {
 		return nil, stderror.ErrInvalidOperation
 	}
+	if len(m.password) == 0 {
+		return nil, fmt.Errorf("client password is not set")
+	}
+	if len(m.endpoints) == 0 {
+		return nil, fmt.Errorf("no server listening endpoint found")
+	}
+	for _, p := range m.endpoints {
+		if netutil.IsNilNetAddr(p.RemoteAddr()) {
+			return nil, fmt.Errorf("endpoint remote address is not set")
+		}
+	}
 
-	createNewUnderlay := true
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.used = true
 	var underlay Underlay
+
+	// Try to allocate a underlay for the session.
+	m.cleanUnderlay()
+	createNewUnderlay := true
 	if m.multiplexFactor > 0 {
 		reuseUnderlayFactor := len(m.underlays) * m.multiplexFactor
 		n := mrand.Intn(reuseUnderlayFactor + 1)
@@ -110,8 +257,8 @@ func (m *Mux) DialContext(ctx context.Context) (net.Conn, error) {
 		}
 	}
 	if createNewUnderlay {
-		i := mrand.Intn(len(m.listenEndpoints))
-		p := m.listenEndpoints[i]
+		i := mrand.Intn(len(m.endpoints))
+		p := m.endpoints[i]
 		switch p.TransportProtocol() {
 		case netutil.TCPTransport:
 			block, err := cipher.BlockCipherFromPassword(m.password, false)
@@ -122,7 +269,15 @@ func (m *Mux) DialContext(ctx context.Context) (net.Conn, error) {
 			if err != nil {
 				return nil, fmt.Errorf("NewTCPUnderlay() failed: %v", err)
 			}
-			log.Debugf("Create new underlay %v", underlay)
+			m.underlays = append(m.underlays, underlay)
+			go func() {
+				err := underlay.RunEventLoop(ctx)
+				if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
+					log.Debugf("%v RunEventLoop(): %v", underlay, err)
+				}
+				underlay.Close()
+				// Dead underlay will be cleaned later.
+			}()
 		default:
 			return nil, fmt.Errorf("unsupport transport protocol %v", p.TransportProtocol())
 		}
@@ -135,4 +290,106 @@ func (m *Mux) DialContext(ctx context.Context) (net.Conn, error) {
 		return nil, fmt.Errorf("AddSession() failed: %v", err)
 	}
 	return session, nil
+}
+
+func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
+	laddr := properties.LocalAddr().String()
+	if laddr == "" {
+		m.chAcceptErr <- fmt.Errorf("underlay local address is empty")
+		return
+	}
+
+	network := properties.LocalAddr().Network()
+	switch network {
+	case "tcp", "tcp4", "tcp6":
+		listenConfig := net.ListenConfig{
+			Control: netutil.ReuseAddrPort,
+		}
+		rawListener, err := listenConfig.Listen(context.Background(), network, laddr)
+		if err != nil {
+			m.chAcceptErr <- fmt.Errorf("net.ListenTCP() failed: %w", err)
+			return
+		}
+		for {
+			underlay, err := m.acceptUnderlay(rawListener, properties)
+			if err != nil {
+				m.chAcceptErr <- err
+				return
+			}
+			log.Debugf("Created new server TCP underlay [%v - %v]", underlay.LocalAddr(), underlay.RemoteAddr())
+			go func() {
+				if err := underlay.RunEventLoop(context.Background()); err != nil {
+					log.Debugf("%v RunEventLoop(): %v", underlay, err)
+				}
+			}()
+			go func() {
+				for {
+					conn, err := underlay.Accept()
+					if err != nil {
+						log.Debugf("%v Accept(): %v", underlay, err)
+						underlay.Close()
+						break
+					}
+					m.chAccept <- conn
+				}
+			}()
+		}
+	default:
+		m.chAcceptErr <- fmt.Errorf("unsupported underlay network type %q", network)
+		return
+	}
+}
+
+func (m *Mux) acceptUnderlay(rawListener net.Listener, properties UnderlayProperties) (Underlay, error) {
+	rawConn, err := rawListener.Accept()
+	if err != nil {
+		return nil, fmt.Errorf("Accept() underlay failed: %w", err)
+	}
+	return m.serverWrapTCPConn(rawConn, properties.MTU(), m.users), nil
+}
+
+func (m *Mux) serverWrapTCPConn(rawConn net.Conn, mtu int, users map[string]*appctlpb.User) Underlay {
+	var err error
+	var blocks []cipher.BlockCipher
+	for _, user := range users {
+		var password []byte
+		password, err = hex.DecodeString(user.GetHashedPassword())
+		if err != nil {
+			log.Debugf("Unable to decode hashed password %q from user %q", user.GetHashedPassword(), user.GetName())
+			continue
+		}
+		if len(password) == 0 {
+			password = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
+		}
+		blocksFromUser, err := cipher.BlockCipherListFromPassword(password, false)
+		if err != nil {
+			log.Debugf("Unable to create block cipher of user %q", user.GetName())
+			continue
+		}
+		for _, block := range blocksFromUser {
+			block.SetBlockContext(cipher.BlockContext{
+				UserName: user.GetName(),
+			})
+		}
+		blocks = append(blocks, blocksFromUser...)
+	}
+	return &TCPUnderlay{
+		baseUnderlay: *newBaseUnderlay(false, mtu),
+		conn:         rawConn.(*net.TCPConn),
+		candidates:   blocks,
+	}
+}
+
+// cleanUnderlay removes closed underlays.
+// This method must be called when holding the lock.
+func (m *Mux) cleanUnderlay() {
+	remaning := make([]Underlay, 0)
+	for _, underlay := range m.underlays {
+		select {
+		case <-underlay.Done():
+		default:
+			remaning = append(remaning, underlay)
+		}
+	}
+	m.underlays = remaning
 }

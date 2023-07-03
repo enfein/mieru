@@ -42,25 +42,33 @@ type UnderlayProperties interface {
 
 // Underlay contains methods implemented by a underlay network connection.
 type Underlay interface {
+	// Accept incoming sessions.
+	net.Listener
+
+	// Store basic network properties.
 	UnderlayProperties
 
 	// Add a session to the underlay connection.
+	// The session is ready to use when this returns.
 	AddSession(*Session) error
 
 	// Remove a session from the underlay connection.
+	// The session is destroyed when this returns.
 	RemoveSession(*Session) error
 
-	// Run input and output loop.
+	// Run event loop.
+	// The underlay needs to be closed when this returns.
 	RunEventLoop(context.Context) error
 
-	// Close the underlay connection.
-	Close() error
+	// Indicate the underlay is closed.
+	Done() chan struct{}
 }
 
 type underlayDescriptor struct {
 	mtu               int
 	ipVersion         netutil.IPVersion
 	transportProtocol netutil.TransportProtocol
+	localAddr         net.Addr
 	remoteAddr        net.Addr
 }
 
@@ -79,7 +87,7 @@ func (d underlayDescriptor) TransportProtocol() netutil.TransportProtocol {
 }
 
 func (d underlayDescriptor) LocalAddr() net.Addr {
-	return netutil.NilNetAddr
+	return d.localAddr
 }
 
 func (d underlayDescriptor) RemoteAddr() net.Addr {

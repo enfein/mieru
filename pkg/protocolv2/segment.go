@@ -16,6 +16,7 @@
 package protocolv2
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/enfein/mieru/pkg/mathext"
@@ -90,6 +91,10 @@ func (s *segment) Less(than *segment) bool {
 		return false
 	}
 	return mySeq < otherSeq
+}
+
+func (s *segment) String() string {
+	return fmt.Sprintf("segment{metadata=%v}", s.metadata)
 }
 
 func segmentLessFunc(a, b *segment) bool {

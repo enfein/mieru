@@ -52,6 +52,9 @@ type metadata interface {
 
 	// Unmarshal constructs the metadata from the non-encrypted wire format.
 	Unmarshal([]byte) error
+
+	// String returns a human readable representation of the metadata.
+	String() string
 }
 
 var (
@@ -115,6 +118,10 @@ func (ss *sessionStruct) Unmarshal(b []byte) error {
 	ss.payloadLen = binary.BigEndian.Uint16(b[11:])
 	ss.suffixLen = b[13]
 	return nil
+}
+
+func (ss *sessionStruct) String() string {
+	return fmt.Sprintf("sessionStruct{protocol=%v, sessionID=%v, statusCode=%v, payloadLen=%v, suffixLen=%v}", ss.protocol, ss.sessionID, ss.statusCode, ss.payloadLen, ss.suffixLen)
 }
 
 func isSessionProtocol(p byte) bool {
@@ -189,6 +196,10 @@ func (das *dataAckStruct) Unmarshal(b []byte) error {
 	das.payloadLen = binary.BigEndian.Uint16(b[22:])
 	das.suffixLen = b[24]
 	return nil
+}
+
+func (das *dataAckStruct) String() string {
+	return fmt.Sprintf("dataAckStruct{protocol=%v, sessionID=%v, seq=%v, unAckSeq=%v, windowSize=%v, fragment=%v, prefixLen=%v, payloadLen=%v, suffixLen=%v}", das.protocol, das.sessionID, das.seq, das.unAckSeq, das.windowSize, das.fragment, das.prefixLen, das.payloadLen, das.suffixLen)
 }
 
 func isDataAckProtocol(p byte) bool {

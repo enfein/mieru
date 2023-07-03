@@ -1,4 +1,4 @@
-// Copyright (C) 2022  mieru authors
+// Copyright (C) 2023  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,28 +13,29 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package netutil
+package log
 
-import "net"
+import (
+	"io"
+	"log"
+	"testing"
+)
 
-// NetAddr implements net.Addr interface.
-type NetAddr struct {
-	Net string
-	Str string
+// testingAdaptor let logs to be printed to testing.T.
+type testingAdaptor struct {
+	t *testing.T
 }
 
-func (a NetAddr) Network() string {
-	return a.Net
+var _ io.Writer = testingAdaptor{}
+
+func (a testingAdaptor) Write(p []byte) (n int, err error) {
+	s := string(p)
+	a.t.Logf(s)
+	return len(p), nil
 }
 
-func (a NetAddr) String() string {
-	return a.Str
-}
-
-// NilNetAddr is an empty network address.
-var NilNetAddr = NetAddr{}
-
-// IsNilNetAddr returns true if the net.Addr is nil / empty.
-func IsNilNetAddr(addr net.Addr) bool {
-	return addr == nil || (addr.Network() == "" && addr.String() == "")
+// SetOutputToTest prints logs to the go test.
+func SetOutputToTest(t *testing.T) {
+	adaptor := testingAdaptor{t: t}
+	log.SetOutput(adaptor)
 }

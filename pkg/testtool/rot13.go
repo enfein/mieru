@@ -88,3 +88,11 @@ func TestHelperServeConn(conn net.Conn) error {
 		}
 	}
 }
+
+// TestHelperConnHandler implements netutil.ConnHandler interface.
+type TestHelperConnHandler struct{}
+
+func (h TestHelperConnHandler) Take(conn net.Conn) (closed bool, err error) {
+	err = TestHelperServeConn(conn)
+	return true, err
+}

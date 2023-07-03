@@ -72,12 +72,35 @@ func NewTCPUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, 
 	if err != nil {
 		return nil, fmt.Errorf("DialContext() failed: %w", err)
 	}
-	log.Debugf("Creating new client TCP underlay [%v - %v]", conn.LocalAddr(), conn.RemoteAddr())
+	log.Debugf("Created new client TCP underlay [%v - %v]", conn.LocalAddr(), conn.RemoteAddr())
 	return &TCPUnderlay{
 		baseUnderlay: *newBaseUnderlay(true, mtu),
 		conn:         conn.(*net.TCPConn),
 		candidates:   []cipher.BlockCipher{block},
 	}, nil
+}
+
+func (t *TCPUnderlay) String() string {
+	if t.conn == nil {
+		return "TCPUnderlay{}"
+	}
+	return fmt.Sprintf("TCPUnderlay{%v - %v}", t.conn.LocalAddr(), t.conn.RemoteAddr())
+}
+
+func (t *TCPUnderlay) Close() error {
+	select {
+	case <-t.done:
+		return nil
+	default:
+	}
+
+	log.Debugf("Closing %v", t)
+	t.baseUnderlay.Close()
+	return t.conn.Close()
+}
+
+func (t *TCPUnderlay) Addr() net.Addr {
+	return t.LocalAddr()
 }
 
 func (t *TCPUnderlay) IPVersion() netutil.IPVersion {
@@ -91,52 +114,68 @@ func (t *TCPUnderlay) TransportProtocol() netutil.TransportProtocol {
 	return netutil.TCPTransport
 }
 
-func (t *TCPUnderlay) AddSession(s *Session) error {
-	if err := t.baseUnderlay.AddSession(s); err != nil {
-		return err
-	}
-	s.wg.Add(2)
-	go func() {
-		s.runInputLoop(context.Background())
-		s.wg.Done()
-	}()
-	go func() {
-		s.runOutputLoop(context.Background())
-		s.wg.Done()
-	}()
-	return nil
-}
-
-func (t *TCPUnderlay) RunEventLoop(ctx context.Context) (err error) {
-	return t.runInputLoop(ctx)
-}
-
-func (t *TCPUnderlay) Close() error {
-	t.baseUnderlay.Close()
-	return t.conn.Close()
-}
-
-func (t *TCPUnderlay) String() string {
-	if t.conn == nil {
-		return "TCPUnderlay[]"
-	}
-	return fmt.Sprintf("TCPUnderlay[%v - %v]", t.conn.LocalAddr(), t.conn.RemoteAddr())
-}
-
-func (t *TCPUnderlay) Read(b []byte) (int, error) {
-	return 0, stderror.ErrUnsupported
-}
-
-func (t *TCPUnderlay) Write(b []byte) (int, error) {
-	return 0, stderror.ErrUnsupported
-}
-
 func (t *TCPUnderlay) LocalAddr() net.Addr {
 	return t.conn.LocalAddr()
 }
 
 func (t *TCPUnderlay) RemoteAddr() net.Addr {
 	return t.conn.RemoteAddr()
+}
+
+func (t *TCPUnderlay) AddSession(s *Session) error {
+	if err := t.baseUnderlay.AddSession(s); err != nil {
+		return err
+	}
+	s.conn = t // override base underlay
+	log.Debugf("Adding session %d to %v", s.id, t)
+
+	if s.isClient {
+		// Send the open session request.
+		seg := &segment{
+			metadata: &sessionStruct{
+				baseStruct: baseStruct{
+					protocol: openSessionRequest,
+					epoch:    0,
+				},
+				sessionID:  s.id,
+				statusCode: 0,
+				payloadLen: 0,
+			},
+		}
+		if err := t.writeOneSegment(seg); err != nil {
+			return fmt.Errorf("write openSessionRequest failed: %v", err)
+		}
+		// Wait for session to establish.
+		<-s.ready
+	}
+
+	s.wg.Add(2)
+	go func() {
+		if err := s.runInputLoop(context.Background()); err != nil {
+			log.Debugf("%v runInputLoop(): %v", s, err)
+		}
+		s.wg.Done()
+	}()
+	go func() {
+		if err := s.runOutputLoop(context.Background()); err != nil {
+			log.Debugf("%v runOutputLoop(): %v", s, err)
+		}
+		s.wg.Done()
+	}()
+	return nil
+}
+
+func (t *TCPUnderlay) RemoveSession(s *Session) error {
+	err := t.baseUnderlay.RemoveSession(s)
+	// TODO: add a delay before close the underlay.
+	if len(t.baseUnderlay.sessionMap) == 0 {
+		t.Close()
+	}
+	return err
+}
+
+func (t *TCPUnderlay) RunEventLoop(ctx context.Context) (err error) {
+	return t.runInputLoop(ctx)
 }
 
 func (t *TCPUnderlay) runInputLoop(ctx context.Context) (err error) {
@@ -155,6 +194,9 @@ func (t *TCPUnderlay) runInputLoop(ctx context.Context) (err error) {
 		seg, err := t.readOneSegment()
 		if err != nil {
 			return fmt.Errorf("readOneSegment() failed: %w", err)
+		}
+		if log.IsLevelEnabled(log.TraceLevel) {
+			log.Tracef("%v received one segment: protocol = %d, payload size = %d", t, seg.metadata.Protocol(), len(seg.payload))
 		}
 		if isSessionProtocol(seg.metadata.Protocol()) {
 			ss, _ := toSessionStruct(seg.metadata)
@@ -232,6 +274,10 @@ func (t *TCPUnderlay) onOpenSessionRequest(ss *sessionStruct) error {
 	if err := t.writeOneSegment(seg); err != nil {
 		return fmt.Errorf("write openSessionResponse failed: %v", err)
 	}
+
+	session.state = sessionEstablished
+	close(session.ready)
+	t.readySessions <- session
 	return nil
 }
 
@@ -248,6 +294,7 @@ func (t *TCPUnderlay) onOpenSessionResponse(ss *sessionStruct) error {
 		return fmt.Errorf("session ID %d is not found", sessionID)
 	}
 	session.state = sessionEstablished
+	close(session.ready)
 	return nil
 }
 
@@ -259,9 +306,9 @@ func (t *TCPUnderlay) onCloseSessionRequest(ss *sessionStruct) error {
 	if !found {
 		return fmt.Errorf("session ID %d is not found", sessionID)
 	}
-	session.state = sessionClosed
+	session.state = sessionClosing
 
-	// Send open session response.
+	// Send close session response.
 	seg := &segment{
 		metadata: &sessionStruct{
 			baseStruct: baseStruct{
@@ -276,8 +323,9 @@ func (t *TCPUnderlay) onCloseSessionRequest(ss *sessionStruct) error {
 	if err := t.writeOneSegment(seg); err != nil {
 		return fmt.Errorf("write closeSessionResponse failed: %v", err)
 	}
-	session.Close()
+	close(session.done)
 	session.wg.Wait()
+	t.RemoveSession(session)
 	return nil
 }
 
@@ -289,9 +337,9 @@ func (t *TCPUnderlay) onCloseSessionResponse(ss *sessionStruct) error {
 	if !found {
 		return fmt.Errorf("session ID %d is not found", sessionID)
 	}
-	session.state = sessionClosed
-	session.Close()
+	close(session.done)
 	session.wg.Wait()
+	t.RemoveSession(session)
 	return nil
 }
 
@@ -424,7 +472,7 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 		padding1 := newPadding(paddingLen1)
 		padding2 := newPadding(paddingLen2)
 
-		plaintextMetadata, err := ss.Marshal()
+		plaintextMetadata, err := das.Marshal()
 		if err != nil {
 			return fmt.Errorf("Marshal() failed: %w", err)
 		}

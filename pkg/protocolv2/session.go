@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/mathext"
 	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/stderror"
@@ -56,6 +57,7 @@ type Session struct {
 	isClient bool          // if this session is owned by client
 	mtu      int           // L2 maxinum transmission unit
 	state    sessionState  // session state
+	ready    chan struct{} // indicate the session is ready to use
 	done     chan struct{} // indicate the session is complete
 
 	sendQueue *segmentTree  // segments waiting to send
@@ -84,6 +86,7 @@ func NewSession(id uint32, isClient bool, mtu int) *Session {
 		isClient:  isClient,
 		mtu:       mtu,
 		state:     sessionInit,
+		ready:     make(chan struct{}),
 		done:      make(chan struct{}),
 		sendQueue: newSegmentTree(segmentTreeCapacity),
 		sendBuf:   newSegmentTree(segmentTreeCapacity),
@@ -93,11 +96,21 @@ func NewSession(id uint32, isClient bool, mtu int) *Session {
 	}
 }
 
+func (s *Session) String() string {
+	if s.conn == nil {
+		return fmt.Sprintf("Session{%d}", s.id)
+	}
+	return fmt.Sprintf("Session{%d - %v - %v}", s.id, s.LocalAddr(), s.RemoteAddr())
+}
+
 // Read lets a user to read data from receive queue.
 // The data boundary is preserved, i.e. no fragment read.
 func (s *Session) Read(b []byte) (n int, err error) {
 	s.rLock.Lock()
 	defer s.rLock.Unlock()
+	if log.IsLevelEnabled(log.TraceLevel) {
+		log.Tracef("%v trying to read %d bytes", s, len(b))
+	}
 
 	// There are some remaining data that application
 	// failed to read last time due to short buffer.
@@ -149,13 +162,26 @@ func (s *Session) Write(b []byte) (n int, err error) {
 	if len(b) > fragmentSize {
 		nFragment = (len(b)-1)/fragmentSize + 1
 	}
+	if log.IsLevelEnabled(log.TraceLevel) {
+		log.Tracef("%v writing %d bytes with %d fragments", s, len(b), nFragment)
+	}
 
 	ptr := b
 	for i := nFragment - 1; i >= 0; i-- {
+		var protocol uint8
+		if s.isClient {
+			protocol = dataClientToServer
+		} else {
+			protocol = dataServerToClient
+		}
 		partLen := mathext.Min(fragmentSize, len(ptr))
 		part := ptr[:partLen]
 		seg := &segment{
 			metadata: &dataAckStruct{
+				baseStruct: baseStruct{
+					protocol: protocol,
+					epoch:    0,
+				},
 				sessionID:  s.id,
 				seq:        s.nextSeq,
 				unAckSeq:   s.unackSeq,
@@ -173,13 +199,39 @@ func (s *Session) Write(b []byte) (n int, err error) {
 	return len(b), nil
 }
 
-// Close terminates the session at our end.
+// Close actively terminates the session. If the session is terminated by the
+// other party, underlay is responsible to terminate the session at our end.
 func (s *Session) Close() error {
+	select {
+	case <-s.done:
+		s.state = sessionClosed
+		return nil
+	default:
+	}
+
+	log.Debugf("Closing %v", s)
 	s.rLock.Lock()
 	s.wLock.Lock()
 	defer s.rLock.Unlock()
 	defer s.wLock.Unlock()
-	close(s.done)
+
+	s.state = sessionClosing
+	seg := &segment{
+		metadata: &sessionStruct{
+			baseStruct: baseStruct{
+				protocol: closeSessionRequest,
+				epoch:    0,
+			},
+			sessionID:  s.id,
+			statusCode: 0,
+			payloadLen: 0,
+		},
+	}
+	if err := s.output(seg); err != nil {
+		return err
+	}
+	<-s.done
+	s.state = sessionClosed
 	return nil
 }
 

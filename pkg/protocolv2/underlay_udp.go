@@ -38,9 +38,9 @@ var _ Underlay = &UDPUnderlay{}
 
 func (u *UDPUnderlay) String() string {
 	if u.conn == nil {
-		return "UDPUnderlay[]"
+		return "UDPUnderlay{}"
 	}
-	return fmt.Sprintf("UDPUnderlay[%v - %v]", u.conn.LocalAddr(), u.conn.RemoteAddr())
+	return fmt.Sprintf("UDPUnderlay{%v - %v}", u.conn.LocalAddr(), u.conn.RemoteAddr())
 }
 
 func (u *UDPUnderlay) MTU() int {

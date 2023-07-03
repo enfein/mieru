@@ -18,6 +18,7 @@ package protocolv2
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"sync"
 
@@ -31,9 +32,9 @@ type baseUnderlay struct {
 	mtu      int
 	done     chan struct{} // if the underlay is closed
 
-	// Map<sessionID, *Session>.
-	sessionMap  map[uint32]*Session
-	sessionLock sync.Mutex
+	sessionMap    map[uint32]*Session // Map<sessionID, *Session>
+	readySessions chan *Session       // sessions that completed handshake and ready for consume
+	sessionLock   sync.Mutex          // a lock required to operate sessionMap
 }
 
 var (
@@ -42,11 +43,35 @@ var (
 
 func newBaseUnderlay(isClient bool, mtu int) *baseUnderlay {
 	return &baseUnderlay{
-		isClient:   isClient,
-		mtu:        mtu,
-		done:       make(chan struct{}),
-		sessionMap: make(map[uint32]*Session),
+		isClient:      isClient,
+		mtu:           mtu,
+		done:          make(chan struct{}),
+		sessionMap:    make(map[uint32]*Session),
+		readySessions: make(chan *Session, 256),
 	}
+}
+
+func (b *baseUnderlay) Accept() (net.Conn, error) {
+	select {
+	case session := <-b.readySessions:
+		return session, nil
+	case <-b.done:
+		return nil, io.ErrClosedPipe
+	}
+}
+
+func (b *baseUnderlay) Close() error {
+	b.sessionLock.Lock()
+	defer b.sessionLock.Unlock()
+	for _, s := range b.sessionMap {
+		s.Close()
+	}
+	close(b.done)
+	return nil
+}
+
+func (b *baseUnderlay) Addr() net.Addr {
+	return netutil.NilNetAddr
 }
 
 func (b *baseUnderlay) MTU() int {
@@ -79,6 +104,12 @@ func (b *baseUnderlay) AddSession(s *Session) error {
 	if s.state >= sessionAttached {
 		return fmt.Errorf("session %d is already attached to a underlay", s.id)
 	}
+	if b.isClient && !s.isClient {
+		return fmt.Errorf("can't add a server session to a client underlay")
+	}
+	if !b.isClient && s.isClient {
+		return fmt.Errorf("can't add a client session to a server underlay")
+	}
 	b.sessionLock.Lock()
 	defer b.sessionLock.Unlock()
 	if s.id != 0 {
@@ -104,6 +135,7 @@ func (b *baseUnderlay) RemoveSession(s *Session) error {
 	defer b.sessionLock.Unlock()
 	delete(b.sessionMap, s.id)
 	s.conn = nil
+	s.state = sessionClosed
 	return nil
 }
 
@@ -111,12 +143,6 @@ func (b *baseUnderlay) RunEventLoop(ctx context.Context) error {
 	return stderror.ErrUnsupported
 }
 
-func (b *baseUnderlay) Close() error {
-	b.sessionLock.Lock()
-	defer b.sessionLock.Unlock()
-	for _, s := range b.sessionMap {
-		s.Close()
-	}
-	close(b.done)
-	return nil
+func (b *baseUnderlay) Done() chan struct{} {
+	return b.done
 }
