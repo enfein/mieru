@@ -270,12 +270,19 @@ func (m *Mux) DialContext(ctx context.Context) (net.Conn, error) {
 				return nil, fmt.Errorf("NewTCPUnderlay() failed: %v", err)
 			}
 			m.underlays = append(m.underlays, underlay)
+			UnderlayActiveOpens.Add(1)
+			currEst := UnderlayCurrEstablished.Add(1)
+			maxConn := UnderlayMaxConn.Load()
+			if currEst > maxConn {
+				UnderlayMaxConn.Store(currEst)
+			}
 			go func() {
 				err := underlay.RunEventLoop(ctx)
 				if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
 					log.Debugf("%v RunEventLoop(): %v", underlay, err)
 				}
 				underlay.Close()
+				UnderlayCurrEstablished.Add(-1)
 				// Dead underlay will be cleaned later.
 			}()
 		default:
@@ -310,6 +317,7 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 			m.chAcceptErr <- fmt.Errorf("net.ListenTCP() failed: %w", err)
 			return
 		}
+		log.Infof("Mux listening to endpoint %s %s", network, laddr)
 		for {
 			underlay, err := m.acceptUnderlay(rawListener, properties)
 			if err != nil {
@@ -317,17 +325,27 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 				return
 			}
 			log.Debugf("Created new server TCP underlay [%v - %v]", underlay.LocalAddr(), underlay.RemoteAddr())
+			UnderlayPassiveOpens.Add(1)
+			currEst := UnderlayCurrEstablished.Add(1)
+			maxConn := UnderlayMaxConn.Load()
+			if currEst > maxConn {
+				UnderlayMaxConn.Store(currEst)
+			}
 			go func() {
-				if err := underlay.RunEventLoop(context.Background()); err != nil {
+				err := underlay.RunEventLoop(context.Background())
+				if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
 					log.Debugf("%v RunEventLoop(): %v", underlay, err)
 				}
+				underlay.Close()
+				UnderlayCurrEstablished.Add(-1)
 			}()
 			go func() {
 				for {
 					conn, err := underlay.Accept()
 					if err != nil {
-						log.Debugf("%v Accept(): %v", underlay, err)
-						underlay.Close()
+						if !stderror.IsEOF(err) && !stderror.IsClosed(err) {
+							log.Debugf("%v Accept(): %v", underlay, err)
+						}
 						break
 					}
 					m.chAccept <- conn

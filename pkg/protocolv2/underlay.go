@@ -19,7 +19,15 @@ import (
 	"context"
 	"net"
 
+	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/netutil"
+)
+
+var (
+	UnderlayMaxConn         = metrics.RegisterMetric("underlay", "MaxConn")
+	UnderlayActiveOpens     = metrics.RegisterMetric("underlay", "ActiveOpens")
+	UnderlayPassiveOpens    = metrics.RegisterMetric("underlay", "PassiveOpens")
+	UnderlayCurrEstablished = metrics.RegisterMetric("underlay", "CurrEstablished")
 )
 
 // UnderlayProperties defines network properties of a underlay.

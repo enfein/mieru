@@ -16,6 +16,7 @@
 package protocolv2
 
 import (
+	"context"
 	"math/rand"
 	"reflect"
 	"sync"
@@ -85,10 +86,10 @@ func TestSegmentTree(t *testing.T) {
 	}
 	st := newSegmentTree(1)
 
-	if err := st.Insert(seg); err != nil {
-		t.Fatalf("ReplaceOrInsert() failed: %v", err)
+	if ok := st.Insert(seg); !ok {
+		t.Fatalf("ReplaceOrInsert() failed")
 	}
-	if err := st.Insert(seg); err == nil {
+	if ok := st.Insert(seg); ok {
 		t.Fatalf("ReplaceOrInsert() is not failing when tree is full")
 	}
 	minSeq, err := st.MinSeq()
@@ -112,9 +113,9 @@ func TestSegmentTree(t *testing.T) {
 		t.Fatalf("Remaining() = %d, want %d", st.Remaining(), 0)
 	}
 
-	seg2, err := st.DeleteMin()
-	if err != nil {
-		t.Fatalf("Remove() failed: %v", err)
+	seg2, ok := st.DeleteMin()
+	if !ok {
+		t.Fatalf("Remove() failed")
 	}
 	if !reflect.DeepEqual(seg, seg2) {
 		t.Fatalf("Segment not equal:\n%v\n%v", seg, seg2)
@@ -151,7 +152,7 @@ func TestSegmentTreeBlocking(t *testing.T) {
 			}
 			s := rand.Intn(10)
 			time.Sleep(time.Duration(s) * time.Millisecond)
-			st.InsertBlocking(seg)
+			st.InsertBlocking(context.Background(), seg)
 		}
 		wg.Done()
 	}()
@@ -162,7 +163,10 @@ func TestSegmentTreeBlocking(t *testing.T) {
 		for ; i < 100; i++ {
 			s := rand.Intn(10)
 			time.Sleep(time.Duration(s) * time.Millisecond)
-			seg := st.DeleteMinBlocking()
+			seg, ok := st.DeleteMinBlocking(context.Background())
+			if !ok {
+				t.Errorf("DeleteMinBlocking() failed")
+			}
 			seq, err := seg.Seq()
 			if err != nil {
 				t.Errorf("Seq() failed: %v", err)

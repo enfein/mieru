@@ -24,7 +24,6 @@ import (
 )
 
 const (
-
 	// Number of bytes used by metadata before encryption.
 	metadataLength = 32
 
@@ -39,6 +38,9 @@ const (
 	dataServerToClient   byte = 7
 	ackClientToServer    byte = 8
 	ackServerToClient    byte = 9
+
+	// Maximum protocol data unit that cat be attached to open session request and response.
+	maxSessionOpenPDU = 1024
 )
 
 // metadata defines the methods supported by all metadata.
@@ -65,7 +67,7 @@ var (
 // baseStruct is shared by all metadata struct.
 type baseStruct struct {
 	protocol  uint8  // byte 0: protocol type
-	epoch     uint8  // byte 1: epoch, it changes when the underlay address is changed
+	reserved  uint8  // byte 1: reserved
 	timestamp uint32 // byte 2 - 5: timestamp, number of minutes after UNIX epoch
 }
 
@@ -73,9 +75,10 @@ type baseStruct struct {
 type sessionStruct struct {
 	baseStruct
 	sessionID  uint32 // byte 6 - 9: session ID number
-	statusCode uint8  // byte 10: status of opening or closing session
-	payloadLen uint16 // byte 11 - 12: length of encapsulated payload, not including auth tag
-	suffixLen  uint8  // byte 13: length of suffix padding
+	seq        uint32 // byte 10 - 13: sequence number
+	statusCode uint8  // byte 14: status of opening or closing session
+	payloadLen uint16 // byte 15 - 16: length of encapsulated payload, not including auth tag
+	suffixLen  uint8  // byte 17: length of suffix padding
 }
 
 func (ss *sessionStruct) Protocol() byte {
@@ -85,13 +88,13 @@ func (ss *sessionStruct) Protocol() byte {
 func (ss *sessionStruct) Marshal() ([]byte, error) {
 	b := make([]byte, metadataLength)
 	b[0] = ss.baseStruct.protocol
-	b[1] = ss.baseStruct.epoch
 	ss.baseStruct.timestamp = uint32(time.Now().Unix() / 60)
 	binary.BigEndian.PutUint32(b[2:], ss.baseStruct.timestamp)
 	binary.BigEndian.PutUint32(b[6:], ss.sessionID)
-	b[10] = ss.statusCode
-	binary.BigEndian.PutUint16(b[11:], ss.payloadLen)
-	b[13] = ss.suffixLen
+	binary.BigEndian.PutUint32(b[10:], ss.seq)
+	b[14] = ss.statusCode
+	binary.BigEndian.PutUint16(b[15:], ss.payloadLen)
+	b[17] = ss.suffixLen
 	return b, nil
 }
 
@@ -108,20 +111,23 @@ func (ss *sessionStruct) Unmarshal(b []byte) error {
 	if !mathext.WithinRange(currentTimestamp, originalTimestamp, 1) {
 		return fmt.Errorf("invalid timestamp %d", originalTimestamp*60)
 	}
+	if ss.payloadLen > 1024 {
+		return fmt.Errorf("payload size %d exceed maximum value 1024", ss.payloadLen)
+	}
 
 	// Do unmarshal.
 	ss.baseStruct.protocol = b[0]
-	ss.baseStruct.epoch = b[1]
 	ss.baseStruct.timestamp = originalTimestamp
 	ss.sessionID = binary.BigEndian.Uint32(b[6:])
-	ss.statusCode = b[10]
-	ss.payloadLen = binary.BigEndian.Uint16(b[11:])
-	ss.suffixLen = b[13]
+	ss.seq = binary.BigEndian.Uint32(b[10:])
+	ss.statusCode = b[14]
+	ss.payloadLen = binary.BigEndian.Uint16(b[15:])
+	ss.suffixLen = b[17]
 	return nil
 }
 
 func (ss *sessionStruct) String() string {
-	return fmt.Sprintf("sessionStruct{protocol=%v, sessionID=%v, statusCode=%v, payloadLen=%v, suffixLen=%v}", ss.protocol, ss.sessionID, ss.statusCode, ss.payloadLen, ss.suffixLen)
+	return fmt.Sprintf("sessionStruct{protocol=%v, sessionID=%v, seq=%v, statusCode=%v, payloadLen=%v, suffixLen=%v}", ss.protocol, ss.sessionID, ss.seq, ss.statusCode, ss.payloadLen, ss.suffixLen)
 }
 
 func isSessionProtocol(p byte) bool {
@@ -155,7 +161,6 @@ func (das *dataAckStruct) Protocol() byte {
 func (das *dataAckStruct) Marshal() ([]byte, error) {
 	b := make([]byte, metadataLength)
 	b[0] = das.baseStruct.protocol
-	b[1] = das.baseStruct.epoch
 	das.baseStruct.timestamp = uint32(time.Now().Unix() / 60)
 	binary.BigEndian.PutUint32(b[2:], das.baseStruct.timestamp)
 	binary.BigEndian.PutUint32(b[6:], das.sessionID)
@@ -185,7 +190,6 @@ func (das *dataAckStruct) Unmarshal(b []byte) error {
 
 	// Do unmarshal.
 	das.baseStruct.protocol = b[0]
-	das.baseStruct.epoch = b[1]
 	das.baseStruct.timestamp = originalTimestamp
 	das.sessionID = binary.BigEndian.Uint32(b[6:])
 	das.seq = binary.BigEndian.Uint32(b[10:])

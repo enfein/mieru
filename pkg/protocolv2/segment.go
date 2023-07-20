@@ -16,13 +16,15 @@
 package protocolv2
 
 import (
+	"context"
 	"fmt"
-	"sync"
+	"time"
 
 	"github.com/enfein/mieru/pkg/mathext"
 	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/stderror"
 	"github.com/google/btree"
+	"golang.org/x/sync/semaphore"
 )
 
 const (
@@ -53,8 +55,11 @@ func MaxFragmentSize(mtu int, ipVersion netutil.IPVersion, transport netutil.Tra
 
 // segment contains metadata and actual payload.
 type segment struct {
-	metadata metadata
-	payload  []byte // also can be a fragment
+	metadata  metadata
+	payload   []byte // also can be a fragment
+	txTime    time.Time
+	txTimeout time.Duration // need to receive ACK within this duration
+	acked     bool
 }
 
 // Protocol returns the protocol of the segment.
@@ -62,20 +67,24 @@ func (s *segment) Protocol() byte {
 	return s.metadata.Protocol()
 }
 
-// Seq returns the sequence number of the segment, if possible.
+// Seq returns the sequence number of the segment.
 func (s *segment) Seq() (uint32, error) {
 	das, ok := s.metadata.(*dataAckStruct)
-	if !ok {
-		return 0, stderror.ErrUnsupported
+	if ok {
+		return das.seq, nil
 	}
-	return das.seq, nil
+	ss, ok := s.metadata.(*sessionStruct)
+	if ok {
+		return ss.seq, nil
+	}
+	return 0, stderror.ErrUnsupported
 }
 
-// Fragment returns the fragment number of the segment, if possible.
+// Fragment returns the fragment number of the segment.
 func (s *segment) Fragment() (uint8, error) {
 	das, ok := s.metadata.(*dataAckStruct)
 	if !ok {
-		return 0, stderror.ErrUnsupported
+		return 0, nil
 	}
 	return das.fragment, nil
 }
@@ -105,73 +114,66 @@ func segmentLessFunc(a, b *segment) bool {
 type segmentTree struct {
 	tr    *btree.BTreeG[*segment]
 	cap   int
-	mu    sync.Mutex
-	full  sync.Cond
-	empty sync.Cond
+	full  *semaphore.Weighted
+	empty *semaphore.Weighted
 }
 
 func newSegmentTree(capacity int) *segmentTree {
 	if capacity <= 0 {
-		panic("SegmentTree capacity is <= 0")
+		panic("segment tree capacity is <= 0")
 	}
 	st := &segmentTree{
 		tr:  btree.NewG(4, segmentLessFunc),
 		cap: capacity,
 	}
-	st.full = *sync.NewCond(&st.mu)
-	st.empty = *sync.NewCond(&st.mu)
+	st.full = semaphore.NewWeighted(int64(capacity))
+	st.empty = semaphore.NewWeighted(int64(capacity))
+	if err := st.empty.Acquire(context.Background(), int64(capacity)); err != nil {
+		panic(fmt.Sprintf("Failed to initialize segment tree semaphore: %v", err))
+	}
 	return st
 }
 
 // Insert adds a new segment to the tree.
-func (t *segmentTree) Insert(seg *segment) error {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	if t.tr.Len() >= t.cap {
-		return stderror.ErrFull
+// It returns true if insert is successful.
+func (t *segmentTree) Insert(seg *segment) (ok bool) {
+	if t.full.TryAcquire(1) {
+		t.tr.ReplaceOrInsert(seg)
+		t.empty.Release(1)
+		return true
 	}
-	t.tr.ReplaceOrInsert(seg)
-	t.empty.Broadcast()
-	return nil
+	return false
 }
 
 // InsertBlocking is same as Insert, but blocks when the tree is full.
-func (t *segmentTree) InsertBlocking(seg *segment) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	for t.tr.Len() >= t.cap {
-		t.full.Wait()
+func (t *segmentTree) InsertBlocking(ctx context.Context, seg *segment) (ok bool) {
+	if err := t.full.Acquire(ctx, 1); err != nil {
+		return false
 	}
 	t.tr.ReplaceOrInsert(seg)
-	t.empty.Broadcast()
+	t.empty.Release(1)
+	return true
 }
 
 // DeleteMin removes the smallest item from the tree.
-func (t *segmentTree) DeleteMin() (*segment, error) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	if t.tr.Len() == 0 {
-		return nil, stderror.ErrEmpty
+// It returns true if delete is successful.
+func (t *segmentTree) DeleteMin() (*segment, bool) {
+	if t.empty.TryAcquire(1) {
+		seg, _ := t.tr.DeleteMin()
+		t.full.Release(1)
+		return seg, true
 	}
-	seg, _ := t.tr.DeleteMin()
-	t.full.Broadcast()
-	return seg, nil
+	return nil, false
 }
 
 // DeleteMinBlocking is the same as DeleteMin, but blocks when the tree is empty.
-func (t *segmentTree) DeleteMinBlocking() *segment {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	for t.tr.Len() == 0 {
-		t.empty.Wait()
+func (t *segmentTree) DeleteMinBlocking(ctx context.Context) (*segment, bool) {
+	if err := t.empty.Acquire(ctx, 1); err != nil {
+		return nil, false
 	}
 	seg, _ := t.tr.DeleteMin()
-	t.full.Broadcast()
-	return seg
+	t.full.Release(1)
+	return seg, true
 }
 
 // MinSeq return the minimum sequence number in the SegmentTree.

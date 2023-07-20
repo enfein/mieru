@@ -22,6 +22,7 @@ import (
 	"net"
 	"sync"
 
+	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/stderror"
 )
@@ -110,6 +111,7 @@ func (b *baseUnderlay) AddSession(s *Session) error {
 	if !b.isClient && s.isClient {
 		return fmt.Errorf("can't add a client session to a server underlay")
 	}
+
 	b.sessionLock.Lock()
 	defer b.sessionLock.Unlock()
 	if s.id != 0 {
@@ -120,7 +122,18 @@ func (b *baseUnderlay) AddSession(s *Session) error {
 		b.sessionMap[s.id] = s
 	}
 	s.conn = b
-	s.state = sessionAttached
+	s.forwardStateTo(sessionAttached)
+
+	if s.isClient {
+		metrics.ActiveOpens.Add(1)
+	} else {
+		metrics.PassiveOpens.Add(1)
+	}
+	currEst := metrics.CurrEstablished.Add(1)
+	maxConn := metrics.MaxConn.Load()
+	if currEst > maxConn {
+		metrics.MaxConn.Store(currEst)
+	}
 	return nil
 }
 
@@ -131,11 +144,13 @@ func (b *baseUnderlay) RemoveSession(s *Session) error {
 	if s.state < sessionAttached {
 		return fmt.Errorf("session %d is not attached to this underlay", s.id)
 	}
+
 	b.sessionLock.Lock()
 	defer b.sessionLock.Unlock()
 	delete(b.sessionMap, s.id)
 	s.conn = nil
-	s.state = sessionClosed
+	s.forwardStateTo(sessionClosed)
+	metrics.CurrEstablished.Add(-1)
 	return nil
 }
 

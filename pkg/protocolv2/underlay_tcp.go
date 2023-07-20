@@ -21,10 +21,12 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/netutil"
+	"github.com/enfein/mieru/pkg/replay"
 	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/stderror"
 )
@@ -47,6 +49,8 @@ type TCPUnderlay struct {
 
 var _ Underlay = &TCPUnderlay{}
 
+var tcpReplayCache = replay.NewCache(16*1024*1024, 2*time.Minute)
+
 // NewTCPUnderlay connects to the remote address "raddr" on the network "tcp"
 // with packet encryption. If "laddr" is empty, an automatic address is used.
 // "block" is the block encryption algorithm to encrypt packets.
@@ -54,10 +58,10 @@ func NewTCPUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, 
 	switch network {
 	case "tcp", "tcp4", "tcp6":
 	default:
-		return nil, fmt.Errorf("network %s not supported", network)
+		return nil, fmt.Errorf("network %s is not supported for TCP underlay", network)
 	}
 	if block.IsStateless() {
-		return nil, fmt.Errorf("block cipher should not be stateless")
+		return nil, fmt.Errorf("TCP block cipher must not be stateless")
 	}
 	dialer := net.Dialer{}
 	if laddr != "" {
@@ -127,27 +131,8 @@ func (t *TCPUnderlay) AddSession(s *Session) error {
 		return err
 	}
 	s.conn = t // override base underlay
+	close(s.ready)
 	log.Debugf("Adding session %d to %v", s.id, t)
-
-	if s.isClient {
-		// Send the open session request.
-		seg := &segment{
-			metadata: &sessionStruct{
-				baseStruct: baseStruct{
-					protocol: openSessionRequest,
-					epoch:    0,
-				},
-				sessionID:  s.id,
-				statusCode: 0,
-				payloadLen: 0,
-			},
-		}
-		if err := t.writeOneSegment(seg); err != nil {
-			return fmt.Errorf("write openSessionRequest failed: %v", err)
-		}
-		// Wait for session to establish.
-		<-s.ready
-	}
 
 	s.wg.Add(2)
 	go func() {
@@ -167,7 +152,6 @@ func (t *TCPUnderlay) AddSession(s *Session) error {
 
 func (t *TCPUnderlay) RemoveSession(s *Session) error {
 	err := t.baseUnderlay.RemoveSession(s)
-	// TODO: add a delay before close the underlay.
 	if len(t.baseUnderlay.sessionMap) == 0 {
 		t.Close()
 	}
@@ -199,23 +183,18 @@ func (t *TCPUnderlay) runInputLoop(ctx context.Context) (err error) {
 			log.Tracef("%v received one segment: protocol = %d, payload size = %d", t, seg.metadata.Protocol(), len(seg.payload))
 		}
 		if isSessionProtocol(seg.metadata.Protocol()) {
-			ss, _ := toSessionStruct(seg.metadata)
 			switch seg.Protocol() {
 			case openSessionRequest:
-				if err := t.onOpenSessionRequest(ss); err != nil {
+				if err := t.onOpenSessionRequest(seg); err != nil {
 					return fmt.Errorf("onOpenSessionRequest() failed: %v", err)
 				}
 			case openSessionResponse:
-				if err := t.onOpenSessionResponse(ss); err != nil {
+				if err := t.onOpenSessionResponse(seg); err != nil {
 					return fmt.Errorf("onOpenSessionResponse() failed: %v", err)
 				}
-			case closeSessionRequest:
-				if err := t.onCloseSessionRequest(ss); err != nil {
-					return fmt.Errorf("onCloseSessionRequest() failed: %v", err)
-				}
-			case closeSessionResponse:
-				if err := t.onCloseSessionResponse(ss); err != nil {
-					return fmt.Errorf("onCloseSessionResponse() failed: %v", err)
+			case closeSessionRequest, closeSessionResponse:
+				if err := t.onCloseSession(seg); err != nil {
+					return fmt.Errorf("onCloseSession() failed: %v", err)
 				}
 			case closeConnRequest:
 				// Ignore. Expect to close TCP connection directly.
@@ -238,13 +217,13 @@ func (t *TCPUnderlay) runInputLoop(ctx context.Context) (err error) {
 	}
 }
 
-func (t *TCPUnderlay) onOpenSessionRequest(ss *sessionStruct) error {
+func (t *TCPUnderlay) onOpenSessionRequest(seg *segment) error {
 	if t.isClient {
 		return stderror.ErrInvalidOperation
 	}
 
 	// Create a new session.
-	sessionID := ss.sessionID
+	sessionID := seg.metadata.(*sessionStruct).sessionID
 	if sessionID == 0 {
 		// 0 is reserved and can't be used.
 		return fmt.Errorf("reserved session ID %d is used", sessionID)
@@ -257,48 +236,29 @@ func (t *TCPUnderlay) onOpenSessionRequest(ss *sessionStruct) error {
 	}
 	session := NewSession(sessionID, t.isClient, t.MTU())
 	t.AddSession(session)
-	session.state = sessionOpening
-
-	// Send open session response.
-	seg := &segment{
-		metadata: &sessionStruct{
-			baseStruct: baseStruct{
-				protocol: openSessionResponse,
-				epoch:    ss.epoch,
-			},
-			sessionID:  ss.sessionID,
-			statusCode: 0,
-			payloadLen: 0,
-		},
-	}
-	if err := t.writeOneSegment(seg); err != nil {
-		return fmt.Errorf("write openSessionResponse failed: %v", err)
-	}
-
-	session.state = sessionEstablished
-	close(session.ready)
+	session.recvChan <- seg
 	t.readySessions <- session
 	return nil
 }
 
-func (t *TCPUnderlay) onOpenSessionResponse(ss *sessionStruct) error {
+func (t *TCPUnderlay) onOpenSessionResponse(seg *segment) error {
 	if !t.isClient {
 		return stderror.ErrInvalidOperation
 	}
 
-	sessionID := ss.sessionID
+	sessionID := seg.metadata.(*sessionStruct).sessionID
 	t.sessionLock.Lock()
 	session, found := t.sessionMap[sessionID]
 	t.sessionLock.Unlock()
 	if !found {
 		return fmt.Errorf("session ID %d is not found", sessionID)
 	}
-	session.state = sessionEstablished
-	close(session.ready)
+	session.recvChan <- seg
 	return nil
 }
 
-func (t *TCPUnderlay) onCloseSessionRequest(ss *sessionStruct) error {
+func (t *TCPUnderlay) onCloseSession(seg *segment) error {
+	ss := seg.metadata.(*sessionStruct)
 	sessionID := ss.sessionID
 	t.sessionLock.Lock()
 	session, found := t.sessionMap[sessionID]
@@ -306,55 +266,34 @@ func (t *TCPUnderlay) onCloseSessionRequest(ss *sessionStruct) error {
 	if !found {
 		return fmt.Errorf("session ID %d is not found", sessionID)
 	}
-	session.state = sessionClosing
-
-	// Send close session response.
-	seg := &segment{
-		metadata: &sessionStruct{
-			baseStruct: baseStruct{
-				protocol: closeSessionResponse,
-				epoch:    ss.epoch,
-			},
-			sessionID:  ss.sessionID,
-			statusCode: 0,
-			payloadLen: 0,
-		},
-	}
-	if err := t.writeOneSegment(seg); err != nil {
-		return fmt.Errorf("write closeSessionResponse failed: %v", err)
-	}
-	close(session.done)
-	session.wg.Wait()
-	t.RemoveSession(session)
-	return nil
-}
-
-func (t *TCPUnderlay) onCloseSessionResponse(ss *sessionStruct) error {
-	sessionID := ss.sessionID
-	t.sessionLock.Lock()
-	session, found := t.sessionMap[sessionID]
-	t.sessionLock.Unlock()
-	if !found {
-		return fmt.Errorf("session ID %d is not found", sessionID)
-	}
-	close(session.done)
+	session.recvChan <- seg
 	session.wg.Wait()
 	t.RemoveSession(session)
 	return nil
 }
 
 func (t *TCPUnderlay) readOneSegment() (*segment, error) {
+	var firstRead bool
 	var err error
 
 	// Read encrypted metadata.
 	readLen := metadataLength + cipher.DefaultOverhead
 	if t.recv == nil {
 		// In the first Read, also include nonce.
+		firstRead = true
 		readLen += cipher.DefaultNonceSize
 	}
 	encryptedMeta := make([]byte, readLen)
 	if _, err := io.ReadFull(t.conn, encryptedMeta); err != nil {
 		return nil, fmt.Errorf("metadata: read %d bytes from TCPUnderlay failed: %w", readLen, err)
+	}
+	if tcpReplayCache.IsDuplicate(encryptedMeta[:cipher.DefaultOverhead], replay.EmptyTag) {
+		if firstRead {
+			replay.NewSession.Add(1)
+			return nil, fmt.Errorf("found possible replay attack in %v", t)
+		} else {
+			replay.KnownSession.Add(1)
+		}
 	}
 
 	// Decrypt metadata.
@@ -399,13 +338,31 @@ func (t *TCPUnderlay) readOneSegment() (*segment, error) {
 }
 
 func (t *TCPUnderlay) readSessionSegment(ss *sessionStruct) (*segment, error) {
+	var decryptedPayload []byte
+	var err error
+	if ss.payloadLen > 0 {
+		encryptedPayload := make([]byte, ss.payloadLen+cipher.DefaultOverhead)
+		if _, err := io.ReadFull(t.conn, encryptedPayload); err != nil {
+			return nil, fmt.Errorf("payload: read %d bytes from TCPUnderlay failed: %w", ss.payloadLen+cipher.DefaultOverhead, err)
+		}
+		if tcpReplayCache.IsDuplicate(encryptedPayload[:cipher.DefaultOverhead], replay.EmptyTag) {
+			replay.KnownSession.Add(1)
+		}
+		decryptedPayload, err = t.recv.Decrypt(encryptedPayload)
+		if err != nil {
+			return nil, fmt.Errorf("Decrypt() failed: %w", err)
+		}
+	}
 	if ss.suffixLen > 0 {
 		padding := make([]byte, ss.suffixLen)
 		if _, err := io.ReadFull(t.conn, padding); err != nil {
 			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", ss.suffixLen, err)
 		}
 	}
-	return &segment{metadata: ss}, nil
+	return &segment{
+		metadata: ss,
+		payload:  decryptedPayload,
+	}, nil
 }
 
 func (t *TCPUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error) {
@@ -420,6 +377,9 @@ func (t *TCPUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error) {
 	if _, err := io.ReadFull(t.conn, encryptedPayload); err != nil {
 		return nil, fmt.Errorf("payload: read %d bytes from TCPUnderlay failed: %w", das.payloadLen+cipher.DefaultOverhead, err)
 	}
+	if tcpReplayCache.IsDuplicate(encryptedPayload[:cipher.DefaultOverhead], replay.EmptyTag) {
+		replay.KnownSession.Add(1)
+	}
 	decryptedPayload, err := t.recv.Decrypt(encryptedPayload)
 	if err != nil {
 		return nil, fmt.Errorf("Decrypt() failed: %w", err)
@@ -432,7 +392,10 @@ func (t *TCPUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error) {
 		}
 	}
 
-	return &segment{metadata: das, payload: decryptedPayload}, nil
+	return &segment{
+		metadata: das,
+		payload:  decryptedPayload,
+	}, nil
 }
 
 func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
@@ -459,8 +422,15 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 		if err != nil {
 			return fmt.Errorf("Encrypt() failed: %w", err)
 		}
-
-		dataToSend := append(encryptedMetadata, padding...)
+		dataToSend := encryptedMetadata
+		if len(seg.payload) > 0 {
+			encryptedPayload, err := t.send.Encrypt(seg.payload)
+			if err != nil {
+				return fmt.Errorf("Encrypt() failed: %w", err)
+			}
+			dataToSend = append(dataToSend, encryptedPayload...)
+		}
+		dataToSend = append(dataToSend, padding...)
 		if _, err := t.conn.Write(dataToSend); err != nil {
 			return fmt.Errorf("Write() failed: %w", err)
 		}
@@ -487,7 +457,6 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 		if err != nil {
 			return fmt.Errorf("Encrypt() failed: %w", err)
 		}
-
 		dataToSend := append(encryptedMetadata, padding1...)
 		dataToSend = append(dataToSend, encryptedPayload...)
 		dataToSend = append(dataToSend, padding2...)

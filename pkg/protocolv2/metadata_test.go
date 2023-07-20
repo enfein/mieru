@@ -25,10 +25,10 @@ func TestCloseSessionStruct(t *testing.T) {
 	s := &sessionStruct{
 		baseStruct: baseStruct{
 			protocol: closeSessionRequest,
-			epoch:    uint8(mrand.Uint32()),
 		},
 		sessionID:  mrand.Uint32(),
 		statusCode: uint8(mrand.Uint32()),
+		seq:        mrand.Uint32(),
 		payloadLen: uint16(mrand.Uint32()),
 		suffixLen:  uint8(mrand.Uint32()),
 	}
@@ -49,7 +49,6 @@ func TestDataAckStruct(t *testing.T) {
 	s := &dataAckStruct{
 		baseStruct: baseStruct{
 			protocol: dataServerToClient,
-			epoch:    uint8(mrand.Uint32()),
 		},
 		sessionID:  mrand.Uint32(),
 		seq:        mrand.Uint32(),

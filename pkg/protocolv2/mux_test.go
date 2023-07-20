@@ -20,13 +20,14 @@ import (
 	"context"
 	"io"
 	mrand "math/rand"
-	"net"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
+	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/testtool"
@@ -40,17 +41,60 @@ var users = map[string]*appctlpb.User{
 	},
 }
 
-func TestSingleIPv4TCPUnderlay(t *testing.T) {
+func runClient(t *testing.T, properties UnderlayProperties, username, password []byte, concurrent int) {
+	clientMux := NewMux(true).
+		SetClientPassword(cipher.HashPassword(password, username)).
+		SetClientMultiplexFactor(2).
+		SetEndpoints([]UnderlayProperties{properties})
+
+	dialCtx, cancelFunc := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelFunc()
+
+	var wg sync.WaitGroup
+	for i := 0; i < concurrent; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			conn, err := clientMux.DialContext(dialCtx)
+			if err != nil {
+				t.Errorf("DialContext() failed: %v", err)
+				return
+			}
+			defer conn.Close()
+			for i := 0; i < 100; i++ {
+				payloadSize := mrand.Intn(MaxPDU) + 1
+				payload := testtool.TestHelperGenRot13Input(payloadSize)
+				if _, err := conn.Write(payload); err != nil {
+					t.Errorf("Write() failed: %v", err)
+				}
+				resp := make([]byte, payloadSize)
+				if _, err := io.ReadFull(conn, resp); err != nil {
+					t.Errorf("io.ReadFull() failed: %v", err)
+				}
+				rot13, err := testtool.TestHelperRot13(resp)
+				if err != nil {
+					t.Errorf("TestHelperRot13() failed: %v", err)
+				}
+				if !bytes.Equal(payload, rot13) {
+					t.Errorf("Received unexpected response")
+				}
+			}
+		}()
+	}
+	wg.Wait()
+
+	if err := clientMux.Close(); err != nil {
+		t.Errorf("Close client mux failed: %v", err)
+	}
+}
+
+func TestIPv4TCPUnderlay(t *testing.T) {
 	rng.InitSeed()
+	log.SetOutputToTest(t)
+	log.SetLevel("DEBUG")
 	port, err := netutil.UnusedTCPPort()
 	if err != nil {
 		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
-	}
-	clientDescriptor := underlayDescriptor{
-		mtu:               1500,
-		ipVersion:         netutil.IPVersion4,
-		transportProtocol: netutil.TCPTransport,
-		remoteAddr:        netutil.NetAddr{Net: "tcp", Str: "127.0.0.1:" + strconv.Itoa(port)},
 	}
 	serverDescriptor := underlayDescriptor{
 		mtu:               1500,
@@ -58,10 +102,6 @@ func TestSingleIPv4TCPUnderlay(t *testing.T) {
 		transportProtocol: netutil.TCPTransport,
 		localAddr:         netutil.NetAddr{Net: "tcp", Str: "127.0.0.1:" + strconv.Itoa(port)},
 	}
-	clientMux := NewMux(true).
-		SetClientPassword(cipher.HashPassword([]byte("kuiranbudong"), []byte("xiaochitang"))).
-		SetClientMultiplexFactor(1).
-		SetEndpoints([]UnderlayProperties{clientDescriptor})
 	serverMux := NewMux(false).
 		SetServerUsers(users).
 		SetServerHandler(testtool.TestHelperConnHandler{}).
@@ -74,38 +114,51 @@ func TestSingleIPv4TCPUnderlay(t *testing.T) {
 	}()
 	time.Sleep(1 * time.Second)
 
-	dialCtx, cancelFunc := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancelFunc()
-	var conn net.Conn
-	if conn, err = clientMux.DialContext(dialCtx); err != nil {
-		t.Errorf("DialContext() failed: %v", err)
+	clientDescriptor := underlayDescriptor{
+		mtu:               1500,
+		ipVersion:         netutil.IPVersion4,
+		transportProtocol: netutil.TCPTransport,
+		remoteAddr:        netutil.NetAddr{Net: "tcp", Str: "127.0.0.1:" + strconv.Itoa(port)},
 	}
+	runClient(t, clientDescriptor, []byte("xiaochitang"), []byte("kuiranbudong"), 4)
+	if err := serverMux.Close(); err != nil {
+		t.Errorf("Server mux close failed: %v", err)
+	}
+}
 
-	for i := 0; i < 100; i++ {
-		payloadSize := mrand.Intn(MaxPDU) + 1
-		payload := testtool.TestHelperGenRot13Input(payloadSize)
-		if _, err := conn.Write(payload); err != nil {
-			t.Errorf("Write() failed: %v", err)
-		}
-		resp := make([]byte, payloadSize)
-		if _, err := io.ReadFull(conn, resp); err != nil {
-			t.Errorf("io.ReadFull() failed: %v", err)
-		}
-		rot13, err := testtool.TestHelperRot13(resp)
-		if err != nil {
-			t.Errorf("TestHelperRot13() failed: %v", err)
-		}
-		if !bytes.Equal(payload, rot13) {
-			t.Errorf("Received unexpected response")
-		}
+func TestIPv6TCPUnderlay(t *testing.T) {
+	rng.InitSeed()
+	log.SetOutputToTest(t)
+	log.SetLevel("DEBUG")
+	port, err := netutil.UnusedTCPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
 	}
+	serverDescriptor := underlayDescriptor{
+		mtu:               1500,
+		ipVersion:         netutil.IPVersion4,
+		transportProtocol: netutil.TCPTransport,
+		localAddr:         netutil.NetAddr{Net: "tcp", Str: "[::1]:" + strconv.Itoa(port)},
+	}
+	serverMux := NewMux(false).
+		SetServerUsers(users).
+		SetServerHandler(testtool.TestHelperConnHandler{}).
+		SetEndpoints([]UnderlayProperties{serverDescriptor})
 
-	if err := conn.Close(); err != nil {
-		t.Errorf("Connection close failed: %v", err)
+	go func() {
+		if err := serverMux.ListenAndServeAll(); err != nil {
+			t.Errorf("[%s] ListenAndServeAll() failed: %v", time.Now().Format(testtool.TimeLayout), err)
+		}
+	}()
+	time.Sleep(1 * time.Second)
+
+	clientDescriptor := underlayDescriptor{
+		mtu:               1500,
+		ipVersion:         netutil.IPVersion4,
+		transportProtocol: netutil.TCPTransport,
+		remoteAddr:        netutil.NetAddr{Net: "tcp", Str: "[::1]:" + strconv.Itoa(port)},
 	}
-	if err := clientMux.Close(); err != nil {
-		t.Errorf("Client mux close failed: %v", err)
-	}
+	runClient(t, clientDescriptor, []byte("xiaochitang"), []byte("kuiranbudong"), 4)
 	if err := serverMux.Close(); err != nil {
 		t.Errorf("Server mux close failed: %v", err)
 	}

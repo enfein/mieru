@@ -40,7 +40,7 @@ func EnableLogging() {
 	defer mutex.Unlock()
 	if ticker == nil {
 		ticker = time.NewTicker(logDuration)
-		go logMetrics()
+		go logMetricsLoop()
 		log.Infof("enabled metrics logging with duration %v", logDuration)
 	}
 }
@@ -68,23 +68,29 @@ func SetLoggingDuration(duration time.Duration) error {
 	return nil
 }
 
-func logMetrics() {
+// LogMetricsNow writes the current metrics to log.
+// This function can be called when (periodic) logging is disabled.
+func LogMetricsNow() {
+	log.Infof("[metrics]")
+	list := MetricGroupList{}
+	metricMap.Range(func(k, v any) bool {
+		group := v.(*MetricGroup)
+		if group.IsLoggingEnabled() {
+			list = list.Append(group)
+		}
+		return true
+	})
+	sort.Sort(list)
+	for _, group := range list {
+		log.WithFields(group.NewLogFields()).Infof(group.NewLogMsg())
+	}
+}
+
+func logMetricsLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			log.Infof("[metrics]")
-			list := MetricGroupList{}
-			metricMap.Range(func(k, v any) bool {
-				group := v.(*MetricGroup)
-				if group.IsLoggingEnabled() {
-					list = list.Append(group)
-				}
-				return true
-			})
-			sort.Sort(list)
-			for _, group := range list {
-				log.WithFields(group.NewLogFields()).Infof(group.NewLogMsg())
-			}
+			LogMetricsNow()
 		case <-done:
 			return
 		}
