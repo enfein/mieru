@@ -1,0 +1,34 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+STOP=01
+
+MIERU_BIN="/usr/bin/mieru"
+MIERU_CONFIG="/etc/mieru_client_config.json"
+PID_FILE="/var/run/mieru.pid"
+
+start() {
+    echo "Starting mieru client..."
+    export MIERU_CONFIG_JSON_FILE=$MIERU_CONFIG
+    start-stop-daemon -S -b -m -p "$PID_FILE" -x "$MIERU_BIN" -- run
+    RC=$?
+    if [ $RC -eq 0 ]; then
+        echo "mieru client is started"
+        exit 0
+    else
+        echo "failed to start mieru client"
+        exit $RC
+    fi
+}
+
+stop() {
+    echo "Stopping mieru client..."
+    start-stop-daemon -K -p "$PID_FILE"
+    RC=$?
+    if [ $RC -eq 0 ]; then
+        echo "mieru client is stopped"
+        rm -f "$PID_FILE"
+    else
+        echo "failed to stop mieru client"
+    fi
+}

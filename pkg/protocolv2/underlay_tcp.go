@@ -158,11 +158,7 @@ func (t *TCPUnderlay) RemoveSession(s *Session) error {
 	return err
 }
 
-func (t *TCPUnderlay) RunEventLoop(ctx context.Context) (err error) {
-	return t.runInputLoop(ctx)
-}
-
-func (t *TCPUnderlay) runInputLoop(ctx context.Context) (err error) {
+func (t *TCPUnderlay) RunEventLoop(ctx context.Context) error {
 	if t.conn == nil {
 		return stderror.ErrNullPointer
 	}
@@ -340,6 +336,7 @@ func (t *TCPUnderlay) readOneSegment() (*segment, error) {
 func (t *TCPUnderlay) readSessionSegment(ss *sessionStruct) (*segment, error) {
 	var decryptedPayload []byte
 	var err error
+
 	if ss.payloadLen > 0 {
 		encryptedPayload := make([]byte, ss.payloadLen+cipher.DefaultOverhead)
 		if _, err := io.ReadFull(t.conn, encryptedPayload); err != nil {
@@ -359,6 +356,7 @@ func (t *TCPUnderlay) readSessionSegment(ss *sessionStruct) (*segment, error) {
 			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", ss.suffixLen, err)
 		}
 	}
+
 	return &segment{
 		metadata: ss,
 		payload:  decryptedPayload,
@@ -366,25 +364,28 @@ func (t *TCPUnderlay) readSessionSegment(ss *sessionStruct) (*segment, error) {
 }
 
 func (t *TCPUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error) {
+	var decryptedPayload []byte
+	var err error
+
 	if das.prefixLen > 0 {
 		padding1 := make([]byte, das.prefixLen)
 		if _, err := io.ReadFull(t.conn, padding1); err != nil {
 			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", das.prefixLen, err)
 		}
 	}
-
-	encryptedPayload := make([]byte, das.payloadLen+cipher.DefaultOverhead)
-	if _, err := io.ReadFull(t.conn, encryptedPayload); err != nil {
-		return nil, fmt.Errorf("payload: read %d bytes from TCPUnderlay failed: %w", das.payloadLen+cipher.DefaultOverhead, err)
+	if das.payloadLen > 0 {
+		encryptedPayload := make([]byte, das.payloadLen+cipher.DefaultOverhead)
+		if _, err := io.ReadFull(t.conn, encryptedPayload); err != nil {
+			return nil, fmt.Errorf("payload: read %d bytes from TCPUnderlay failed: %w", das.payloadLen+cipher.DefaultOverhead, err)
+		}
+		if tcpReplayCache.IsDuplicate(encryptedPayload[:cipher.DefaultOverhead], replay.EmptyTag) {
+			replay.KnownSession.Add(1)
+		}
+		decryptedPayload, err = t.recv.Decrypt(encryptedPayload)
+		if err != nil {
+			return nil, fmt.Errorf("Decrypt() failed: %w", err)
+		}
 	}
-	if tcpReplayCache.IsDuplicate(encryptedPayload[:cipher.DefaultOverhead], replay.EmptyTag) {
-		replay.KnownSession.Add(1)
-	}
-	decryptedPayload, err := t.recv.Decrypt(encryptedPayload)
-	if err != nil {
-		return nil, fmt.Errorf("Decrypt() failed: %w", err)
-	}
-
 	if das.suffixLen > 0 {
 		padding2 := make([]byte, das.suffixLen)
 		if _, err := io.ReadFull(t.conn, padding2); err != nil {
@@ -411,10 +412,7 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 		ss.suffixLen = uint8(suffixLen)
 		padding := newPadding(suffixLen)
 
-		plaintextMetadata, err := ss.Marshal()
-		if err != nil {
-			return fmt.Errorf("Marshal() failed: %w", err)
-		}
+		plaintextMetadata := ss.Marshal()
 		if err := t.maybeInitSendBlockCipher(); err != nil {
 			return fmt.Errorf("maybeInitSendBlockCipher() failed: %w", err)
 		}
@@ -442,10 +440,7 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 		padding1 := newPadding(paddingLen1)
 		padding2 := newPadding(paddingLen2)
 
-		plaintextMetadata, err := das.Marshal()
-		if err != nil {
-			return fmt.Errorf("Marshal() failed: %w", err)
-		}
+		plaintextMetadata := das.Marshal()
 		if err := t.maybeInitSendBlockCipher(); err != nil {
 			return fmt.Errorf("maybeInitSendBlockCipher() failed: %w", err)
 		}
@@ -453,12 +448,14 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 		if err != nil {
 			return fmt.Errorf("Encrypt() failed: %w", err)
 		}
-		encryptedPayload, err := t.send.Encrypt(seg.payload)
-		if err != nil {
-			return fmt.Errorf("Encrypt() failed: %w", err)
-		}
 		dataToSend := append(encryptedMetadata, padding1...)
-		dataToSend = append(dataToSend, encryptedPayload...)
+		if len(seg.payload) > 0 {
+			encryptedPayload, err := t.send.Encrypt(seg.payload)
+			if err != nil {
+				return fmt.Errorf("Encrypt() failed: %w", err)
+			}
+			dataToSend = append(dataToSend, encryptedPayload...)
+		}
 		dataToSend = append(dataToSend, padding2...)
 		if _, err := t.conn.Write(dataToSend); err != nil {
 			return fmt.Errorf("Write() failed: %w", err)

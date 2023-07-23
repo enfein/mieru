@@ -28,6 +28,7 @@ var (
 	UnderlayActiveOpens     = metrics.RegisterMetric("underlay", "ActiveOpens")
 	UnderlayPassiveOpens    = metrics.RegisterMetric("underlay", "PassiveOpens")
 	UnderlayCurrEstablished = metrics.RegisterMetric("underlay", "CurrEstablished")
+	UnderlayUnsolicitedUDP  = metrics.RegisterMetric("underlay", "UnsolicitedUDP")
 )
 
 // UnderlayProperties defines network properties of a underlay.

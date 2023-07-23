@@ -50,7 +50,7 @@ type metadata interface {
 	Protocol() byte
 
 	// Marshal serializes the metadata to a non-encrypted wire format.
-	Marshal() ([]byte, error)
+	Marshal() []byte
 
 	// Unmarshal constructs the metadata from the non-encrypted wire format.
 	Unmarshal([]byte) error
@@ -62,6 +62,7 @@ type metadata interface {
 var (
 	_ metadata = &sessionStruct{}
 	_ metadata = &dataAckStruct{}
+	_ metadata = &closeConnStruct{}
 )
 
 // baseStruct is shared by all metadata struct.
@@ -85,7 +86,7 @@ func (ss *sessionStruct) Protocol() byte {
 	return ss.baseStruct.protocol
 }
 
-func (ss *sessionStruct) Marshal() ([]byte, error) {
+func (ss *sessionStruct) Marshal() []byte {
 	b := make([]byte, metadataLength)
 	b[0] = ss.baseStruct.protocol
 	ss.baseStruct.timestamp = uint32(time.Now().Unix() / 60)
@@ -95,7 +96,7 @@ func (ss *sessionStruct) Marshal() ([]byte, error) {
 	b[14] = ss.statusCode
 	binary.BigEndian.PutUint16(b[15:], ss.payloadLen)
 	b[17] = ss.suffixLen
-	return b, nil
+	return b
 }
 
 func (ss *sessionStruct) Unmarshal(b []byte) error {
@@ -158,7 +159,7 @@ func (das *dataAckStruct) Protocol() byte {
 	return das.baseStruct.protocol
 }
 
-func (das *dataAckStruct) Marshal() ([]byte, error) {
+func (das *dataAckStruct) Marshal() []byte {
 	b := make([]byte, metadataLength)
 	b[0] = das.baseStruct.protocol
 	das.baseStruct.timestamp = uint32(time.Now().Unix() / 60)
@@ -171,7 +172,7 @@ func (das *dataAckStruct) Marshal() ([]byte, error) {
 	b[21] = das.prefixLen
 	binary.BigEndian.PutUint16(b[22:], das.payloadLen)
 	b[24] = das.suffixLen
-	return b, nil
+	return b
 }
 
 func (das *dataAckStruct) Unmarshal(b []byte) error {
@@ -213,6 +214,64 @@ func isDataAckProtocol(p byte) bool {
 func toDataAckStruct(m metadata) (*dataAckStruct, bool) {
 	if isDataAckProtocol(m.Protocol()) {
 		return m.(*dataAckStruct), true
+	}
+	return nil, false
+}
+
+// closeConnStruct is used to close a underlay connection.
+type closeConnStruct struct {
+	baseStruct
+	statusCode uint8 // byte 6: status of opening or closing session
+	suffixLen  uint8 // byte 7: length of suffix padding
+}
+
+func (ccs *closeConnStruct) Protocol() byte {
+	return ccs.baseStruct.protocol
+}
+
+func (ccs *closeConnStruct) Marshal() []byte {
+	b := make([]byte, metadataLength)
+	b[0] = ccs.baseStruct.protocol
+	ccs.baseStruct.timestamp = uint32(time.Now().Unix() / 60)
+	binary.BigEndian.PutUint32(b[2:], ccs.baseStruct.timestamp)
+	b[6] = ccs.statusCode
+	b[7] = ccs.suffixLen
+	return b
+}
+
+func (ccs *closeConnStruct) Unmarshal(b []byte) error {
+	// Check errors.
+	if len(b) != metadataLength {
+		return fmt.Errorf("input bytes: %d, want %d", len(b), metadataLength)
+	}
+	if b[0] != closeConnRequest && b[0] != closeConnResponse {
+		return fmt.Errorf("invalid protocol %d", b[0])
+	}
+	originalTimestamp := binary.BigEndian.Uint32(b[2:])
+	currentTimestamp := uint32(time.Now().Unix() / 60)
+	if !mathext.WithinRange(currentTimestamp, originalTimestamp, 1) {
+		return fmt.Errorf("invalid timestamp %d", originalTimestamp*60)
+	}
+
+	// Do unmarshal.
+	ccs.baseStruct.protocol = b[0]
+	ccs.baseStruct.timestamp = originalTimestamp
+	ccs.statusCode = b[6]
+	ccs.suffixLen = b[7]
+	return nil
+}
+
+func (ccs *closeConnStruct) String() string {
+	return fmt.Sprintf("closeConnStruct{protocol=%v, statusCode=%v, suffixLen=%v}", ccs.baseStruct.protocol, ccs.statusCode, ccs.suffixLen)
+}
+
+func isCloseConnProtocol(p byte) bool {
+	return p == closeConnRequest || p == closeConnResponse
+}
+
+func toCloseConnStruct(m metadata) (*closeConnStruct, bool) {
+	if isCloseConnProtocol(m.Protocol()) {
+		return m.(*closeConnStruct), true
 	}
 	return nil, false
 }

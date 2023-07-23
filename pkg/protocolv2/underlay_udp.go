@@ -19,21 +19,38 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
+	"time"
 
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/netutil"
+	"github.com/enfein/mieru/pkg/replay"
+	"github.com/enfein/mieru/pkg/rng"
+	"github.com/enfein/mieru/pkg/stderror"
 )
 
 const (
-	udpOverhead = cipher.DefaultNonceSize + metadataLength + cipher.DefaultOverhead*2
+	udpOverhead          = cipher.DefaultNonceSize + metadataLength + cipher.DefaultOverhead*2
+	udpNonHeaderPosition = cipher.DefaultNonceSize + metadataLength + cipher.DefaultOverhead
 )
+
+var udpReplayCache = replay.NewCache(16*1024*1024, 2*time.Minute)
 
 type UDPUnderlay struct {
 	baseUnderlay
+
 	conn       *net.UDPConn
 	remoteAddr *net.UDPAddr
-	block      cipher.BlockCipher
+
+	block cipher.BlockCipher
+
+	// Candidates are block ciphers that can be used to encrypt or decrypt data.
+	// When isClient is true, there must be exactly 1 element in the slice.
+	candidates []cipher.BlockCipher
+
+	// sendMutex is used when write data to the connection.
+	sendMutex sync.Mutex
 }
 
 var _ Underlay = &UDPUnderlay{}
@@ -72,6 +89,7 @@ func NewUDPUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, 
 		conn:         conn,
 		remoteAddr:   remoteAddr,
 		block:        block,
+		candidates:   []cipher.BlockCipher{block},
 	}, nil
 }
 
@@ -146,5 +164,204 @@ func (u *UDPUnderlay) RemoveSession(s *Session) error {
 }
 
 func (u *UDPUnderlay) RunEventLoop(ctx context.Context) error {
+	if u.conn == nil {
+		return stderror.ErrNullPointer
+	}
+	return nil
+}
+
+func (u *UDPUnderlay) readOneSegment() (*segment, error) {
+	b := make([]byte, u.mtu)
+	for {
+		n, addr, err := u.conn.ReadFromUDP(b)
+		if err != nil {
+			return nil, fmt.Errorf("ReadFromUDP() failed: %w", err)
+		}
+		if addr.String() != u.remoteAddr.String() {
+			UnderlayUnsolicitedUDP.Add(1)
+			continue
+		}
+		if n < udpOverhead {
+			return nil, fmt.Errorf("metadata: received incomplete UDP packet")
+		}
+		b = b[:n]
+
+		// Read encrypted metadata.
+		readLen := metadataLength + cipher.DefaultOverhead
+		encryptedMeta := b[:readLen]
+		if udpReplayCache.IsDuplicate(encryptedMeta[:cipher.DefaultOverhead], addr.String()) {
+			replay.NewSession.Add(1)
+			return nil, fmt.Errorf("found possible replay attack in %v", u)
+		}
+
+		// Decrypt metadata.
+		var decryptedMeta []byte
+		if u.block == nil && u.isClient {
+			u.block = u.candidates[0].Clone()
+		}
+		if u.block == nil {
+			var peerBlock cipher.BlockCipher
+			peerBlock, decryptedMeta, err = cipher.SelectDecrypt(encryptedMeta, cipher.CloneBlockCiphers(u.candidates))
+			if err != nil {
+				return nil, fmt.Errorf("cipher.SelectDecrypt() failed: %w", err)
+			}
+			u.block = peerBlock.Clone()
+		} else {
+			decryptedMeta, err = u.block.Decrypt(encryptedMeta)
+			if err != nil {
+				return nil, fmt.Errorf("Decrypt() failed: %w", err)
+			}
+		}
+		if len(decryptedMeta) != metadataLength {
+			return nil, fmt.Errorf("decrypted metadata size %d is unexpected", len(decryptedMeta))
+		}
+
+		// Read payload and construct segment.
+		p := decryptedMeta[0]
+		if isSessionProtocol(p) {
+			ss := &sessionStruct{}
+			if err := ss.Unmarshal(decryptedMeta); err != nil {
+				return nil, fmt.Errorf("Unmarshal() failed: %w", err)
+			}
+			return u.readSessionSegment(ss, b[udpNonHeaderPosition:])
+		} else if isDataAckProtocol(p) {
+			das := &dataAckStruct{}
+			if err := das.Unmarshal(decryptedMeta); err != nil {
+				return nil, fmt.Errorf("Unmarshal() failed: %w", err)
+			}
+			return u.readDataAckSegment(das, b[udpNonHeaderPosition:])
+		}
+
+		// TODO: handle close connection
+		return nil, fmt.Errorf("unable to handle protocol %d", p)
+	}
+}
+
+func (u *UDPUnderlay) readSessionSegment(ss *sessionStruct, remaining []byte) (*segment, error) {
+	var decryptedPayload []byte
+	var err error
+
+	if ss.payloadLen > 0 {
+		if len(remaining) < int(ss.payloadLen)+cipher.DefaultOverhead {
+			return nil, fmt.Errorf("payload: received incomplete UDP packet")
+		}
+		decryptedPayload, err = u.block.Decrypt(remaining[:ss.payloadLen+cipher.DefaultOverhead])
+		if err != nil {
+			return nil, fmt.Errorf("Decrypt() failed: %w", err)
+		}
+	}
+	if int(ss.payloadLen)+cipher.DefaultOverhead+int(ss.suffixLen) != len(remaining) {
+		return nil, fmt.Errorf("padding: size not match")
+	}
+
+	return &segment{
+		metadata: ss,
+		payload:  decryptedPayload,
+	}, nil
+}
+
+func (u *UDPUnderlay) readDataAckSegment(das *dataAckStruct, remaining []byte) (*segment, error) {
+	var decryptedPayload []byte
+	var err error
+
+	if das.prefixLen > 0 {
+		remaining = remaining[das.prefixLen:]
+	}
+	if das.payloadLen > 0 {
+		if len(remaining) < int(das.payloadLen)+cipher.DefaultOverhead {
+			return nil, fmt.Errorf("payload: received incomplete UDP packet")
+		}
+		decryptedPayload, err = u.block.Decrypt(remaining[:das.payloadLen+cipher.DefaultOverhead])
+		if err != nil {
+			return nil, fmt.Errorf("Decrypt() failed: %w", err)
+		}
+	}
+	if int(das.payloadLen)+cipher.DefaultOverhead+int(das.suffixLen) != len(remaining) {
+		return nil, fmt.Errorf("padding: size not match")
+	}
+
+	return &segment{
+		metadata: das,
+		payload:  decryptedPayload,
+	}, nil
+}
+
+func (u *UDPUnderlay) writeOneSegment(seg *segment, destination *net.UDPAddr) error {
+	if seg == nil {
+		return stderror.ErrNullPointer
+	}
+
+	u.sendMutex.Lock()
+	defer u.sendMutex.Unlock()
+
+	if u.block == nil {
+		return fmt.Errorf("%v cipher block is not ready", u)
+	}
+	if ss, ok := toSessionStruct(seg.metadata); ok {
+		suffixLen := rng.Intn(255)
+		ss.suffixLen = uint8(suffixLen)
+		padding := newPadding(suffixLen)
+
+		plaintextMetadata := ss.Marshal()
+		encryptedMetadata, err := u.block.Encrypt(plaintextMetadata)
+		if err != nil {
+			return fmt.Errorf("Encrypt() failed: %w", err)
+		}
+		dataToSend := encryptedMetadata
+		if len(seg.payload) > 0 {
+			encryptedPayload, err := u.block.Encrypt(seg.payload)
+			if err != nil {
+				return fmt.Errorf("Encrypt() failed: %w", err)
+			}
+			dataToSend = append(dataToSend, encryptedPayload...)
+		}
+		dataToSend = append(dataToSend, padding...)
+		if _, err := u.conn.WriteToUDP(dataToSend, destination); err != nil {
+			return fmt.Errorf("WriteToUDP() failed: %w", err)
+		}
+	} else if das, ok := toDataAckStruct(seg.metadata); ok {
+		paddingLen1 := rng.Intn(255)
+		paddingLen2 := rng.Intn(255)
+		das.prefixLen = uint8(paddingLen1)
+		das.suffixLen = uint8(paddingLen2)
+		padding1 := newPadding(paddingLen1)
+		padding2 := newPadding(paddingLen2)
+
+		plaintextMetadata := das.Marshal()
+		encryptedMetadata, err := u.block.Encrypt(plaintextMetadata)
+		if err != nil {
+			return fmt.Errorf("Encrypt() failed: %w", err)
+		}
+		dataToSend := append(encryptedMetadata, padding1...)
+		if len(seg.payload) > 0 {
+			encryptedPayload, err := u.block.Encrypt(seg.payload)
+			if err != nil {
+				return fmt.Errorf("Encrypt() failed: %w", err)
+			}
+			dataToSend = append(dataToSend, encryptedPayload...)
+		}
+		dataToSend = append(dataToSend, padding2...)
+		if _, err := u.conn.WriteToUDP(dataToSend, destination); err != nil {
+			return fmt.Errorf("WriteToUDP() failed: %w", err)
+		}
+	} else if ccs, ok := toCloseConnStruct(seg.metadata); ok {
+		suffixLen := rng.Intn(255)
+		ccs.suffixLen = uint8(suffixLen)
+		padding := newPadding(suffixLen)
+
+		plaintextMetadata := ccs.Marshal()
+		encryptedMetadata, err := u.block.Encrypt(plaintextMetadata)
+		if err != nil {
+			return fmt.Errorf("Encrypt() failed: %w", err)
+		}
+		dataToSend := encryptedMetadata
+		dataToSend = append(dataToSend, padding...)
+		if _, err := u.conn.WriteToUDP(dataToSend, destination); err != nil {
+			return fmt.Errorf("WriteToUDP() failed: %w", err)
+		}
+	} else {
+		return stderror.ErrInvalidArgument
+	}
+
 	return nil
 }

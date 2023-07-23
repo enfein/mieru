@@ -382,6 +382,10 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 						return fmt.Errorf("output() failed: %v", err)
 					}
 				}
+			case netutil.UDPTransport:
+				// Delete segments that are acked in sendBuf.
+				// Refill sendBuf with segments from sendQueue.
+				// Flush sendBuf.
 			default:
 				return fmt.Errorf("unsupported transport protocol %v", s.conn.TransportProtocol())
 			}

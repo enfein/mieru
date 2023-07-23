@@ -57,7 +57,8 @@ func MaxFragmentSize(mtu int, ipVersion netutil.IPVersion, transport netutil.Tra
 type segment struct {
 	metadata  metadata
 	payload   []byte // also can be a fragment
-	txTime    time.Time
+	txCount   byte
+	txTime    time.Time     // most recent tx time
 	txTimeout time.Duration // need to receive ACK within this duration
 	acked     bool
 }

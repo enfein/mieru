@@ -6,6 +6,8 @@ The mieru client supports Windows, Mac OS, and Linux. Users can download it from
 
 If your client OS is Linux, you can also install mieru using the debian and RPM installers.
 
+If you are an OpenWrt user, please copy the extracted mieru executable file to the `/usr/bin/` directory.
+
 ## Modify proxy client settings
 
 Use can invoke command
@@ -113,6 +115,8 @@ mieru describe config
 
 to check the current proxy settings.
 
+For OpenWrt users, do not use the `mieru apply config <FILE>` and `mieru describe config` commands. Please save the client configuration directly to the `/etc/mieru_client_config.json` file instead. Also, it is recommended to set `loggingLevel` to `ERROR` to prevent filling up the disk with logs.
+
 ## Start proxy client
 
 ```sh
@@ -132,6 +136,8 @@ mieru stop
 ```
 
 Note that every time you change the settings with `mieru apply config <FILE>`, you need to restart the client with `mieru stop` and `mieru start` for the new settings to take effect.
+
+For OpenWrt users, do not use the `mieru start` and `mieru stop` commands. Please copy the `configs/examples/etc_initd_mieru` file in the project root directory and save it to `/etc/init.d/mieru`. After this, the mieru client will start automatically after OpenWrt boots up. If you need to manually start or stop the mieru client, you can use the commands `/etc/init.d/mieru start` and `/etc/init.d/mieru stop`.
 
 ## Configuring the browser
 

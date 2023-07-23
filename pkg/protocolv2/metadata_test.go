@@ -21,7 +21,7 @@ import (
 	"testing"
 )
 
-func TestCloseSessionStruct(t *testing.T) {
+func TestSessionStruct(t *testing.T) {
 	s := &sessionStruct{
 		baseStruct: baseStruct{
 			protocol: closeSessionRequest,
@@ -32,16 +32,16 @@ func TestCloseSessionStruct(t *testing.T) {
 		payloadLen: uint16(mrand.Uint32()),
 		suffixLen:  uint8(mrand.Uint32()),
 	}
-	b, err := s.Marshal()
-	if err != nil {
-		t.Fatalf("Marshal() failed: %v", err)
-	}
+	b := s.Marshal()
 	s2 := &sessionStruct{}
 	if err := s2.Unmarshal(b); err != nil {
 		t.Fatalf("Unmarshal() failed: %v", err)
 	}
 	if !reflect.DeepEqual(s, s2) {
 		t.Errorf("Not equal:\n%v\n====\n%v", s, s2)
+	}
+	if s.String() != s2.String() {
+		t.Errorf("Not equal:\n%s\n====\n%s", s.String(), s2.String())
 	}
 }
 
@@ -59,15 +59,36 @@ func TestDataAckStruct(t *testing.T) {
 		payloadLen: uint16(mrand.Uint32()),
 		suffixLen:  uint8(mrand.Uint32()),
 	}
-	b, err := s.Marshal()
-	if err != nil {
-		t.Fatalf("Marshal() failed: %v", err)
-	}
+	b := s.Marshal()
 	s2 := &dataAckStruct{}
 	if err := s2.Unmarshal(b); err != nil {
 		t.Fatalf("Unmarshal() failed: %v", err)
 	}
 	if !reflect.DeepEqual(s, s2) {
 		t.Errorf("Not equal:\n%v\n====\n%v", s, s2)
+	}
+	if s.String() != s2.String() {
+		t.Errorf("Not equal:\n%s\n====\n%s", s.String(), s2.String())
+	}
+}
+
+func TestCloseConnStruct(t *testing.T) {
+	s := &closeConnStruct{
+		baseStruct: baseStruct{
+			protocol: closeConnRequest,
+		},
+		statusCode: uint8(mrand.Uint32()),
+		suffixLen:  uint8(mrand.Uint32()),
+	}
+	b := s.Marshal()
+	s2 := &closeConnStruct{}
+	if err := s2.Unmarshal(b); err != nil {
+		t.Fatalf("Unmarshal() failed: %v", err)
+	}
+	if !reflect.DeepEqual(s, s2) {
+		t.Errorf("Not equal:\n%v\n====\n%v", s, s2)
+	}
+	if s.String() != s2.String() {
+		t.Errorf("Not equal:\n%s\n====\n%s", s.String(), s2.String())
 	}
 }
