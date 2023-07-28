@@ -16,7 +16,6 @@
 package protocolv2
 
 import (
-	"context"
 	"math/rand"
 	"reflect"
 	"sync"
@@ -152,7 +151,7 @@ func TestSegmentTreeBlocking(t *testing.T) {
 			}
 			s := rand.Intn(10)
 			time.Sleep(time.Duration(s) * time.Millisecond)
-			st.InsertBlocking(context.Background(), seg)
+			st.InsertBlocking(seg)
 		}
 		wg.Done()
 	}()
@@ -163,7 +162,7 @@ func TestSegmentTreeBlocking(t *testing.T) {
 		for ; i < 100; i++ {
 			s := rand.Intn(10)
 			time.Sleep(time.Duration(s) * time.Millisecond)
-			seg, ok := st.DeleteMinBlocking(context.Background())
+			seg, ok := st.DeleteMinBlocking()
 			if !ok {
 				t.Errorf("DeleteMinBlocking() failed")
 			}

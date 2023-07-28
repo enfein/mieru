@@ -16,15 +16,14 @@
 package protocolv2
 
 import (
-	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/enfein/mieru/pkg/mathext"
 	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/stderror"
 	"github.com/google/btree"
-	"golang.org/x/sync/semaphore"
 )
 
 const (
@@ -115,8 +114,9 @@ func segmentLessFunc(a, b *segment) bool {
 type segmentTree struct {
 	tr    *btree.BTreeG[*segment]
 	cap   int
-	full  *semaphore.Weighted
-	empty *semaphore.Weighted
+	mu    sync.Mutex
+	full  sync.Cond
+	empty sync.Cond
 }
 
 func newSegmentTree(capacity int) *segmentTree {
@@ -127,53 +127,88 @@ func newSegmentTree(capacity int) *segmentTree {
 		tr:  btree.NewG(4, segmentLessFunc),
 		cap: capacity,
 	}
-	st.full = semaphore.NewWeighted(int64(capacity))
-	st.empty = semaphore.NewWeighted(int64(capacity))
-	if err := st.empty.Acquire(context.Background(), int64(capacity)); err != nil {
-		panic(fmt.Sprintf("Failed to initialize segment tree semaphore: %v", err))
-	}
+	st.full = *sync.NewCond(&st.mu)
+	st.empty = *sync.NewCond(&st.mu)
 	return st
 }
 
 // Insert adds a new segment to the tree.
 // It returns true if insert is successful.
 func (t *segmentTree) Insert(seg *segment) (ok bool) {
-	if t.full.TryAcquire(1) {
-		t.tr.ReplaceOrInsert(seg)
-		t.empty.Release(1)
-		return true
+	if seg == nil {
+		panic("Insert() nil segment")
 	}
-	return false
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.tr.Len() >= t.cap {
+		return false
+	}
+	prev, replace := t.tr.ReplaceOrInsert(seg)
+	if replace {
+		panic(fmt.Sprintf("%v is replaced by %v", seg, prev))
+	} else {
+		t.empty.Broadcast()
+	}
+	return true
 }
 
 // InsertBlocking is same as Insert, but blocks when the tree is full.
-func (t *segmentTree) InsertBlocking(ctx context.Context, seg *segment) (ok bool) {
-	if err := t.full.Acquire(ctx, 1); err != nil {
-		return false
+func (t *segmentTree) InsertBlocking(seg *segment) (ok bool) {
+	if seg == nil {
+		panic("Insert() nil segment")
 	}
-	t.tr.ReplaceOrInsert(seg)
-	t.empty.Release(1)
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	for t.tr.Len() >= t.cap {
+		t.full.Wait()
+	}
+	prev, replace := t.tr.ReplaceOrInsert(seg)
+	if replace {
+		panic(fmt.Sprintf("%v is replaced by %v", seg, prev))
+	} else {
+		t.empty.Broadcast()
+	}
 	return true
 }
 
 // DeleteMin removes the smallest item from the tree.
 // It returns true if delete is successful.
 func (t *segmentTree) DeleteMin() (*segment, bool) {
-	if t.empty.TryAcquire(1) {
-		seg, _ := t.tr.DeleteMin()
-		t.full.Release(1)
-		return seg, true
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.tr.Len() == 0 {
+		return nil, false
 	}
-	return nil, false
+	seg, ok := t.tr.DeleteMin()
+	if !ok {
+		panic("segmentTree.DeleteMin() is called when the tree is empty")
+	}
+	if seg == nil {
+		panic("segmentTree.DeleteMin() return nil")
+	}
+	t.full.Broadcast()
+	return seg, true
 }
 
 // DeleteMinBlocking is the same as DeleteMin, but blocks when the tree is empty.
-func (t *segmentTree) DeleteMinBlocking(ctx context.Context) (*segment, bool) {
-	if err := t.empty.Acquire(ctx, 1); err != nil {
-		return nil, false
+func (t *segmentTree) DeleteMinBlocking() (*segment, bool) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	for t.tr.Len() == 0 {
+		t.empty.Wait()
 	}
-	seg, _ := t.tr.DeleteMin()
-	t.full.Release(1)
+	seg, ok := t.tr.DeleteMin()
+	if !ok {
+		panic("segmentTree.DeleteMin() is called when the tree is empty")
+	}
+	if seg == nil {
+		panic("segmentTree.DeleteMin() return nil")
+	}
+	t.full.Broadcast()
 	return seg, true
 }
 

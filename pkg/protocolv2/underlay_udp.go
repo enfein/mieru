@@ -38,11 +38,9 @@ const (
 var udpReplayCache = replay.NewCache(16*1024*1024, 2*time.Minute)
 
 type UDPUnderlay struct {
+	// ---- common fields ----
 	baseUnderlay
-
-	conn       *net.UDPConn
-	remoteAddr *net.UDPAddr
-
+	conn  *net.UDPConn
 	block cipher.BlockCipher
 
 	// Candidates are block ciphers that can be used to encrypt or decrypt data.
@@ -51,6 +49,9 @@ type UDPUnderlay struct {
 
 	// sendMutex is used when write data to the connection.
 	sendMutex sync.Mutex
+
+	// ---- client fields ----
+	serverAddr *net.UDPAddr
 }
 
 var _ Underlay = &UDPUnderlay{}
@@ -87,7 +88,7 @@ func NewUDPUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, 
 	return &UDPUnderlay{
 		baseUnderlay: *newBaseUnderlay(true, mtu),
 		conn:         conn,
-		remoteAddr:   remoteAddr,
+		serverAddr:   remoteAddr,
 		block:        block,
 		candidates:   []cipher.BlockCipher{block},
 	}, nil
@@ -177,7 +178,7 @@ func (u *UDPUnderlay) readOneSegment() (*segment, error) {
 		if err != nil {
 			return nil, fmt.Errorf("ReadFromUDP() failed: %w", err)
 		}
-		if addr.String() != u.remoteAddr.String() {
+		if u.isClient && addr.String() != u.serverAddr.String() {
 			UnderlayUnsolicitedUDP.Add(1)
 			continue
 		}

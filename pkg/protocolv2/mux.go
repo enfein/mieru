@@ -162,6 +162,7 @@ func (m *Mux) Close() error {
 	for _, underlay := range m.underlays {
 		underlay.Close()
 	}
+	m.underlays = make([]Underlay, 0)
 	close(m.done)
 	return nil
 }

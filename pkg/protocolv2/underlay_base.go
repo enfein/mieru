@@ -64,9 +64,17 @@ func (b *baseUnderlay) Accept() (net.Conn, error) {
 func (b *baseUnderlay) Close() error {
 	b.sessionLock.Lock()
 	defer b.sessionLock.Unlock()
+
+	select {
+	case <-b.done:
+		return nil
+	default:
+	}
+
 	for _, s := range b.sessionMap {
 		s.Close()
 	}
+	b.sessionMap = make(map[uint32]*Session)
 	close(b.done)
 	return nil
 }

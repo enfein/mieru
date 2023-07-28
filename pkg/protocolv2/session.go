@@ -33,9 +33,6 @@ import (
 const (
 	segmentTreeCapacity = 4096
 	segmentChanCapacity = 256
-)
-
-var (
 	segmentPollInterval = 10 * time.Millisecond
 )
 
@@ -136,7 +133,7 @@ func (s *Session) Read(b []byte) (n int, err error) {
 
 	// Read all the fragments of the original message.
 	for {
-		seg, ok := s.recvQueue.DeleteMinBlocking(context.Background())
+		seg, ok := s.recvQueue.DeleteMinBlocking()
 		if !ok {
 			// recvQueue is dead.
 			return 0, io.EOF
@@ -208,7 +205,7 @@ func (s *Session) Write(b []byte) (n int, err error) {
 			if log.IsLevelEnabled(log.TraceLevel) {
 				log.Tracef("%v writing %d bytes with open session request", s, len(seg.payload))
 			}
-			s.sendQueue.InsertBlocking(context.Background(), seg)
+			s.sendQueue.InsertBlocking(seg)
 			s.forwardStateTo(sessionOpening)
 			if len(seg.payload) > 0 {
 				return len(seg.payload), nil
@@ -234,7 +231,7 @@ func (s *Session) Write(b []byte) (n int, err error) {
 			if log.IsLevelEnabled(log.TraceLevel) {
 				log.Tracef("%v writing %d bytes with open session response", s, len(seg.payload))
 			}
-			s.sendQueue.InsertBlocking(context.Background(), seg)
+			s.sendQueue.InsertBlocking(seg)
 			s.forwardStateTo(sessionEstablished)
 			if len(seg.payload) > 0 {
 				return len(seg.payload), nil
@@ -276,7 +273,7 @@ func (s *Session) Write(b []byte) (n int, err error) {
 			payload: part,
 		}
 		s.nextSeq++
-		s.sendQueue.InsertBlocking(context.Background(), seg)
+		s.sendQueue.InsertBlocking(seg)
 		ptr = ptr[partLen:]
 	}
 	n = len(b)
@@ -314,7 +311,7 @@ func (s *Session) Close() error {
 		},
 	}
 	s.nextSeq++
-	s.sendQueue.InsertBlocking(context.Background(), seg)
+	s.sendQueue.InsertBlocking(seg)
 	<-s.done
 	s.forwardStateTo(sessionClosed)
 	return nil
@@ -423,7 +420,7 @@ func (s *Session) inputData(seg *segment) error {
 	switch s.conn.TransportProtocol() {
 	case netutil.TCPTransport:
 		// Deliver the segment directly to recvQueue.
-		s.recvQueue.InsertBlocking(context.Background(), seg)
+		s.recvQueue.InsertBlocking(seg)
 		return nil
 	default:
 		return fmt.Errorf("unsupported transport protocol %v", s.conn.TransportProtocol())
