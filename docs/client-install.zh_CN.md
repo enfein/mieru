@@ -6,8 +6,6 @@ mieru 客户端软件支持 Windows，Mac OS 和 Linux 系统。用户可以在 
 
 如果你的客户端操作系统是 Linux，也可以使用 debian 和 RPM 安装包安装 mieru。
 
-如果你是 OpenWrt 用户，请将解压缩后的 mieru 可执行文件复制到 `/usr/bin/` 目录下。
-
 ## 修改客户端的设置
 
 用户可以通过
@@ -115,8 +113,6 @@ mieru describe config
 
 指令查看当前设置。
 
-对于 OpenWrt 用户，请勿使用 `mieru apply config <FILE>` 和 `mieru describe config` 指令。请将客户端配置直接保存至 `/etc/mieru_client_config.json` 文件。另外，建议将日志等级 `loggingLevel` 设置成 `ERROR` 防止日志打满硬盘。
-
 ## 启动客户端
 
 ```sh
@@ -136,8 +132,6 @@ mieru stop
 ```
 
 注意，每次使用 `mieru apply config <FILE>` 修改设置后，需要用 `mieru stop` 和 `mieru start` 重启客户端，才能使新设置生效。
-
-对于 OpenWrt 用户，请勿使用 `mieru start` 和 `mieru stop` 指令。请将项目根目录下的 `configs/examples/etc_initd_mieru` 文件复制并保存至 `/etc/init.d/mieru` 文件。此后，mieru 客户端将在 OpenWrt 开机后自行启动。如果需要手动启动或停止 mieru 客户端，可以使用指令 `/etc/init.d/mieru start` 和 `/etc/init.d/mieru stop`。
 
 ## 配置浏览器
 

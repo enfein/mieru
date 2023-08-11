@@ -183,3 +183,84 @@ func TestSegmentTreeBlocking(t *testing.T) {
 
 	wg.Wait()
 }
+
+func TestSegmentTreeDeleteMinIf(t *testing.T) {
+	st := newSegmentTree(3)
+	seg1 := &segment{
+		metadata: &dataAckStruct{
+			seq: 100,
+		},
+	}
+	seg2 := &segment{
+		metadata: &dataAckStruct{
+			seq: 200,
+		},
+	}
+	seg3 := &segment{
+		metadata: &dataAckStruct{
+			seq: 300,
+		},
+	}
+	st.InsertBlocking(seg3)
+	st.InsertBlocking(seg2)
+	st.InsertBlocking(seg1)
+
+	f := func(s *segment) bool {
+		seq, err := s.Seq()
+		if err != nil {
+			t.Errorf("Seq() failed: %v", err)
+			return false
+		}
+		if seq == 100 {
+			return true
+		}
+		return false
+	}
+	_, deleted := st.DeleteMinIf(f)
+	if deleted != true {
+		t.Errorf("got deleted = %v, want %v", deleted, true)
+	}
+	_, deleted = st.DeleteMinIf(f)
+	if deleted != false {
+		t.Errorf("got deleted = %v, want %v", deleted, true)
+	}
+	if st.Len() != 2 {
+		t.Errorf("got Len() = %v, want %v", st.Len(), 2)
+	}
+}
+
+func TestSegmentTreeAscend(t *testing.T) {
+	st := newSegmentTree(3)
+	seg1 := &segment{
+		metadata: &dataAckStruct{
+			seq: 100,
+		},
+	}
+	seg2 := &segment{
+		metadata: &dataAckStruct{
+			seq: 200,
+		},
+	}
+	seg3 := &segment{
+		metadata: &dataAckStruct{
+			seq: 300,
+		},
+	}
+	st.InsertBlocking(seg3)
+	st.InsertBlocking(seg2)
+	st.InsertBlocking(seg1)
+
+	got := make([]uint32, 0)
+	st.Ascend(func(s *segment) bool {
+		seq, err := s.Seq()
+		if err != nil {
+			return false
+		}
+		got = append(got, seq)
+		return true
+	})
+	want := []uint32{100, 200, 300}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}

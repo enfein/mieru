@@ -169,7 +169,7 @@ func (m *Mux) Close() error {
 
 // Addr is not supported by Mux.
 func (m *Mux) Addr() net.Addr {
-	return netutil.NilNetAddr
+	return netutil.NilNetAddr()
 }
 
 // ListenAndServeAll listens on all the server addresses and serves

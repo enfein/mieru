@@ -80,7 +80,7 @@ func (b *baseUnderlay) Close() error {
 }
 
 func (b *baseUnderlay) Addr() net.Addr {
-	return netutil.NilNetAddr
+	return netutil.NilNetAddr()
 }
 
 func (b *baseUnderlay) MTU() int {
@@ -96,11 +96,11 @@ func (b *baseUnderlay) TransportProtocol() netutil.TransportProtocol {
 }
 
 func (b *baseUnderlay) LocalAddr() net.Addr {
-	return netutil.NilNetAddr
+	return netutil.NilNetAddr()
 }
 
 func (b *baseUnderlay) RemoteAddr() net.Addr {
-	return netutil.NilNetAddr
+	return netutil.NilNetAddr()
 }
 
 func (b *baseUnderlay) AddSession(s *Session) error {

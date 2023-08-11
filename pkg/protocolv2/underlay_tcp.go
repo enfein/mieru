@@ -179,7 +179,7 @@ func (t *TCPUnderlay) RunEventLoop(ctx context.Context) error {
 			log.Tracef("%v received one segment: protocol = %d, payload size = %d", t, seg.metadata.Protocol(), len(seg.payload))
 		}
 		if isSessionProtocol(seg.metadata.Protocol()) {
-			switch seg.Protocol() {
+			switch seg.metadata.Protocol() {
 			case openSessionRequest:
 				if err := t.onOpenSessionRequest(seg); err != nil {
 					return fmt.Errorf("onOpenSessionRequest() failed: %v", err)
@@ -192,12 +192,8 @@ func (t *TCPUnderlay) RunEventLoop(ctx context.Context) error {
 				if err := t.onCloseSession(seg); err != nil {
 					return fmt.Errorf("onCloseSession() failed: %v", err)
 				}
-			case closeConnRequest:
-				// Ignore. Expect to close TCP connection directly.
-			case closeConnResponse:
-				// Ignore. Expect to close TCP connection directly.
 			default:
-				// Ignore unknown protocol from a future version.
+				panic(fmt.Sprintf("Protocol %d is a session protocol but not recognized by TCP underlay", seg.metadata.Protocol()))
 			}
 		} else if isDataAckProtocol(seg.metadata.Protocol()) {
 			das, _ := toDataAckStruct(seg.metadata)
@@ -205,11 +201,12 @@ func (t *TCPUnderlay) RunEventLoop(ctx context.Context) error {
 			session, ok := t.sessionMap[das.sessionID]
 			t.sessionLock.Unlock()
 			if !ok {
-				log.Debugf("Session %d is not registered to %s", das.sessionID, t.String())
+				log.Debugf("Session %d is not registered to %v", das.sessionID, t)
 				continue
 			}
 			session.recvChan <- seg
 		}
+		// Ignore other protocols.
 	}
 }
 
@@ -319,13 +316,13 @@ func (t *TCPUnderlay) readOneSegment() (*segment, error) {
 	if isSessionProtocol(p) {
 		ss := &sessionStruct{}
 		if err := ss.Unmarshal(decryptedMeta); err != nil {
-			return nil, fmt.Errorf("Unmarshal() failed: %w", err)
+			return nil, fmt.Errorf("Unmarshal() to sessionStruct failed: %w", err)
 		}
 		return t.readSessionSegment(ss)
 	} else if isDataAckProtocol(p) {
 		das := &dataAckStruct{}
 		if err := das.Unmarshal(decryptedMeta); err != nil {
-			return nil, fmt.Errorf("Unmarshal() failed: %w", err)
+			return nil, fmt.Errorf("Unmarshal() to dataAckStruct failed: %w", err)
 		}
 		return t.readDataAckSegment(das)
 	}

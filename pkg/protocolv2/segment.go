@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/mathext"
 	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/stderror"
@@ -57,9 +58,9 @@ type segment struct {
 	metadata  metadata
 	payload   []byte // also can be a fragment
 	txCount   byte
+	fastAck   byte
 	txTime    time.Time     // most recent tx time
 	txTimeout time.Duration // need to receive ACK within this duration
-	acked     bool
 }
 
 // Protocol returns the protocol of the segment.
@@ -103,12 +104,16 @@ func (s *segment) Less(than *segment) bool {
 }
 
 func (s *segment) String() string {
-	return fmt.Sprintf("segment{metadata=%v}", s.metadata)
+	return fmt.Sprintf("segment{metadata=%v, payloadLen=%d}", s.metadata, len(s.payload))
 }
 
 func segmentLessFunc(a, b *segment) bool {
 	return a.Less(b)
 }
+
+// segmentIterator processes the given segment.
+// If it returns false, stop the iteration.
+type segmentIterator func(*segment) bool
 
 // segmentTree is a B-tree to store multiple Segment in order.
 type segmentTree struct {
@@ -138,6 +143,9 @@ func (t *segmentTree) Insert(seg *segment) (ok bool) {
 	if seg == nil {
 		panic("Insert() nil segment")
 	}
+	if _, err := seg.Seq(); err != nil {
+		panic(fmt.Sprintf("%v Seq() failed: %v", seg, err))
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -146,7 +154,9 @@ func (t *segmentTree) Insert(seg *segment) (ok bool) {
 	}
 	prev, replace := t.tr.ReplaceOrInsert(seg)
 	if replace {
-		panic(fmt.Sprintf("%v is replaced by %v", seg, prev))
+		if log.IsLevelEnabled(log.TraceLevel) {
+			log.Tracef("%v is replaced by %v", seg, prev)
+		}
 	} else {
 		t.empty.Broadcast()
 	}
@@ -158,6 +168,9 @@ func (t *segmentTree) InsertBlocking(seg *segment) (ok bool) {
 	if seg == nil {
 		panic("Insert() nil segment")
 	}
+	if _, err := seg.Seq(); err != nil {
+		panic(fmt.Sprintf("%v Seq() failed: %v", seg, err))
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -166,7 +179,9 @@ func (t *segmentTree) InsertBlocking(seg *segment) (ok bool) {
 	}
 	prev, replace := t.tr.ReplaceOrInsert(seg)
 	if replace {
-		panic(fmt.Sprintf("%v is replaced by %v", seg, prev))
+		if log.IsLevelEnabled(log.TraceLevel) {
+			log.Tracef("%v is replaced by %v", seg, prev)
+		}
 	} else {
 		t.empty.Broadcast()
 	}
@@ -210,6 +225,44 @@ func (t *segmentTree) DeleteMinBlocking() (*segment, bool) {
 	}
 	t.full.Broadcast()
 	return seg, true
+}
+
+// DeleteMinIf removes the smallest item from the tree if
+// the input function returns true.
+// It returns true if the item is deleted from the tree.
+func (t *segmentTree) DeleteMinIf(si segmentIterator) (*segment, bool) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.tr.Len() == 0 {
+		return nil, false
+	}
+	seg, ok := t.tr.Min()
+	if !ok {
+		panic("segmentTree.Min() is called when the tree is empty")
+	}
+	if seg == nil {
+		panic("segmentTree.Min() return nil")
+	}
+	delete := si(seg)
+	if delete {
+		seg, ok = t.tr.DeleteMin()
+		if !ok {
+			panic("segmentTree.DeleteMin() is called when the tree is empty")
+		}
+		if seg == nil {
+			panic("segmentTree.DeleteMin() return nil")
+		}
+		t.full.Broadcast()
+	}
+	return seg, delete
+}
+
+// Ascend iterates the segment tree in ascending order.
+func (t *segmentTree) Ascend(si segmentIterator) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.tr.Ascend(btree.ItemIteratorG[*segment](si))
 }
 
 // MinSeq return the minimum sequence number in the SegmentTree.

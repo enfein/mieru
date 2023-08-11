@@ -34,8 +34,9 @@ For an explanation of the mieru protocol, see [mieru Proxy Protocol](https://git
 
 1. [Server Installation & Configuration](https://github.com/enfein/mieru/blob/main/docs/server-install.md)
 2. [Client Installation & Configuration](https://github.com/enfein/mieru/blob/main/docs/client-install.md)
-3. [Maintenance & Troubleshooting](https://github.com/enfein/mieru/blob/main/docs/operation.md)
-4. [Security Guide](https://github.com/enfein/mieru/blob/main/docs/security.md)
+3. [Client Installation & Configuration - OpenWrt](https://github.com/enfein/mieru/blob/main/docs/client-install-openwrt.md)
+4. [Maintenance & Troubleshooting](https://github.com/enfein/mieru/blob/main/docs/operation.md)
+5. [Security Guide](https://github.com/enfein/mieru/blob/main/docs/security.md)
 
 ## Compile
 

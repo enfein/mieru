@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/enfein/mieru/pkg/congestion"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/mathext"
 	"github.com/enfein/mieru/pkg/metrics"
@@ -33,6 +34,8 @@ import (
 const (
 	segmentTreeCapacity = 4096
 	segmentChanCapacity = 256
+	minWindowSize       = 32
+	maxWindowSize       = 4096
 	segmentPollInterval = 10 * time.Millisecond
 )
 
@@ -65,8 +68,12 @@ type Session struct {
 	recvChan  chan *segment // channel to receive segment from underlay
 
 	nextSeq   uint32 // next sequence number to send a segment
+	nextRecv  uint32 // next sequence number to receive
 	unackSeq  uint32 // unacknowledged sequence number
 	unreadBuf []byte // payload removed from the recvQueue that haven't been read by application
+
+	rttStat       *congestion.RTTStats
+	sendAlgorithm *congestion.CubicSendAlgorithm
 
 	wg    sync.WaitGroup
 	rLock sync.Mutex
@@ -78,22 +85,28 @@ var _ net.Conn = &Session{}
 
 // NewSession creates a new session.
 func NewSession(id uint32, isClient bool, mtu int) *Session {
+	rttStat := congestion.NewRTTStats()
+	rttStat.SetMaxAckDelay(2 * segmentPollInterval)
+	rttStat.SetRTOMultiplier(1.5)
 	return &Session{
-		conn:        nil,
-		id:          id,
-		isClient:    isClient,
-		mtu:         mtu,
-		state:       sessionInit,
-		ready:       make(chan struct{}),
-		established: make(chan struct{}),
-		done:        make(chan struct{}),
-		sendQueue:   newSegmentTree(segmentTreeCapacity),
-		sendBuf:     newSegmentTree(segmentTreeCapacity),
-		recvBuf:     newSegmentTree(segmentTreeCapacity),
-		recvQueue:   newSegmentTree(segmentTreeCapacity),
-		recvChan:    make(chan *segment, segmentChanCapacity),
-		nextSeq:     0,
-		unackSeq:    0,
+		conn:          nil,
+		id:            id,
+		isClient:      isClient,
+		mtu:           mtu,
+		state:         sessionInit,
+		ready:         make(chan struct{}),
+		established:   make(chan struct{}),
+		done:          make(chan struct{}),
+		sendQueue:     newSegmentTree(segmentTreeCapacity),
+		sendBuf:       newSegmentTree(segmentTreeCapacity),
+		recvBuf:       newSegmentTree(segmentTreeCapacity),
+		recvQueue:     newSegmentTree(segmentTreeCapacity),
+		recvChan:      make(chan *segment, segmentChanCapacity),
+		nextSeq:       0,
+		nextRecv:      0,
+		unackSeq:      0,
+		rttStat:       rttStat,
+		sendAlgorithm: congestion.NewCubicSendAlgorithm(minWindowSize, maxWindowSize),
 	}
 }
 
@@ -422,6 +435,33 @@ func (s *Session) inputData(seg *segment) error {
 		// Deliver the segment directly to recvQueue.
 		s.recvQueue.InsertBlocking(seg)
 		return nil
+	case netutil.UDPTransport:
+		// Deliver the segment to recvBuf.
+		s.recvBuf.InsertBlocking(seg)
+		// Move recvBuf to recvQueue.
+		for {
+			seg, deleted := s.recvBuf.DeleteMinIf(func(iter *segment) bool {
+				seq, err := iter.Seq()
+				if err != nil {
+					panic(fmt.Sprintf("%v get segment sequence number failed: %v", s, err))
+				}
+				if seq <= s.nextRecv {
+					return true
+				}
+				return false
+			})
+			if seg == nil || !deleted {
+				return nil
+			}
+			seq, err := seg.Seq()
+			if err != nil {
+				panic(fmt.Sprintf("%v get segment sequence number failed: %v", s, err))
+			}
+			if seq == s.nextRecv {
+				s.recvQueue.InsertBlocking(seg)
+				s.nextRecv++
+			}
+		}
 	default:
 		return fmt.Errorf("unsupported transport protocol %v", s.conn.TransportProtocol())
 	}
@@ -431,6 +471,26 @@ func (s *Session) inputAck(seg *segment) error {
 	switch s.conn.TransportProtocol() {
 	case netutil.TCPTransport:
 		// Do nothing when receive ACK from TCP protocol.
+		return nil
+	case netutil.UDPTransport:
+		// Delete all previous acknowledged segments.
+		das := seg.metadata.(*dataAckStruct)
+		unAckSeq := das.unAckSeq
+		for {
+			_, deleted := s.sendBuf.DeleteMinIf(func(iter *segment) bool {
+				seq, err := iter.Seq()
+				if err != nil {
+					panic(fmt.Sprintf("%v get segment sequence number failed: %v", s, err))
+				}
+				if seq < unAckSeq {
+					return true
+				}
+				return false
+			})
+			if !deleted {
+				break
+			}
+		}
 		return nil
 	default:
 		return fmt.Errorf("unsupported transport protocol %v", s.conn.TransportProtocol())

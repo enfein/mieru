@@ -31,8 +31,10 @@ func (a NetAddr) String() string {
 	return a.Str
 }
 
-// NilNetAddr is an empty network address.
-var NilNetAddr = NetAddr{}
+// NilNetAddr returns an empty network address.
+func NilNetAddr() net.Addr {
+	return NetAddr{}
+}
 
 // IsNilNetAddr returns true if the net.Addr is nil / empty.
 func IsNilNetAddr(addr net.Addr) bool {

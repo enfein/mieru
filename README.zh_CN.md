@@ -32,8 +32,9 @@ mieru 的翻墙原理与 shadowsocks / v2ray 等软件类似，在客户端和�
 
 1. [服务器安装与配置](https://github.com/enfein/mieru/blob/main/docs/server-install.zh_CN.md)
 2. [客户端安装与配置](https://github.com/enfein/mieru/blob/main/docs/client-install.zh_CN.md)
-3. [运营维护与故障排查](https://github.com/enfein/mieru/blob/main/docs/operation.zh_CN.md)
-4. [翻墙安全指南](https://github.com/enfein/mieru/blob/main/docs/security.zh_CN.md)
+3. [客户端安装与配置 - OpenWrt](https://github.com/enfein/mieru/blob/main/docs/client-install-openwrt.zh_CN.md)
+4. [运营维护与故障排查](https://github.com/enfein/mieru/blob/main/docs/operation.zh_CN.md)
+5. [翻墙安全指南](https://github.com/enfein/mieru/blob/main/docs/security.zh_CN.md)
 
 ## 编译
 
