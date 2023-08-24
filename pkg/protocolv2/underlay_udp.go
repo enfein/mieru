@@ -17,11 +17,14 @@ package protocolv2
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"net"
 	"sync"
 	"time"
 
+	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/netutil"
@@ -31,7 +34,7 @@ import (
 )
 
 const (
-	udpOverhead          = cipher.DefaultNonceSize + metadataLength + cipher.DefaultOverhead*2
+	udpOverhead          = cipher.DefaultNonceSize*2 + metadataLength + cipher.DefaultOverhead*2
 	udpNonHeaderPosition = cipher.DefaultNonceSize + metadataLength + cipher.DefaultOverhead
 )
 
@@ -40,18 +43,18 @@ var udpReplayCache = replay.NewCache(16*1024*1024, 2*time.Minute)
 type UDPUnderlay struct {
 	// ---- common fields ----
 	baseUnderlay
-	conn  *net.UDPConn
-	block cipher.BlockCipher
-
-	// Candidates are block ciphers that can be used to encrypt or decrypt data.
-	// When isClient is true, there must be exactly 1 element in the slice.
-	candidates []cipher.BlockCipher
+	conn      *net.UDPConn
+	ipVersion netutil.IPVersion
 
 	// sendMutex is used when write data to the connection.
 	sendMutex sync.Mutex
 
 	// ---- client fields ----
+	block      cipher.BlockCipher
 	serverAddr *net.UDPAddr
+
+	// ---- server fields ----
+	users map[string]*appctlpb.User // registered users
 }
 
 var _ Underlay = &UDPUnderlay{}
@@ -90,7 +93,6 @@ func NewUDPUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, 
 		conn:         conn,
 		serverAddr:   remoteAddr,
 		block:        block,
-		candidates:   []cipher.BlockCipher{block},
 	}, nil
 }
 
@@ -99,9 +101,9 @@ func (u *UDPUnderlay) String() string {
 		return "UDPUnderlay{}"
 	}
 	if u.isClient {
-		return fmt.Sprintf("UDPUnderlay{%v - %v}", u.LocalAddr(), u.RemoteAddr())
+		return fmt.Sprintf("UDPUnderlay{local=%v, remote=%v, mtu=%v, ipVersion=%v}", u.LocalAddr(), u.RemoteAddr(), u.mtu, u.IPVersion())
 	} else {
-		return fmt.Sprintf("UDPUnderlay{%v}", u.LocalAddr())
+		return fmt.Sprintf("UDPUnderlay{local=%v, mtu=%v, ipVersion=%v}", u.LocalAddr(), u.mtu, u.IPVersion())
 	}
 }
 
@@ -121,7 +123,10 @@ func (u *UDPUnderlay) IPVersion() netutil.IPVersion {
 	if u.conn == nil {
 		return netutil.IPVersionUnknown
 	}
-	return netutil.GetIPVersion(u.conn.LocalAddr().String())
+	if u.ipVersion == netutil.IPVersionUnknown {
+		u.ipVersion = netutil.GetIPVersion(u.conn.LocalAddr().String())
+	}
+	return u.ipVersion
 }
 
 func (u *UDPUnderlay) TransportProtocol() netutil.TransportProtocol {
@@ -139,8 +144,8 @@ func (u *UDPUnderlay) RemoteAddr() net.Addr {
 	return netutil.NilNetAddr()
 }
 
-func (u *UDPUnderlay) AddSession(s *Session) error {
-	if err := u.baseUnderlay.AddSession(s); err != nil {
+func (u *UDPUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
+	if err := u.baseUnderlay.AddSession(s, remoteAddr); err != nil {
 		return err
 	}
 	s.conn = u // override base underlay
@@ -189,12 +194,12 @@ func (u *UDPUnderlay) RunEventLoop(ctx context.Context) error {
 			return fmt.Errorf("readOneSegment() failed: %w", err)
 		}
 		if log.IsLevelEnabled(log.TraceLevel) {
-			log.Tracef("%v received one segment: peer = %v, protocol = %d, payload size = %d", u, addr, seg.metadata.Protocol(), len(seg.payload))
+			log.Tracef("%v received %v from peer %v", u, seg, addr)
 		}
 		if isSessionProtocol(seg.metadata.Protocol()) {
 			switch seg.metadata.Protocol() {
 			case openSessionRequest:
-				if err := u.onOpenSessionRequest(seg); err != nil {
+				if err := u.onOpenSessionRequest(seg, addr); err != nil {
 					return fmt.Errorf("onOpenSessionRequest() failed: %v", err)
 				}
 			case openSessionResponse:
@@ -219,13 +224,13 @@ func (u *UDPUnderlay) RunEventLoop(ctx context.Context) error {
 			}
 			session.recvChan <- seg
 		} else if isCloseConnProtocol(seg.metadata.Protocol()) {
-			// Close connection.
+			// TODO: Close connection.
 		}
 		// Ignore other protocols.
 	}
 }
 
-func (u *UDPUnderlay) onOpenSessionRequest(seg *segment) error {
+func (u *UDPUnderlay) onOpenSessionRequest(seg *segment, remoteAddr net.Addr) error {
 	if u.isClient {
 		return stderror.ErrInvalidOperation
 	}
@@ -244,7 +249,7 @@ func (u *UDPUnderlay) onOpenSessionRequest(seg *segment) error {
 		return nil
 	}
 	session := NewSession(sessionID, u.isClient, u.MTU())
-	u.AddSession(session)
+	u.AddSession(session, remoteAddr)
 	session.recvChan <- seg
 	u.readySessions <- session
 	return nil
@@ -288,6 +293,12 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 	var addr *net.UDPAddr
 	var err error
 	for {
+		select {
+		case <-u.done:
+			return nil, nil, io.ErrClosedPipe
+		default:
+		}
+
 		n, addr, err = u.conn.ReadFromUDP(b)
 		if err != nil {
 			return nil, nil, fmt.Errorf("ReadFromUDP() failed: %w", err)
@@ -309,8 +320,7 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 		b = b[:n]
 
 		// Read encrypted metadata.
-		readLen := metadataLength + cipher.DefaultOverhead
-		encryptedMeta := b[:readLen]
+		encryptedMeta := b[:udpNonHeaderPosition]
 		if udpReplayCache.IsDuplicate(encryptedMeta[:cipher.DefaultOverhead], addr.String()) {
 			replay.NewSession.Add(1)
 			return nil, nil, fmt.Errorf("found possible replay attack in %v from %v", u, addr)
@@ -318,21 +328,9 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 
 		// Decrypt metadata.
 		var decryptedMeta []byte
-		if u.block == nil && u.isClient {
-			u.block = u.candidates[0].Clone()
-		}
-		if u.block == nil {
-			var peerBlock cipher.BlockCipher
-			peerBlock, decryptedMeta, err = cipher.SelectDecrypt(encryptedMeta, cipher.CloneBlockCiphers(u.candidates))
-			if err != nil {
-				UnderlayMalformedUDP.Add(1)
-				if log.IsLevelEnabled(log.TraceLevel) {
-					log.Tracef("%v cipher.SelectDecrypt() failed with UDP packet from %v", u, addr)
-				}
-				continue
-			}
-			u.block = peerBlock.Clone()
-		} else {
+		var blockCipher cipher.BlockCipher
+		isKnownSession := true
+		if u.isClient {
 			decryptedMeta, err = u.block.Decrypt(encryptedMeta)
 			if err != nil {
 				UnderlayMalformedUDP.Add(1)
@@ -340,6 +338,59 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 					log.Tracef("%v Decrypt() failed with UDP packet from %v", u, addr)
 				}
 				continue
+			}
+		} else {
+			var decrypted bool
+			var err error
+			// Try existing sessions.
+			u.sessionLock.Lock()
+			for _, session := range u.sessionMap {
+				if session.block != nil && session.RemoteAddr().String() == addr.String() {
+					decryptedMeta, err = session.block.Decrypt(encryptedMeta)
+					if err == nil {
+						decrypted = true
+						blockCipher = session.block
+						break
+					}
+				}
+			}
+			u.sessionLock.Unlock()
+			if !decrypted {
+				// This is a new session. Try all registered users.
+				isKnownSession = false
+				for _, user := range u.users {
+					var password []byte
+					password, err = hex.DecodeString(user.GetHashedPassword())
+					if err != nil {
+						log.Debugf("unable to decode hashed password %q from user %q", user.GetHashedPassword(), user.GetName())
+						continue
+					}
+					if len(password) == 0 {
+						password = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
+					}
+					blockCipher, decryptedMeta, err = cipher.TryDecrypt(encryptedMeta, password, true)
+					if err == nil {
+						decrypted = true
+						blockCipher.SetBlockContext(cipher.BlockContext{
+							UserName: user.GetName(),
+						})
+						break
+					}
+				}
+			}
+			if !decrypted {
+				UnderlayMalformedUDP.Add(1)
+				if log.IsLevelEnabled(log.TraceLevel) {
+					log.Tracef("%v TryDecrypt() failed with UDP packet from %v", u, addr)
+				}
+				continue
+			} else {
+				if blockCipher == nil {
+					panic("UDPUnderlay readOneSegment(): block cipher is nil after decryption is successful")
+				}
+				if log.IsLevelEnabled(log.TraceLevel) {
+					log.Tracef("%v successfully decrypted UDP packet metadata from %v", u, addr)
+				}
 			}
 		}
 		if len(decryptedMeta) != metadataLength {
@@ -354,9 +405,12 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 			if err := ss.Unmarshal(decryptedMeta); err != nil {
 				return nil, nil, fmt.Errorf("Unmarshal() to sessionStruct failed: %w", err)
 			}
-			seg, err = u.readSessionSegment(ss, b[udpNonHeaderPosition:])
+			seg, err = u.readSessionSegment(ss, b[udpNonHeaderPosition:], blockCipher)
 			if err != nil {
 				return nil, nil, err
+			}
+			if !isKnownSession && blockCipher != nil {
+				seg.block = blockCipher
 			}
 			return seg, addr, nil
 		} else if isDataAckProtocol(p) {
@@ -364,9 +418,12 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 			if err := das.Unmarshal(decryptedMeta); err != nil {
 				return nil, nil, fmt.Errorf("Unmarshal() to dataAckStruct failed: %w", err)
 			}
-			seg, err = u.readDataAckSegment(das, b[udpNonHeaderPosition:])
+			seg, err = u.readDataAckSegment(das, b[udpNonHeaderPosition:], blockCipher)
 			if err != nil {
 				return nil, nil, err
+			}
+			if !isKnownSession && blockCipher != nil {
+				seg.block = blockCipher
 			}
 			return seg, addr, nil
 		}
@@ -376,7 +433,7 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 	}
 }
 
-func (u *UDPUnderlay) readSessionSegment(ss *sessionStruct, remaining []byte) (*segment, error) {
+func (u *UDPUnderlay) readSessionSegment(ss *sessionStruct, remaining []byte, blockCipher cipher.BlockCipher) (*segment, error) {
 	var decryptedPayload []byte
 	var err error
 
@@ -384,13 +441,25 @@ func (u *UDPUnderlay) readSessionSegment(ss *sessionStruct, remaining []byte) (*
 		if len(remaining) < int(ss.payloadLen)+cipher.DefaultOverhead {
 			return nil, fmt.Errorf("payload: received incomplete UDP packet")
 		}
-		decryptedPayload, err = u.block.Decrypt(remaining[:ss.payloadLen+cipher.DefaultOverhead])
+		if blockCipher == nil {
+			if u.isClient {
+				blockCipher = u.block
+			} else {
+				panic("UDPUnderlay readSessionSegment(): block is nil")
+			}
+		}
+		encryptedPayload := remaining[:cipher.DefaultNonceSize+ss.payloadLen+cipher.DefaultOverhead]
+		decryptedPayload, err = blockCipher.Decrypt(encryptedPayload)
 		if err != nil {
 			return nil, fmt.Errorf("Decrypt() failed: %w", err)
 		}
-	}
-	if int(ss.payloadLen)+cipher.DefaultOverhead+int(ss.suffixLen) != len(remaining) {
-		return nil, fmt.Errorf("padding: size not match")
+		if cipher.DefaultNonceSize+int(ss.payloadLen)+cipher.DefaultOverhead+int(ss.suffixLen) != len(remaining) {
+			return nil, fmt.Errorf("padding: size not match")
+		}
+	} else {
+		if int(ss.suffixLen) != len(remaining) {
+			return nil, fmt.Errorf("padding: size not match")
+		}
 	}
 
 	return &segment{
@@ -399,7 +468,7 @@ func (u *UDPUnderlay) readSessionSegment(ss *sessionStruct, remaining []byte) (*
 	}, nil
 }
 
-func (u *UDPUnderlay) readDataAckSegment(das *dataAckStruct, remaining []byte) (*segment, error) {
+func (u *UDPUnderlay) readDataAckSegment(das *dataAckStruct, remaining []byte, blockCipher cipher.BlockCipher) (*segment, error) {
 	var decryptedPayload []byte
 	var err error
 
@@ -410,13 +479,25 @@ func (u *UDPUnderlay) readDataAckSegment(das *dataAckStruct, remaining []byte) (
 		if len(remaining) < int(das.payloadLen)+cipher.DefaultOverhead {
 			return nil, fmt.Errorf("payload: received incomplete UDP packet")
 		}
-		decryptedPayload, err = u.block.Decrypt(remaining[:das.payloadLen+cipher.DefaultOverhead])
+		if blockCipher == nil {
+			if u.isClient {
+				blockCipher = u.block
+			} else {
+				panic("UDPUnderlay readDataAckSegment(): block is nil")
+			}
+		}
+		encryptedPayload := remaining[:cipher.DefaultNonceSize+das.payloadLen+cipher.DefaultOverhead]
+		decryptedPayload, err = blockCipher.Decrypt(encryptedPayload)
 		if err != nil {
 			return nil, fmt.Errorf("Decrypt() failed: %w", err)
 		}
-	}
-	if int(das.payloadLen)+cipher.DefaultOverhead+int(das.suffixLen) != len(remaining) {
-		return nil, fmt.Errorf("padding: size not match")
+		if cipher.DefaultNonceSize+int(das.payloadLen)+cipher.DefaultOverhead+int(das.suffixLen) != len(remaining) {
+			return nil, fmt.Errorf("padding: size not match")
+		}
+	} else {
+		if int(das.suffixLen) != len(remaining) {
+			return nil, fmt.Errorf("padding: size not match")
+		}
 	}
 
 	return &segment{
@@ -436,22 +517,51 @@ func (u *UDPUnderlay) writeOneSegment(seg *segment, addr *net.UDPAddr) error {
 	u.sendMutex.Lock()
 	defer u.sendMutex.Unlock()
 
-	if u.block == nil {
-		return fmt.Errorf("%v cipher block is not ready", u)
+	var blockCipher cipher.BlockCipher
+	if u.isClient {
+		if u.block == nil {
+			return fmt.Errorf("%v cipher block is not ready", u)
+		} else {
+			blockCipher = u.block
+		}
+	} else {
+		if seg.block != nil {
+			blockCipher = seg.block
+		} else {
+			sessionID, err := seg.SessionID()
+			if err != nil {
+				return fmt.Errorf("%v SessionID() failed: %v", seg, err)
+			}
+			u.sessionLock.Lock()
+			session, ok := u.sessionMap[sessionID]
+			if !ok {
+				return fmt.Errorf("session %d not found", sessionID)
+			}
+			if session.block == nil {
+				return fmt.Errorf("%v cipher block is not ready", session)
+			} else {
+				blockCipher = session.block
+			}
+			u.sessionLock.Unlock()
+		}
 	}
+
 	if ss, ok := toSessionStruct(seg.metadata); ok {
-		suffixLen := rng.Intn(255)
+		suffixLen := rng.Intn(MaxPaddingSize(u.mtu, u.IPVersion(), u.TransportProtocol(), int(ss.payloadLen), 0) + 1)
 		ss.suffixLen = uint8(suffixLen)
 		padding := newPadding(suffixLen)
+		if log.IsLevelEnabled(log.TraceLevel) {
+			log.Tracef("%v is sending %v", u, seg)
+		}
 
-		plaintextMetadata := ss.Marshal()
-		encryptedMetadata, err := u.block.Encrypt(plaintextMetadata)
+		plaintextMetadata := seg.metadata.Marshal()
+		encryptedMetadata, err := blockCipher.Encrypt(plaintextMetadata)
 		if err != nil {
 			return fmt.Errorf("Encrypt() failed: %w", err)
 		}
 		dataToSend := encryptedMetadata
 		if len(seg.payload) > 0 {
-			encryptedPayload, err := u.block.Encrypt(seg.payload)
+			encryptedPayload, err := blockCipher.Encrypt(seg.payload)
 			if err != nil {
 				return fmt.Errorf("Encrypt() failed: %w", err)
 			}
@@ -462,21 +572,24 @@ func (u *UDPUnderlay) writeOneSegment(seg *segment, addr *net.UDPAddr) error {
 			return fmt.Errorf("WriteToUDP() failed: %w", err)
 		}
 	} else if das, ok := toDataAckStruct(seg.metadata); ok {
-		paddingLen1 := rng.Intn(255)
-		paddingLen2 := rng.Intn(255)
+		paddingLen1 := rng.Intn(MaxPaddingSize(u.mtu, u.IPVersion(), u.TransportProtocol(), int(das.payloadLen), 0) + 1)
+		paddingLen2 := rng.Intn(MaxPaddingSize(u.mtu, u.IPVersion(), u.TransportProtocol(), int(das.payloadLen), paddingLen1) + 1)
 		das.prefixLen = uint8(paddingLen1)
 		das.suffixLen = uint8(paddingLen2)
 		padding1 := newPadding(paddingLen1)
 		padding2 := newPadding(paddingLen2)
+		if log.IsLevelEnabled(log.TraceLevel) {
+			log.Tracef("%v is sending %v", u, seg)
+		}
 
-		plaintextMetadata := das.Marshal()
-		encryptedMetadata, err := u.block.Encrypt(plaintextMetadata)
+		plaintextMetadata := seg.metadata.Marshal()
+		encryptedMetadata, err := blockCipher.Encrypt(plaintextMetadata)
 		if err != nil {
 			return fmt.Errorf("Encrypt() failed: %w", err)
 		}
 		dataToSend := append(encryptedMetadata, padding1...)
 		if len(seg.payload) > 0 {
-			encryptedPayload, err := u.block.Encrypt(seg.payload)
+			encryptedPayload, err := blockCipher.Encrypt(seg.payload)
 			if err != nil {
 				return fmt.Errorf("Encrypt() failed: %w", err)
 			}
@@ -487,12 +600,12 @@ func (u *UDPUnderlay) writeOneSegment(seg *segment, addr *net.UDPAddr) error {
 			return fmt.Errorf("WriteToUDP() failed: %w", err)
 		}
 	} else if ccs, ok := toCloseConnStruct(seg.metadata); ok {
-		suffixLen := rng.Intn(255)
+		suffixLen := rng.Intn(MaxPaddingSize(u.mtu, u.IPVersion(), u.TransportProtocol(), 0, 0) + 1)
 		ccs.suffixLen = uint8(suffixLen)
 		padding := newPadding(suffixLen)
 
-		plaintextMetadata := ccs.Marshal()
-		encryptedMetadata, err := u.block.Encrypt(plaintextMetadata)
+		plaintextMetadata := seg.metadata.Marshal()
+		encryptedMetadata, err := blockCipher.Encrypt(plaintextMetadata)
 		if err != nil {
 			return fmt.Errorf("Encrypt() failed: %w", err)
 		}

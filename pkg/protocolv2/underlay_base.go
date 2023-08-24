@@ -103,7 +103,7 @@ func (b *baseUnderlay) RemoteAddr() net.Addr {
 	return netutil.NilNetAddr()
 }
 
-func (b *baseUnderlay) AddSession(s *Session) error {
+func (b *baseUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
 	if s == nil {
 		return stderror.ErrNullPointer
 	}
@@ -130,6 +130,7 @@ func (b *baseUnderlay) AddSession(s *Session) error {
 		b.sessionMap[s.id] = s
 	}
 	s.conn = b
+	s.remoteAddr = remoteAddr
 	s.forwardStateTo(sessionAttached)
 
 	if s.isClient {

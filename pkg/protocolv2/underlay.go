@@ -59,8 +59,9 @@ type Underlay interface {
 	UnderlayProperties
 
 	// Add a session to the underlay connection.
+	// Optionally, the remote network address can be specified for the session.
 	// The session is ready to use when this returns.
-	AddSession(*Session) error
+	AddSession(*Session, net.Addr) error
 
 	// Remove a session from the underlay connection.
 	// The session is destroyed when this returns.

@@ -270,31 +270,40 @@ func (m *Mux) DialContext(ctx context.Context) (net.Conn, error) {
 			if err != nil {
 				return nil, fmt.Errorf("NewTCPUnderlay() failed: %v", err)
 			}
-			m.underlays = append(m.underlays, underlay)
-			UnderlayActiveOpens.Add(1)
-			currEst := UnderlayCurrEstablished.Add(1)
-			maxConn := UnderlayMaxConn.Load()
-			if currEst > maxConn {
-				UnderlayMaxConn.Store(currEst)
+		case netutil.UDPTransport:
+			block, err := cipher.BlockCipherFromPassword(m.password, true)
+			if err != nil {
+				return nil, fmt.Errorf("cipher.BlockCipherFromPassword() failed: %v", err)
 			}
-			go func() {
-				err := underlay.RunEventLoop(ctx)
-				if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
-					log.Debugf("%v RunEventLoop(): %v", underlay, err)
-				}
-				underlay.Close()
-				UnderlayCurrEstablished.Add(-1)
-				// Dead underlay will be cleaned later.
-			}()
+			underlay, err = NewUDPUnderlay(ctx, p.RemoteAddr().Network(), "", p.RemoteAddr().String(), p.MTU(), block)
+			if err != nil {
+				return nil, fmt.Errorf("NewUDPUnderlay() failed: %v", err)
+			}
 		default:
 			return nil, fmt.Errorf("unsupport transport protocol %v", p.TransportProtocol())
 		}
+		m.underlays = append(m.underlays, underlay)
+		UnderlayActiveOpens.Add(1)
+		currEst := UnderlayCurrEstablished.Add(1)
+		maxConn := UnderlayMaxConn.Load()
+		if currEst > maxConn {
+			UnderlayMaxConn.Store(currEst)
+		}
+		go func() {
+			err := underlay.RunEventLoop(ctx)
+			if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
+				log.Debugf("%v RunEventLoop(): %v", underlay, err)
+			}
+			underlay.Close()
+			UnderlayCurrEstablished.Add(-1)
+			// Dead underlay will be cleaned later.
+		}()
 	} else {
 		log.Debugf("Reuse existing underlay %v", underlay)
 	}
 
 	session := NewSession(mrand.Uint32(), true, underlay.MTU())
-	if err := underlay.AddSession(session); err != nil {
+	if err := underlay.AddSession(session, nil); err != nil {
 		return nil, fmt.Errorf("AddSession() failed: %v", err)
 	}
 	return session, nil
@@ -320,12 +329,12 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 		}
 		log.Infof("Mux listening to endpoint %s %s", network, laddr)
 		for {
-			underlay, err := m.acceptUnderlay(rawListener, properties)
+			underlay, err := m.acceptTCPUnderlay(rawListener, properties)
 			if err != nil {
 				m.chAcceptErr <- err
 				return
 			}
-			log.Debugf("Created new server TCP underlay [%v - %v]", underlay.LocalAddr(), underlay.RemoteAddr())
+			log.Debugf("Created new server underlay %v", underlay)
 			UnderlayPassiveOpens.Add(1)
 			currEst := UnderlayCurrEstablished.Add(1)
 			maxConn := UnderlayMaxConn.Load()
@@ -353,13 +362,51 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 				}
 			}()
 		}
+	case "udp", "udp4", "udp6":
+		conn, err := net.ListenUDP(network, properties.LocalAddr().(*net.UDPAddr))
+		if err != nil {
+			m.chAcceptErr <- fmt.Errorf("net.ListenUDP() failed: %w", err)
+			return
+		}
+		log.Infof("Mux listening to endpoint %s %s", network, laddr)
+		underlay := &UDPUnderlay{
+			baseUnderlay: *newBaseUnderlay(false, properties.MTU()),
+			conn:         conn,
+			users:        m.users,
+		}
+		log.Debugf("Created new server underlay %v", underlay)
+		UnderlayPassiveOpens.Add(1)
+		currEst := UnderlayCurrEstablished.Add(1)
+		maxConn := UnderlayMaxConn.Load()
+		if currEst > maxConn {
+			UnderlayMaxConn.Store(currEst)
+		}
+		go func() {
+			err := underlay.RunEventLoop(context.Background())
+			if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
+				log.Debugf("%v RunEventLoop(): %v", underlay, err)
+			}
+			underlay.Close()
+			UnderlayCurrEstablished.Add(-1)
+		}()
+		go func() {
+			for {
+				conn, err := underlay.Accept()
+				if err != nil {
+					if !stderror.IsEOF(err) && !stderror.IsClosed(err) {
+						log.Debugf("%v Accept(): %v", underlay, err)
+					}
+					break
+				}
+				m.chAccept <- conn
+			}
+		}()
 	default:
 		m.chAcceptErr <- fmt.Errorf("unsupported underlay network type %q", network)
-		return
 	}
 }
 
-func (m *Mux) acceptUnderlay(rawListener net.Listener, properties UnderlayProperties) (Underlay, error) {
+func (m *Mux) acceptTCPUnderlay(rawListener net.Listener, properties UnderlayProperties) (Underlay, error) {
 	rawConn, err := rawListener.Accept()
 	if err != nil {
 		return nil, fmt.Errorf("Accept() underlay failed: %w", err)
@@ -402,13 +449,13 @@ func (m *Mux) serverWrapTCPConn(rawConn net.Conn, mtu int, users map[string]*app
 // cleanUnderlay removes closed underlays.
 // This method must be called when holding the lock.
 func (m *Mux) cleanUnderlay() {
-	remaning := make([]Underlay, 0)
+	remaining := make([]Underlay, 0)
 	for _, underlay := range m.underlays {
 		select {
 		case <-underlay.Done():
 		default:
-			remaning = append(remaning, underlay)
+			remaining = append(remaining, underlay)
 		}
 	}
-	m.underlays = remaning
+	m.underlays = remaining
 }

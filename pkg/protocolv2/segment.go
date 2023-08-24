@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/mathext"
 	"github.com/enfein/mieru/pkg/netutil"
@@ -30,6 +31,12 @@ import (
 const (
 	// Maximum protocol data unit supported in a single Write() call from application.
 	MaxPDU = 16 * 1024
+
+	// Maxinum number of transmission before marking the session as dead.
+	txCountLimit = 10
+
+	// Number of fast ack received before retransmission.
+	fastAckLimit = 3
 )
 
 // MaxFragmentSize returns the maximum payload size in a fragment.
@@ -53,19 +60,57 @@ func MaxFragmentSize(mtu int, ipVersion netutil.IPVersion, transport netutil.Tra
 	return mathext.Max(0, res)
 }
 
+// MaxPaddingSize returns the maximum padding size of a segment.
+func MaxPaddingSize(mtu int, ipVersion netutil.IPVersion, transport netutil.TransportProtocol, fragmentSize int, existingPaddingSize int) int {
+	if transport == netutil.TCPTransport {
+		// No limit.
+		return 255
+	}
+
+	res := mtu - fragmentSize - udpOverhead
+	if ipVersion == netutil.IPVersion4 {
+		res -= 20
+	} else {
+		res -= 40
+	}
+	if transport == netutil.UDPTransport {
+		res -= 8
+	} else {
+		res -= 20
+	}
+	if res <= int(existingPaddingSize) {
+		return 0
+	}
+	return mathext.Min(res-int(existingPaddingSize), 255)
+}
+
 // segment contains metadata and actual payload.
 type segment struct {
 	metadata  metadata
-	payload   []byte // also can be a fragment
-	txCount   byte
-	fastAck   byte
-	txTime    time.Time     // most recent tx time
-	txTimeout time.Duration // need to receive ACK within this duration
+	payload   []byte             // also can be a fragment
+	txCount   byte               // number of transmission times
+	fastAck   byte               // accumulated out of order ACK
+	txTime    time.Time          // most recent tx time
+	txTimeout time.Duration      // need to receive ACK within this duration
+	block     cipher.BlockCipher // cipher block to encrypt or decrypt the payload
 }
 
 // Protocol returns the protocol of the segment.
 func (s *segment) Protocol() byte {
 	return s.metadata.Protocol()
+}
+
+// SessionID returns the session ID of the segment.
+func (s *segment) SessionID() (uint32, error) {
+	das, ok := s.metadata.(*dataAckStruct)
+	if ok {
+		return das.sessionID, nil
+	}
+	ss, ok := s.metadata.(*sessionStruct)
+	if ok {
+		return ss.sessionID, nil
+	}
+	return 0, stderror.ErrUnsupported
 }
 
 // Seq returns the sequence number of the segment.
@@ -104,7 +149,7 @@ func (s *segment) Less(than *segment) bool {
 }
 
 func (s *segment) String() string {
-	return fmt.Sprintf("segment{metadata=%v, payloadLen=%d}", s.metadata, len(s.payload))
+	return fmt.Sprintf("segment{metadata=%v}", s.metadata)
 }
 
 func segmentLessFunc(a, b *segment) bool {
@@ -164,7 +209,7 @@ func (t *segmentTree) Insert(seg *segment) (ok bool) {
 }
 
 // InsertBlocking is same as Insert, but blocks when the tree is full.
-func (t *segmentTree) InsertBlocking(seg *segment) (ok bool) {
+func (t *segmentTree) InsertBlocking(seg *segment) {
 	if seg == nil {
 		panic("Insert() nil segment")
 	}
@@ -185,7 +230,6 @@ func (t *segmentTree) InsertBlocking(seg *segment) (ok bool) {
 	} else {
 		t.empty.Broadcast()
 	}
-	return true
 }
 
 // DeleteMin removes the smallest item from the tree.
@@ -209,7 +253,7 @@ func (t *segmentTree) DeleteMin() (*segment, bool) {
 }
 
 // DeleteMinBlocking is the same as DeleteMin, but blocks when the tree is empty.
-func (t *segmentTree) DeleteMinBlocking() (*segment, bool) {
+func (t *segmentTree) DeleteMinBlocking() *segment {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -224,7 +268,7 @@ func (t *segmentTree) DeleteMinBlocking() (*segment, bool) {
 		panic("segmentTree.DeleteMin() return nil")
 	}
 	t.full.Broadcast()
-	return seg, true
+	return seg
 }
 
 // DeleteMinIf removes the smallest item from the tree if
@@ -258,7 +302,8 @@ func (t *segmentTree) DeleteMinIf(si segmentIterator) (*segment, bool) {
 	return seg, delete
 }
 
-// Ascend iterates the segment tree in ascending order.
+// Ascend iterates the segment tree in ascending order,
+// until the iterator returns false.
 func (t *segmentTree) Ascend(si segmentIterator) {
 	t.mu.Lock()
 	defer t.mu.Unlock()

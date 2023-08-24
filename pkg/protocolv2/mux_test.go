@@ -20,7 +20,7 @@ import (
 	"context"
 	"io"
 	mrand "math/rand"
-	"strconv"
+	"net"
 	"sync"
 	"testing"
 	"time"
@@ -100,7 +100,7 @@ func TestIPv4TCPUnderlay(t *testing.T) {
 		mtu:               1500,
 		ipVersion:         netutil.IPVersion4,
 		transportProtocol: netutil.TCPTransport,
-		localAddr:         netutil.NetAddr{Net: "tcp", Str: "127.0.0.1:" + strconv.Itoa(port)},
+		localAddr:         &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
 	}
 	serverMux := NewMux(false).
 		SetServerUsers(users).
@@ -118,9 +118,9 @@ func TestIPv4TCPUnderlay(t *testing.T) {
 		mtu:               1500,
 		ipVersion:         netutil.IPVersion4,
 		transportProtocol: netutil.TCPTransport,
-		remoteAddr:        netutil.NetAddr{Net: "tcp", Str: "127.0.0.1:" + strconv.Itoa(port)},
+		remoteAddr:        &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
 	}
-	runClient(t, clientDescriptor, []byte("xiaochitang"), []byte("kuiranbudong"), 4)
+	runClient(t, clientDescriptor, []byte("xiaochitang"), []byte("kuiranbudong"), 1)
 	if err := serverMux.Close(); err != nil {
 		t.Errorf("Server mux close failed: %v", err)
 	}
@@ -136,9 +136,48 @@ func TestIPv6TCPUnderlay(t *testing.T) {
 	}
 	serverDescriptor := underlayDescriptor{
 		mtu:               1500,
-		ipVersion:         netutil.IPVersion4,
+		ipVersion:         netutil.IPVersion6,
 		transportProtocol: netutil.TCPTransport,
-		localAddr:         netutil.NetAddr{Net: "tcp", Str: "[::1]:" + strconv.Itoa(port)},
+		localAddr:         &net.TCPAddr{IP: net.ParseIP("::1"), Port: port},
+	}
+	serverMux := NewMux(false).
+		SetServerUsers(users).
+		SetServerHandler(testtool.TestHelperConnHandler{}).
+		SetEndpoints([]UnderlayProperties{serverDescriptor})
+
+	go func() {
+		if err := serverMux.ListenAndServeAll(); err != nil {
+			t.Errorf("[%s] ListenAndServeAll() failed: %v", time.Now().Format(testtool.TimeLayout), err)
+		}
+	}()
+	time.Sleep(1 * time.Second)
+
+	clientDescriptor := underlayDescriptor{
+		mtu:               1500,
+		ipVersion:         netutil.IPVersion6,
+		transportProtocol: netutil.TCPTransport,
+		remoteAddr:        &net.TCPAddr{IP: net.ParseIP("::1"), Port: port},
+	}
+	runClient(t, clientDescriptor, []byte("xiaochitang"), []byte("kuiranbudong"), 1)
+	if err := serverMux.Close(); err != nil {
+		t.Errorf("Server mux close failed: %v", err)
+	}
+}
+
+func TestIPv4UDPUnderlay(t *testing.T) {
+	t.SkipNow()
+	rng.InitSeed()
+	log.SetOutputToTest(t)
+	log.SetLevel("TRACE")
+	port, err := netutil.UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+	}
+	serverDescriptor := underlayDescriptor{
+		mtu:               1500,
+		ipVersion:         netutil.IPVersion4,
+		transportProtocol: netutil.UDPTransport,
+		localAddr:         &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
 	}
 	serverMux := NewMux(false).
 		SetServerUsers(users).
@@ -155,10 +194,49 @@ func TestIPv6TCPUnderlay(t *testing.T) {
 	clientDescriptor := underlayDescriptor{
 		mtu:               1500,
 		ipVersion:         netutil.IPVersion4,
-		transportProtocol: netutil.TCPTransport,
-		remoteAddr:        netutil.NetAddr{Net: "tcp", Str: "[::1]:" + strconv.Itoa(port)},
+		transportProtocol: netutil.UDPTransport,
+		remoteAddr:        &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
 	}
-	runClient(t, clientDescriptor, []byte("xiaochitang"), []byte("kuiranbudong"), 4)
+	runClient(t, clientDescriptor, []byte("xiaochitang"), []byte("kuiranbudong"), 1)
+	if err := serverMux.Close(); err != nil {
+		t.Errorf("Server mux close failed: %v", err)
+	}
+}
+
+func TestIPv6UDPUnderlay(t *testing.T) {
+	t.SkipNow()
+	rng.InitSeed()
+	log.SetOutputToTest(t)
+	log.SetLevel("TRACE")
+	port, err := netutil.UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+	}
+	serverDescriptor := underlayDescriptor{
+		mtu:               1500,
+		ipVersion:         netutil.IPVersion6,
+		transportProtocol: netutil.UDPTransport,
+		localAddr:         &net.UDPAddr{IP: net.ParseIP("::1"), Port: port},
+	}
+	serverMux := NewMux(false).
+		SetServerUsers(users).
+		SetServerHandler(testtool.TestHelperConnHandler{}).
+		SetEndpoints([]UnderlayProperties{serverDescriptor})
+
+	go func() {
+		if err := serverMux.ListenAndServeAll(); err != nil {
+			t.Errorf("[%s] ListenAndServeAll() failed: %v", time.Now().Format(testtool.TimeLayout), err)
+		}
+	}()
+	time.Sleep(1 * time.Second)
+
+	clientDescriptor := underlayDescriptor{
+		mtu:               1500,
+		ipVersion:         netutil.IPVersion6,
+		transportProtocol: netutil.UDPTransport,
+		remoteAddr:        &net.UDPAddr{IP: net.ParseIP("::1"), Port: port},
+	}
+	runClient(t, clientDescriptor, []byte("xiaochitang"), []byte("kuiranbudong"), 1)
 	if err := serverMux.Close(); err != nil {
 		t.Errorf("Server mux close failed: %v", err)
 	}

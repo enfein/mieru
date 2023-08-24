@@ -33,8 +33,8 @@ import (
 
 type TCPUnderlay struct {
 	baseUnderlay
-
-	conn *net.TCPConn
+	conn      *net.TCPConn
+	ipVersion netutil.IPVersion
 
 	send cipher.BlockCipher
 	recv cipher.BlockCipher
@@ -88,7 +88,7 @@ func (t *TCPUnderlay) String() string {
 	if t.conn == nil {
 		return "TCPUnderlay{}"
 	}
-	return fmt.Sprintf("TCPUnderlay{%v - %v}", t.conn.LocalAddr(), t.conn.RemoteAddr())
+	return fmt.Sprintf("TCPUnderlay{local=%v, remote=%v, mtu=%v, ipVersion=%v}", t.conn.LocalAddr(), t.conn.RemoteAddr(), t.mtu, t.IPVersion())
 }
 
 func (t *TCPUnderlay) Close() error {
@@ -111,7 +111,10 @@ func (t *TCPUnderlay) IPVersion() netutil.IPVersion {
 	if t.conn == nil {
 		return netutil.IPVersionUnknown
 	}
-	return netutil.GetIPVersion(t.conn.LocalAddr().String())
+	if t.ipVersion == netutil.IPVersionUnknown {
+		t.ipVersion = netutil.GetIPVersion(t.conn.LocalAddr().String())
+	}
+	return t.ipVersion
 }
 
 func (t *TCPUnderlay) TransportProtocol() netutil.TransportProtocol {
@@ -126,8 +129,8 @@ func (t *TCPUnderlay) RemoteAddr() net.Addr {
 	return t.conn.RemoteAddr()
 }
 
-func (t *TCPUnderlay) AddSession(s *Session) error {
-	if err := t.baseUnderlay.AddSession(s); err != nil {
+func (t *TCPUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
+	if err := t.baseUnderlay.AddSession(s, remoteAddr); err != nil {
 		return err
 	}
 	s.conn = t // override base underlay
@@ -176,7 +179,7 @@ func (t *TCPUnderlay) RunEventLoop(ctx context.Context) error {
 			return fmt.Errorf("readOneSegment() failed: %w", err)
 		}
 		if log.IsLevelEnabled(log.TraceLevel) {
-			log.Tracef("%v received one segment: protocol = %d, payload size = %d", t, seg.metadata.Protocol(), len(seg.payload))
+			log.Tracef("%v received %v", t, seg)
 		}
 		if isSessionProtocol(seg.metadata.Protocol()) {
 			switch seg.metadata.Protocol() {
@@ -228,7 +231,7 @@ func (t *TCPUnderlay) onOpenSessionRequest(seg *segment) error {
 		return fmt.Errorf("session ID %d is already used", sessionID)
 	}
 	session := NewSession(sessionID, t.isClient, t.MTU())
-	t.AddSession(session)
+	t.AddSession(session, nil)
 	session.recvChan <- seg
 	t.readySessions <- session
 	return nil
@@ -405,11 +408,14 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 	defer t.sendMutex.Unlock()
 
 	if ss, ok := toSessionStruct(seg.metadata); ok {
-		suffixLen := rng.Intn(255)
+		suffixLen := rng.Intn(MaxPaddingSize(t.mtu, t.IPVersion(), t.TransportProtocol(), int(ss.payloadLen), 0) + 1)
 		ss.suffixLen = uint8(suffixLen)
 		padding := newPadding(suffixLen)
+		if log.IsLevelEnabled(log.TraceLevel) {
+			log.Tracef("%v is sending %v", t, seg)
+		}
 
-		plaintextMetadata := ss.Marshal()
+		plaintextMetadata := seg.metadata.Marshal()
 		if err := t.maybeInitSendBlockCipher(); err != nil {
 			return fmt.Errorf("maybeInitSendBlockCipher() failed: %w", err)
 		}
@@ -430,14 +436,17 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 			return fmt.Errorf("Write() failed: %w", err)
 		}
 	} else if das, ok := toDataAckStruct(seg.metadata); ok {
-		paddingLen1 := rng.Intn(255)
-		paddingLen2 := rng.Intn(255)
+		paddingLen1 := rng.Intn(MaxPaddingSize(t.mtu, t.IPVersion(), t.TransportProtocol(), int(das.payloadLen), 0) + 1)
+		paddingLen2 := rng.Intn(MaxPaddingSize(t.mtu, t.IPVersion(), t.TransportProtocol(), int(das.payloadLen), paddingLen1) + 1)
 		das.prefixLen = uint8(paddingLen1)
 		das.suffixLen = uint8(paddingLen2)
 		padding1 := newPadding(paddingLen1)
 		padding2 := newPadding(paddingLen2)
+		if log.IsLevelEnabled(log.TraceLevel) {
+			log.Tracef("%v is sending %v", t, seg)
+		}
 
-		plaintextMetadata := das.Marshal()
+		plaintextMetadata := seg.metadata.Marshal()
 		if err := t.maybeInitSendBlockCipher(); err != nil {
 			return fmt.Errorf("maybeInitSendBlockCipher() failed: %w", err)
 		}

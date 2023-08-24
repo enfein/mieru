@@ -80,7 +80,6 @@ func TestAESGCMBlockCipherEncryptDecrypt(t *testing.T) {
 		if _, err := crand.Read(data); err != nil {
 			t.Fatalf("fail to generate data: %v", err)
 		}
-
 		ciphertext, err := cipher.Encrypt(data)
 		if err != nil {
 			t.Fatalf("Encrypt() failed: %v", err)
@@ -88,6 +87,22 @@ func TestAESGCMBlockCipherEncryptDecrypt(t *testing.T) {
 		plaintext, err := cipher.Decrypt(ciphertext)
 		if err != nil {
 			t.Fatalf("Decrypt() failed: %v", err)
+		}
+		if !bytes.Equal(data, plaintext) {
+			t.Errorf("data after decryption is different")
+		}
+
+		nonce := make([]byte, DefaultNonceSize)
+		if _, err := crand.Read(nonce); err != nil {
+			t.Fatalf("fail to generate nonce: %v", err)
+		}
+		ciphertext, err = cipher.EncryptWithNonce(data, nonce)
+		if err != nil {
+			t.Fatalf("EncryptWithNonce() failed: %v", err)
+		}
+		plaintext, err = cipher.DecryptWithNonce(ciphertext, nonce)
+		if err != nil {
+			t.Fatalf("DecryptWithNonce() failed: %v", err)
 		}
 		if !bytes.Equal(data, plaintext) {
 			t.Errorf("data after decryption is different")

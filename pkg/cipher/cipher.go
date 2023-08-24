@@ -120,6 +120,18 @@ func (c *AESGCMBlockCipher) Encrypt(plaintext []byte) ([]byte, error) {
 	return dst, nil
 }
 
+func (c *AESGCMBlockCipher) EncryptWithNonce(plaintext, nonce []byte) ([]byte, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.enableImplicitNonce {
+		return nil, fmt.Errorf("EncryptWithNonce() is not supported when implicit nonce is enabled")
+	}
+	if len(nonce) != DefaultNonceSize {
+		return nil, fmt.Errorf("want nonce size %d, got %d", DefaultNonceSize, len(nonce))
+	}
+	return c.aead.Seal(nil, nonce, plaintext, nil), nil
+}
+
 func (c *AESGCMBlockCipher) Decrypt(ciphertext []byte) ([]byte, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -144,6 +156,22 @@ func (c *AESGCMBlockCipher) Decrypt(ciphertext []byte) ([]byte, error) {
 		ciphertext = ciphertext[c.NonceSize():]
 	}
 
+	plaintext, err := c.aead.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return nil, fmt.Errorf("cipher.AEAD.Open() failed: %w", err)
+	}
+	return plaintext, nil
+}
+
+func (c *AESGCMBlockCipher) DecryptWithNonce(ciphertext, nonce []byte) ([]byte, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.enableImplicitNonce {
+		return nil, fmt.Errorf("EncryptWithNonce() is not supported when implicit nonce is enabled")
+	}
+	if len(nonce) != DefaultNonceSize {
+		return nil, fmt.Errorf("want nonce size %d, got %d", DefaultNonceSize, len(nonce))
+	}
 	plaintext, err := c.aead.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
 		return nil, fmt.Errorf("cipher.AEAD.Open() failed: %w", err)

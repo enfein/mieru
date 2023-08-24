@@ -31,6 +31,19 @@ const (
 	IPVersion6
 )
 
+func (v IPVersion) String() string {
+	switch v {
+	case IPVersionUnknown:
+		return "UNKNOWN"
+	case IPVersion4:
+		return "IPV4"
+	case IPVersion6:
+		return "IPV6"
+	default:
+		return "UNSPECIFIED"
+	}
+}
+
 // IsIPDualStack returns true if an IPv6 socket is able to send and receive
 // both IPv4 and IPv6 packets.
 //

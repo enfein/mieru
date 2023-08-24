@@ -39,8 +39,8 @@ const (
 	ackClientToServer    byte = 8
 	ackServerToClient    byte = 9
 
-	// Maximum protocol data unit that cat be attached to open session request and response.
-	maxSessionOpenPDU = 1024
+	// Maximum payload that cat be attached to open session request and response.
+	maxSessionOpenPayload = 1024
 )
 
 // metadata defines the methods supported by all metadata.

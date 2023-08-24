@@ -16,7 +16,7 @@
 package protocolv2
 
 import (
-	"math/rand"
+	mrand "math/rand"
 	"reflect"
 	"sync"
 	"testing"
@@ -56,6 +56,48 @@ func TestMaxFragmentSize(t *testing.T) {
 		got := MaxFragmentSize(tc.mtu, tc.ipVersion, tc.transport)
 		if got != tc.want {
 			t.Errorf("MaxFragmentSize() = %d, want %d", got, tc.want)
+		}
+	}
+}
+
+func TestMaxPaddingSize(t *testing.T) {
+	testcases := []struct {
+		mtu                 int
+		ipVersion           netutil.IPVersion
+		transport           netutil.TransportProtocol
+		fragmentSize        int
+		existingPaddingSize int
+		want                int
+	}{
+		{
+			1500,
+			netutil.IPVersion6,
+			netutil.TCPTransport,
+			MaxPDU,
+			255,
+			255,
+		},
+		{
+			1500,
+			netutil.IPVersion4,
+			netutil.UDPTransport,
+			1472 - udpOverhead - 16,
+			12,
+			4,
+		},
+		{
+			1500,
+			netutil.IPVersionUnknown,
+			netutil.UnknownTransport,
+			0,
+			255,
+			255,
+		},
+	}
+	for _, tc := range testcases {
+		got := MaxPaddingSize(tc.mtu, tc.ipVersion, tc.transport, tc.fragmentSize, tc.existingPaddingSize)
+		if got != tc.want {
+			t.Errorf("MaxPaddingSize() = %d, want %d", got, tc.want)
 		}
 	}
 }
@@ -135,6 +177,7 @@ func TestSegmentTree(t *testing.T) {
 
 func TestSegmentTreeBlocking(t *testing.T) {
 	rng.InitSeed()
+	sessionID := uint32(mrand.Int31())
 	st := newSegmentTree(1)
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -145,11 +188,12 @@ func TestSegmentTreeBlocking(t *testing.T) {
 		for ; i < 100; i++ {
 			seg := &segment{
 				metadata: &dataAckStruct{
-					seq: i,
+					sessionID: sessionID,
+					seq:       i,
 				},
 				payload: []byte{0},
 			}
-			s := rand.Intn(10)
+			s := mrand.Intn(10)
 			time.Sleep(time.Duration(s) * time.Millisecond)
 			st.InsertBlocking(seg)
 		}
@@ -160,11 +204,17 @@ func TestSegmentTreeBlocking(t *testing.T) {
 	go func() {
 		var i uint32 = 0
 		for ; i < 100; i++ {
-			s := rand.Intn(10)
+			s := mrand.Intn(10)
 			time.Sleep(time.Duration(s) * time.Millisecond)
-			seg, ok := st.DeleteMinBlocking()
-			if !ok {
-				t.Errorf("DeleteMinBlocking() failed")
+			seg := st.DeleteMinBlocking()
+			id, err := seg.SessionID()
+			if err != nil {
+				t.Errorf("SessionID() failed: %v", err)
+				wg.Done()
+				return
+			}
+			if id != sessionID {
+				t.Errorf("session ID = %d, want %d", id, sessionID)
 			}
 			seq, err := seg.Seq()
 			if err != nil {

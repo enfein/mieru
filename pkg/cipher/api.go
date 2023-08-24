@@ -53,8 +53,16 @@ type BlockCipher interface {
 	// Encrypt method adds the nonce in the dst, then encryptes the src.
 	Encrypt(plaintext []byte) ([]byte, error)
 
+	// EncryptWithNonce encrypts the src with the given nonce.
+	// This method is not supported by stateful BlockCipher.
+	EncryptWithNonce(plaintext, nonce []byte) ([]byte, error)
+
 	// Decrypt method removes the nonce in the src, then decryptes the src.
 	Decrypt(ciphertext []byte) ([]byte, error)
+
+	// DecryptWithNonce decrypts the src with the given nonce.
+	// This method is not supported by stateful BlockCipher.
+	DecryptWithNonce(ciphertext, nonce []byte) ([]byte, error)
 
 	NonceSize() int
 

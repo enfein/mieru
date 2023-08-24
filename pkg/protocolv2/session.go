@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/congestion"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/mathext"
@@ -37,6 +38,7 @@ const (
 	minWindowSize       = 32
 	maxWindowSize       = 4096
 	segmentPollInterval = 10 * time.Millisecond
+	segmentAckDelay     = 20 * time.Millisecond
 )
 
 type sessionState int
@@ -51,11 +53,13 @@ const (
 )
 
 type Session struct {
-	conn Underlay // underlay connection
+	conn  Underlay           // underlay connection
+	block cipher.BlockCipher // cipher to encrypt and decrypt data
 
 	id          uint32        // session ID number
 	isClient    bool          // if this session is owned by client
 	mtu         int           // L2 maxinum transmission unit
+	remoteAddr  net.Addr      // remote network address
 	state       sessionState  // session state
 	ready       chan struct{} // indicate the session is ready to use
 	established chan struct{} // indicate the session handshake is completed
@@ -67,10 +71,11 @@ type Session struct {
 	recvQueue *segmentTree  // segments waiting to be read by application
 	recvChan  chan *segment // channel to receive segment from underlay
 
-	nextSeq   uint32 // next sequence number to send a segment
-	nextRecv  uint32 // next sequence number to receive
-	unackSeq  uint32 // unacknowledged sequence number
-	unreadBuf []byte // payload removed from the recvQueue that haven't been read by application
+	nextSeq    uint32    // next sequence number to send a segment
+	nextRecv   uint32    // next sequence number to receive
+	unackSeq   uint32    // unacknowledged sequence number
+	lastTXTime time.Time // last timestamp when a segment is sent
+	unreadBuf  []byte    // payload removed from the recvQueue that haven't been read by application
 
 	rttStat       *congestion.RTTStats
 	sendAlgorithm *congestion.CubicSendAlgorithm
@@ -90,6 +95,7 @@ func NewSession(id uint32, isClient bool, mtu int) *Session {
 	rttStat.SetRTOMultiplier(1.5)
 	return &Session{
 		conn:          nil,
+		block:         nil,
 		id:            id,
 		isClient:      isClient,
 		mtu:           mtu,
@@ -146,11 +152,7 @@ func (s *Session) Read(b []byte) (n int, err error) {
 
 	// Read all the fragments of the original message.
 	for {
-		seg, ok := s.recvQueue.DeleteMinBlocking()
-		if !ok {
-			// recvQueue is dead.
-			return 0, io.EOF
-		}
+		seg := s.recvQueue.DeleteMinBlocking()
 
 		if s.isClient && seg.metadata.Protocol() == openSessionResponse && (s.state == sessionAttached || s.state == sessionOpening) {
 			s.forwardStateTo(sessionEstablished)
@@ -204,14 +206,12 @@ func (s *Session) Write(b []byte) (n int, err error) {
 					baseStruct: baseStruct{
 						protocol: openSessionRequest,
 					},
-					sessionID:  s.id,
-					seq:        s.nextSeq,
-					statusCode: 0,
-					payloadLen: 0,
+					sessionID: s.id,
+					seq:       s.nextSeq,
 				},
 			}
 			s.nextSeq++
-			if len(b) <= maxSessionOpenPDU {
+			if len(b) <= maxSessionOpenPayload {
 				seg.metadata.(*sessionStruct).payloadLen = uint16(len(b))
 				seg.payload = b
 			}
@@ -230,14 +230,12 @@ func (s *Session) Write(b []byte) (n int, err error) {
 					baseStruct: baseStruct{
 						protocol: openSessionResponse,
 					},
-					sessionID:  s.id,
-					seq:        s.nextSeq,
-					statusCode: 0,
-					payloadLen: 0,
+					sessionID: s.id,
+					seq:       s.nextSeq,
 				},
 			}
 			s.nextSeq++
-			if len(b) <= maxSessionOpenPDU {
+			if len(b) <= maxSessionOpenPayload {
 				seg.metadata.(*sessionStruct).payloadLen = uint16(len(b))
 				seg.payload = b
 			}
@@ -279,7 +277,7 @@ func (s *Session) Write(b []byte) (n int, err error) {
 				sessionID:  s.id,
 				seq:        s.nextSeq,
 				unAckSeq:   s.unackSeq,
-				windowSize: uint16(s.recvBuf.Remaining()),
+				windowSize: uint16(mathext.Min(uint32(s.recvBuf.Remaining()), s.sendAlgorithm.CongestionWindowSize())),
 				fragment:   uint8(i),
 				payloadLen: uint16(partLen),
 			},
@@ -317,10 +315,8 @@ func (s *Session) Close() error {
 			baseStruct: baseStruct{
 				protocol: closeSessionRequest,
 			},
-			sessionID:  s.id,
-			seq:        s.nextSeq,
-			statusCode: 0,
-			payloadLen: 0,
+			sessionID: s.id,
+			seq:       s.nextSeq,
 		},
 	}
 	s.nextSeq++
@@ -335,6 +331,9 @@ func (s *Session) LocalAddr() net.Addr {
 }
 
 func (s *Session) RemoteAddr() net.Addr {
+	if !netutil.IsNilNetAddr(s.remoteAddr) {
+		return s.remoteAddr
+	}
 	return s.conn.RemoteAddr()
 }
 
@@ -373,6 +372,7 @@ func (s *Session) runInputLoop(ctx context.Context) error {
 }
 
 func (s *Session) runOutputLoop(ctx context.Context) error {
+	var lastErr error
 	for {
 		select {
 		case <-ctx.Done():
@@ -380,6 +380,9 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 		case <-s.done:
 			return nil
 		default:
+			if lastErr != nil {
+				return lastErr
+			}
 			switch s.conn.TransportProtocol() {
 			case netutil.TCPTransport:
 				for {
@@ -388,14 +391,102 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 						time.Sleep(segmentPollInterval)
 						break
 					}
-					if err := s.output(seg); err != nil {
+					if err := s.output(seg, nil); err != nil {
 						return fmt.Errorf("output() failed: %v", err)
 					}
 				}
 			case netutil.UDPTransport:
-				// Delete segments that are acked in sendBuf.
-				// Refill sendBuf with segments from sendQueue.
-				// Flush sendBuf.
+				needRetransmission := false
+				hasLoss := false
+				hasTimeout := false
+				// Resend segments in sendBuf.
+				s.sendBuf.Ascend(func(iter *segment) bool {
+					if iter.txCount >= txCountLimit {
+						lastErr = fmt.Errorf("too many retransmission of %v", iter)
+						return false
+					}
+					if iter.fastAck >= fastAckLimit {
+						needRetransmission = true
+						hasLoss = true
+						iter.txCount++
+						iter.fastAck = 0
+						iter.txTime = time.Now()
+						iter.txTimeout = s.rttStat.RTO()
+						if err := s.output(iter, s.RemoteAddr()); err != nil {
+							lastErr = fmt.Errorf("output() failed: %v", err)
+							return false
+						}
+						return true
+					}
+					if time.Since(iter.txTime) > iter.txTimeout {
+						needRetransmission = true
+						hasTimeout = true
+						iter.txCount++
+						iter.fastAck = 0
+						iter.txTime = time.Now()
+						iter.txTimeout = s.rttStat.RTO()
+						if err := s.output(iter, s.RemoteAddr()); err != nil {
+							lastErr = fmt.Errorf("output() failed: %v", err)
+							return false
+						}
+						return true
+					}
+					return true
+				})
+				if hasTimeout {
+					s.sendAlgorithm.OnTimeout()
+				} else if hasLoss {
+					s.sendAlgorithm.OnLoss()
+				}
+				// Send new segments in sendQueue.
+				segmentMoved := 0
+				if s.sendQueue.Len() > 0 {
+					maxSegmentToMove := mathext.Min(s.sendQueue.Len(), s.sendBuf.Remaining())
+					maxSegmentToMove = mathext.Min(maxSegmentToMove, int(s.sendAlgorithm.CongestionWindowSize()))
+					for {
+						seg, deleted := s.sendQueue.DeleteMinIf(func(iter *segment) bool {
+							if segmentMoved >= maxSegmentToMove {
+								return false
+							}
+							segmentMoved++
+							return true
+						})
+						if !deleted {
+							break
+						}
+						seg.txCount++
+						seg.fastAck = 0
+						seg.txTime = time.Now()
+						seg.txTimeout = s.rttStat.RTO()
+						if err := s.output(seg, s.RemoteAddr()); err != nil {
+							return fmt.Errorf("output() failed: %v", err)
+						}
+						s.sendBuf.InsertBlocking(seg)
+					}
+				}
+				if !needRetransmission && segmentMoved == 0 {
+					// Send ACK if needed.
+					if time.Since(s.lastTXTime) > segmentAckDelay {
+						baseStruct := baseStruct{}
+						if s.isClient {
+							baseStruct.protocol = ackClientToServer
+						} else {
+							baseStruct.protocol = ackServerToClient
+						}
+						ackSeg := &segment{
+							metadata: &dataAckStruct{
+								baseStruct: baseStruct,
+								sessionID:  s.id,
+								seq:        s.unackSeq,
+								unAckSeq:   s.unackSeq,
+								windowSize: uint16(mathext.Min(uint32(s.recvBuf.Remaining()), s.sendAlgorithm.CongestionWindowSize())),
+							},
+						}
+						if err := s.output(ackSeg, s.RemoteAddr()); err != nil {
+							return fmt.Errorf("output() failed: %v", err)
+						}
+					}
+				}
 			default:
 				return fmt.Errorf("unsupported transport protocol %v", s.conn.TransportProtocol())
 			}
@@ -406,9 +497,6 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 // input reads incoming packets from network and assemble
 // them in the receive buffer and receive queue.
 func (s *Session) input(seg *segment) error {
-	if log.IsLevelEnabled(log.TraceLevel) {
-		log.Tracef("%v input %v", s, seg)
-	}
 	protocol := seg.Protocol()
 	if s.isClient {
 		if protocol != openSessionResponse && protocol != dataServerToClient && protocol != ackServerToClient && protocol != closeSessionRequest && protocol != closeSessionResponse {
@@ -418,6 +506,9 @@ func (s *Session) input(seg *segment) error {
 		if protocol != openSessionRequest && protocol != dataClientToServer && protocol != ackClientToServer && protocol != closeSessionRequest && protocol != closeSessionResponse {
 			return stderror.ErrInvalidArgument
 		}
+	}
+	if seg.block != nil {
+		s.block = seg.block
 	}
 	if protocol == openSessionRequest || protocol == openSessionResponse || protocol == dataServerToClient || protocol == dataClientToServer {
 		return s.inputData(seg)
@@ -440,7 +531,7 @@ func (s *Session) inputData(seg *segment) error {
 		s.recvBuf.InsertBlocking(seg)
 		// Move recvBuf to recvQueue.
 		for {
-			seg, deleted := s.recvBuf.DeleteMinIf(func(iter *segment) bool {
+			seg2, deleted := s.recvBuf.DeleteMinIf(func(iter *segment) bool {
 				seq, err := iter.Seq()
 				if err != nil {
 					panic(fmt.Sprintf("%v get segment sequence number failed: %v", s, err))
@@ -450,15 +541,15 @@ func (s *Session) inputData(seg *segment) error {
 				}
 				return false
 			})
-			if seg == nil || !deleted {
+			if seg2 == nil || !deleted {
 				return nil
 			}
-			seq, err := seg.Seq()
+			seq, err := seg2.Seq()
 			if err != nil {
 				panic(fmt.Sprintf("%v get segment sequence number failed: %v", s, err))
 			}
 			if seq == s.nextRecv {
-				s.recvQueue.InsertBlocking(seg)
+				s.recvQueue.InsertBlocking(seg2)
 				s.nextRecv++
 			}
 		}
@@ -473,11 +564,11 @@ func (s *Session) inputAck(seg *segment) error {
 		// Do nothing when receive ACK from TCP protocol.
 		return nil
 	case netutil.UDPTransport:
-		// Delete all previous acknowledged segments.
+		// Delete all previous acknowledged segments from sendBuf.
 		das := seg.metadata.(*dataAckStruct)
 		unAckSeq := das.unAckSeq
 		for {
-			_, deleted := s.sendBuf.DeleteMinIf(func(iter *segment) bool {
+			seg2, deleted := s.sendBuf.DeleteMinIf(func(iter *segment) bool {
 				seq, err := iter.Seq()
 				if err != nil {
 					panic(fmt.Sprintf("%v get segment sequence number failed: %v", s, err))
@@ -490,6 +581,8 @@ func (s *Session) inputAck(seg *segment) error {
 			if !deleted {
 				break
 			}
+			s.rttStat.UpdateRTT(time.Since(seg2.txTime))
+			s.sendAlgorithm.OnAck()
 		}
 		return nil
 	default:
@@ -513,7 +606,7 @@ func (s *Session) inputClose(seg *segment) error {
 		}
 		s.nextSeq++
 		// The response will not retry if it is not delivered.
-		if err := s.output(seg2); err != nil {
+		if err := s.output(seg2, s.RemoteAddr()); err != nil {
 			return fmt.Errorf("output() failed: %v", err)
 		}
 		// Immediately shutdown event loop.
@@ -533,17 +626,19 @@ func (s *Session) inputClose(seg *segment) error {
 	return nil
 }
 
-func (s *Session) output(seg *segment) error {
-	if log.IsLevelEnabled(log.TraceLevel) {
-		log.Tracef("%v output %v", s, seg)
-	}
+func (s *Session) output(seg *segment, remoteAddr net.Addr) error {
 	switch s.conn.TransportProtocol() {
 	case netutil.TCPTransport:
 		if err := s.conn.(*TCPUnderlay).writeOneSegment(seg); err != nil {
 			return fmt.Errorf("TCPUnderlay.writeOneSegment() failed: %v", err)
 		}
+	case netutil.UDPTransport:
+		if err := s.conn.(*UDPUnderlay).writeOneSegment(seg, remoteAddr.(*net.UDPAddr)); err != nil {
+			return fmt.Errorf("UDPUnderlay.writeOneSegment() failed: %v", err)
+		}
 	default:
 		return fmt.Errorf("unsupported transport protocol %v", s.conn.TransportProtocol())
 	}
+	s.lastTXTime = time.Now()
 	return nil
 }
