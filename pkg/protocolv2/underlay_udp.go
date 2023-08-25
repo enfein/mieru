@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	udpOverhead          = cipher.DefaultNonceSize*2 + metadataLength + cipher.DefaultOverhead*2
+	udpOverhead          = cipher.DefaultNonceSize + metadataLength + cipher.DefaultOverhead*2
 	udpNonHeaderPosition = cipher.DefaultNonceSize + metadataLength + cipher.DefaultOverhead
 )
 
@@ -310,7 +310,7 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 			}
 			continue
 		}
-		if n < udpOverhead {
+		if n < udpNonHeaderPosition {
 			UnderlayMalformedUDP.Add(1)
 			if log.IsLevelEnabled(log.TraceLevel) {
 				log.Tracef("%v received UDP packet from %v with only %d bytes, which is too short", u, addr, n)
@@ -325,6 +325,7 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 			replay.NewSession.Add(1)
 			return nil, nil, fmt.Errorf("found possible replay attack in %v from %v", u, addr)
 		}
+		nonce := encryptedMeta[:cipher.DefaultNonceSize]
 
 		// Decrypt metadata.
 		var decryptedMeta []byte
@@ -388,9 +389,6 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 				if blockCipher == nil {
 					panic("UDPUnderlay readOneSegment(): block cipher is nil after decryption is successful")
 				}
-				if log.IsLevelEnabled(log.TraceLevel) {
-					log.Tracef("%v successfully decrypted UDP packet metadata from %v", u, addr)
-				}
 			}
 		}
 		if len(decryptedMeta) != metadataLength {
@@ -405,7 +403,7 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 			if err := ss.Unmarshal(decryptedMeta); err != nil {
 				return nil, nil, fmt.Errorf("Unmarshal() to sessionStruct failed: %w", err)
 			}
-			seg, err = u.readSessionSegment(ss, b[udpNonHeaderPosition:], blockCipher)
+			seg, err = u.readSessionSegment(ss, nonce, b[udpNonHeaderPosition:], blockCipher)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -418,7 +416,7 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 			if err := das.Unmarshal(decryptedMeta); err != nil {
 				return nil, nil, fmt.Errorf("Unmarshal() to dataAckStruct failed: %w", err)
 			}
-			seg, err = u.readDataAckSegment(das, b[udpNonHeaderPosition:], blockCipher)
+			seg, err = u.readDataAckSegment(das, nonce, b[udpNonHeaderPosition:], blockCipher)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -433,7 +431,7 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 	}
 }
 
-func (u *UDPUnderlay) readSessionSegment(ss *sessionStruct, remaining []byte, blockCipher cipher.BlockCipher) (*segment, error) {
+func (u *UDPUnderlay) readSessionSegment(ss *sessionStruct, nonce, remaining []byte, blockCipher cipher.BlockCipher) (*segment, error) {
 	var decryptedPayload []byte
 	var err error
 
@@ -448,12 +446,12 @@ func (u *UDPUnderlay) readSessionSegment(ss *sessionStruct, remaining []byte, bl
 				panic("UDPUnderlay readSessionSegment(): block is nil")
 			}
 		}
-		encryptedPayload := remaining[:cipher.DefaultNonceSize+ss.payloadLen+cipher.DefaultOverhead]
-		decryptedPayload, err = blockCipher.Decrypt(encryptedPayload)
+		encryptedPayload := remaining[:ss.payloadLen+cipher.DefaultOverhead]
+		decryptedPayload, err = blockCipher.DecryptWithNonce(encryptedPayload, nonce)
 		if err != nil {
-			return nil, fmt.Errorf("Decrypt() failed: %w", err)
+			return nil, fmt.Errorf("DecryptWithNonce() failed: %w", err)
 		}
-		if cipher.DefaultNonceSize+int(ss.payloadLen)+cipher.DefaultOverhead+int(ss.suffixLen) != len(remaining) {
+		if int(ss.payloadLen)+cipher.DefaultOverhead+int(ss.suffixLen) != len(remaining) {
 			return nil, fmt.Errorf("padding: size not match")
 		}
 	} else {
@@ -468,7 +466,7 @@ func (u *UDPUnderlay) readSessionSegment(ss *sessionStruct, remaining []byte, bl
 	}, nil
 }
 
-func (u *UDPUnderlay) readDataAckSegment(das *dataAckStruct, remaining []byte, blockCipher cipher.BlockCipher) (*segment, error) {
+func (u *UDPUnderlay) readDataAckSegment(das *dataAckStruct, nonce, remaining []byte, blockCipher cipher.BlockCipher) (*segment, error) {
 	var decryptedPayload []byte
 	var err error
 
@@ -486,12 +484,12 @@ func (u *UDPUnderlay) readDataAckSegment(das *dataAckStruct, remaining []byte, b
 				panic("UDPUnderlay readDataAckSegment(): block is nil")
 			}
 		}
-		encryptedPayload := remaining[:cipher.DefaultNonceSize+das.payloadLen+cipher.DefaultOverhead]
-		decryptedPayload, err = blockCipher.Decrypt(encryptedPayload)
+		encryptedPayload := remaining[:das.payloadLen+cipher.DefaultOverhead]
+		decryptedPayload, err = blockCipher.DecryptWithNonce(encryptedPayload, nonce)
 		if err != nil {
-			return nil, fmt.Errorf("Decrypt() failed: %w", err)
+			return nil, fmt.Errorf("DecryptWithNonce() failed: %w", err)
 		}
-		if cipher.DefaultNonceSize+int(das.payloadLen)+cipher.DefaultOverhead+int(das.suffixLen) != len(remaining) {
+		if int(das.payloadLen)+cipher.DefaultOverhead+int(das.suffixLen) != len(remaining) {
 			return nil, fmt.Errorf("padding: size not match")
 		}
 	} else {
@@ -520,7 +518,7 @@ func (u *UDPUnderlay) writeOneSegment(seg *segment, addr *net.UDPAddr) error {
 	var blockCipher cipher.BlockCipher
 	if u.isClient {
 		if u.block == nil {
-			return fmt.Errorf("%v cipher block is not ready", u)
+			return fmt.Errorf("%v cipher block is not ready: %w", u, stderror.ErrNotReady)
 		} else {
 			blockCipher = u.block
 		}
@@ -538,7 +536,7 @@ func (u *UDPUnderlay) writeOneSegment(seg *segment, addr *net.UDPAddr) error {
 				return fmt.Errorf("session %d not found", sessionID)
 			}
 			if session.block == nil {
-				return fmt.Errorf("%v cipher block is not ready", session)
+				return fmt.Errorf("%v cipher block is not ready: %w", session, stderror.ErrNotReady)
 			} else {
 				blockCipher = session.block
 			}
@@ -559,11 +557,12 @@ func (u *UDPUnderlay) writeOneSegment(seg *segment, addr *net.UDPAddr) error {
 		if err != nil {
 			return fmt.Errorf("Encrypt() failed: %w", err)
 		}
+		nonce := encryptedMetadata[:cipher.DefaultNonceSize]
 		dataToSend := encryptedMetadata
 		if len(seg.payload) > 0 {
-			encryptedPayload, err := blockCipher.Encrypt(seg.payload)
+			encryptedPayload, err := blockCipher.EncryptWithNonce(seg.payload, nonce)
 			if err != nil {
-				return fmt.Errorf("Encrypt() failed: %w", err)
+				return fmt.Errorf("EncryptWithNonce() failed: %w", err)
 			}
 			dataToSend = append(dataToSend, encryptedPayload...)
 		}
@@ -587,11 +586,12 @@ func (u *UDPUnderlay) writeOneSegment(seg *segment, addr *net.UDPAddr) error {
 		if err != nil {
 			return fmt.Errorf("Encrypt() failed: %w", err)
 		}
+		nonce := encryptedMetadata[:cipher.DefaultNonceSize]
 		dataToSend := append(encryptedMetadata, padding1...)
 		if len(seg.payload) > 0 {
-			encryptedPayload, err := blockCipher.Encrypt(seg.payload)
+			encryptedPayload, err := blockCipher.EncryptWithNonce(seg.payload, nonce)
 			if err != nil {
-				return fmt.Errorf("Encrypt() failed: %w", err)
+				return fmt.Errorf("EncryptWithNonce() failed: %w", err)
 			}
 			dataToSend = append(dataToSend, encryptedPayload...)
 		}

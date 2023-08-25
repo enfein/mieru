@@ -32,6 +32,7 @@ var (
 	ErrInvalidOperation = fmt.Errorf("INVALID OPERATION")
 	ErrNoEnoughData     = fmt.Errorf("NO ENOUGH DATA")
 	ErrNotFound         = fmt.Errorf("NOT FOUND")
+	ErrNotReady         = fmt.Errorf("NOT READY")
 	ErrNotRunning       = fmt.Errorf("NOT RUNNING")
 	ErrNullPointer      = fmt.Errorf("NULL POINTER")
 	ErrOutOfRange       = fmt.Errorf("OUT OF RANGE")

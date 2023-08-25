@@ -165,7 +165,6 @@ func TestIPv6TCPUnderlay(t *testing.T) {
 }
 
 func TestIPv4UDPUnderlay(t *testing.T) {
-	t.SkipNow()
 	rng.InitSeed()
 	log.SetOutputToTest(t)
 	log.SetLevel("TRACE")
@@ -204,7 +203,6 @@ func TestIPv4UDPUnderlay(t *testing.T) {
 }
 
 func TestIPv6UDPUnderlay(t *testing.T) {
-	t.SkipNow()
 	rng.InitSeed()
 	log.SetOutputToTest(t)
 	log.SetLevel("TRACE")

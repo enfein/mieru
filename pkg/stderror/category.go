@@ -46,3 +46,8 @@ func IsPermissionDenied(err error) bool {
 	s := strings.ToLower(err.Error())
 	return strings.Contains(s, "permission denied")
 }
+
+// ShouldRetry returns true if the caller should retry the same operation again.
+func ShouldRetry(err error) bool {
+	return errors.Is(err, ErrNotReady)
+}
