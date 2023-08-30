@@ -225,7 +225,8 @@ func TestAESGCMBlockCipherNewNonce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newAESGCMBlockCipher() failed: %v", err)
 	}
-	for i := 0; i < 1000; i++ {
+	distribution := make(map[byte]int32)
+	for i := 0; i < 100000; i++ {
 		nonce, err := c.newNonce()
 		if err != nil {
 			t.Fatalf("newNonce() failed: %v", err)
@@ -237,7 +238,23 @@ func TestAESGCMBlockCipherNewNonce(t *testing.T) {
 			if b < printableCharSub || b > printableCharSup {
 				t.Fatalf("Byte %v in position %d is not a printable ASCII character", b, j)
 			}
+			distribution[b]++
 		}
+	}
+	var max int32 = 0
+	var min int32 = 0x7FFFFFFF
+	for _, val := range distribution {
+		if val > max {
+			max = val
+		}
+		if val < min {
+			min = val
+		}
+	}
+	ratio := float64(min) / float64(max)
+	t.Logf("Nonce random ratio is %f", ratio)
+	if ratio < 0.8 {
+		t.Errorf("Nonce random ratio %f is too low", ratio)
 	}
 }
 

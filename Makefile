@@ -32,7 +32,7 @@ PROJECT_NAME=$(shell basename "${ROOT}")
 # - pkg/version/current.go
 #
 # Use `tools/bump_version.sh` script to change all those files at one shot.
-VERSION="1.14.1"
+VERSION="1.15.0"
 
 # Build binaries and installation packages.
 .PHONY: build
@@ -79,7 +79,7 @@ client-mac-arm64:
 
 # Build linux clients.
 .PHONY: client-linux
-client-linux: client-linux-amd64 client-linux-arm64 client-linux-armv7
+client-linux: client-linux-amd64 client-linux-arm64 client-linux-armv7 client-linux-riscv64
 
 # Build linux amd64 client.
 .PHONY: client-linux-amd64
@@ -116,6 +116,18 @@ client-linux-armv7:
 		sha256sum mieru_${VERSION}_linux_armv7.tar.gz > mieru_${VERSION}_linux_armv7.tar.gz.sha256.txt
 	mv release/linux/armv7/mieru_${VERSION}_linux_armv7.tar.gz release/
 	mv release/linux/armv7/mieru_${VERSION}_linux_armv7.tar.gz.sha256.txt release/
+
+# Build linux riscv64 client.
+.PHONY: client-linux-riscv64
+client-linux-riscv64:
+	mkdir -p release/linux/riscv64
+	env GOOS=linux GOARCH=riscv64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/linux/riscv64/mieru cmd/mieru/mieru.go
+	cd release/linux/riscv64;\
+		sha256sum mieru > mieru_${VERSION}_linux_riscv64.sha256.txt;\
+		tar -zcvf mieru_${VERSION}_linux_riscv64.tar.gz mieru;\
+		sha256sum mieru_${VERSION}_linux_riscv64.tar.gz > mieru_${VERSION}_linux_riscv64.tar.gz.sha256.txt
+	mv release/linux/riscv64/mieru_${VERSION}_linux_riscv64.tar.gz release/
+	mv release/linux/riscv64/mieru_${VERSION}_linux_riscv64.tar.gz.sha256.txt release/
 
 # Build windows amd64 client.
 .PHONY: client-windows-amd64

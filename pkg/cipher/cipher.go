@@ -232,6 +232,13 @@ func (c *AESGCMBlockCipher) newNonce() ([]byte, error) {
 	}
 	for i := 0; i < rewriteLen; i++ {
 		if nonce[i] < printableCharSub || nonce[i] > printableCharSup {
+			if nonce[i]&0x80 > 0 {
+				lowBits := nonce[i] & 0x7F
+				if lowBits >= printableCharSub && lowBits <= printableCharSup {
+					nonce[i] = lowBits
+					continue
+				}
+			}
 			randBigInt, err := crand.Int(crand.Reader, printableCharRange)
 			if err != nil {
 				return nil, err
