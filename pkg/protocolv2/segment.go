@@ -33,7 +33,7 @@ const (
 	MaxPDU = 16 * 1024
 
 	// Maxinum number of transmission before marking the session as dead.
-	txCountLimit = 10
+	txCountLimit = 20
 
 	// Number of fast ack received before retransmission.
 	fastAckLimit = 3

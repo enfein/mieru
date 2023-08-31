@@ -533,9 +533,11 @@ func (u *UDPUnderlay) writeOneSegment(seg *segment, addr *net.UDPAddr) error {
 			u.sessionLock.Lock()
 			session, ok := u.sessionMap[sessionID]
 			if !ok {
+				u.sessionLock.Unlock()
 				return fmt.Errorf("session %d not found", sessionID)
 			}
 			if session.block == nil {
+				u.sessionLock.Unlock()
 				return fmt.Errorf("%v cipher block is not ready: %w", session, stderror.ErrNotReady)
 			} else {
 				blockCipher = session.block

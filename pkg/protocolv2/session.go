@@ -35,10 +35,10 @@ import (
 const (
 	segmentTreeCapacity = 4096
 	segmentChanCapacity = 256
-	minWindowSize       = 32
+	minWindowSize       = 16
 	maxWindowSize       = 4096
 	segmentPollInterval = 10 * time.Millisecond
-	segmentAckDelay     = 20 * time.Millisecond
+	segmentAckDelay     = 50 * time.Millisecond
 )
 
 type sessionState int
@@ -73,7 +73,6 @@ type Session struct {
 
 	nextSeq    uint32    // next sequence number to send a segment
 	nextRecv   uint32    // next sequence number to receive
-	unackSeq   uint32    // unacknowledged sequence number
 	lastTXTime time.Time // last timestamp when a segment is sent
 	unreadBuf  []byte    // payload removed from the recvQueue that haven't been read by application
 
@@ -276,7 +275,7 @@ func (s *Session) Write(b []byte) (n int, err error) {
 				},
 				sessionID:  s.id,
 				seq:        s.nextSeq,
-				unAckSeq:   s.unackSeq,
+				unAckSeq:   s.nextRecv,
 				windowSize: uint16(mathext.Max(0, int(s.sendAlgorithm.CongestionWindowSize())-s.recvBuf.Len())),
 				fragment:   uint8(i),
 				payloadLen: uint16(partLen),
@@ -478,8 +477,8 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 							metadata: &dataAckStruct{
 								baseStruct: baseStruct,
 								sessionID:  s.id,
-								seq:        s.unackSeq,
-								unAckSeq:   s.unackSeq,
+								seq:        uint32(mathext.Max(0, int(s.nextRecv)-1)),
+								unAckSeq:   s.nextRecv,
 								windowSize: uint16(mathext.Max(0, int(s.sendAlgorithm.CongestionWindowSize())-s.recvBuf.Len())),
 							},
 						}
@@ -588,8 +587,8 @@ func (s *Session) inputAck(seg *segment) error {
 			}
 			s.rttStat.UpdateRTT(time.Since(seg2.txTime))
 			s.sendAlgorithm.OnAck()
-			s.remoteWindowSize = seg2.metadata.(*dataAckStruct).windowSize
 		}
+		s.remoteWindowSize = das.windowSize
 		return nil
 	default:
 		return fmt.Errorf("unsupported transport protocol %v", s.conn.TransportProtocol())

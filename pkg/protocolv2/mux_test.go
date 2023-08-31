@@ -196,7 +196,7 @@ func TestIPv4UDPUnderlay(t *testing.T) {
 		transportProtocol: netutil.UDPTransport,
 		remoteAddr:        &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
 	}
-	runClient(t, clientDescriptor, []byte("xiaochitang"), []byte("kuiranbudong"), 1)
+	runClient(t, clientDescriptor, []byte("xiaochitang"), []byte("kuiranbudong"), 2)
 	if err := serverMux.Close(); err != nil {
 		t.Errorf("Server mux close failed: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestIPv6UDPUnderlay(t *testing.T) {
 		transportProtocol: netutil.UDPTransport,
 		remoteAddr:        &net.UDPAddr{IP: net.ParseIP("::1"), Port: port},
 	}
-	runClient(t, clientDescriptor, []byte("xiaochitang"), []byte("kuiranbudong"), 1)
+	runClient(t, clientDescriptor, []byte("xiaochitang"), []byte("kuiranbudong"), 2)
 	if err := serverMux.Close(); err != nil {
 		t.Errorf("Server mux close failed: %v", err)
 	}
