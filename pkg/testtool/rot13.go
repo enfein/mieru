@@ -48,7 +48,7 @@ func TestHelperRot13(in []byte) ([]byte, error) {
 	}
 	match, err := regexp.MatchString("[A-Za-z]+", string(in))
 	if err != nil {
-		return nil, fmt.Errorf("regexp.MatchString() failed: %v", err)
+		return nil, fmt.Errorf("regexp.MatchString() failed: %w", err)
 	}
 	if !match {
 		return nil, fmt.Errorf("input format is invalid")
@@ -74,17 +74,17 @@ func TestHelperServeConn(conn net.Conn) error {
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
-			return fmt.Errorf("Read() failed: %v", err)
+			return fmt.Errorf("Read() failed: %w", err)
 		}
 		if n == 0 {
 			continue
 		}
 		out, err := TestHelperRot13(buf[:n])
 		if err != nil {
-			return fmt.Errorf("rot13() failed: %v", err)
+			return fmt.Errorf("rot13() failed: %w", err)
 		}
 		if _, err = conn.Write(out); err != nil {
-			return fmt.Errorf("Write() failed: %v", err)
+			return fmt.Errorf("Write() failed: %w", err)
 		}
 	}
 }

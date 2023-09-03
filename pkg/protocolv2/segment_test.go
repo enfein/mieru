@@ -133,6 +133,9 @@ func TestSegmentTree(t *testing.T) {
 	if ok := st.Insert(seg); ok {
 		t.Fatalf("ReplaceOrInsert() is not failing when tree is full")
 	}
+	if ready := st.IsReadReady(); !ready {
+		t.Fatalf("IsReadReady() returned false")
+	}
 	minSeq, err := st.MinSeq()
 	if err != nil {
 		t.Fatalf("MinSeq() failed: %v", err)
@@ -175,7 +178,7 @@ func TestSegmentTree(t *testing.T) {
 	}
 }
 
-func TestSegmentTreeBlocking(t *testing.T) {
+func TestSegmentTreeConcurrent(t *testing.T) {
 	rng.InitSeed()
 	sessionID := uint32(mrand.Int31())
 	st := newSegmentTree(1)
@@ -193,9 +196,14 @@ func TestSegmentTreeBlocking(t *testing.T) {
 				},
 				payload: []byte{0},
 			}
-			s := mrand.Intn(10)
-			time.Sleep(time.Duration(s) * time.Millisecond)
-			st.InsertBlocking(seg)
+			for {
+				ok := st.Insert(seg)
+				if ok {
+					break
+				}
+				time.Sleep(time.Duration(mrand.Intn(10)) * time.Millisecond)
+			}
+
 		}
 		wg.Done()
 	}()
@@ -203,10 +211,16 @@ func TestSegmentTreeBlocking(t *testing.T) {
 	// Consumer.
 	go func() {
 		var i uint32 = 0
+		var seg *segment
+		var ok bool
 		for ; i < 100; i++ {
-			s := mrand.Intn(10)
-			time.Sleep(time.Duration(s) * time.Millisecond)
-			seg := st.DeleteMinBlocking()
+			for {
+				seg, ok = st.DeleteMin()
+				if ok {
+					break
+				}
+				time.Sleep(time.Duration(mrand.Intn(10)) * time.Millisecond)
+			}
 			id, err := seg.SessionID()
 			if err != nil {
 				t.Errorf("SessionID() failed: %v", err)

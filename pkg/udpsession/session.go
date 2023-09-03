@@ -51,9 +51,6 @@ const (
 )
 
 var (
-	// zeroTime is used to clear the deadline.
-	zeroTime = time.Time{}
-
 	// replayCache records possible replay in UDP sessions.
 	replayCache = replay.NewCache(1024*1024*1024, 8*time.Minute)
 
@@ -206,7 +203,7 @@ func newUDPSession(conv uint32, conn net.PacketConn, ownConn bool, remote net.Ad
 // Read implements net.Conn
 func (s *UDPSession) Read(b []byte) (n int, err error) {
 	// Clear read deadline after a read.
-	defer s.SetReadDeadline(zeroTime)
+	defer s.SetReadDeadline(netutil.ZeroTime())
 	for {
 		s.mu.Lock()
 		// When recvBufPtr has remaining data, copy from recvBufPtr.

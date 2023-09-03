@@ -33,12 +33,13 @@ import (
 )
 
 const (
-	segmentTreeCapacity = 4096
-	segmentChanCapacity = 256
-	minWindowSize       = 16
-	maxWindowSize       = 4096
-	segmentPollInterval = 10 * time.Millisecond
-	segmentAckDelay     = 50 * time.Millisecond
+	segmentTreeCapacity  = 4096
+	segmentChanCapacity  = 256
+	minWindowSize        = 16
+	maxWindowSize        = 4096
+	segmentRetryInterval = 10 * time.Millisecond
+	segmentAckDelay      = 50 * time.Millisecond
+	serverRespTimeout    = 10 * time.Second
 )
 
 type sessionState int
@@ -56,14 +57,18 @@ type Session struct {
 	conn  Underlay           // underlay connection
 	block cipher.BlockCipher // cipher to encrypt and decrypt data
 
-	id          uint32        // session ID number
-	isClient    bool          // if this session is owned by client
-	mtu         int           // L2 maxinum transmission unit
-	remoteAddr  net.Addr      // remote network address
-	state       sessionState  // session state
-	ready       chan struct{} // indicate the session is ready to use
-	established chan struct{} // indicate the session handshake is completed
-	done        chan struct{} // indicate the session is complete
+	id            uint32        // session ID number
+	isClient      bool          // if this session is owned by client
+	mtu           int           // L2 maxinum transmission unit
+	remoteAddr    net.Addr      // remote network address
+	state         sessionState  // session state
+	readDeadline  time.Time     // read deadline
+	writeDeadline time.Time     // write deadline
+	ready         chan struct{} // indicate the session is ready to use
+	established   chan struct{} // indicate the session handshake is completed
+	done          chan struct{} // indicate the session is complete
+	inputErr      chan error    // input error
+	outputErr     chan error    // output error
 
 	sendQueue *segmentTree  // segments waiting to send
 	sendBuf   *segmentTree  // segments sent but not acknowledged
@@ -91,7 +96,7 @@ var _ net.Conn = &Session{}
 // NewSession creates a new session.
 func NewSession(id uint32, isClient bool, mtu int) *Session {
 	rttStat := congestion.NewRTTStats()
-	rttStat.SetMaxAckDelay(2 * segmentPollInterval)
+	rttStat.SetMaxAckDelay(2 * segmentRetryInterval)
 	rttStat.SetRTOMultiplier(1.5)
 	return &Session{
 		conn:             nil,
@@ -100,9 +105,13 @@ func NewSession(id uint32, isClient bool, mtu int) *Session {
 		isClient:         isClient,
 		mtu:              mtu,
 		state:            sessionInit,
+		readDeadline:     netutil.ZeroTime(),
+		writeDeadline:    netutil.ZeroTime(),
 		ready:            make(chan struct{}),
 		established:      make(chan struct{}),
 		done:             make(chan struct{}),
+		inputErr:         make(chan error, 1),
+		outputErr:        make(chan error, 1),
 		sendQueue:        newSegmentTree(segmentTreeCapacity),
 		sendBuf:          newSegmentTree(segmentTreeCapacity),
 		recvBuf:          newSegmentTree(segmentTreeCapacity),
@@ -133,6 +142,10 @@ func (s *Session) Read(b []byte) (n int, err error) {
 	}
 	s.rLock.Lock()
 	defer s.rLock.Unlock()
+
+	defer func() {
+		s.readDeadline = netutil.ZeroTime()
+	}()
 	if log.IsLevelEnabled(log.TraceLevel) {
 		log.Tracef("%v trying to read %d bytes", s, len(b))
 	}
@@ -149,27 +162,50 @@ func (s *Session) Read(b []byte) (n int, err error) {
 		return n, nil
 	}
 
-	// Read all the fragments of the original message.
+	var timeC <-chan time.Time
+	if !netutil.IsZeroTime(s.readDeadline) {
+		timeC = time.After(time.Until(s.readDeadline))
+	}
+
 	for {
-		seg := s.recvQueue.DeleteMinBlocking()
-
-		if s.isClient && seg.metadata.Protocol() == openSessionResponse && (s.state == sessionAttached || s.state == sessionOpening) {
-			s.forwardStateTo(sessionEstablished)
-			close(s.established)
-			// fallthrough
+		select {
+		case <-s.done:
+			return 0, io.EOF
+		case <-s.inputErr:
+			return 0, io.ErrUnexpectedEOF
+		case <-timeC:
+			return 0, stderror.ErrTimeout
+		default:
+		}
+		if !s.recvQueue.IsReadReady() {
+			time.Sleep(segmentRetryInterval)
+			continue
 		}
 
-		if len(s.unreadBuf) == 0 {
-			s.unreadBuf = seg.payload
-		} else {
-			s.unreadBuf = append(s.unreadBuf, seg.payload...)
-		}
+		// Segments in segment tree are ready to read.
+		for {
+			seg, ok := s.recvQueue.DeleteMin()
+			if !ok {
+				return 0, stderror.ErrEmpty
+			}
 
-		fragment, err := seg.Fragment()
-		if err != nil {
-			return 0, fmt.Errorf("Fragment() failed: %w", err)
+			if s.isClient && seg.metadata.Protocol() == openSessionResponse && (s.state == sessionAttached || s.state == sessionOpening) {
+				s.forwardStateTo(sessionEstablished)
+				close(s.established)
+			}
+
+			if len(s.unreadBuf) == 0 {
+				s.unreadBuf = seg.payload
+			} else {
+				s.unreadBuf = append(s.unreadBuf, seg.payload...)
+			}
+
+			fragment := seg.Fragment()
+			if fragment == 0 {
+				break
+			}
 		}
-		if fragment == 0 {
+		if len(s.unreadBuf) > 0 {
 			break
 		}
 	}
@@ -197,6 +233,9 @@ func (s *Session) Write(b []byte) (n int, err error) {
 	s.wLock.Lock()
 	defer s.wLock.Unlock()
 
+	defer func() {
+		s.writeDeadline = netutil.ZeroTime()
+	}()
 	if s.state == sessionAttached {
 		if s.isClient {
 			// Send open session request.
@@ -249,6 +288,11 @@ func (s *Session) Write(b []byte) (n int, err error) {
 		}
 	}
 
+	var timeC <-chan time.Time
+	if !netutil.IsZeroTime(s.writeDeadline) {
+		timeC = time.After(time.Until(s.writeDeadline))
+	}
+
 	nFragment := 1
 	fragmentSize := MaxFragmentSize(s.mtu, s.conn.IPVersion(), s.conn.TransportProtocol())
 	if len(b) > fragmentSize {
@@ -283,8 +327,27 @@ func (s *Session) Write(b []byte) (n int, err error) {
 			payload: part,
 		}
 		s.nextSeq++
-		s.sendQueue.InsertBlocking(seg)
+		for {
+			select {
+			case <-s.done:
+				return 0, io.EOF
+			case <-s.outputErr:
+				return 0, io.ErrClosedPipe
+			case <-timeC:
+				return 0, stderror.ErrTimeout
+			default:
+			}
+			ok := s.sendQueue.Insert(seg)
+			if ok {
+				break
+			}
+			time.Sleep(segmentRetryInterval)
+		}
 		ptr = ptr[partLen:]
+	}
+
+	if s.isClient {
+		s.readDeadline = time.Now().Add(serverRespTimeout)
 	}
 	n = len(b)
 	metrics.OutBytes.Add(int64(n))
@@ -303,9 +366,7 @@ func (s *Session) Close() error {
 	}
 
 	log.Debugf("Closing %v", s)
-	s.rLock.Lock()
 	s.wLock.Lock()
-	defer s.rLock.Unlock()
 	defer s.wLock.Unlock()
 
 	s.forwardStateTo(sessionClosing)
@@ -337,15 +398,19 @@ func (s *Session) RemoteAddr() net.Addr {
 }
 
 func (s *Session) SetDeadline(t time.Time) error {
-	return stderror.ErrUnsupported
+	s.readDeadline = t
+	s.writeDeadline = t
+	return nil
 }
 
 func (s *Session) SetReadDeadline(t time.Time) error {
-	return stderror.ErrUnsupported
+	s.readDeadline = t
+	return nil
 }
 
 func (s *Session) SetWriteDeadline(t time.Time) error {
-	return stderror.ErrUnsupported
+	s.writeDeadline = t
+	return nil
 }
 
 func (s *Session) forwardStateTo(new sessionState) {
@@ -364,7 +429,9 @@ func (s *Session) runInputLoop(ctx context.Context) error {
 			return nil
 		case seg := <-s.recvChan:
 			if err := s.input(seg); err != nil {
-				return fmt.Errorf("input() failed: %v", err)
+				err = fmt.Errorf("input() failed: %w", err)
+				s.inputErr <- err
+				return err
 			}
 		}
 	}
@@ -380,6 +447,7 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 			return nil
 		default:
 			if lastErr != nil {
+				s.outputErr <- lastErr
 				return lastErr
 			}
 			switch s.conn.TransportProtocol() {
@@ -387,11 +455,13 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 				for {
 					seg, ok := s.sendQueue.DeleteMin()
 					if !ok {
-						time.Sleep(segmentPollInterval)
+						time.Sleep(segmentRetryInterval)
 						break
 					}
 					if err := s.output(seg, nil); err != nil {
-						return fmt.Errorf("output() failed: %v", err)
+						err = fmt.Errorf("output() failed: %w", err)
+						s.outputErr <- err
+						return err
 					}
 				}
 			case netutil.UDPTransport:
@@ -412,7 +482,7 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 						iter.txTime = time.Now()
 						iter.txTimeout = s.rttStat.RTO()
 						if err := s.output(iter, s.RemoteAddr()); err != nil {
-							lastErr = fmt.Errorf("output() failed: %v", err)
+							lastErr = fmt.Errorf("output() failed: %w", err)
 							return false
 						}
 						return true
@@ -425,7 +495,7 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 						iter.txTime = time.Now()
 						iter.txTimeout = s.rttStat.RTO()
 						if err := s.output(iter, s.RemoteAddr()); err != nil {
-							lastErr = fmt.Errorf("output() failed: %v", err)
+							lastErr = fmt.Errorf("output() failed: %w", err)
 							return false
 						}
 						return true
@@ -459,7 +529,9 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 						seg.txTime = time.Now()
 						seg.txTimeout = s.rttStat.RTO()
 						if err := s.output(seg, s.RemoteAddr()); err != nil {
-							return fmt.Errorf("output() failed: %v", err)
+							err = fmt.Errorf("output() failed: %w", err)
+							s.outputErr <- err
+							return err
 						}
 						s.sendBuf.InsertBlocking(seg)
 					}
@@ -483,12 +555,17 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 							},
 						}
 						if err := s.output(ackSeg, s.RemoteAddr()); err != nil {
-							return fmt.Errorf("output() failed: %v", err)
+							err = fmt.Errorf("output() failed: %w", err)
+							s.outputErr <- err
+							return err
 						}
 					}
 				}
+				time.Sleep(segmentRetryInterval)
 			default:
-				return fmt.Errorf("unsupported transport protocol %v", s.conn.TransportProtocol())
+				err := fmt.Errorf("unsupported transport protocol %v", s.conn.TransportProtocol())
+				s.outputErr <- err
+				return err
 			}
 		}
 	}
@@ -527,11 +604,36 @@ func (s *Session) inputData(seg *segment) error {
 		s.recvQueue.InsertBlocking(seg)
 		return nil
 	case netutil.UDPTransport:
+		// Delete all previous acknowledged segments from sendBuf.
+		das, ok := seg.metadata.(*dataAckStruct)
+		if ok {
+			unAckSeq := das.unAckSeq
+			for {
+				seg2, deleted := s.sendBuf.DeleteMinIf(func(iter *segment) bool {
+					seq, err := iter.Seq()
+					if err != nil {
+						panic(fmt.Sprintf("%v get segment sequence number failed: %v", s, err))
+					}
+					if seq < unAckSeq {
+						return true
+					}
+					return false
+				})
+				if !deleted {
+					break
+				}
+				s.rttStat.UpdateRTT(time.Since(seg2.txTime))
+				s.sendAlgorithm.OnAck()
+			}
+			s.remoteWindowSize = das.windowSize
+		}
+
 		// Deliver the segment to recvBuf.
 		s.recvBuf.InsertBlocking(seg)
+
 		// Move recvBuf to recvQueue.
 		for {
-			seg2, deleted := s.recvBuf.DeleteMinIf(func(iter *segment) bool {
+			seg3, deleted := s.recvBuf.DeleteMinIf(func(iter *segment) bool {
 				seq, err := iter.Seq()
 				if err != nil {
 					panic(fmt.Sprintf("%v get segment sequence number failed: %v", s, err))
@@ -541,17 +643,17 @@ func (s *Session) inputData(seg *segment) error {
 				}
 				return false
 			})
-			if seg2 == nil || !deleted {
+			if seg3 == nil || !deleted {
 				return nil
 			}
-			seq, err := seg2.Seq()
+			seq, err := seg3.Seq()
 			if err != nil {
 				panic(fmt.Sprintf("%v get segment sequence number failed: %v", s, err))
 			}
 			if seq == s.nextRecv {
-				s.recvQueue.InsertBlocking(seg2)
+				s.recvQueue.InsertBlocking(seg3)
 				s.nextRecv++
-				das, ok := seg2.metadata.(*dataAckStruct)
+				das, ok := seg3.metadata.(*dataAckStruct)
 				if ok {
 					s.remoteWindowSize = das.windowSize
 				}

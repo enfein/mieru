@@ -127,12 +127,12 @@ func (s *segment) Seq() (uint32, error) {
 }
 
 // Fragment returns the fragment number of the segment.
-func (s *segment) Fragment() (uint8, error) {
+func (s *segment) Fragment() uint8 {
 	das, ok := s.metadata.(*dataAckStruct)
 	if !ok {
-		return 0, nil
+		return 0
 	}
-	return das.fragment, nil
+	return das.fragment
 }
 
 // Less tests whether the current item is less than the given argument.
@@ -162,11 +162,12 @@ type segmentIterator func(*segment) bool
 
 // segmentTree is a B-tree to store multiple Segment in order.
 type segmentTree struct {
-	tr    *btree.BTreeG[*segment]
-	cap   int
-	mu    sync.Mutex
-	full  sync.Cond
-	empty sync.Cond
+	tr     *btree.BTreeG[*segment]
+	cap    int
+	mu     sync.Mutex
+	full   sync.Cond
+	empty  sync.Cond
+	series int
 }
 
 func newSegmentTree(capacity int) *segmentTree {
@@ -197,10 +198,16 @@ func (t *segmentTree) Insert(seg *segment) (ok bool) {
 	if t.tr.Len() >= t.cap {
 		return false
 	}
+	if seg.Fragment() == 0 {
+		t.series++
+	}
 	prev, replace := t.tr.ReplaceOrInsert(seg)
 	if replace {
 		if log.IsLevelEnabled(log.TraceLevel) {
 			log.Tracef("%v is replaced by %v", seg, prev)
+		}
+		if prev.Fragment() == 0 {
+			t.series--
 		}
 	} else {
 		t.empty.Broadcast()
@@ -222,10 +229,16 @@ func (t *segmentTree) InsertBlocking(seg *segment) {
 	for t.tr.Len() >= t.cap {
 		t.full.Wait()
 	}
+	if seg.Fragment() == 0 {
+		t.series++
+	}
 	prev, replace := t.tr.ReplaceOrInsert(seg)
 	if replace {
 		if log.IsLevelEnabled(log.TraceLevel) {
 			log.Tracef("%v is replaced by %v", seg, prev)
+		}
+		if prev.Fragment() == 0 {
+			t.series--
 		}
 	} else {
 		t.empty.Broadcast()
@@ -248,27 +261,11 @@ func (t *segmentTree) DeleteMin() (*segment, bool) {
 	if seg == nil {
 		panic("segmentTree.DeleteMin() return nil")
 	}
+	if seg.Fragment() == 0 {
+		t.series--
+	}
 	t.full.Broadcast()
 	return seg, true
-}
-
-// DeleteMinBlocking is the same as DeleteMin, but blocks when the tree is empty.
-func (t *segmentTree) DeleteMinBlocking() *segment {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	for t.tr.Len() == 0 {
-		t.empty.Wait()
-	}
-	seg, ok := t.tr.DeleteMin()
-	if !ok {
-		panic("segmentTree.DeleteMin() is called when the tree is empty")
-	}
-	if seg == nil {
-		panic("segmentTree.DeleteMin() return nil")
-	}
-	t.full.Broadcast()
-	return seg
 }
 
 // DeleteMinIf removes the smallest item from the tree if
@@ -297,6 +294,9 @@ func (t *segmentTree) DeleteMinIf(si segmentIterator) (*segment, bool) {
 		if seg == nil {
 			panic("segmentTree.DeleteMin() return nil")
 		}
+		if seg.Fragment() == 0 {
+			t.series--
+		}
 		t.full.Broadcast()
 	}
 	return seg, delete
@@ -308,6 +308,11 @@ func (t *segmentTree) Ascend(si segmentIterator) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.tr.Ascend(btree.ItemIteratorG[*segment](si))
+}
+
+// IsReadReady returns true if session is ready to read segments.
+func (t *segmentTree) IsReadReady() bool {
+	return t.series > 0
 }
 
 // MinSeq return the minimum sequence number in the SegmentTree.

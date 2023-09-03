@@ -120,7 +120,7 @@ func TestIPv4TCPUnderlay(t *testing.T) {
 		transportProtocol: netutil.TCPTransport,
 		remoteAddr:        &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
 	}
-	runClient(t, clientDescriptor, []byte("xiaochitang"), []byte("kuiranbudong"), 1)
+	runClient(t, clientDescriptor, []byte("xiaochitang"), []byte("kuiranbudong"), 4)
 	if err := serverMux.Close(); err != nil {
 		t.Errorf("Server mux close failed: %v", err)
 	}
@@ -158,7 +158,7 @@ func TestIPv6TCPUnderlay(t *testing.T) {
 		transportProtocol: netutil.TCPTransport,
 		remoteAddr:        &net.TCPAddr{IP: net.ParseIP("::1"), Port: port},
 	}
-	runClient(t, clientDescriptor, []byte("xiaochitang"), []byte("kuiranbudong"), 1)
+	runClient(t, clientDescriptor, []byte("xiaochitang"), []byte("kuiranbudong"), 4)
 	if err := serverMux.Close(); err != nil {
 		t.Errorf("Server mux close failed: %v", err)
 	}
