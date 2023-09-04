@@ -7,7 +7,7 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/enfein/mieru/pkg/netutil"
+	"github.com/enfein/mieru/pkg/util"
 )
 
 func (cfg *Config) dialSocks5(targetAddr string) (conn net.Conn, err error) {
@@ -48,7 +48,7 @@ func (cfg *Config) dialSocks5Long(targetAddr string) (conn net.Conn, udpConn *ne
 
 	// Process the first response.
 	var resp []byte
-	resp, err = netutil.SendReceive(ctx, conn, req.Bytes())
+	resp, err = util.SendReceive(ctx, conn, req.Bytes())
 	if err != nil {
 		return nil, nil, nil, err
 	} else if len(resp) != 2 {
@@ -69,7 +69,7 @@ func (cfg *Config) dialSocks5Long(targetAddr string) (conn net.Conn, udpConn *ne
 		req.Write([]byte{byte(len(cfg.Auth.Password))})
 		req.Write([]byte(cfg.Auth.Password))
 
-		resp, err = netutil.SendReceive(ctx, conn, req.Bytes())
+		resp, err = util.SendReceive(ctx, conn, req.Bytes())
 		if err != nil {
 			return nil, nil, nil, err
 		} else if len(resp) != 2 {
@@ -122,7 +122,7 @@ func (cfg *Config) dialSocks5Long(targetAddr string) (conn net.Conn, udpConn *ne
 	})
 
 	// Process the second response.
-	resp, err = netutil.SendReceive(ctx, conn, req.Bytes())
+	resp, err = util.SendReceive(ctx, conn, req.Bytes())
 	if err != nil {
 		return
 	} else if len(resp) < 10 {

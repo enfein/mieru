@@ -12,8 +12,8 @@ import (
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
-	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/stderror"
+	"github.com/enfein/mieru/pkg/util"
 )
 
 const (
@@ -115,7 +115,7 @@ func New(conf *Config) (*Server, error) {
 
 	// Provide a default bind IP.
 	if conf.BindIP == nil {
-		conf.BindIP = net.ParseIP(netutil.AllIPAddr())
+		conf.BindIP = net.ParseIP(util.AllIPAddr())
 		if conf.BindIP == nil {
 			return nil, fmt.Errorf("set socks5 bind IP failed")
 		}
@@ -177,7 +177,7 @@ func (s *Server) Serve(l net.Listener) error {
 
 // ServeConn is used to serve a single connection.
 func (s *Server) ServeConn(conn net.Conn) error {
-	conn = netutil.WrapHierarchyConn(conn)
+	conn = util.WrapHierarchyConn(conn)
 	defer conn.Close()
 	if log.IsLevelEnabled(log.TraceLevel) {
 		log.Tracef("socks5 server starts to serve connection [%v - %v]", conn.LocalAddr(), conn.RemoteAddr())
@@ -263,14 +263,14 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 
 	if udpAssociateConn != nil {
 		log.Debugf("UDP association is listening on %v", udpAssociateConn.LocalAddr())
-		conn.(netutil.HierarchyConn).AddSubConnection(udpAssociateConn)
+		conn.(util.HierarchyConn).AddSubConnection(udpAssociateConn)
 		go func() {
-			netutil.WaitForClose(conn)
+			util.WaitForClose(conn)
 			conn.Close()
 		}()
 		return BidiCopyUDP(udpAssociateConn, WrapUDPAssociateTunnel(proxyConn))
 	}
-	return netutil.BidiCopy(conn, proxyConn, true)
+	return util.BidiCopy(conn, proxyConn, true)
 }
 
 func (s *Server) serverServeConn(conn net.Conn) error {

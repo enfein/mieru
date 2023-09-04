@@ -23,13 +23,14 @@ import (
 	mrand "math/rand"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/mathext"
-	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/stderror"
+	"github.com/enfein/mieru/pkg/util"
 )
 
 // Mux manages the sessions and underlays.
@@ -42,7 +43,7 @@ type Mux struct {
 
 	// ---- server fields ----
 	users         map[string]*appctlpb.User
-	serverHandler netutil.ConnHandler
+	serverHandler util.ConnHandler
 
 	// ---- common fields ----
 	endpoints   []UnderlayProperties
@@ -111,7 +112,7 @@ func (m *Mux) SetServerUsers(users map[string]*appctlpb.User) *Mux {
 	return m
 }
 
-func (m *Mux) SetServerHandler(handler netutil.ConnHandler) *Mux {
+func (m *Mux) SetServerHandler(handler util.ConnHandler) *Mux {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.isClient {
@@ -169,7 +170,7 @@ func (m *Mux) Close() error {
 
 // Addr is not supported by Mux.
 func (m *Mux) Addr() net.Addr {
-	return netutil.NilNetAddr()
+	return util.NilNetAddr()
 }
 
 // ListenAndServeAll listens on all the server addresses and serves
@@ -188,7 +189,7 @@ func (m *Mux) ListenAndServeAll() error {
 		return fmt.Errorf("no server listening endpoint found")
 	}
 	for _, p := range m.endpoints {
-		if netutil.IsNilNetAddr(p.LocalAddr()) {
+		if util.IsNilNetAddr(p.LocalAddr()) {
 			return fmt.Errorf("endpoint local address is not set")
 		}
 	}
@@ -236,7 +237,7 @@ func (m *Mux) DialContext(ctx context.Context) (net.Conn, error) {
 		return nil, fmt.Errorf("no server listening endpoint found")
 	}
 	for _, p := range m.endpoints {
-		if netutil.IsNilNetAddr(p.RemoteAddr()) {
+		if util.IsNilNetAddr(p.RemoteAddr()) {
 			return nil, fmt.Errorf("endpoint remote address is not set")
 		}
 	}
@@ -261,7 +262,7 @@ func (m *Mux) DialContext(ctx context.Context) (net.Conn, error) {
 		i := mrand.Intn(len(m.endpoints))
 		p := m.endpoints[i]
 		switch p.TransportProtocol() {
-		case netutil.TCPTransport:
+		case util.TCPTransport:
 			block, err := cipher.BlockCipherFromPassword(m.password, false)
 			if err != nil {
 				return nil, fmt.Errorf("cipher.BlockCipherFromPassword() failed: %v", err)
@@ -270,7 +271,7 @@ func (m *Mux) DialContext(ctx context.Context) (net.Conn, error) {
 			if err != nil {
 				return nil, fmt.Errorf("NewTCPUnderlay() failed: %v", err)
 			}
-		case netutil.UDPTransport:
+		case util.UDPTransport:
 			block, err := cipher.BlockCipherFromPassword(m.password, true)
 			if err != nil {
 				return nil, fmt.Errorf("cipher.BlockCipherFromPassword() failed: %v", err)
@@ -320,7 +321,7 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 	switch network {
 	case "tcp", "tcp4", "tcp6":
 		listenConfig := net.ListenConfig{
-			Control: netutil.ReuseAddrPort,
+			Control: util.ReuseAddrPort,
 		}
 		rawListener, err := listenConfig.Listen(context.Background(), network, laddr)
 		if err != nil {
@@ -370,9 +371,10 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 		}
 		log.Infof("Mux listening to endpoint %s %s", network, laddr)
 		underlay := &UDPUnderlay{
-			baseUnderlay: *newBaseUnderlay(false, properties.MTU()),
-			conn:         conn,
-			users:        m.users,
+			baseUnderlay:      *newBaseUnderlay(false, properties.MTU()),
+			conn:              conn,
+			idleSessionTicker: time.NewTicker(idleSessionTickerInterval),
+			users:             m.users,
 		}
 		log.Debugf("Created new server underlay %v", underlay)
 		UnderlayPassiveOpens.Add(1)

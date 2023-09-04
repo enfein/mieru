@@ -25,8 +25,8 @@ import (
 
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
-	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/socks5client"
+	"github.com/enfein/mieru/pkg/util"
 )
 
 var (
@@ -102,14 +102,14 @@ func (p *Proxy) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		}
 
 		// Dial to socks server.
-		socksConn, err := dialFunc("tcp", netutil.MaybeDecorateIPv6(req.URL.Hostname())+":"+port)
+		socksConn, err := dialFunc("tcp", util.MaybeDecorateIPv6(req.URL.Hostname())+":"+port)
 		if err != nil {
 			HTTPConnErrors.Add(1)
 			log.Debugf("HTTP proxy dial to socks5 server failed: %v", err)
 			return
 		}
 		httpConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
-		netutil.BidiCopy(httpConn, socksConn, true)
+		util.BidiCopy(httpConn, socksConn, true)
 	} else {
 		// HTTP
 		tr := &http.Transport{

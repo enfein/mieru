@@ -28,9 +28,9 @@ import (
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
-	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/testtool"
+	"github.com/enfein/mieru/pkg/util"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -92,14 +92,14 @@ func TestIPv4TCPUnderlay(t *testing.T) {
 	rng.InitSeed()
 	log.SetOutputToTest(t)
 	log.SetLevel("DEBUG")
-	port, err := netutil.UnusedTCPPort()
+	port, err := util.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
 	serverDescriptor := underlayDescriptor{
 		mtu:               1500,
-		ipVersion:         netutil.IPVersion4,
-		transportProtocol: netutil.TCPTransport,
+		ipVersion:         util.IPVersion4,
+		transportProtocol: util.TCPTransport,
 		localAddr:         &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
 	}
 	serverMux := NewMux(false).
@@ -116,8 +116,8 @@ func TestIPv4TCPUnderlay(t *testing.T) {
 
 	clientDescriptor := underlayDescriptor{
 		mtu:               1500,
-		ipVersion:         netutil.IPVersion4,
-		transportProtocol: netutil.TCPTransport,
+		ipVersion:         util.IPVersion4,
+		transportProtocol: util.TCPTransport,
 		remoteAddr:        &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
 	}
 	runClient(t, clientDescriptor, []byte("xiaochitang"), []byte("kuiranbudong"), 4)
@@ -130,14 +130,14 @@ func TestIPv6TCPUnderlay(t *testing.T) {
 	rng.InitSeed()
 	log.SetOutputToTest(t)
 	log.SetLevel("DEBUG")
-	port, err := netutil.UnusedTCPPort()
+	port, err := util.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
 	serverDescriptor := underlayDescriptor{
 		mtu:               1500,
-		ipVersion:         netutil.IPVersion6,
-		transportProtocol: netutil.TCPTransport,
+		ipVersion:         util.IPVersion6,
+		transportProtocol: util.TCPTransport,
 		localAddr:         &net.TCPAddr{IP: net.ParseIP("::1"), Port: port},
 	}
 	serverMux := NewMux(false).
@@ -154,8 +154,8 @@ func TestIPv6TCPUnderlay(t *testing.T) {
 
 	clientDescriptor := underlayDescriptor{
 		mtu:               1500,
-		ipVersion:         netutil.IPVersion6,
-		transportProtocol: netutil.TCPTransport,
+		ipVersion:         util.IPVersion6,
+		transportProtocol: util.TCPTransport,
 		remoteAddr:        &net.TCPAddr{IP: net.ParseIP("::1"), Port: port},
 	}
 	runClient(t, clientDescriptor, []byte("xiaochitang"), []byte("kuiranbudong"), 4)
@@ -168,14 +168,14 @@ func TestIPv4UDPUnderlay(t *testing.T) {
 	rng.InitSeed()
 	log.SetOutputToTest(t)
 	log.SetLevel("TRACE")
-	port, err := netutil.UnusedUDPPort()
+	port, err := util.UnusedUDPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+		t.Fatalf("util.UnusedUDPPort() failed: %v", err)
 	}
 	serverDescriptor := underlayDescriptor{
 		mtu:               1500,
-		ipVersion:         netutil.IPVersion4,
-		transportProtocol: netutil.UDPTransport,
+		ipVersion:         util.IPVersion4,
+		transportProtocol: util.UDPTransport,
 		localAddr:         &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
 	}
 	serverMux := NewMux(false).
@@ -192,11 +192,11 @@ func TestIPv4UDPUnderlay(t *testing.T) {
 
 	clientDescriptor := underlayDescriptor{
 		mtu:               1500,
-		ipVersion:         netutil.IPVersion4,
-		transportProtocol: netutil.UDPTransport,
+		ipVersion:         util.IPVersion4,
+		transportProtocol: util.UDPTransport,
 		remoteAddr:        &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
 	}
-	runClient(t, clientDescriptor, []byte("xiaochitang"), []byte("kuiranbudong"), 1)
+	runClient(t, clientDescriptor, []byte("xiaochitang"), []byte("kuiranbudong"), 4)
 	if err := serverMux.Close(); err != nil {
 		t.Errorf("Server mux close failed: %v", err)
 	}
@@ -206,14 +206,14 @@ func TestIPv6UDPUnderlay(t *testing.T) {
 	rng.InitSeed()
 	log.SetOutputToTest(t)
 	log.SetLevel("TRACE")
-	port, err := netutil.UnusedUDPPort()
+	port, err := util.UnusedUDPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+		t.Fatalf("util.UnusedUDPPort() failed: %v", err)
 	}
 	serverDescriptor := underlayDescriptor{
 		mtu:               1500,
-		ipVersion:         netutil.IPVersion6,
-		transportProtocol: netutil.UDPTransport,
+		ipVersion:         util.IPVersion6,
+		transportProtocol: util.UDPTransport,
 		localAddr:         &net.UDPAddr{IP: net.ParseIP("::1"), Port: port},
 	}
 	serverMux := NewMux(false).
@@ -230,11 +230,11 @@ func TestIPv6UDPUnderlay(t *testing.T) {
 
 	clientDescriptor := underlayDescriptor{
 		mtu:               1500,
-		ipVersion:         netutil.IPVersion6,
-		transportProtocol: netutil.UDPTransport,
+		ipVersion:         util.IPVersion6,
+		transportProtocol: util.UDPTransport,
 		remoteAddr:        &net.UDPAddr{IP: net.ParseIP("::1"), Port: port},
 	}
-	runClient(t, clientDescriptor, []byte("xiaochitang"), []byte("kuiranbudong"), 1)
+	runClient(t, clientDescriptor, []byte("xiaochitang"), []byte("kuiranbudong"), 4)
 	if err := serverMux.Close(); err != nil {
 		t.Errorf("Server mux close failed: %v", err)
 	}

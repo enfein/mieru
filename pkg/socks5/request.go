@@ -11,8 +11,8 @@ import (
 	"sync/atomic"
 
 	"github.com/enfein/mieru/pkg/log"
-	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/stderror"
+	"github.com/enfein/mieru/pkg/util"
 )
 
 const (
@@ -179,7 +179,7 @@ func (s *Server) handleConnect(ctx context.Context, conn io.ReadWriteCloser, req
 		return fmt.Errorf("failed to send reply: %w", err)
 	}
 
-	return netutil.BidiCopy(conn, target, false)
+	return util.BidiCopy(conn, target, false)
 }
 
 // handleBind is used to handle a bind command.
@@ -196,7 +196,7 @@ func (s *Server) handleBind(ctx context.Context, conn io.ReadWriteCloser, req *R
 func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, req *Request) error {
 	// Create a UDP listener on a random port.
 	// All the requests associated to this connection will go through this port.
-	udpListenerAddr, err := net.ResolveUDPAddr("udp", netutil.MaybeDecorateIPv6(netutil.AllIPAddr())+":0")
+	udpListenerAddr, err := net.ResolveUDPAddr("udp", util.MaybeDecorateIPv6(util.AllIPAddr())+":0")
 	if err != nil {
 		UDPAssociateErrors.Add(1)
 		return fmt.Errorf("failed to resolve UDP address: %w", err)

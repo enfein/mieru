@@ -26,21 +26,21 @@ import (
 	"time"
 
 	"github.com/enfein/mieru/pkg/kcp"
-	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/stderror"
+	"github.com/enfein/mieru/pkg/util"
 )
 
 func newKCPPipe(t *testing.T) (*net.UDPConn, *net.UDPConn, *kcp.KCP, *kcp.KCP) {
 	t.Helper()
 	mrand.Seed(time.Now().UnixNano())
 
-	port1, err := netutil.UnusedUDPPort()
+	port1, err := util.UnusedUDPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+		t.Fatalf("util.UnusedUDPPort() failed: %v", err)
 	}
-	port2, err := netutil.UnusedUDPPort()
+	port2, err := util.UnusedUDPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+		t.Fatalf("util.UnusedUDPPort() failed: %v", err)
 	}
 
 	convId := uint32(mrand.Int31())

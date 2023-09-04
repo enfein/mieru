@@ -32,11 +32,11 @@ import (
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
-	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/recording"
 	"github.com/enfein/mieru/pkg/replay"
 	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/stderror"
+	"github.com/enfein/mieru/pkg/util"
 )
 
 const (
@@ -524,7 +524,7 @@ func (l *TCPSessionListener) acceptLoop() {
 // ListenWithOptions creates a new TCPSession listener.
 func ListenWithOptions(laddr string, users map[string]*appctlpb.User) (*TCPSessionListener, error) {
 	listenConfig := net.ListenConfig{
-		Control: netutil.ReuseAddrPort,
+		Control: util.ReuseAddrPort,
 	}
 	l, err := listenConfig.Listen(context.Background(), "tcp", laddr)
 	if err != nil {

@@ -13,15 +13,29 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//go:build !linux
-
-package netutil
+package util
 
 import (
-	"syscall"
+	"net"
+	"testing"
 )
 
-// ReuseAddrPort does nothing outside Linux platform.
-func ReuseAddrPort(network, address string, conn syscall.RawConn) error {
+type counterCloser struct {
+	net.Conn
+	Counter *int
+}
+
+func (cc counterCloser) Close() error {
+	*cc.Counter = *cc.Counter + 1
 	return nil
+}
+
+func TestHierarchyConn(t *testing.T) {
+	counter := 0
+	parent := WrapHierarchyConn(counterCloser{Conn: nil, Counter: &counter})
+	parent.AddSubConnection(counterCloser{Conn: nil, Counter: &counter})
+	parent.Close()
+	if counter != 2 {
+		t.Errorf("counter = %d, want %d", counter, 2)
+	}
 }

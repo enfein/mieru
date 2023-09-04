@@ -1,4 +1,4 @@
-// Copyright (C) 2022  mieru authors
+// Copyright (C) 2023  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,29 +13,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package netutil
+package util
 
-import (
-	"net"
-	"testing"
+type TransportProtocol int
+
+const (
+	UnknownTransport TransportProtocol = iota
+	UDPTransport
+	TCPTransport
 )
-
-type counterCloser struct {
-	net.Conn
-	Counter *int
-}
-
-func (cc counterCloser) Close() error {
-	*cc.Counter = *cc.Counter + 1
-	return nil
-}
-
-func TestHierarchyConn(t *testing.T) {
-	counter := 0
-	parent := WrapHierarchyConn(counterCloser{Conn: nil, Counter: &counter})
-	parent.AddSubConnection(counterCloser{Conn: nil, Counter: &counter})
-	parent.Close()
-	if counter != 2 {
-		t.Errorf("counter = %d, want %d", counter, 2)
-	}
-}

@@ -28,10 +28,10 @@ import (
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/metrics"
-	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/recording"
 	"github.com/enfein/mieru/pkg/replay"
 	"github.com/enfein/mieru/pkg/testtool"
+	"github.com/enfein/mieru/pkg/util"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -134,17 +134,17 @@ func runCloseWaitClient(t *testing.T, laddr, raddr string, username, password []
 // the client's request to the server. The monitor should not get any response
 // from the server.
 func TestReplayClientRequestToServer(t *testing.T) {
-	serverPort, err := netutil.UnusedTCPPort()
+	serverPort, err := util.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
-	clientPort, err := netutil.UnusedTCPPort()
+	clientPort, err := util.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
-	attackPort, err := netutil.UnusedTCPPort()
+	attackPort, err := util.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
 	serverAddr := fmt.Sprintf("127.0.0.1:%d", serverPort)
 	clientAddr := fmt.Sprintf("127.0.0.1:%d", clientPort)
@@ -252,17 +252,17 @@ func TestReplayClientRequestToServer(t *testing.T) {
 // the server's response back to the server. The monitor should not get any
 // response from the server.
 func TestReplayServerResponseToServer(t *testing.T) {
-	serverPort, err := netutil.UnusedTCPPort()
+	serverPort, err := util.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
-	clientPort, err := netutil.UnusedTCPPort()
+	clientPort, err := util.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
-	attackPort, err := netutil.UnusedTCPPort()
+	attackPort, err := util.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
 	serverAddr := fmt.Sprintf("127.0.0.1:%d", serverPort)
 	clientAddr := fmt.Sprintf("127.0.0.1:%d", clientPort)

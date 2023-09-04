@@ -25,9 +25,9 @@ import (
 	"time"
 
 	"github.com/enfein/mieru/pkg/log"
-	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/socks5client"
 	"github.com/enfein/mieru/pkg/testtool"
+	"github.com/enfein/mieru/pkg/util"
 )
 
 var (
@@ -102,7 +102,7 @@ func DoRequestWithExistingConn(conn *net.UDPConn, proxyAddr, dstAddr *net.UDPAdd
 	payload := testtool.TestHelperGenRot13Input(payloadSize)
 
 	conn.SetReadDeadline(time.Now().Add(1 * time.Second))
-	defer conn.SetReadDeadline(netutil.ZeroTime())
+	defer conn.SetReadDeadline(util.ZeroTime())
 	resp, err := socks5client.SendUDP(conn, proxyAddr, dstAddr, payload)
 	if err != nil {
 		log.Fatalf("socks5client.SendUDP() failed: %v", err)

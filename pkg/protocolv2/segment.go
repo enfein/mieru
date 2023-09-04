@@ -23,8 +23,8 @@ import (
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/mathext"
-	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/stderror"
+	"github.com/enfein/mieru/pkg/util"
 	"github.com/google/btree"
 )
 
@@ -40,19 +40,19 @@ const (
 )
 
 // MaxFragmentSize returns the maximum payload size in a fragment.
-func MaxFragmentSize(mtu int, ipVersion netutil.IPVersion, transport netutil.TransportProtocol) int {
-	if transport == netutil.TCPTransport {
+func MaxFragmentSize(mtu int, ipVersion util.IPVersion, transport util.TransportProtocol) int {
+	if transport == util.TCPTransport {
 		// No fragment needed.
 		return MaxPDU
 	}
 
 	res := mtu - udpOverhead
-	if ipVersion == netutil.IPVersion4 {
+	if ipVersion == util.IPVersion4 {
 		res -= 20
 	} else {
 		res -= 40
 	}
-	if transport == netutil.UDPTransport {
+	if transport == util.UDPTransport {
 		res -= 8
 	} else {
 		res -= 20
@@ -61,19 +61,19 @@ func MaxFragmentSize(mtu int, ipVersion netutil.IPVersion, transport netutil.Tra
 }
 
 // MaxPaddingSize returns the maximum padding size of a segment.
-func MaxPaddingSize(mtu int, ipVersion netutil.IPVersion, transport netutil.TransportProtocol, fragmentSize int, existingPaddingSize int) int {
-	if transport == netutil.TCPTransport {
+func MaxPaddingSize(mtu int, ipVersion util.IPVersion, transport util.TransportProtocol, fragmentSize int, existingPaddingSize int) int {
+	if transport == util.TCPTransport {
 		// No limit.
 		return 255
 	}
 
 	res := mtu - fragmentSize - udpOverhead
-	if ipVersion == netutil.IPVersion4 {
+	if ipVersion == util.IPVersion4 {
 		res -= 20
 	} else {
 		res -= 40
 	}
-	if transport == netutil.UDPTransport {
+	if transport == util.UDPTransport {
 		res -= 8
 	} else {
 		res -= 20

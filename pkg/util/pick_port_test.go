@@ -13,18 +13,36 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package netutil
+package util
 
 import (
+	"fmt"
+	"net"
 	"testing"
-	"time"
 )
 
-func TestIsZeroTime(t *testing.T) {
-	if IsZeroTime(time.Now()) {
-		t.Errorf("IsZeroTime(time.Now()) = true, want false")
+func TestUnusedTCPPort(t *testing.T) {
+	port, err := UnusedTCPPort()
+	if err != nil {
+		t.Fatalf("UnusedTCPPort() failed: %v", err)
 	}
-	if !IsZeroTime(ZeroTime()) {
-		t.Errorf("IsZeroTime(ZeroTime()) = false, want true")
+
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		t.Fatalf("net.Listen() on port %d failed: %v", port, err)
 	}
+	l.Close()
+}
+
+func TestUnusedUDPPort(t *testing.T) {
+	port, err := UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("UnusedUDPPort() failed: %v", err)
+	}
+
+	l, err := net.ListenPacket("udp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		t.Fatalf("net.ListenPacket() on port %d failed: %v", port, err)
+	}
+	l.Close()
 }

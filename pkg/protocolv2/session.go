@@ -28,18 +28,21 @@ import (
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/mathext"
 	"github.com/enfein/mieru/pkg/metrics"
-	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/stderror"
+	"github.com/enfein/mieru/pkg/util"
 )
 
 const (
-	segmentTreeCapacity  = 4096
-	segmentChanCapacity  = 256
-	minWindowSize        = 16
-	maxWindowSize        = 4096
+	segmentTreeCapacity = 4096
+	segmentChanCapacity = 1024
+	minWindowSize       = 16
+	maxWindowSize       = 4096
+
 	segmentRetryInterval = 10 * time.Millisecond
 	segmentAckDelay      = 50 * time.Millisecond
-	serverRespTimeout    = 10 * time.Second
+
+	serverRespTimeout        = 10 * time.Second
+	sessionHeartbeatInterval = 5 * time.Second
 )
 
 type sessionState int
@@ -78,6 +81,7 @@ type Session struct {
 
 	nextSeq    uint32    // next sequence number to send a segment
 	nextRecv   uint32    // next sequence number to receive
+	lastRXTime time.Time // last timestamp when a segment is received
 	lastTXTime time.Time // last timestamp when a segment is sent
 	unreadBuf  []byte    // payload removed from the recvQueue that haven't been read by application
 
@@ -105,8 +109,8 @@ func NewSession(id uint32, isClient bool, mtu int) *Session {
 		isClient:         isClient,
 		mtu:              mtu,
 		state:            sessionInit,
-		readDeadline:     netutil.ZeroTime(),
-		writeDeadline:    netutil.ZeroTime(),
+		readDeadline:     util.ZeroTime(),
+		writeDeadline:    util.ZeroTime(),
 		ready:            make(chan struct{}),
 		established:      make(chan struct{}),
 		done:             make(chan struct{}),
@@ -117,6 +121,7 @@ func NewSession(id uint32, isClient bool, mtu int) *Session {
 		recvBuf:          newSegmentTree(segmentTreeCapacity),
 		recvQueue:        newSegmentTree(segmentTreeCapacity),
 		recvChan:         make(chan *segment, segmentChanCapacity),
+		lastRXTime:       time.Now(),
 		lastTXTime:       time.Now(),
 		rttStat:          rttStat,
 		sendAlgorithm:    congestion.NewCubicSendAlgorithm(minWindowSize, maxWindowSize),
@@ -144,7 +149,7 @@ func (s *Session) Read(b []byte) (n int, err error) {
 	defer s.rLock.Unlock()
 
 	defer func() {
-		s.readDeadline = netutil.ZeroTime()
+		s.readDeadline = util.ZeroTime()
 	}()
 	if log.IsLevelEnabled(log.TraceLevel) {
 		log.Tracef("%v trying to read %d bytes", s, len(b))
@@ -163,7 +168,7 @@ func (s *Session) Read(b []byte) (n int, err error) {
 	}
 
 	var timeC <-chan time.Time
-	if !netutil.IsZeroTime(s.readDeadline) {
+	if !util.IsZeroTime(s.readDeadline) {
 		timeC = time.After(time.Until(s.readDeadline))
 	}
 
@@ -234,7 +239,7 @@ func (s *Session) Write(b []byte) (n int, err error) {
 	defer s.wLock.Unlock()
 
 	defer func() {
-		s.writeDeadline = netutil.ZeroTime()
+		s.writeDeadline = util.ZeroTime()
 	}()
 	if s.state == sessionAttached {
 		if s.isClient {
@@ -289,7 +294,7 @@ func (s *Session) Write(b []byte) (n int, err error) {
 	}
 
 	var timeC <-chan time.Time
-	if !netutil.IsZeroTime(s.writeDeadline) {
+	if !util.IsZeroTime(s.writeDeadline) {
 		timeC = time.After(time.Until(s.writeDeadline))
 	}
 
@@ -369,19 +374,22 @@ func (s *Session) Close() error {
 	s.wLock.Lock()
 	defer s.wLock.Unlock()
 
-	s.forwardStateTo(sessionClosing)
-	seg := &segment{
-		metadata: &sessionStruct{
-			baseStruct: baseStruct{
-				protocol: closeSessionRequest,
+	if s.conn.TransportProtocol() == util.TCPTransport {
+		// Send closeSessionRequest, and wait for closeSessionResponse.
+		s.forwardStateTo(sessionClosing)
+		seg := &segment{
+			metadata: &sessionStruct{
+				baseStruct: baseStruct{
+					protocol: closeSessionRequest,
+				},
+				sessionID: s.id,
+				seq:       s.nextSeq,
 			},
-			sessionID: s.id,
-			seq:       s.nextSeq,
-		},
+		}
+		s.nextSeq++
+		s.sendQueue.InsertBlocking(seg)
+		<-s.done
 	}
-	s.nextSeq++
-	s.sendQueue.InsertBlocking(seg)
-	<-s.done
 	s.forwardStateTo(sessionClosed)
 	return nil
 }
@@ -391,7 +399,7 @@ func (s *Session) LocalAddr() net.Addr {
 }
 
 func (s *Session) RemoteAddr() net.Addr {
-	if !netutil.IsNilNetAddr(s.remoteAddr) {
+	if !util.IsNilNetAddr(s.remoteAddr) {
 		return s.remoteAddr
 	}
 	return s.conn.RemoteAddr()
@@ -451,7 +459,7 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 				return lastErr
 			}
 			switch s.conn.TransportProtocol() {
-			case netutil.TCPTransport:
+			case util.TCPTransport:
 				for {
 					seg, ok := s.sendQueue.DeleteMin()
 					if !ok {
@@ -464,7 +472,7 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 						return err
 					}
 				}
-			case netutil.UDPTransport:
+			case util.UDPTransport:
 				needRetransmission := false
 				hasLoss := false
 				hasTimeout := false
@@ -537,8 +545,8 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 					}
 				}
 				if !needRetransmission && segmentMoved == 0 {
-					// Send ACK if needed.
-					if time.Since(s.lastTXTime) > segmentAckDelay {
+					// Send ACK or heartbeat if needed.
+					if (s.sendBuf.Len() > 0 && time.Since(s.lastTXTime) > segmentAckDelay) || time.Since(s.lastRXTime) > sessionHeartbeatInterval {
 						baseStruct := baseStruct{}
 						if s.isClient {
 							baseStruct.protocol = ackClientToServer
@@ -549,7 +557,7 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 							metadata: &dataAckStruct{
 								baseStruct: baseStruct,
 								sessionID:  s.id,
-								seq:        uint32(mathext.Max(0, int(s.nextRecv)-1)),
+								seq:        uint32(mathext.Max(0, int(s.nextSeq)-1)),
 								unAckSeq:   s.nextRecv,
 								windowSize: uint16(mathext.Max(0, int(s.sendAlgorithm.CongestionWindowSize())-s.recvBuf.Len())),
 							},
@@ -587,6 +595,7 @@ func (s *Session) input(seg *segment) error {
 	if seg.block != nil {
 		s.block = seg.block
 	}
+	s.lastRXTime = time.Now()
 	if protocol == openSessionRequest || protocol == openSessionResponse || protocol == dataServerToClient || protocol == dataClientToServer {
 		return s.inputData(seg)
 	} else if protocol == ackServerToClient || protocol == ackClientToServer {
@@ -599,11 +608,11 @@ func (s *Session) input(seg *segment) error {
 
 func (s *Session) inputData(seg *segment) error {
 	switch s.conn.TransportProtocol() {
-	case netutil.TCPTransport:
+	case util.TCPTransport:
 		// Deliver the segment directly to recvQueue.
 		s.recvQueue.InsertBlocking(seg)
 		return nil
-	case netutil.UDPTransport:
+	case util.UDPTransport:
 		// Delete all previous acknowledged segments from sendBuf.
 		das, ok := seg.metadata.(*dataAckStruct)
 		if ok {
@@ -666,10 +675,10 @@ func (s *Session) inputData(seg *segment) error {
 
 func (s *Session) inputAck(seg *segment) error {
 	switch s.conn.TransportProtocol() {
-	case netutil.TCPTransport:
+	case util.TCPTransport:
 		// Do nothing when receive ACK from TCP protocol.
 		return nil
-	case netutil.UDPTransport:
+	case util.UDPTransport:
 		// Delete all previous acknowledged segments from sendBuf.
 		das := seg.metadata.(*dataAckStruct)
 		unAckSeq := das.unAckSeq
@@ -735,15 +744,18 @@ func (s *Session) inputClose(seg *segment) error {
 
 func (s *Session) output(seg *segment, remoteAddr net.Addr) error {
 	switch s.conn.TransportProtocol() {
-	case netutil.TCPTransport:
+	case util.TCPTransport:
 		if err := s.conn.(*TCPUnderlay).writeOneSegment(seg); err != nil {
 			return fmt.Errorf("TCPUnderlay.writeOneSegment() failed: %v", err)
 		}
-	case netutil.UDPTransport:
+	case util.UDPTransport:
 		err := s.conn.(*UDPUnderlay).writeOneSegment(seg, remoteAddr.(*net.UDPAddr))
 		if err != nil {
 			if !stderror.ShouldRetry(err) {
 				return fmt.Errorf("UDPUnderlay.writeOneSegment() failed: %v", err)
+			}
+			if log.IsLevelEnabled(log.TraceLevel) {
+				log.Tracef("UDPUnderlay.writeOneSegment() failed: %v. Will retry later.", err)
 			}
 			return nil
 		}

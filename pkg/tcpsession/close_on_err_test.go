@@ -24,20 +24,20 @@ import (
 	"time"
 
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
-	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/testtool"
+	"github.com/enfein/mieru/pkg/util"
 	"google.golang.org/protobuf/proto"
 )
 
 func TestCloseOnErr(t *testing.T) {
-	serverPort, err := netutil.UnusedTCPPort()
+	serverPort, err := util.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
-	clientPort, err := netutil.UnusedTCPPort()
+	clientPort, err := util.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
 	serverAddr := fmt.Sprintf("127.0.0.1:%d", serverPort)
 	clientAddr := fmt.Sprintf("127.0.0.1:%d", clientPort)
@@ -133,13 +133,13 @@ func TestCloseOnErr(t *testing.T) {
 }
 
 func TestErrorMetrics(t *testing.T) {
-	serverPort, err := netutil.UnusedTCPPort()
+	serverPort, err := util.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
-	clientPort, err := netutil.UnusedTCPPort()
+	clientPort, err := util.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
 	serverAddr := fmt.Sprintf("127.0.0.1:%d", serverPort)
 	clientAddr := fmt.Sprintf("127.0.0.1:%d", clientPort)

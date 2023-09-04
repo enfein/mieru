@@ -19,12 +19,12 @@ import (
 	"github.com/enfein/mieru/pkg/kcp"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
-	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/recording"
 	"github.com/enfein/mieru/pkg/replay"
 	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/schedule"
 	"github.com/enfein/mieru/pkg/stderror"
+	"github.com/enfein/mieru/pkg/util"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
 )
@@ -170,7 +170,7 @@ func newUDPSession(conv uint32, conn net.PacketConn, ownConn bool, remote net.Ad
 
 	sess.kcp.ReserveBytes(kcpReservedSize)
 
-	if netutil.GetIPVersion(sess.remote.String()) == netutil.IPVersion4 {
+	if util.GetIPVersion(sess.remote.String()) == util.IPVersion4 {
 		sess.SetMtu(int(globalMTU) - 20 - 8 - kcp.OuterHeaderSize)
 	} else {
 		sess.SetMtu(int(globalMTU) - 40 - 8 - kcp.OuterHeaderSize)
@@ -203,7 +203,7 @@ func newUDPSession(conv uint32, conn net.PacketConn, ownConn bool, remote net.Ad
 // Read implements net.Conn
 func (s *UDPSession) Read(b []byte) (n int, err error) {
 	// Clear read deadline after a read.
-	defer s.SetReadDeadline(netutil.ZeroTime())
+	defer s.SetReadDeadline(util.ZeroTime())
 	for {
 		s.mu.Lock()
 		// When recvBufPtr has remaining data, copy from recvBufPtr.

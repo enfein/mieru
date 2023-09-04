@@ -23,8 +23,8 @@ import (
 	"sync"
 
 	"github.com/enfein/mieru/pkg/metrics"
-	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/stderror"
+	"github.com/enfein/mieru/pkg/util"
 )
 
 // baseUnderlay contains a base implementation of underlay.
@@ -80,27 +80,27 @@ func (b *baseUnderlay) Close() error {
 }
 
 func (b *baseUnderlay) Addr() net.Addr {
-	return netutil.NilNetAddr()
+	return util.NilNetAddr()
 }
 
 func (b *baseUnderlay) MTU() int {
 	return b.mtu
 }
 
-func (b *baseUnderlay) IPVersion() netutil.IPVersion {
-	return netutil.IPVersionUnknown
+func (b *baseUnderlay) IPVersion() util.IPVersion {
+	return util.IPVersionUnknown
 }
 
-func (b *baseUnderlay) TransportProtocol() netutil.TransportProtocol {
-	return netutil.UnknownTransport
+func (b *baseUnderlay) TransportProtocol() util.TransportProtocol {
+	return util.UnknownTransport
 }
 
 func (b *baseUnderlay) LocalAddr() net.Addr {
-	return netutil.NilNetAddr()
+	return util.NilNetAddr()
 }
 
 func (b *baseUnderlay) RemoteAddr() net.Addr {
-	return netutil.NilNetAddr()
+	return util.NilNetAddr()
 }
 
 func (b *baseUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {

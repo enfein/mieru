@@ -13,31 +13,15 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//go:build linux
+//go:build !linux
 
-package netutil
+package util
 
 import (
 	"syscall"
-
-	"golang.org/x/sys/unix"
 )
 
-// ReuseAddrPort sets SO_REUSEADDR and SO_REUSEPORT options to a given connection.
+// ReuseAddrPort does nothing outside Linux platform.
 func ReuseAddrPort(network, address string, conn syscall.RawConn) error {
-	var err error
-	// See syscall.RawConn.Control
-	conn.Control(func(fd uintptr) {
-		// Set SO_REUSEADDR
-		err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEADDR, 1)
-		if err != nil {
-			return
-		}
-		// Set SO_REUSEPORT
-		err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
-		if err != nil {
-			return
-		}
-	})
-	return err
+	return nil
 }

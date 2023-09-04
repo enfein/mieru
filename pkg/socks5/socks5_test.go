@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/enfein/mieru/pkg/netutil"
+	"github.com/enfein/mieru/pkg/util"
 )
 
 func TestSocks5Connect(t *testing.T) {
@@ -58,9 +58,9 @@ func TestSocks5Connect(t *testing.T) {
 	}
 
 	// Socks server start listening.
-	serverPort, err := netutil.UnusedTCPPort()
+	serverPort, err := util.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
 	go func() {
 		if err := serv.ListenAndServe("tcp", "127.0.0.1:"+strconv.Itoa(serverPort)); err != nil {
@@ -173,9 +173,9 @@ func TestSocks5UDPAssociation(t *testing.T) {
 	}
 
 	// Socks server start listening.
-	serverPort, err := netutil.UnusedTCPPort()
+	serverPort, err := util.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
 	go func() {
 		if err := serv.ListenAndServe("tcp", "127.0.0.1:"+strconv.Itoa(serverPort)); err != nil {
@@ -262,9 +262,9 @@ func TestServerGroup(t *testing.T) {
 		t.Fatalf("New() failed: %v", err)
 	}
 	g := NewGroup()
-	port, err := netutil.UnusedUDPPort()
+	port, err := util.UnusedUDPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+		t.Fatalf("util.UnusedUDPPort() failed: %v", err)
 	}
 	if err := g.Add("UDP", port, s1); err != nil {
 		t.Fatalf("Add() failed: %v", err)

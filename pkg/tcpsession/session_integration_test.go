@@ -26,10 +26,10 @@ import (
 
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
-	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/tcpsession"
 	"github.com/enfein/mieru/pkg/testtool"
+	"github.com/enfein/mieru/pkg/util"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -97,9 +97,9 @@ func runClient(t *testing.T, laddr, serverAddr string, username, password []byte
 
 func TestTCPSessionIPv4(t *testing.T) {
 	rng.InitSeed()
-	serverPort, err := netutil.UnusedTCPPort()
+	serverPort, err := util.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
 	party, err := tcpsession.ListenWithOptions(fmt.Sprintf("127.0.0.1:%d", serverPort), users)
 	if err != nil {
@@ -123,13 +123,13 @@ func TestTCPSessionIPv4(t *testing.T) {
 	}()
 	time.Sleep(1 * time.Second)
 
-	clientPort1, err := netutil.UnusedTCPPort()
+	clientPort1, err := util.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
-	clientPort2, err := netutil.UnusedTCPPort()
+	clientPort2, err := util.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -157,9 +157,9 @@ func TestTCPSessionIPv4(t *testing.T) {
 
 func TestTCPSessionIPv6(t *testing.T) {
 	rng.InitSeed()
-	serverPort, err := netutil.UnusedTCPPort()
+	serverPort, err := util.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
 	party, err := tcpsession.ListenWithOptions(fmt.Sprintf("[::1]:%d", serverPort), users)
 	if err != nil {
@@ -183,13 +183,13 @@ func TestTCPSessionIPv6(t *testing.T) {
 	}()
 	time.Sleep(1 * time.Second)
 
-	clientPort1, err := netutil.UnusedTCPPort()
+	clientPort1, err := util.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
-	clientPort2, err := netutil.UnusedTCPPort()
+	clientPort2, err := util.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
 	var wg sync.WaitGroup
 	wg.Add(2)

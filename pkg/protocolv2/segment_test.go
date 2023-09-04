@@ -22,33 +22,33 @@ import (
 	"testing"
 	"time"
 
-	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/rng"
+	"github.com/enfein/mieru/pkg/util"
 )
 
 func TestMaxFragmentSize(t *testing.T) {
 	testcases := []struct {
 		mtu       int
-		ipVersion netutil.IPVersion
-		transport netutil.TransportProtocol
+		ipVersion util.IPVersion
+		transport util.TransportProtocol
 		want      int
 	}{
 		{
 			1500,
-			netutil.IPVersion6,
-			netutil.TCPTransport,
+			util.IPVersion6,
+			util.TCPTransport,
 			MaxPDU,
 		},
 		{
 			1500,
-			netutil.IPVersion4,
-			netutil.UDPTransport,
+			util.IPVersion4,
+			util.UDPTransport,
 			1472 - udpOverhead,
 		},
 		{
 			1500,
-			netutil.IPVersionUnknown,
-			netutil.UnknownTransport,
+			util.IPVersionUnknown,
+			util.UnknownTransport,
 			1440 - udpOverhead,
 		},
 	}
@@ -63,32 +63,32 @@ func TestMaxFragmentSize(t *testing.T) {
 func TestMaxPaddingSize(t *testing.T) {
 	testcases := []struct {
 		mtu                 int
-		ipVersion           netutil.IPVersion
-		transport           netutil.TransportProtocol
+		ipVersion           util.IPVersion
+		transport           util.TransportProtocol
 		fragmentSize        int
 		existingPaddingSize int
 		want                int
 	}{
 		{
 			1500,
-			netutil.IPVersion6,
-			netutil.TCPTransport,
+			util.IPVersion6,
+			util.TCPTransport,
 			MaxPDU,
 			255,
 			255,
 		},
 		{
 			1500,
-			netutil.IPVersion4,
-			netutil.UDPTransport,
+			util.IPVersion4,
+			util.UDPTransport,
 			1472 - udpOverhead - 16,
 			12,
 			4,
 		},
 		{
 			1500,
-			netutil.IPVersionUnknown,
-			netutil.UnknownTransport,
+			util.IPVersionUnknown,
+			util.UnknownTransport,
 			0,
 			255,
 			255,

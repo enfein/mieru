@@ -1,4 +1,4 @@
-// Copyright (C) 2023  mieru authors
+// Copyright (C) 2022  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,16 +13,31 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package netutil
+//go:build linux
 
-import "time"
+package util
 
-// ZeroTime returns the time of UNIX epoch.
-func ZeroTime() time.Time {
-	return time.Time{}
-}
+import (
+	"syscall"
 
-// IsZeroTime returns true if the input time is UNIX epoch.
-func IsZeroTime(t time.Time) bool {
-	return t == ZeroTime()
+	"golang.org/x/sys/unix"
+)
+
+// ReuseAddrPort sets SO_REUSEADDR and SO_REUSEPORT options to a given connection.
+func ReuseAddrPort(network, address string, conn syscall.RawConn) error {
+	var err error
+	// See syscall.RawConn.Control
+	conn.Control(func(fd uintptr) {
+		// Set SO_REUSEADDR
+		err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEADDR, 1)
+		if err != nil {
+			return
+		}
+		// Set SO_REUSEPORT
+		err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
+		if err != nil {
+			return
+		}
+	})
+	return err
 }

@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/socks5"
+	"github.com/enfein/mieru/pkg/util"
 )
 
 var httpTestServer = func() *http.Server {
-	httpTestPort, err := netutil.UnusedTCPPort()
+	httpTestPort, err := util.UnusedTCPPort()
 	if err != nil {
 		panic(err)
 	}
@@ -90,9 +90,9 @@ func tcpReady(port int, timeout time.Duration) {
 }
 
 func TestSocks5Anonymous(t *testing.T) {
-	port, err := netutil.UnusedTCPPort()
+	port, err := util.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
 	newTestSocksServer(port, false)
 	dialSocksProxy := Dial(fmt.Sprintf("socks5://127.0.0.1:%d?timeout=5s", port), ConnectCmd)
@@ -113,9 +113,9 @@ func TestSocks5Anonymous(t *testing.T) {
 }
 
 func TestSocks5Auth(t *testing.T) {
-	port, err := netutil.UnusedTCPPort()
+	port, err := util.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
 	newTestSocksServer(port, true)
 	dialSocksProxy := Dial(fmt.Sprintf("socks5://test_user:test_pass@127.0.0.1:%d?timeout=5s", port), ConnectCmd)

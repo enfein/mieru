@@ -13,36 +13,16 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package netutil
+package util
 
-import (
-	"fmt"
-	"net"
-	"testing"
-)
+import "time"
 
-func TestUnusedTCPPort(t *testing.T) {
-	port, err := UnusedTCPPort()
-	if err != nil {
-		t.Fatalf("UnusedTCPPort() failed: %v", err)
-	}
-
-	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-	if err != nil {
-		t.Fatalf("net.Listen() on port %d failed: %v", port, err)
-	}
-	l.Close()
+// ZeroTime returns the time of UNIX epoch.
+func ZeroTime() time.Time {
+	return time.Time{}
 }
 
-func TestUnusedUDPPort(t *testing.T) {
-	port, err := UnusedUDPPort()
-	if err != nil {
-		t.Fatalf("UnusedUDPPort() failed: %v", err)
-	}
-
-	l, err := net.ListenPacket("udp", fmt.Sprintf(":%d", port))
-	if err != nil {
-		t.Fatalf("net.ListenPacket() on port %d failed: %v", port, err)
-	}
-	l.Close()
+// IsZeroTime returns true if the input time is UNIX epoch.
+func IsZeroTime(t time.Time) bool {
+	return t == ZeroTime()
 }

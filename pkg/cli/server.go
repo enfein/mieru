@@ -33,11 +33,11 @@ import (
 	"github.com/enfein/mieru/pkg/http2socks"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
-	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/socks5"
 	"github.com/enfein/mieru/pkg/stderror"
 	"github.com/enfein/mieru/pkg/tcpsession"
 	"github.com/enfein/mieru/pkg/udpsession"
+	"github.com/enfein/mieru/pkg/util"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 )
@@ -323,7 +323,7 @@ var serverRunFunc = func(s []string) error {
 
 			// Run the egress socks5 server in the background.
 			go func() {
-				socks5Addr := netutil.MaybeDecorateIPv6(netutil.AllIPAddr()) + ":" + strconv.Itoa(int(port))
+				socks5Addr := util.MaybeDecorateIPv6(util.AllIPAddr()) + ":" + strconv.Itoa(int(port))
 				var l net.Listener
 				var err error
 				if protocol == appctlpb.TransportProtocol_TCP {

@@ -26,10 +26,10 @@ import (
 
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
-	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/recording"
 	"github.com/enfein/mieru/pkg/replay"
 	"github.com/enfein/mieru/pkg/testtool"
+	"github.com/enfein/mieru/pkg/util"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -132,17 +132,17 @@ func runCloseWaitClient(t *testing.T, laddr, raddr string, username, password []
 // the server's response back to the client. The client should drop the replay
 // packet before processing it.
 func TestReplayServerResponseToClient(t *testing.T) {
-	serverPort, err := netutil.UnusedUDPPort()
+	serverPort, err := util.UnusedUDPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+		t.Fatalf("util.UnusedUDPPort() failed: %v", err)
 	}
-	clientPort, err := netutil.UnusedUDPPort()
+	clientPort, err := util.UnusedUDPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+		t.Fatalf("util.UnusedUDPPort() failed: %v", err)
 	}
-	attackPort, err := netutil.UnusedUDPPort()
+	attackPort, err := util.UnusedUDPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+		t.Fatalf("util.UnusedUDPPort() failed: %v", err)
 	}
 	serverAddr := fmt.Sprintf("127.0.0.1:%d", serverPort)
 	clientAddr := fmt.Sprintf("127.0.0.1:%d", clientPort)
@@ -232,17 +232,17 @@ func TestReplayServerResponseToClient(t *testing.T) {
 // the client's request to the server. The monitor should not get any response
 // from the server.
 func TestReplayClientRequestToServer(t *testing.T) {
-	serverPort, err := netutil.UnusedUDPPort()
+	serverPort, err := util.UnusedUDPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+		t.Fatalf("util.UnusedUDPPort() failed: %v", err)
 	}
-	clientPort, err := netutil.UnusedUDPPort()
+	clientPort, err := util.UnusedUDPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+		t.Fatalf("util.UnusedUDPPort() failed: %v", err)
 	}
-	attackPort, err := netutil.UnusedUDPPort()
+	attackPort, err := util.UnusedUDPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+		t.Fatalf("util.UnusedUDPPort() failed: %v", err)
 	}
 	serverAddr := fmt.Sprintf("127.0.0.1:%d", serverPort)
 	clientAddr := fmt.Sprintf("127.0.0.1:%d", clientPort)
@@ -351,17 +351,17 @@ func TestReplayClientRequestToServer(t *testing.T) {
 // the server's response back to the server. The server should drop the replay
 // packet before processing it.
 func TestReplayServerResponseToServer(t *testing.T) {
-	serverPort, err := netutil.UnusedUDPPort()
+	serverPort, err := util.UnusedUDPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+		t.Fatalf("util.UnusedUDPPort() failed: %v", err)
 	}
-	clientPort, err := netutil.UnusedUDPPort()
+	clientPort, err := util.UnusedUDPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+		t.Fatalf("util.UnusedUDPPort() failed: %v", err)
 	}
-	attackPort, err := netutil.UnusedUDPPort()
+	attackPort, err := util.UnusedUDPPort()
 	if err != nil {
-		t.Fatalf("netutil.UnusedUDPPort() failed: %v", err)
+		t.Fatalf("util.UnusedUDPPort() failed: %v", err)
 	}
 	serverAddr := fmt.Sprintf("127.0.0.1:%d", serverPort)
 	clientAddr := fmt.Sprintf("127.0.0.1:%d", clientPort)

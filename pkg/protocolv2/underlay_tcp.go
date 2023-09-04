@@ -25,16 +25,16 @@ import (
 
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
-	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/replay"
 	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/stderror"
+	"github.com/enfein/mieru/pkg/util"
 )
 
 type TCPUnderlay struct {
 	baseUnderlay
 	conn      *net.TCPConn
-	ipVersion netutil.IPVersion
+	ipVersion util.IPVersion
 
 	send cipher.BlockCipher
 	recv cipher.BlockCipher
@@ -107,18 +107,18 @@ func (t *TCPUnderlay) Addr() net.Addr {
 	return t.LocalAddr()
 }
 
-func (t *TCPUnderlay) IPVersion() netutil.IPVersion {
+func (t *TCPUnderlay) IPVersion() util.IPVersion {
 	if t.conn == nil {
-		return netutil.IPVersionUnknown
+		return util.IPVersionUnknown
 	}
-	if t.ipVersion == netutil.IPVersionUnknown {
-		t.ipVersion = netutil.GetIPVersion(t.conn.LocalAddr().String())
+	if t.ipVersion == util.IPVersionUnknown {
+		t.ipVersion = util.GetIPVersion(t.conn.LocalAddr().String())
 	}
 	return t.ipVersion
 }
 
-func (t *TCPUnderlay) TransportProtocol() netutil.TransportProtocol {
-	return netutil.TCPTransport
+func (t *TCPUnderlay) TransportProtocol() util.TransportProtocol {
+	return util.TCPTransport
 }
 
 func (t *TCPUnderlay) LocalAddr() net.Addr {

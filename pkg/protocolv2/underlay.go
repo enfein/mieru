@@ -20,7 +20,7 @@ import (
 	"net"
 
 	"github.com/enfein/mieru/pkg/metrics"
-	"github.com/enfein/mieru/pkg/netutil"
+	"github.com/enfein/mieru/pkg/util"
 )
 
 var (
@@ -38,10 +38,10 @@ type UnderlayProperties interface {
 	MTU() int
 
 	// The IP version used to establish the underlay.
-	IPVersion() netutil.IPVersion
+	IPVersion() util.IPVersion
 
 	// The transport protocol used to implement the underlay.
-	TransportProtocol() netutil.TransportProtocol
+	TransportProtocol() util.TransportProtocol
 
 	// Implement the LocalAddr() method in net.Conn interface.
 	LocalAddr() net.Addr
@@ -77,8 +77,8 @@ type Underlay interface {
 
 type underlayDescriptor struct {
 	mtu               int
-	ipVersion         netutil.IPVersion
-	transportProtocol netutil.TransportProtocol
+	ipVersion         util.IPVersion
+	transportProtocol util.TransportProtocol
 	localAddr         net.Addr
 	remoteAddr        net.Addr
 }
@@ -89,11 +89,11 @@ func (d underlayDescriptor) MTU() int {
 	return d.mtu
 }
 
-func (d underlayDescriptor) IPVersion() netutil.IPVersion {
+func (d underlayDescriptor) IPVersion() util.IPVersion {
 	return d.ipVersion
 }
 
-func (d underlayDescriptor) TransportProtocol() netutil.TransportProtocol {
+func (d underlayDescriptor) TransportProtocol() util.TransportProtocol {
 	return d.transportProtocol
 }
 

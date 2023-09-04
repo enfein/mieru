@@ -34,11 +34,11 @@ import (
 	"github.com/enfein/mieru/pkg/http2socks"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
-	"github.com/enfein/mieru/pkg/netutil"
 	"github.com/enfein/mieru/pkg/socks5"
 	"github.com/enfein/mieru/pkg/stderror"
 	"github.com/enfein/mieru/pkg/tcpsession"
 	"github.com/enfein/mieru/pkg/udpsession"
+	"github.com/enfein/mieru/pkg/util"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 )
@@ -359,14 +359,14 @@ var clientRunFunc = func(s []string) error {
 			if bindingInfo.GetProtocol() == appctlpb.TransportProtocol_TCP {
 				proxyConfigs = append(proxyConfigs, socks5.ProxyConfig{
 					NetworkType: "tcp",
-					Address:     netutil.MaybeDecorateIPv6(proxyHost) + ":" + strconv.Itoa(int(proxyPort)),
+					Address:     util.MaybeDecorateIPv6(proxyHost) + ":" + strconv.Itoa(int(proxyPort)),
 					Password:    hashedPassword,
 					Dial:        tcpsession.DialWithOptionsReturnConn,
 				})
 			} else if bindingInfo.GetProtocol() == appctlpb.TransportProtocol_UDP {
 				proxyConfigs = append(proxyConfigs, socks5.ProxyConfig{
 					NetworkType: "udp",
-					Address:     netutil.MaybeDecorateIPv6(proxyHost) + ":" + strconv.Itoa(int(proxyPort)),
+					Address:     util.MaybeDecorateIPv6(proxyHost) + ":" + strconv.Itoa(int(proxyPort)),
 					Password:    hashedPassword,
 					Dial:        udpsession.DialWithOptionsReturnConn,
 				})
@@ -393,9 +393,9 @@ var clientRunFunc = func(s []string) error {
 	// Run the local socks5 server in the background.
 	var socks5Addr string
 	if config.GetSocks5ListenLAN() {
-		socks5Addr = netutil.MaybeDecorateIPv6(netutil.AllIPAddr()) + ":" + strconv.Itoa(int(config.GetSocks5Port()))
+		socks5Addr = util.MaybeDecorateIPv6(util.AllIPAddr()) + ":" + strconv.Itoa(int(config.GetSocks5Port()))
 	} else {
-		socks5Addr = netutil.MaybeDecorateIPv6(netutil.LocalIPAddr()) + ":" + strconv.Itoa(int(config.GetSocks5Port()))
+		socks5Addr = util.MaybeDecorateIPv6(util.LocalIPAddr()) + ":" + strconv.Itoa(int(config.GetSocks5Port()))
 	}
 	wg.Add(1)
 	go func(socks5Addr string) {
@@ -418,9 +418,9 @@ var clientRunFunc = func(s []string) error {
 		go func(socks5Addr string) {
 			var httpServerAddr string
 			if config.GetHttpProxyListenLAN() {
-				httpServerAddr = netutil.MaybeDecorateIPv6(netutil.AllIPAddr()) + ":" + strconv.Itoa(int(config.GetHttpProxyPort()))
+				httpServerAddr = util.MaybeDecorateIPv6(util.AllIPAddr()) + ":" + strconv.Itoa(int(config.GetHttpProxyPort()))
 			} else {
-				httpServerAddr = netutil.MaybeDecorateIPv6(netutil.LocalIPAddr()) + ":" + strconv.Itoa(int(config.GetHttpProxyPort()))
+				httpServerAddr = util.MaybeDecorateIPv6(util.LocalIPAddr()) + ":" + strconv.Itoa(int(config.GetHttpProxyPort()))
 			}
 			httpServer := http2socks.NewHTTPServer(httpServerAddr, &http2socks.Proxy{
 				ProxyURI: "socks5://" + socks5Addr + "?timeout=10s",

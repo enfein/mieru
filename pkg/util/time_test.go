@@ -13,12 +13,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package netutil
+package util
 
-type TransportProtocol int
-
-const (
-	UnknownTransport TransportProtocol = iota
-	UDPTransport
-	TCPTransport
+import (
+	"testing"
+	"time"
 )
+
+func TestIsZeroTime(t *testing.T) {
+	if IsZeroTime(time.Now()) {
+		t.Errorf("IsZeroTime(time.Now()) = true, want false")
+	}
+	if !IsZeroTime(ZeroTime()) {
+		t.Errorf("IsZeroTime(ZeroTime()) = false, want true")
+	}
+}
