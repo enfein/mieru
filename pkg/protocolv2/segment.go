@@ -37,6 +37,9 @@ const (
 
 	// Number of fast ack received before retransmission.
 	fastAckLimit = 3
+
+	// Format to print segment TX time.
+	segmentTimeFormat = "15:04:05.999"
 )
 
 // MaxFragmentSize returns the maximum payload size in a fragment.
@@ -87,16 +90,17 @@ func MaxPaddingSize(mtu int, ipVersion util.IPVersion, transport util.TransportP
 // segment contains metadata and actual payload.
 type segment struct {
 	metadata  metadata
-	payload   []byte             // also can be a fragment
-	txCount   byte               // number of transmission times
-	fastAck   byte               // accumulated out of order ACK
-	txTime    time.Time          // most recent tx time
-	txTimeout time.Duration      // need to receive ACK within this duration
-	block     cipher.BlockCipher // cipher block to encrypt or decrypt the payload
+	payload   []byte                 // also can be a fragment
+	transport util.TransportProtocol // transport protocol
+	txCount   byte                   // number of transmission times
+	fastAck   byte                   // accumulated out of order ACK
+	txTime    time.Time              // most recent tx time
+	txTimeout time.Duration          // need to receive ACK within this duration
+	block     cipher.BlockCipher     // cipher block to encrypt or decrypt the payload
 }
 
 // Protocol returns the protocol of the segment.
-func (s *segment) Protocol() byte {
+func (s *segment) Protocol() protocolType {
 	return s.metadata.Protocol()
 }
 
@@ -149,6 +153,9 @@ func (s *segment) Less(than *segment) bool {
 }
 
 func (s *segment) String() string {
+	if s.transport == util.UDPTransport && (!util.IsZeroTime(s.txTime) || s.txTimeout != 0) {
+		return fmt.Sprintf("segment{metadata=%v, txCount=%v, fastAck=%v, txTime=%v, txTimeout=%v}", s.metadata, s.txCount, s.fastAck, s.txTime.Format(segmentTimeFormat), s.txTimeout)
+	}
 	return fmt.Sprintf("segment{metadata=%v}", s.metadata)
 }
 

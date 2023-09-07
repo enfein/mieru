@@ -23,21 +23,55 @@ import (
 	"github.com/enfein/mieru/pkg/mathext"
 )
 
+type protocolType byte
+
+const (
+	closeConnRequest     protocolType = 0
+	closeConnResponse    protocolType = 1
+	openSessionRequest   protocolType = 2
+	openSessionResponse  protocolType = 3
+	closeSessionRequest  protocolType = 4
+	closeSessionResponse protocolType = 5
+	dataClientToServer   protocolType = 6
+	dataServerToClient   protocolType = 7
+	ackClientToServer    protocolType = 8
+	ackServerToClient    protocolType = 9
+)
+
+func (p protocolType) equals(other byte) bool {
+	return byte(p) == other
+}
+
+func (p protocolType) String() string {
+	switch p {
+	case closeConnRequest:
+		return "closeConnRequest"
+	case closeConnResponse:
+		return "closeConnResponse"
+	case openSessionRequest:
+		return "openSessionRequest"
+	case openSessionResponse:
+		return "openSessionResponse"
+	case closeSessionRequest:
+		return "closeSessionRequest"
+	case closeSessionResponse:
+		return "closeSessionResponse"
+	case dataClientToServer:
+		return "dataClientToServer"
+	case dataServerToClient:
+		return "dataServerToClient"
+	case ackClientToServer:
+		return "ackClientToServer"
+	case ackServerToClient:
+		return "ackServerToClient"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 const (
 	// Number of bytes used by metadata before encryption.
 	metadataLength = 32
-
-	// Protocols.
-	closeConnRequest     byte = 0
-	closeConnResponse    byte = 1
-	openSessionRequest   byte = 2
-	openSessionResponse  byte = 3
-	closeSessionRequest  byte = 4
-	closeSessionResponse byte = 5
-	dataClientToServer   byte = 6
-	dataServerToClient   byte = 7
-	ackClientToServer    byte = 8
-	ackServerToClient    byte = 9
 
 	// Maximum payload that cat be attached to open session request and response.
 	maxSessionOpenPayload = 1024
@@ -47,7 +81,7 @@ const (
 type metadata interface {
 
 	// Protocol returns the protocol of metadata.
-	Protocol() byte
+	Protocol() protocolType
 
 	// Marshal serializes the metadata to a non-encrypted wire format.
 	Marshal() []byte
@@ -82,8 +116,8 @@ type sessionStruct struct {
 	suffixLen  uint8  // byte 17: length of suffix padding
 }
 
-func (ss *sessionStruct) Protocol() byte {
-	return ss.baseStruct.protocol
+func (ss *sessionStruct) Protocol() protocolType {
+	return protocolType(ss.baseStruct.protocol)
 }
 
 func (ss *sessionStruct) Marshal() []byte {
@@ -104,7 +138,7 @@ func (ss *sessionStruct) Unmarshal(b []byte) error {
 	if len(b) != metadataLength {
 		return fmt.Errorf("input bytes: %d, want %d", len(b), metadataLength)
 	}
-	if b[0] != openSessionRequest && b[0] != openSessionResponse && b[0] != closeSessionRequest && b[0] != closeSessionResponse {
+	if !openSessionRequest.equals(b[0]) && !openSessionResponse.equals(b[0]) && !closeSessionRequest.equals(b[0]) && !closeSessionResponse.equals(b[0]) {
 		return fmt.Errorf("invalid protocol %d", b[0])
 	}
 	originalTimestamp := binary.BigEndian.Uint32(b[2:])
@@ -128,10 +162,10 @@ func (ss *sessionStruct) Unmarshal(b []byte) error {
 }
 
 func (ss *sessionStruct) String() string {
-	return fmt.Sprintf("sessionStruct{protocol=%v, sessionID=%v, seq=%v, statusCode=%v, payloadLen=%v, suffixLen=%v}", ss.protocol, ss.sessionID, ss.seq, ss.statusCode, ss.payloadLen, ss.suffixLen)
+	return fmt.Sprintf("sessionStruct{protocol=%v, sessionID=%v, seq=%v, statusCode=%v, payloadLen=%v, suffixLen=%v}", protocolType(ss.protocol), ss.sessionID, ss.seq, ss.statusCode, ss.payloadLen, ss.suffixLen)
 }
 
-func isSessionProtocol(p byte) bool {
+func isSessionProtocol(p protocolType) bool {
 	return p == openSessionRequest || p == openSessionResponse || p == closeSessionRequest || p == closeSessionResponse
 }
 
@@ -155,8 +189,8 @@ type dataAckStruct struct {
 	suffixLen  uint8  // byte 24: length of suffix padding
 }
 
-func (das *dataAckStruct) Protocol() byte {
-	return das.baseStruct.protocol
+func (das *dataAckStruct) Protocol() protocolType {
+	return protocolType(das.baseStruct.protocol)
 }
 
 func (das *dataAckStruct) Marshal() []byte {
@@ -180,7 +214,7 @@ func (das *dataAckStruct) Unmarshal(b []byte) error {
 	if len(b) != metadataLength {
 		return fmt.Errorf("input bytes: %d, want %d", len(b), metadataLength)
 	}
-	if b[0] != dataClientToServer && b[0] != dataServerToClient && b[0] != ackClientToServer && b[0] != ackServerToClient {
+	if !dataClientToServer.equals(b[0]) && !dataServerToClient.equals(b[0]) && !ackClientToServer.equals(b[0]) && !ackServerToClient.equals(b[0]) {
 		return fmt.Errorf("invalid protocol %d", b[0])
 	}
 	originalTimestamp := binary.BigEndian.Uint32(b[2:])
@@ -204,10 +238,10 @@ func (das *dataAckStruct) Unmarshal(b []byte) error {
 }
 
 func (das *dataAckStruct) String() string {
-	return fmt.Sprintf("dataAckStruct{protocol=%v, sessionID=%v, seq=%v, unAckSeq=%v, windowSize=%v, fragment=%v, prefixLen=%v, payloadLen=%v, suffixLen=%v}", das.protocol, das.sessionID, das.seq, das.unAckSeq, das.windowSize, das.fragment, das.prefixLen, das.payloadLen, das.suffixLen)
+	return fmt.Sprintf("dataAckStruct{protocol=%v, sessionID=%v, seq=%v, unAckSeq=%v, windowSize=%v, fragment=%v, prefixLen=%v, payloadLen=%v, suffixLen=%v}", protocolType(das.protocol), das.sessionID, das.seq, das.unAckSeq, das.windowSize, das.fragment, das.prefixLen, das.payloadLen, das.suffixLen)
 }
 
-func isDataAckProtocol(p byte) bool {
+func isDataAckProtocol(p protocolType) bool {
 	return p == dataClientToServer || p == dataServerToClient || p == ackClientToServer || p == ackServerToClient
 }
 
@@ -225,8 +259,8 @@ type closeConnStruct struct {
 	suffixLen  uint8 // byte 7: length of suffix padding
 }
 
-func (ccs *closeConnStruct) Protocol() byte {
-	return ccs.baseStruct.protocol
+func (ccs *closeConnStruct) Protocol() protocolType {
+	return protocolType(ccs.baseStruct.protocol)
 }
 
 func (ccs *closeConnStruct) Marshal() []byte {
@@ -244,7 +278,7 @@ func (ccs *closeConnStruct) Unmarshal(b []byte) error {
 	if len(b) != metadataLength {
 		return fmt.Errorf("input bytes: %d, want %d", len(b), metadataLength)
 	}
-	if b[0] != closeConnRequest && b[0] != closeConnResponse {
+	if !closeConnRequest.equals(b[0]) && !closeConnResponse.equals(b[0]) {
 		return fmt.Errorf("invalid protocol %d", b[0])
 	}
 	originalTimestamp := binary.BigEndian.Uint32(b[2:])
@@ -262,10 +296,10 @@ func (ccs *closeConnStruct) Unmarshal(b []byte) error {
 }
 
 func (ccs *closeConnStruct) String() string {
-	return fmt.Sprintf("closeConnStruct{protocol=%v, statusCode=%v, suffixLen=%v}", ccs.baseStruct.protocol, ccs.statusCode, ccs.suffixLen)
+	return fmt.Sprintf("closeConnStruct{protocol=%v, statusCode=%v, suffixLen=%v}", protocolType(ccs.baseStruct.protocol), ccs.statusCode, ccs.suffixLen)
 }
 
-func isCloseConnProtocol(p byte) bool {
+func isCloseConnProtocol(p protocolType) bool {
 	return p == closeConnRequest || p == closeConnResponse
 }
 

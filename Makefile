@@ -56,26 +56,26 @@ client-mac: client-mac-amd64 client-mac-arm64
 # Build MacOS amd64 client.
 .PHONY: client-mac-amd64
 client-mac-amd64:
-	mkdir -p release/darwin/amd64
-	env GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/darwin/amd64/mieru cmd/mieru/mieru.go
-	cd release/darwin/amd64;\
-		sha256sum mieru > mieru_${VERSION}_darwin_amd64.sha256.txt;\
-		tar -zcvf mieru_${VERSION}_darwin_amd64.tar.gz mieru;\
-		sha256sum mieru_${VERSION}_darwin_amd64.tar.gz > mieru_${VERSION}_darwin_amd64.tar.gz.sha256.txt
-	mv release/darwin/amd64/mieru_${VERSION}_darwin_amd64.tar.gz release/
-	mv release/darwin/amd64/mieru_${VERSION}_darwin_amd64.tar.gz.sha256.txt release/
+	mkdir -p release/macos/amd64
+	env GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/macos/amd64/mieru cmd/mieru/mieru.go
+	cd release/macos/amd64;\
+		sha256sum mieru > mieru_${VERSION}_macos_amd64.sha256.txt;\
+		tar -zcvf mieru_${VERSION}_macos_amd64.tar.gz mieru;\
+		sha256sum mieru_${VERSION}_macos_amd64.tar.gz > mieru_${VERSION}_macos_amd64.tar.gz.sha256.txt
+	mv release/macos/amd64/mieru_${VERSION}_macos_amd64.tar.gz release/
+	mv release/macos/amd64/mieru_${VERSION}_macos_amd64.tar.gz.sha256.txt release/
 
 # Build MacOS arm64 client.
 .PHONY: client-mac-arm64
 client-mac-arm64:
-	mkdir -p release/darwin/arm64
-	env GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/darwin/arm64/mieru cmd/mieru/mieru.go
-	cd release/darwin/arm64;\
-		sha256sum mieru > mieru_${VERSION}_darwin_arm64.sha256.txt;\
-		tar -zcvf mieru_${VERSION}_darwin_arm64.tar.gz mieru;\
-		sha256sum mieru_${VERSION}_darwin_arm64.tar.gz > mieru_${VERSION}_darwin_arm64.tar.gz.sha256.txt
-	mv release/darwin/arm64/mieru_${VERSION}_darwin_arm64.tar.gz release/
-	mv release/darwin/arm64/mieru_${VERSION}_darwin_arm64.tar.gz.sha256.txt release/
+	mkdir -p release/macos/arm64
+	env GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/macos/arm64/mieru cmd/mieru/mieru.go
+	cd release/macos/arm64;\
+		sha256sum mieru > mieru_${VERSION}_macos_arm64.sha256.txt;\
+		tar -zcvf mieru_${VERSION}_macos_arm64.tar.gz mieru;\
+		sha256sum mieru_${VERSION}_macos_arm64.tar.gz > mieru_${VERSION}_macos_arm64.tar.gz.sha256.txt
+	mv release/macos/arm64/mieru_${VERSION}_macos_arm64.tar.gz release/
+	mv release/macos/arm64/mieru_${VERSION}_macos_arm64.tar.gz.sha256.txt release/
 
 # Build linux clients.
 .PHONY: client-linux

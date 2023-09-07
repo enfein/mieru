@@ -177,7 +177,12 @@ func (u *UDPUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
 
 func (u *UDPUnderlay) RemoveSession(s *Session) error {
 	err := u.baseUnderlay.RemoveSession(s)
-	if len(u.baseUnderlay.sessionMap) == 0 {
+	size := 0
+	u.sessionMap.Range(func(k, v any) bool {
+		size += 1
+		return false
+	})
+	if size == 0 {
 		u.Close()
 	}
 	return err
@@ -196,7 +201,8 @@ func (u *UDPUnderlay) RunEventLoop(ctx context.Context) error {
 			return nil
 		case <-u.idleSessionTicker.C:
 			// Close idle sessions.
-			for _, session := range u.sessionMap {
+			u.sessionMap.Range(func(k, v any) bool {
+				session := v.(*Session)
 				if time.Since(session.lastRXTime) > idleSessionTimeout {
 					if err := session.Close(); err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
 						log.Debugf("%v Close() failed: %v", session, err)
@@ -206,7 +212,8 @@ func (u *UDPUnderlay) RunEventLoop(ctx context.Context) error {
 						log.Debugf("%v RemoveSession() failed: %v", u, err)
 					}
 				}
-			}
+				return true
+			})
 		default:
 		}
 		seg, addr, err := u.readOneSegment()
@@ -235,14 +242,12 @@ func (u *UDPUnderlay) RunEventLoop(ctx context.Context) error {
 			}
 		} else if isDataAckProtocol(seg.metadata.Protocol()) {
 			das, _ := toDataAckStruct(seg.metadata)
-			u.sessionLock.Lock()
-			session, ok := u.sessionMap[das.sessionID]
-			u.sessionLock.Unlock()
+			session, ok := u.sessionMap.Load(das.sessionID)
 			if !ok {
 				log.Debugf("Session %d is not registered to %v", das.sessionID, u)
 				continue
 			}
-			session.recvChan <- seg
+			session.(*Session).recvChan <- seg
 		}
 		// Ignore other protocols.
 	}
@@ -259,9 +264,7 @@ func (u *UDPUnderlay) onOpenSessionRequest(seg *segment, remoteAddr net.Addr) er
 		// 0 is reserved and can't be used.
 		return fmt.Errorf("reserved session ID %d is used", sessionID)
 	}
-	u.sessionLock.Lock()
-	_, found := u.sessionMap[sessionID]
-	u.sessionLock.Unlock()
+	_, found := u.sessionMap.Load(sessionID)
 	if found {
 		log.Debugf("%v received open session request, but session ID %d is already used", u, sessionID)
 		return nil
@@ -279,29 +282,26 @@ func (u *UDPUnderlay) onOpenSessionResponse(seg *segment) error {
 	}
 
 	sessionID := seg.metadata.(*sessionStruct).sessionID
-	u.sessionLock.Lock()
-	session, found := u.sessionMap[sessionID]
-	u.sessionLock.Unlock()
+	session, found := u.sessionMap.Load(sessionID)
 	if !found {
 		return fmt.Errorf("session ID %d is not found", sessionID)
 	}
-	session.recvChan <- seg
+	session.(*Session).recvChan <- seg
 	return nil
 }
 
 func (u *UDPUnderlay) onCloseSession(seg *segment) error {
 	ss := seg.metadata.(*sessionStruct)
 	sessionID := ss.sessionID
-	u.sessionLock.Lock()
-	session, found := u.sessionMap[sessionID]
-	u.sessionLock.Unlock()
+	session, found := u.sessionMap.Load(sessionID)
 	if !found {
 		log.Debugf("%v received close session request or response, but session ID %d is not found", u, sessionID)
 		return nil
 	}
-	session.recvChan <- seg
-	session.wg.Wait()
-	u.RemoveSession(session)
+	s := session.(*Session)
+	s.recvChan <- seg
+	s.wg.Wait()
+	u.RemoveSession(s)
 	return nil
 }
 
@@ -361,18 +361,18 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 			var decrypted bool
 			var err error
 			// Try existing sessions.
-			u.sessionLock.Lock()
-			for _, session := range u.sessionMap {
+			u.sessionMap.Range(func(k, v any) bool {
+				session := v.(*Session)
 				if session.block != nil && session.RemoteAddr().String() == addr.String() {
 					decryptedMeta, err = session.block.Decrypt(encryptedMeta)
 					if err == nil {
 						decrypted = true
 						blockCipher = session.block
-						break
+						return false
 					}
 				}
-			}
-			u.sessionLock.Unlock()
+				return true
+			})
 			if !decrypted {
 				// This is a new session. Try all registered users.
 				for _, user := range u.users {
@@ -414,7 +414,7 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 		// Read payload and construct segment.
 		var seg *segment
 		p := decryptedMeta[0]
-		if isSessionProtocol(p) {
+		if isSessionProtocol(protocolType(p)) {
 			ss := &sessionStruct{}
 			if err := ss.Unmarshal(decryptedMeta); err != nil {
 				return nil, nil, fmt.Errorf("Unmarshal() to sessionStruct failed: %w", err)
@@ -427,7 +427,7 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 				seg.block = blockCipher
 			}
 			return seg, addr, nil
-		} else if isDataAckProtocol(p) {
+		} else if isDataAckProtocol(protocolType(p)) {
 			das := &dataAckStruct{}
 			if err := das.Unmarshal(decryptedMeta); err != nil {
 				return nil, nil, fmt.Errorf("Unmarshal() to dataAckStruct failed: %w", err)
@@ -475,8 +475,9 @@ func (u *UDPUnderlay) readSessionSegment(ss *sessionStruct, nonce, remaining []b
 	}
 
 	return &segment{
-		metadata: ss,
-		payload:  decryptedPayload,
+		metadata:  ss,
+		payload:   decryptedPayload,
+		transport: util.UDPTransport,
 	}, nil
 }
 
@@ -513,8 +514,9 @@ func (u *UDPUnderlay) readDataAckSegment(das *dataAckStruct, nonce, remaining []
 	}
 
 	return &segment{
-		metadata: das,
-		payload:  decryptedPayload,
+		metadata:  das,
+		payload:   decryptedPayload,
+		transport: util.UDPTransport,
 	}, nil
 }
 
@@ -544,19 +546,16 @@ func (u *UDPUnderlay) writeOneSegment(seg *segment, addr *net.UDPAddr) error {
 			if err != nil {
 				return fmt.Errorf("%v SessionID() failed: %v", seg, err)
 			}
-			u.sessionLock.Lock()
-			session, ok := u.sessionMap[sessionID]
+			session, ok := u.sessionMap.Load(sessionID)
 			if !ok {
-				u.sessionLock.Unlock()
 				return fmt.Errorf("session %d not found", sessionID)
 			}
-			if session.block == nil {
-				u.sessionLock.Unlock()
-				return fmt.Errorf("%v cipher block is not ready: %w", session, stderror.ErrNotReady)
+			s := session.(*Session)
+			if s.block == nil {
+				return fmt.Errorf("%v cipher block is not ready: %w", s, stderror.ErrNotReady)
 			} else {
-				blockCipher = session.block
+				blockCipher = s.block
 			}
-			u.sessionLock.Unlock()
 		}
 	}
 

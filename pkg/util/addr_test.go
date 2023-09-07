@@ -15,10 +15,25 @@
 
 package util
 
-type TransportProtocol uint8
-
-const (
-	UnknownTransport TransportProtocol = iota
-	UDPTransport
-	TCPTransport
+import (
+	"net"
+	"testing"
 )
+
+func TestIsNilNetAddr(t *testing.T) {
+	testcases := []struct {
+		addr net.Addr
+		want bool
+	}{
+		{&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8964}, false},
+		{&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8964}, false},
+		{NilNetAddr(), true},
+	}
+
+	for _, tc := range testcases {
+		got := IsNilNetAddr(tc.addr)
+		if got != tc.want {
+			t.Errorf("IsNilNetAddr(%v) = %v, want %v", tc.addr, got, tc.want)
+		}
+	}
+}

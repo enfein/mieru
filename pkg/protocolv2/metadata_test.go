@@ -24,7 +24,7 @@ import (
 func TestSessionStruct(t *testing.T) {
 	s := &sessionStruct{
 		baseStruct: baseStruct{
-			protocol: closeSessionRequest,
+			protocol: uint8(closeSessionRequest),
 		},
 		sessionID:  mrand.Uint32(),
 		statusCode: uint8(mrand.Uint32()),
@@ -48,7 +48,7 @@ func TestSessionStruct(t *testing.T) {
 func TestDataAckStruct(t *testing.T) {
 	s := &dataAckStruct{
 		baseStruct: baseStruct{
-			protocol: dataServerToClient,
+			protocol: uint8(dataServerToClient),
 		},
 		sessionID:  mrand.Uint32(),
 		seq:        mrand.Uint32(),
@@ -75,7 +75,7 @@ func TestDataAckStruct(t *testing.T) {
 func TestCloseConnStruct(t *testing.T) {
 	s := &closeConnStruct{
 		baseStruct: baseStruct{
-			protocol: closeConnRequest,
+			protocol: uint8(closeConnRequest),
 		},
 		statusCode: uint8(mrand.Uint32()),
 		suffixLen:  uint8(mrand.Uint32()),

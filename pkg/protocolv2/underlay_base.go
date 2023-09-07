@@ -33,9 +33,8 @@ type baseUnderlay struct {
 	mtu      int
 	done     chan struct{} // if the underlay is closed
 
-	sessionMap    map[uint32]*Session // Map<sessionID, *Session>
-	readySessions chan *Session       // sessions that completed handshake and ready for consume
-	sessionLock   sync.Mutex          // a lock required to operate sessionMap
+	sessionMap    sync.Map      // Map<sessionID, *Session>
+	readySessions chan *Session // sessions that completed handshake and ready for consume
 }
 
 var (
@@ -47,7 +46,6 @@ func newBaseUnderlay(isClient bool, mtu int) *baseUnderlay {
 		isClient:      isClient,
 		mtu:           mtu,
 		done:          make(chan struct{}),
-		sessionMap:    make(map[uint32]*Session),
 		readySessions: make(chan *Session, 256),
 	}
 }
@@ -62,19 +60,18 @@ func (b *baseUnderlay) Accept() (net.Conn, error) {
 }
 
 func (b *baseUnderlay) Close() error {
-	b.sessionLock.Lock()
-	defer b.sessionLock.Unlock()
-
 	select {
 	case <-b.done:
 		return nil
 	default:
 	}
 
-	for _, s := range b.sessionMap {
+	b.sessionMap.Range(func(k, v any) bool {
+		s := v.(*Session)
 		s.Close()
-	}
-	b.sessionMap = make(map[uint32]*Session)
+		return true
+	})
+	b.sessionMap = sync.Map{}
 	close(b.done)
 	return nil
 }
@@ -120,14 +117,10 @@ func (b *baseUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
 		return fmt.Errorf("can't add a client session to a server underlay")
 	}
 
-	b.sessionLock.Lock()
-	defer b.sessionLock.Unlock()
 	if s.id != 0 {
-		_, found := b.sessionMap[s.id]
-		if found {
+		if _, loaded := b.sessionMap.LoadOrStore(s.id, s); loaded {
 			return stderror.ErrAlreadyExist
 		}
-		b.sessionMap[s.id] = s
 	}
 	s.conn = b
 	s.remoteAddr = remoteAddr
@@ -154,9 +147,7 @@ func (b *baseUnderlay) RemoveSession(s *Session) error {
 		return fmt.Errorf("session %d is not attached to this underlay", s.id)
 	}
 
-	b.sessionLock.Lock()
-	defer b.sessionLock.Unlock()
-	delete(b.sessionMap, s.id)
+	b.sessionMap.Delete(s.id)
 	s.conn = nil
 	s.forwardStateTo(sessionClosed)
 	metrics.CurrEstablished.Add(-1)

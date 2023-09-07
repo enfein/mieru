@@ -221,6 +221,10 @@ func (m *Mux) ListenAndServeAll() error {
 				session.Close()
 			}
 		}()
+
+		m.mu.Lock()
+		m.cleanUnderlay()
+		m.mu.Unlock()
 	}
 }
 
@@ -336,12 +340,16 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 				return
 			}
 			log.Debugf("Created new server underlay %v", underlay)
+			m.mu.Lock()
+			m.underlays = append(m.underlays, underlay)
+			m.mu.Unlock()
 			UnderlayPassiveOpens.Add(1)
 			currEst := UnderlayCurrEstablished.Add(1)
 			maxConn := UnderlayMaxConn.Load()
 			if currEst > maxConn {
 				UnderlayMaxConn.Store(currEst)
 			}
+
 			go func() {
 				err := underlay.RunEventLoop(context.Background())
 				if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
@@ -350,6 +358,7 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 				underlay.Close()
 				UnderlayCurrEstablished.Add(-1)
 			}()
+
 			go func() {
 				for {
 					conn, err := underlay.Accept()
@@ -377,12 +386,16 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 			users:             m.users,
 		}
 		log.Debugf("Created new server underlay %v", underlay)
+		m.mu.Lock()
+		m.underlays = append(m.underlays, underlay)
+		m.mu.Unlock()
 		UnderlayPassiveOpens.Add(1)
 		currEst := UnderlayCurrEstablished.Add(1)
 		maxConn := UnderlayMaxConn.Load()
 		if currEst > maxConn {
 			UnderlayMaxConn.Store(currEst)
 		}
+
 		go func() {
 			err := underlay.RunEventLoop(context.Background())
 			if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
@@ -391,6 +404,7 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 			underlay.Close()
 			UnderlayCurrEstablished.Add(-1)
 		}()
+
 		go func() {
 			for {
 				conn, err := underlay.Accept()
