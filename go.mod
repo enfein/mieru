@@ -1,6 +1,6 @@
 module github.com/enfein/mieru
 
-go 1.19
+go 1.20
 
 require (
 	github.com/google/btree v1.1.2

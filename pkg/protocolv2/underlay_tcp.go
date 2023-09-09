@@ -139,13 +139,13 @@ func (t *TCPUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
 
 	s.wg.Add(2)
 	go func() {
-		if err := s.runInputLoop(context.Background()); err != nil {
+		if err := s.runInputLoop(context.Background()); err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
 			log.Debugf("%v runInputLoop(): %v", s, err)
 		}
 		s.wg.Done()
 	}()
 	go func() {
-		if err := s.runOutputLoop(context.Background()); err != nil {
+		if err := s.runOutputLoop(context.Background()); err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
 			log.Debugf("%v runOutputLoop(): %v", s, err)
 		}
 		s.wg.Done()

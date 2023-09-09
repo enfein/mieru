@@ -27,7 +27,6 @@ import (
 	"flag"
 	mrand "math/rand"
 	"net/http"
-	"time"
 
 	"github.com/enfein/mieru/pkg/log"
 )
@@ -92,7 +91,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	flag.Parse()
 	log.SetFormatter(&log.DaemonFormatter{})
-	mrand.Seed(time.Now().UnixNano())
 	fillData()
 	log.Infof("HTTP server data initialized.")
 	http.HandleFunc("/", handler)

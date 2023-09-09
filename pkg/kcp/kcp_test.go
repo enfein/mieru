@@ -32,7 +32,6 @@ import (
 
 func newKCPPipe(t *testing.T) (*net.UDPConn, *net.UDPConn, *kcp.KCP, *kcp.KCP) {
 	t.Helper()
-	mrand.Seed(time.Now().UnixNano())
 
 	port1, err := util.UnusedUDPPort()
 	if err != nil {

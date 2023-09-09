@@ -21,23 +21,13 @@ import (
 	"math"
 	mrand "math/rand"
 	"os"
-	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/enfein/mieru/pkg/version"
 )
 
-var once sync.Once
-
 var fixedValue atomic.Value
-
-// InitSeed initializes the random seed.
-func InitSeed() {
-	once.Do(func() {
-		mrand.Seed(time.Now().UnixNano())
-	})
-}
 
 // Intn returns a random int from [0, n) with scale down distribution.
 func Intn(n int) int {

@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/util"
 )
 
@@ -179,7 +178,6 @@ func TestSegmentTree(t *testing.T) {
 }
 
 func TestSegmentTreeConcurrent(t *testing.T) {
-	rng.InitSeed()
 	sessionID := uint32(mrand.Int31())
 	st := newSegmentTree(1)
 	var wg sync.WaitGroup

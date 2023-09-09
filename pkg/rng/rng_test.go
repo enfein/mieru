@@ -21,7 +21,6 @@ import (
 )
 
 func TestIntnScaleDown(t *testing.T) {
-	InitSeed()
 	numbers := make([]int, 10)
 	for i := 0; i < 100000; i++ {
 		n := Intn(10)
@@ -35,7 +34,6 @@ func TestIntnScaleDown(t *testing.T) {
 }
 
 func TestRandTime(t *testing.T) {
-	InitSeed()
 	oneHour := time.Hour
 	begin := time.Now()
 	end := begin.Add(oneHour)
@@ -46,7 +44,6 @@ func TestRandTime(t *testing.T) {
 }
 
 func TestFixedInt(t *testing.T) {
-	InitSeed()
 	v := FixedInt(256)
 	v2 := FixedInt(256)
 	if v2 != v {

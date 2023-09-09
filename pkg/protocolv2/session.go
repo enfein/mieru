@@ -416,25 +416,21 @@ func (s *Session) Close() error {
 		<-s.done
 	case util.UDPTransport:
 		if s.isState(sessionEstablished) {
-			// Send a final ACK to the peer.
+			// Send closeSessionRequest, but don't wait for closeSessionResponse.
+			// The closeSessionRequest won't be sent again.
 			s.forwardStateTo(sessionClosing)
-			baseStruct := baseStruct{}
-			if s.isClient {
-				baseStruct.protocol = uint8(ackClientToServer)
-			} else {
-				baseStruct.protocol = uint8(ackServerToClient)
-			}
-			ackSeg := &segment{
-				metadata: &dataAckStruct{
-					baseStruct: baseStruct,
-					sessionID:  s.id,
-					seq:        uint32(mathext.Max(0, int(s.nextSeq)-1)),
-					unAckSeq:   s.nextRecv,
-					windowSize: uint16(mathext.Max(0, int(s.sendAlgorithm.CongestionWindowSize())-s.recvBuf.Len())),
+			seg := &segment{
+				metadata: &sessionStruct{
+					baseStruct: baseStruct{
+						protocol: uint8(closeSessionRequest),
+					},
+					sessionID: s.id,
+					seq:       s.nextSeq,
 				},
 				transport: s.conn.TransportProtocol(),
 			}
-			if err := s.output(ackSeg, s.RemoteAddr()); err != nil {
+			s.nextSeq++
+			if err := s.output(seg, s.RemoteAddr()); err != nil {
 				log.Debugf("output() failed: %v", err)
 			}
 		}

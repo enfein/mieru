@@ -12,12 +12,17 @@ import (
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
+	"github.com/enfein/mieru/pkg/protocolv2"
 	"github.com/enfein/mieru/pkg/stderror"
 	"github.com/enfein/mieru/pkg/util"
 )
 
 const (
-	socks5Version = uint8(5)
+	// socks5 version number.
+	Socks5Version byte = 5
+
+	// No authentication required.
+	NoAuth byte = 0
 )
 
 var (
@@ -59,19 +64,8 @@ type ProxyConfig struct {
 
 // Config is used to setup and configure a socks5 server.
 type Config struct {
-	// AuthMethods can be provided to implement custom authentication
-	// By default, "auth-less" mode is enabled.
-	// For password-based auth use UserPassAuthenticator.
-	AuthMethods []Authenticator
-
-	// If provided, username/password authentication is enabled,
-	// by appending a UserPassAuthenticator to AuthMethods. If not provided,
-	// and AUthMethods is nil, then "auth-less" mode is enabled.
-	Credentials CredentialStore
-
 	// Resolver can be provided to do custom name resolution.
-	// Defaults to DNSResolver if not provided.
-	Resolver NameResolver
+	Resolver *util.DNSResolver
 
 	// BindIP is used for bind or udp associate
 	BindIP net.IP
@@ -84,33 +78,30 @@ type Config struct {
 
 	// Mieru proxy configuration.
 	ProxyConf []ProxyConfig
+
+	// Mieru proxy multiplexer.
+	ProxyMux *protocolv2.Mux
 }
 
 // Server is responsible for accepting connections and handling
 // the details of the SOCKS5 protocol
 type Server struct {
 	config      *Config
-	authMethods map[uint8]Authenticator
 	listener    net.Listener
 	chAccept    chan net.Conn
 	chAcceptErr chan error
 	die         chan struct{}
 }
 
+var (
+	_ util.ConnHandler = &Server{}
+)
+
 // New creates a new Server and potentially returns an error.
 func New(conf *Config) (*Server, error) {
-	// Ensure we have at least one authentication method enabled.
-	if len(conf.AuthMethods) == 0 {
-		if conf.Credentials != nil {
-			conf.AuthMethods = []Authenticator{&UserPassAuthenticator{conf.Credentials}}
-		} else {
-			conf.AuthMethods = []Authenticator{&NoAuthAuthenticator{}}
-		}
-	}
-
 	// Ensure we have a DNS resolver.
 	if conf.Resolver == nil {
-		conf.Resolver = DNSResolver{}
+		conf.Resolver = &util.DNSResolver{}
 	}
 
 	// Provide a default bind IP.
@@ -121,19 +112,12 @@ func New(conf *Config) (*Server, error) {
 		}
 	}
 
-	server := &Server{
+	return &Server{
 		config:      conf,
 		chAccept:    make(chan net.Conn, 256),
 		chAcceptErr: make(chan error, 1), // non-blocking
 		die:         make(chan struct{}),
-	}
-
-	server.authMethods = make(map[uint8]Authenticator)
-	for _, a := range conf.AuthMethods {
-		server.authMethods[a.GetCode()] = a
-	}
-
-	return server, nil
+	}, nil
 }
 
 // ListenAndServe is used to create a listener and serve on it.
@@ -173,6 +157,12 @@ func (s *Server) Serve(l net.Listener) error {
 			return nil
 		}
 	}
+}
+
+// Take implements util.ConnHandler interface.
+func (s *Server) Take(conn net.Conn) (closed bool, err error) {
+	err = s.ServeConn(conn)
+	return true, err
 }
 
 // ServeConn is used to serve a single connection.
@@ -278,31 +268,54 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 	version := []byte{0}
 	if _, err := io.ReadFull(conn, version); err != nil {
 		HandshakeErrors.Add(1)
-		return fmt.Errorf("failed to get version byte: %w", err)
+		return fmt.Errorf("get socks version failed: %w", err)
 	}
-	if version[0] != socks5Version {
+	if version[0] != Socks5Version {
 		HandshakeErrors.Add(1)
-		return fmt.Errorf("unsupported SOCKS version: %v", version)
+		return fmt.Errorf("unsupported socks version: %v", version)
 	}
 
 	// Authenticate the connection.
-	authContext, err := s.authenticate(conn)
-	if err != nil {
+	nAuthMethods := []byte{0}
+	if _, err := io.ReadFull(conn, nAuthMethods); err != nil {
 		HandshakeErrors.Add(1)
-		return fmt.Errorf("failed to authenticate: %w", err)
+		return fmt.Errorf("get number of authentication method failed: %w", err)
+	}
+	if nAuthMethods[0] == 0 {
+		HandshakeErrors.Add(1)
+		return fmt.Errorf("number of authentication method is 0")
+	}
+	allowNoAuth := false
+	authMethods := make([]byte, nAuthMethods[0])
+	if _, err := io.ReadFull(conn, authMethods); err != nil {
+		HandshakeErrors.Add(1)
+		return fmt.Errorf("get authentication method failed: %w", err)
+	}
+	for _, method := range authMethods {
+		if method == NoAuth {
+			allowNoAuth = true
+			break
+		}
+	}
+	if !allowNoAuth {
+		HandshakeErrors.Add(1)
+		return fmt.Errorf("no authentication is not supported by socks5 client")
+	}
+	if _, err := conn.Write([]byte{Socks5Version, NoAuth}); err != nil {
+		HandshakeErrors.Add(1)
+		return fmt.Errorf("write authentication response failed: %w", err)
 	}
 
 	request, err := NewRequest(conn)
 	if err != nil {
 		HandshakeErrors.Add(1)
-		if err == unrecognizedAddrType {
+		if err == errUnrecognizedAddrType {
 			if err := sendReply(conn, addrTypeNotSupported, nil); err != nil {
 				return fmt.Errorf("failed to send reply: %w", err)
 			}
 		}
 		return fmt.Errorf("failed to read destination address: %w", err)
 	}
-	request.AuthContext = authContext
 	if client, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
 		request.RemoteAddr = &AddrSpec{IP: client.IP, Port: client.Port}
 	}

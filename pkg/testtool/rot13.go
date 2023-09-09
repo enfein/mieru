@@ -20,7 +20,6 @@ import (
 	mrand "math/rand"
 	"net"
 	"regexp"
-	"time"
 )
 
 // TestHelperGenRot13Input generates valid rotate-13 input.
@@ -28,7 +27,6 @@ func TestHelperGenRot13Input(size int) []byte {
 	if size <= 0 {
 		return []byte{}
 	}
-	mrand.Seed(time.Now().UnixNano())
 	data := make([]byte, size)
 	for i := 0; i < size; i++ {
 		p := mrand.Float32()

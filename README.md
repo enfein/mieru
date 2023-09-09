@@ -47,7 +47,7 @@ The following softwares are required for compilation.
 - curl
 - env
 - git
-- go (version >= 1.19)
+- go (version >= 1.20)
 - make
 - sha256sum
 - tar

@@ -26,7 +26,6 @@ import (
 
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
-	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/testtool"
 	"github.com/enfein/mieru/pkg/udpsession"
 	"github.com/enfein/mieru/pkg/util"
@@ -107,7 +106,6 @@ func runClient(t *testing.T, laddr, serverAddr string, username, password []byte
 // some data (in format [A-Za-z]+) to the listener. The listener returns the
 // ROT13 (rotate by 13 places) of the data back to the client.
 func TestKCPSessionsIPv4(t *testing.T) {
-	rng.InitSeed()
 	serverPort, err := util.UnusedUDPPort()
 	if err != nil {
 		t.Fatalf("util.UnusedUDPPort() failed: %v", err)
@@ -168,7 +166,6 @@ func TestKCPSessionsIPv4(t *testing.T) {
 
 // TestKCPSessionsIPv6 is similar to TestKCPSessionsIPv4 but running in IPv6.
 func TestKCPSessionsIPv6(t *testing.T) {
-	rng.InitSeed()
 	serverPort, err := util.UnusedUDPPort()
 	if err != nil {
 		t.Fatalf("util.UnusedUDPPort() failed: %v", err)

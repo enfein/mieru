@@ -161,13 +161,13 @@ func (u *UDPUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
 
 	s.wg.Add(2)
 	go func() {
-		if err := s.runInputLoop(context.Background()); err != nil {
+		if err := s.runInputLoop(context.Background()); err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
 			log.Debugf("%v runInputLoop(): %v", s, err)
 		}
 		s.wg.Done()
 	}()
 	go func() {
-		if err := s.runOutputLoop(context.Background()); err != nil {
+		if err := s.runOutputLoop(context.Background()); err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
 			log.Debugf("%v runOutputLoop(): %v", s, err)
 		}
 		s.wg.Done()
@@ -614,24 +614,8 @@ func (u *UDPUnderlay) writeOneSegment(seg *segment, addr *net.UDPAddr) error {
 		if _, err := u.conn.WriteToUDP(dataToSend, addr); err != nil {
 			return fmt.Errorf("WriteToUDP() failed: %w", err)
 		}
-	} else if ccs, ok := toCloseConnStruct(seg.metadata); ok {
-		suffixLen := rng.Intn(MaxPaddingSize(u.mtu, u.IPVersion(), u.TransportProtocol(), 0, 0) + 1)
-		ccs.suffixLen = uint8(suffixLen)
-		padding := newPadding(suffixLen)
-
-		plaintextMetadata := seg.metadata.Marshal()
-		encryptedMetadata, err := blockCipher.Encrypt(plaintextMetadata)
-		if err != nil {
-			return fmt.Errorf("Encrypt() failed: %w", err)
-		}
-		dataToSend := encryptedMetadata
-		dataToSend = append(dataToSend, padding...)
-		if _, err := u.conn.WriteToUDP(dataToSend, addr); err != nil {
-			return fmt.Errorf("WriteToUDP() failed: %w", err)
-		}
 	} else {
 		return stderror.ErrInvalidArgument
 	}
-
 	return nil
 }

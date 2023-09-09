@@ -20,7 +20,6 @@ import (
 	crand "crypto/rand"
 	mrand "math/rand"
 	"testing"
-	"time"
 )
 
 func TestDefaultNonceSize(t *testing.T) {
@@ -54,7 +53,6 @@ func TestDefaultOverhead(t *testing.T) {
 func TestAESGCMBlockCipherEncryptDecrypt(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		var key []byte
-		mrand.Seed(time.Now().UnixNano())
 		n := mrand.Intn(3)
 		switch n {
 		case 0:

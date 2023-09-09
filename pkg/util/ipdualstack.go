@@ -23,7 +23,7 @@ import (
 	"strings"
 )
 
-type IPVersion int
+type IPVersion uint8
 
 const (
 	IPVersionUnknown IPVersion = iota

@@ -20,12 +20,10 @@ import (
 	"github.com/enfein/mieru/pkg/appctl"
 	"github.com/enfein/mieru/pkg/cli"
 	"github.com/enfein/mieru/pkg/log"
-	"github.com/enfein/mieru/pkg/rng"
 )
 
 func main() {
 	appctl.SetAppType(appctl.SERVER_APP)
-	rng.InitSeed()
 	cli.RegisterServerCommands()
 	err := cli.ParseAndExecute()
 	if err != nil {

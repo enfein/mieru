@@ -26,7 +26,6 @@ import (
 
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
-	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/tcpsession"
 	"github.com/enfein/mieru/pkg/testtool"
 	"github.com/enfein/mieru/pkg/util"
@@ -96,7 +95,6 @@ func runClient(t *testing.T, laddr, serverAddr string, username, password []byte
 }
 
 func TestTCPSessionIPv4(t *testing.T) {
-	rng.InitSeed()
 	serverPort, err := util.UnusedTCPPort()
 	if err != nil {
 		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
@@ -156,7 +154,6 @@ func TestTCPSessionIPv4(t *testing.T) {
 }
 
 func TestTCPSessionIPv6(t *testing.T) {
-	rng.InitSeed()
 	serverPort, err := util.UnusedTCPPort()
 	if err != nil {
 		t.Fatalf("util.UnusedTCPPort() failed: %v", err)

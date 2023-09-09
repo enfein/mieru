@@ -28,7 +28,6 @@ import (
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
-	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/testtool"
 	"github.com/enfein/mieru/pkg/util"
 	"google.golang.org/protobuf/proto"
@@ -89,7 +88,6 @@ func runClient(t *testing.T, properties UnderlayProperties, username, password [
 }
 
 func TestIPv4TCPUnderlay(t *testing.T) {
-	rng.InitSeed()
 	log.SetOutputToTest(t)
 	log.SetLevel("DEBUG")
 	port, err := util.UnusedTCPPort()
@@ -127,7 +125,6 @@ func TestIPv4TCPUnderlay(t *testing.T) {
 }
 
 func TestIPv6TCPUnderlay(t *testing.T) {
-	rng.InitSeed()
 	log.SetOutputToTest(t)
 	log.SetLevel("DEBUG")
 	port, err := util.UnusedTCPPort()
@@ -165,9 +162,8 @@ func TestIPv6TCPUnderlay(t *testing.T) {
 }
 
 func TestIPv4UDPUnderlay(t *testing.T) {
-	rng.InitSeed()
 	log.SetOutputToTest(t)
-	log.SetLevel("TRACE")
+	log.SetLevel("DEBUG")
 	port, err := util.UnusedUDPPort()
 	if err != nil {
 		t.Fatalf("util.UnusedUDPPort() failed: %v", err)
@@ -203,9 +199,8 @@ func TestIPv4UDPUnderlay(t *testing.T) {
 }
 
 func TestIPv6UDPUnderlay(t *testing.T) {
-	rng.InitSeed()
 	log.SetOutputToTest(t)
-	log.SetLevel("TRACE")
+	log.SetLevel("DEBUG")
 	port, err := util.UnusedUDPPort()
 	if err != nil {
 		t.Fatalf("util.UnusedUDPPort() failed: %v", err)

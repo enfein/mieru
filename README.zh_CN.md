@@ -45,7 +45,7 @@ mieru 的翻墙原理与 shadowsocks / v2ray 等软件类似，在客户端和�
 - curl
 - env
 - git
-- go (version >= 1.19)
+- go (version >= 1.20)
 - make
 - sha256sum
 - tar

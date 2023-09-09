@@ -37,7 +37,7 @@ const (
 )
 
 var (
-	unrecognizedAddrType = fmt.Errorf("unrecognized address type")
+	errUnrecognizedAddrType = fmt.Errorf("unrecognized address type")
 )
 
 // AddrSpec is used to return the target AddrSpec
@@ -58,7 +58,7 @@ func (a *AddrSpec) String() string {
 // Address returns a string suitable to dial; prefer returning IP-based
 // address, fallback to FQDN
 func (a AddrSpec) Address() string {
-	if 0 != len(a.IP) {
+	if len(a.IP) != 0 {
 		return net.JoinHostPort(a.IP.String(), strconv.Itoa(a.Port))
 	}
 	return net.JoinHostPort(a.FQDN, strconv.Itoa(a.Port))
@@ -70,8 +70,6 @@ type Request struct {
 	Version uint8
 	// Requested command.
 	Command uint8
-	// AuthContext provided during negotiation.
-	AuthContext *AuthContext
 	// AddrSpec of the the network that sent the request.
 	RemoteAddr *AddrSpec
 	// AddrSpec of the desired destination.
@@ -87,7 +85,7 @@ func NewRequest(conn io.Reader) (*Request, error) {
 	}
 
 	// Ensure we are compatible.
-	if header[0] != socks5Version {
+	if header[0] != Socks5Version {
 		return nil, fmt.Errorf("unsupported command version: %v", header[0])
 	}
 
@@ -98,7 +96,7 @@ func NewRequest(conn io.Reader) (*Request, error) {
 	}
 
 	request := &Request{
-		Version:  socks5Version,
+		Version:  Socks5Version,
 		Command:  header[1],
 		DestAddr: dest,
 	}
@@ -113,7 +111,7 @@ func (s *Server) handleRequest(req *Request, conn io.ReadWriteCloser) error {
 	// Resolve the address if we have a FQDN.
 	dest := req.DestAddr
 	if dest.FQDN != "" {
-		ctx_, addr, err := s.config.Resolver.Resolve(ctx, dest.FQDN)
+		addr, err := s.config.Resolver.LookupIP(ctx, dest.FQDN)
 		if err != nil {
 			DNSResolveErrors.Add(1)
 			if err := sendReply(conn, hostUnreachable, nil); err != nil {
@@ -121,7 +119,6 @@ func (s *Server) handleRequest(req *Request, conn io.ReadWriteCloser) error {
 			}
 			return fmt.Errorf("failed to resolve destination %q: %w", dest.FQDN, err)
 		}
-		ctx = ctx_
 		dest.IP = addr
 	}
 
@@ -384,7 +381,7 @@ func (s *Server) proxySocks5AuthReq(conn, proxyConn net.Conn) error {
 	if _, err := io.ReadFull(conn, version); err != nil {
 		return fmt.Errorf("failed to get version byte: %w", err)
 	}
-	if version[0] != socks5Version {
+	if version[0] != Socks5Version {
 		return fmt.Errorf("unsupported SOCKS version: %v", version)
 	}
 	nMethods := []byte{0}
@@ -554,7 +551,7 @@ func readAddrSpec(r io.Reader) (*AddrSpec, error) {
 		d.FQDN = string(fqdn)
 
 	default:
-		return nil, unrecognizedAddrType
+		return nil, errUnrecognizedAddrType
 	}
 
 	// Read the port number.
@@ -600,7 +597,7 @@ func sendReply(w io.Writer, resp uint8, addr *AddrSpec) error {
 
 	// Format the message.
 	msg := make([]byte, 6+len(addrBody))
-	msg[0] = socks5Version
+	msg[0] = Socks5Version
 	msg[1] = resp
 	msg[2] = 0 // reserved byte
 	msg[3] = addrType

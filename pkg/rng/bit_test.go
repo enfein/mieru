@@ -21,7 +21,6 @@ import (
 )
 
 func TestFlipBitsAlreadyUnderRatio(t *testing.T) {
-	InitSeed()
 	testcases := []struct {
 		bs    []byte
 		src   byte
@@ -53,8 +52,6 @@ func TestFlipBitsAlreadyUnderRatio(t *testing.T) {
 }
 
 func TestFlipBits(t *testing.T) {
-	InitSeed()
-
 	solutions := make(map[string]struct{})
 	for round := 0; round < 100; round++ {
 		input := make([]byte, 20)

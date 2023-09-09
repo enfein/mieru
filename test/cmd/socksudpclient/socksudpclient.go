@@ -43,7 +43,6 @@ var (
 
 func init() {
 	log.SetFormatter(&log.DaemonFormatter{})
-	mrand.Seed(time.Now().UnixNano())
 }
 
 func main() {

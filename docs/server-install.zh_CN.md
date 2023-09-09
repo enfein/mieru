@@ -10,16 +10,16 @@
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.15.0/mita_1.15.0_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.15.1/mita_1.15.1_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.15.0/mita_1.15.0_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.15.1/mita_1.15.1_arm64.deb
 
 # Fedora / CentOS / Red Hat Enterprise Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.15.0/mita-1.15.0-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.15.1/mita-1.15.1-1.x86_64.rpm
 
 # Fedora / CentOS / Red Hat Enterprise Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.15.0/mita-1.15.0-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v1.15.1/mita-1.15.1-1.aarch64.rpm
 ```
 
 如果上述链接被墙，请翻墙后使用浏览器从 GitHub Releases 页面下载安装。
@@ -28,16 +28,16 @@ curl -LSO https://github.com/enfein/mieru/releases/download/v1.15.0/mita-1.15.0-
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_1.15.0_amd64.deb
+sudo dpkg -i mita_1.15.1_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_1.15.0_arm64.deb
+sudo dpkg -i mita_1.15.1_arm64.deb
 
 # Fedora / CentOS / Red Hat Enterprise Linux - X86_64
-sudo rpm -Uvh --force mita-1.15.0-1.x86_64.rpm
+sudo rpm -Uvh --force mita-1.15.1-1.x86_64.rpm
 
 # Fedora / CentOS / Red Hat Enterprise Linux - ARM 64
-sudo rpm -Uvh --force mita-1.15.0-1.aarch64.rpm
+sudo rpm -Uvh --force mita-1.15.1-1.aarch64.rpm
 ```
 
 ## 赋予当前用户操作 mita 的权限，需要重启服务器使此设置生效
