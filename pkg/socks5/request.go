@@ -16,24 +16,23 @@ import (
 )
 
 const (
-	ConnectCommand   = uint8(1)
-	BindCommand      = uint8(2)
-	AssociateCommand = uint8(3)
-	ipv4Address      = uint8(1)
-	fqdnAddress      = uint8(3)
-	ipv6Address      = uint8(4)
-)
+	connectCommand   byte = 1
+	bindCommand      byte = 2
+	associateCommand byte = 3
 
-const (
-	successReply uint8 = iota
-	serverFailure
-	ruleFailure
-	networkUnreachable
-	hostUnreachable
-	connectionRefused
-	ttlExpired
-	commandNotSupported
-	addrTypeNotSupported
+	ipv4Address byte = 1
+	fqdnAddress byte = 3
+	ipv6Address byte = 4
+
+	successReply         byte = 0
+	serverFailure        byte = 1
+	ruleFailure          byte = 2
+	networkUnreachable   byte = 3
+	hostUnreachable      byte = 4
+	connectionRefused    byte = 5
+	ttlExpired           byte = 6
+	commandNotSupported  byte = 7
+	addrTypeNotSupported byte = 8
 )
 
 var (
@@ -70,8 +69,6 @@ type Request struct {
 	Version uint8
 	// Requested command.
 	Command uint8
-	// AddrSpec of the the network that sent the request.
-	RemoteAddr *AddrSpec
 	// AddrSpec of the desired destination.
 	DestAddr *AddrSpec
 }
@@ -85,7 +82,7 @@ func NewRequest(conn io.Reader) (*Request, error) {
 	}
 
 	// Ensure we are compatible.
-	if header[0] != Socks5Version {
+	if header[0] != socks5Version {
 		return nil, fmt.Errorf("unsupported command version: %v", header[0])
 	}
 
@@ -95,19 +92,15 @@ func NewRequest(conn io.Reader) (*Request, error) {
 		return nil, err
 	}
 
-	request := &Request{
-		Version:  Socks5Version,
+	return &Request{
+		Version:  socks5Version,
 		Command:  header[1],
 		DestAddr: dest,
-	}
-
-	return request, nil
+	}, nil
 }
 
 // handleRequest is used for request processing after authentication.
-func (s *Server) handleRequest(req *Request, conn io.ReadWriteCloser) error {
-	ctx := context.Background()
-
+func (s *Server) handleRequest(ctx context.Context, req *Request, conn io.ReadWriteCloser) error {
 	// Resolve the address if we have a FQDN.
 	dest := req.DestAddr
 	if dest.FQDN != "" {
@@ -129,12 +122,12 @@ func (s *Server) handleRequest(req *Request, conn io.ReadWriteCloser) error {
 
 	// Switch on the command.
 	switch req.Command {
-	case ConnectCommand:
-		return s.handleConnect(ctx, conn, req)
-	case BindCommand:
-		return s.handleBind(ctx, conn, req)
-	case AssociateCommand:
-		return s.handleAssociate(ctx, conn, req)
+	case connectCommand:
+		return s.handleConnect(ctx, req, conn)
+	case bindCommand:
+		return s.handleBind(ctx, req, conn)
+	case associateCommand:
+		return s.handleAssociate(ctx, req, conn)
 	default:
 		UnsupportedCommandErrors.Add(1)
 		if err := sendReply(conn, commandNotSupported, nil); err != nil {
@@ -145,7 +138,7 @@ func (s *Server) handleRequest(req *Request, conn io.ReadWriteCloser) error {
 }
 
 // handleConnect is used to handle a connect command.
-func (s *Server) handleConnect(ctx context.Context, conn io.ReadWriteCloser, req *Request) error {
+func (s *Server) handleConnect(ctx context.Context, req *Request, conn io.ReadWriteCloser) error {
 	var d net.Dialer
 	target, err := d.DialContext(ctx, "tcp", req.DestAddr.Address())
 	if err != nil {
@@ -180,7 +173,7 @@ func (s *Server) handleConnect(ctx context.Context, conn io.ReadWriteCloser, req
 }
 
 // handleBind is used to handle a bind command.
-func (s *Server) handleBind(ctx context.Context, conn io.ReadWriteCloser, req *Request) error {
+func (s *Server) handleBind(ctx context.Context, req *Request, conn io.ReadWriteCloser) error {
 	UnsupportedCommandErrors.Add(1)
 	if err := sendReply(conn, commandNotSupported, nil); err != nil {
 		HandshakeErrors.Add(1)
@@ -190,7 +183,7 @@ func (s *Server) handleBind(ctx context.Context, conn io.ReadWriteCloser, req *R
 }
 
 // handleAssociate is used to handle a associate command.
-func (s *Server) handleAssociate(ctx context.Context, conn io.ReadWriteCloser, req *Request) error {
+func (s *Server) handleAssociate(ctx context.Context, req *Request, conn io.ReadWriteCloser) error {
 	// Create a UDP listener on a random port.
 	// All the requests associated to this connection will go through this port.
 	udpListenerAddr, err := net.ResolveUDPAddr("udp", util.MaybeDecorateIPv6(util.AllIPAddr())+":0")
@@ -381,7 +374,7 @@ func (s *Server) proxySocks5AuthReq(conn, proxyConn net.Conn) error {
 	if _, err := io.ReadFull(conn, version); err != nil {
 		return fmt.Errorf("failed to get version byte: %w", err)
 	}
-	if version[0] != Socks5Version {
+	if version[0] != socks5Version {
 		return fmt.Errorf("unsupported SOCKS version: %v", version)
 	}
 	nMethods := []byte{0}
@@ -481,7 +474,7 @@ func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, err
 	connResp = append(connResp, bindAddr...)
 
 	var udpConn *net.UDPConn
-	if cmd == AssociateCommand {
+	if cmd == associateCommand {
 		// Create a UDP listener on a random port in IPv4 network.
 		var err error
 		udpAddr := &net.UDPAddr{IP: net.IP{0, 0, 0, 0}, Port: 0}
@@ -597,7 +590,7 @@ func sendReply(w io.Writer, resp uint8, addr *AddrSpec) error {
 
 	// Format the message.
 	msg := make([]byte, 6+len(addrBody))
-	msg[0] = Socks5Version
+	msg[0] = socks5Version
 	msg[1] = resp
 	msg[2] = 0 // reserved byte
 	msg[3] = addrType

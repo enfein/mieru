@@ -22,8 +22,8 @@ import (
 )
 
 var (
-	versionFmt = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)$`)
-	tagFmt     = regexp.MustCompile(`^v(\d+)\.(\d+)\.(\d+)$`)
+	versionFmt = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)`)
+	tagFmt     = regexp.MustCompile(`^v(\d+)\.(\d+)\.(\d+)`)
 )
 
 // Version defines the components of version number.

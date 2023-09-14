@@ -2,6 +2,7 @@ package socks5
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"io"
 	"net"
@@ -59,7 +60,7 @@ func TestRequestConnect(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRequest() failed: %v", err)
 	}
-	if err := s.handleRequest(req, serverConn); err != nil {
+	if err := s.handleRequest(context.Background(), req, serverConn); err != nil {
 		t.Fatalf("handleRequest() failed: %v", err)
 	}
 
@@ -88,7 +89,7 @@ func TestRequestUnsupportedCommand(t *testing.T) {
 		resp []byte
 	}{
 		{
-			[]byte{5, BindCommand, 0, 1, 127, 0, 0, 1, 0, 1},
+			[]byte{5, bindCommand, 0, 1, 127, 0, 0, 1, 0, 1},
 			[]byte{5, commandNotSupported, 0, 1, 0, 0, 0, 0, 0, 0},
 		},
 	}
@@ -112,7 +113,7 @@ func TestRequestUnsupportedCommand(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewRequest() failed: %v", err)
 		}
-		if err := s.handleRequest(req, serverConn); err != nil {
+		if err := s.handleRequest(context.Background(), req, serverConn); err != nil {
 			t.Fatalf("handleRequest() failed: %v", err)
 		}
 

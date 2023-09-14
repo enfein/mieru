@@ -73,7 +73,7 @@ func TestSocks5Connect(t *testing.T) {
 
 	req := bytes.NewBuffer(nil)
 	req.Write([]byte{5})
-	req.Write([]byte{1, NoAuth})
+	req.Write([]byte{1, noAuth})
 	req.Write([]byte{5, 1, 0, 1, 127, 0, 0, 1})
 	port := []byte{0, 0}
 	binary.BigEndian.PutUint16(port, uint16(lAddr.Port))
@@ -87,8 +87,8 @@ func TestSocks5Connect(t *testing.T) {
 
 	// Verify response from socks server.
 	want := []byte{
-		Socks5Version, NoAuth,
-		Socks5Version, 0, 0, 1,
+		socks5Version, noAuth,
+		socks5Version, 0, 0, 1,
 		127, 0, 0, 1,
 		0, 0,
 		'p', 'o', 'n', 'g',
@@ -182,7 +182,7 @@ func TestSocks5UDPAssociation(t *testing.T) {
 
 	req := bytes.NewBuffer(nil)
 	req.Write([]byte{5})
-	req.Write([]byte{1, NoAuth})
+	req.Write([]byte{1, noAuth})
 	req.Write([]byte{5, 3, 0, 1, 127, 0, 0, 1, 0, 0})
 
 	// Send initial UDP association request.
@@ -192,8 +192,8 @@ func TestSocks5UDPAssociation(t *testing.T) {
 
 	// Verify response from socks server.
 	want := []byte{
-		Socks5Version, NoAuth,
-		Socks5Version, 0, 0, 1,
+		socks5Version, noAuth,
+		socks5Version, 0, 0, 1,
 		0, 0, 0, 0,
 		0, 0,
 	}

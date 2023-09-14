@@ -2,6 +2,7 @@ package socks5
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	mrand "math/rand"
@@ -19,10 +20,10 @@ import (
 
 const (
 	// socks5 version number.
-	Socks5Version byte = 5
+	socks5Version byte = 5
 
 	// No authentication required.
-	NoAuth byte = 0
+	noAuth byte = 0
 )
 
 var (
@@ -70,11 +71,14 @@ type Config struct {
 	// BindIP is used for bind or udp associate
 	BindIP net.IP
 
+	// Use mieru proxy to carry socks5 traffic.
+	UseProxy bool
+
 	// Allow using socks5 to access resources served in localhost.
 	AllowLocalDestination bool
 
-	// Use mieru proxy to carry socks5 traffic.
-	UseProxy bool
+	// Do socks5 authentication at proxy client side.
+	ClientSideAuthentication bool
 
 	// Mieru proxy configuration.
 	ProxyConf []ProxyConfig
@@ -201,7 +205,13 @@ func (s *Server) acceptLoop() {
 }
 
 func (s *Server) clientServeConn(conn net.Conn) error {
-	// Proxy is enabled, forward all the traffic to proxy.
+	if s.config.ClientSideAuthentication {
+		if err := s.handleAuthentication(conn); err != nil {
+			return err
+		}
+	}
+
+	// Forward remaining bytes to proxy.
 	// If there are multiple proxy endpoints, randomly select one of them.
 	n := len(s.config.ProxyConf)
 	if n == 0 {
@@ -221,6 +231,7 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 	if proxyConf.Dial == nil {
 		log.Fatalf("Proxy dial function is not set in socks5 server config")
 	}
+
 	ctx := context.Background()
 	var block cipher.BlockCipher
 	var err error
@@ -239,10 +250,12 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 		return fmt.Errorf("proxy Dial(%q, %q) failed: %w", proxyConf.NetworkType, proxyConf.Address, err)
 	}
 
-	if err := s.proxySocks5AuthReq(conn, proxyConn); err != nil {
-		HandshakeErrors.Add(1)
-		proxyConn.Close()
-		return err
+	if !s.config.ClientSideAuthentication {
+		if err := s.proxySocks5AuthReq(conn, proxyConn); err != nil {
+			HandshakeErrors.Add(1)
+			proxyConn.Close()
+			return err
+		}
 	}
 	udpAssociateConn, err := s.proxySocks5ConnReq(conn, proxyConn)
 	if err != nil {
@@ -264,13 +277,38 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 }
 
 func (s *Server) serverServeConn(conn net.Conn) error {
+	if !s.config.ClientSideAuthentication {
+		if err := s.handleAuthentication(conn); err != nil {
+			return err
+		}
+	}
+
+	request, err := NewRequest(conn)
+	if err != nil {
+		HandshakeErrors.Add(1)
+		if errors.Is(err, errUnrecognizedAddrType) {
+			if err := sendReply(conn, addrTypeNotSupported, nil); err != nil {
+				return fmt.Errorf("failed to send reply: %w", err)
+			}
+		}
+		return fmt.Errorf("failed to read destination address: %w", err)
+	}
+
+	// Process the client request.
+	if err := s.handleRequest(context.Background(), request, conn); err != nil {
+		return fmt.Errorf("handleRequest() failed: %w", err)
+	}
+	return nil
+}
+
+func (s *Server) handleAuthentication(conn net.Conn) error {
 	// Read the version byte and ensure we are compatible.
 	version := []byte{0}
 	if _, err := io.ReadFull(conn, version); err != nil {
 		HandshakeErrors.Add(1)
 		return fmt.Errorf("get socks version failed: %w", err)
 	}
-	if version[0] != Socks5Version {
+	if version[0] != socks5Version {
 		HandshakeErrors.Add(1)
 		return fmt.Errorf("unsupported socks version: %v", version)
 	}
@@ -292,7 +330,7 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 		return fmt.Errorf("get authentication method failed: %w", err)
 	}
 	for _, method := range authMethods {
-		if method == NoAuth {
+		if method == noAuth {
 			allowNoAuth = true
 			break
 		}
@@ -301,28 +339,9 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 		HandshakeErrors.Add(1)
 		return fmt.Errorf("no authentication is not supported by socks5 client")
 	}
-	if _, err := conn.Write([]byte{Socks5Version, NoAuth}); err != nil {
+	if _, err := conn.Write([]byte{socks5Version, noAuth}); err != nil {
 		HandshakeErrors.Add(1)
 		return fmt.Errorf("write authentication response failed: %w", err)
-	}
-
-	request, err := NewRequest(conn)
-	if err != nil {
-		HandshakeErrors.Add(1)
-		if err == errUnrecognizedAddrType {
-			if err := sendReply(conn, addrTypeNotSupported, nil); err != nil {
-				return fmt.Errorf("failed to send reply: %w", err)
-			}
-		}
-		return fmt.Errorf("failed to read destination address: %w", err)
-	}
-	if client, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
-		request.RemoteAddr = &AddrSpec{IP: client.IP, Port: client.Port}
-	}
-
-	// Process the client request.
-	if err := s.handleRequest(request, conn); err != nil {
-		return fmt.Errorf("handleRequest() failed: %w", err)
 	}
 	return nil
 }

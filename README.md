@@ -64,6 +64,10 @@ To build RPM packages:
 
 To compile, go to the root directory of the project and invoke `make`. The compilation result will be stored in the `release` directory.
 
+## Share
+
+If you think this software is helpful, please share to your friends. Thanks!
+
 ## Contact Us
 
 Use GitHub issue.

@@ -15,26 +15,21 @@
 
 package version
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func TestAppVersion(t *testing.T) {
-	v, err := Parse(AppVersion)
+	_, err := Parse(AppVersion)
 	if err != nil {
 		t.Fatalf("Parse() failed: %v", err)
 	}
-	str := v.String()
-	if str != AppVersion {
-		t.Errorf("version string = %s, want %s", str, AppVersion)
-	}
 
 	tag := "v" + AppVersion
-	v, err = ParseTag(tag)
+	_, err = ParseTag(tag)
 	if err != nil {
 		t.Fatalf("ParseTag() failed: %v", err)
-	}
-	tagStr := v.ToTag()
-	if tagStr != tag {
-		t.Errorf("tag = %s, want %s", tagStr, tag)
 	}
 }
 
@@ -85,6 +80,38 @@ func TestLessThan(t *testing.T) {
 		res := tc.my.LessThan(tc.another)
 		if res != tc.isLess {
 			t.Errorf("%s less than %s got %v, want %v", tc.my.String(), tc.another.String(), res, tc.isLess)
+		}
+	}
+}
+
+func TestParse(t *testing.T) {
+	testcases := []struct {
+		s string
+		v Version
+	}{
+		{"1.0.0", Version{1, 0, 0}},
+		{"1.0.0-alpha", Version{1, 0, 0}},
+		{"1.0.0-alpha.1", Version{1, 0, 0}},
+		{"1.0.0-alpha+001", Version{1, 0, 0}},
+		{"1.0.0+20130313144700", Version{1, 0, 0}},
+		{"1.0.0+21AF26D3----117B344092BD", Version{1, 0, 0}},
+	}
+
+	for _, tc := range testcases {
+		v, err := Parse(tc.s)
+		if err != nil {
+			t.Fatalf("Parse() failed: %v", err)
+		}
+		if !reflect.DeepEqual(v, tc.v) {
+			t.Errorf("parsed version %v is unexpected", v)
+		}
+
+		v, err = ParseTag("v" + tc.s)
+		if err != nil {
+			t.Fatalf("ParseTag() failed: %v", err)
+		}
+		if !reflect.DeepEqual(v, tc.v) {
+			t.Errorf("parsed version %v is unexpected", v)
 		}
 	}
 }
