@@ -97,10 +97,6 @@ type Server struct {
 	die         chan struct{}
 }
 
-var (
-	_ util.ConnHandler = &Server{}
-)
-
 // New creates a new Server and potentially returns an error.
 func New(conf *Config) (*Server, error) {
 	// Ensure we have a DNS resolver.
@@ -163,12 +159,6 @@ func (s *Server) Serve(l net.Listener) error {
 	}
 }
 
-// Take implements util.ConnHandler interface.
-func (s *Server) Take(conn net.Conn) (closed bool, err error) {
-	err = s.ServeConn(conn)
-	return true, err
-}
-
 // ServeConn is used to serve a single connection.
 func (s *Server) ServeConn(conn net.Conn) error {
 	conn = util.WrapHierarchyConn(conn)
@@ -212,42 +202,50 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 	}
 
 	// Forward remaining bytes to proxy.
-	// If there are multiple proxy endpoints, randomly select one of them.
-	n := len(s.config.ProxyConf)
-	if n == 0 {
-		log.Fatalf("No proxy configuration is available in socks5 server config")
-	}
-	i := mrand.Intn(n)
-	proxyConf := s.config.ProxyConf[i]
-	if proxyConf.NetworkType == "" {
-		log.Fatalf("Proxy network type is not set in socks5 server config")
-	}
-	if proxyConf.Address == "" {
-		log.Fatalf("Proxy address is not set in socks5 server config")
-	}
-	if len(proxyConf.Password) == 0 {
-		log.Fatalf("Proxy password is not set in socks5 server config")
-	}
-	if proxyConf.Dial == nil {
-		log.Fatalf("Proxy dial function is not set in socks5 server config")
-	}
-
 	ctx := context.Background()
-	var block cipher.BlockCipher
+	var proxyConn net.Conn
 	var err error
-	if proxyConf.NetworkType == "tcp" {
-		block, err = cipher.BlockCipherFromPassword(proxyConf.Password, false)
-	} else if proxyConf.NetworkType == "udp" {
-		block, err = cipher.BlockCipherFromPassword(proxyConf.Password, true)
+	if s.config.ProxyMux != nil {
+		proxyConn, err = s.config.ProxyMux.DialContext(ctx)
+		if err != nil {
+			return fmt.Errorf("mux DialContext() failed: %w", err)
+		}
 	} else {
-		return fmt.Errorf("proxy network type %q is not supported", proxyConf.NetworkType)
-	}
-	if err != nil {
-		return fmt.Errorf("cipher.BlockCipherFromPassword() failed: %w", err)
-	}
-	proxyConn, err := proxyConf.Dial(ctx, proxyConf.NetworkType, "", proxyConf.Address, block)
-	if err != nil {
-		return fmt.Errorf("proxy Dial(%q, %q) failed: %w", proxyConf.NetworkType, proxyConf.Address, err)
+		// If there are multiple proxy endpoints, randomly select one of them.
+		n := len(s.config.ProxyConf)
+		if n == 0 {
+			log.Fatalf("No proxy configuration is available in socks5 server config")
+		}
+		i := mrand.Intn(n)
+		proxyConf := s.config.ProxyConf[i]
+		if proxyConf.NetworkType == "" {
+			log.Fatalf("Proxy network type is not set in socks5 server config")
+		}
+		if proxyConf.Address == "" {
+			log.Fatalf("Proxy address is not set in socks5 server config")
+		}
+		if len(proxyConf.Password) == 0 {
+			log.Fatalf("Proxy password is not set in socks5 server config")
+		}
+		if proxyConf.Dial == nil {
+			log.Fatalf("Proxy dial function is not set in socks5 server config")
+		}
+
+		var block cipher.BlockCipher
+		if proxyConf.NetworkType == "tcp" {
+			block, err = cipher.BlockCipherFromPassword(proxyConf.Password, false)
+		} else if proxyConf.NetworkType == "udp" {
+			block, err = cipher.BlockCipherFromPassword(proxyConf.Password, true)
+		} else {
+			return fmt.Errorf("proxy network type %q is not supported", proxyConf.NetworkType)
+		}
+		if err != nil {
+			return fmt.Errorf("cipher.BlockCipherFromPassword() failed: %w", err)
+		}
+		proxyConn, err = proxyConf.Dial(ctx, proxyConf.NetworkType, "", proxyConf.Address, block)
+		if err != nil {
+			return fmt.Errorf("proxy Dial(%q, %q) failed: %w", proxyConf.NetworkType, proxyConf.Address, err)
+		}
 	}
 
 	if !s.config.ClientSideAuthentication {

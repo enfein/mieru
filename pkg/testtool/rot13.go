@@ -20,6 +20,8 @@ import (
 	mrand "math/rand"
 	"net"
 	"regexp"
+
+	"github.com/enfein/mieru/pkg/stderror"
 )
 
 // TestHelperGenRot13Input generates valid rotate-13 input.
@@ -87,10 +89,53 @@ func TestHelperServeConn(conn net.Conn) error {
 	}
 }
 
-// TestHelperConnHandler implements util.ConnHandler interface.
-type TestHelperConnHandler struct{}
+// TestHelperServer is a testing server.
+type TestHelperServer struct {
+	done chan struct{}
+}
 
-func (h TestHelperConnHandler) Take(conn net.Conn) (closed bool, err error) {
-	err = TestHelperServeConn(conn)
-	return true, err
+// NewTestHelperServer initializes a new testing server.
+func NewTestHelperServer() *TestHelperServer {
+	return &TestHelperServer{done: make(chan struct{})}
+}
+
+// Serve serves incoming connections.
+func (s *TestHelperServer) Serve(l net.Listener) error {
+	var connErr error
+	for {
+		select {
+		case <-s.done:
+			return nil
+		default:
+		}
+		if connErr != nil {
+			return connErr
+		}
+		conn, err := l.Accept()
+		if err != nil {
+			if stderror.IsEOF(err) || stderror.IsClosed(err) {
+				return nil
+			}
+			return err
+		}
+		go func() {
+			err := TestHelperServeConn(conn)
+			if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
+				connErr = err
+			}
+		}()
+	}
+}
+
+// Close stops the testing server.
+// To be more flexible, it doesn't shutdown the listener.
+// The server can't be reused after close.
+func (s *TestHelperServer) Close() error {
+	select {
+	case <-s.done:
+		return nil
+	default:
+	}
+	close(s.done)
+	return nil
 }

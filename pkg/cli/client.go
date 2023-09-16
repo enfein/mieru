@@ -381,8 +381,9 @@ var clientRunFunc = func(s []string) error {
 
 	// Create the local socks5 server.
 	socks5Config := &socks5.Config{
-		UseProxy:  true,
-		ProxyConf: proxyConfigs,
+		UseProxy:                 true,
+		ClientSideAuthentication: true,
+		ProxyConf:                proxyConfigs,
 	}
 	socks5Server, err := socks5.New(socks5Config)
 	if err != nil {

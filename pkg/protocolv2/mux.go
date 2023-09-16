@@ -42,8 +42,7 @@ type Mux struct {
 	multiplexFactor int
 
 	// ---- server fields ----
-	users         map[string]*appctlpb.User
-	serverHandler util.ConnHandler
+	users map[string]*appctlpb.User
 
 	// ---- common fields ----
 	endpoints   []UnderlayProperties
@@ -112,19 +111,6 @@ func (m *Mux) SetServerUsers(users map[string]*appctlpb.User) *Mux {
 	return m
 }
 
-func (m *Mux) SetServerHandler(handler util.ConnHandler) *Mux {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.isClient {
-		log.Fatalf("Can't set server handler in client mux")
-	}
-	if m.used {
-		log.Fatalf("Can't set server handler after mux is used")
-	}
-	m.serverHandler = handler
-	return m
-}
-
 func (m *Mux) SetEndpoints(endpoints []UnderlayProperties) *Mux {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -173,17 +159,14 @@ func (m *Mux) Addr() net.Addr {
 	return util.NilNetAddr()
 }
 
-// ListenAndServeAll listens on all the server addresses and serves
-// incoming requests. Call this method in client results in an error.
-func (m *Mux) ListenAndServeAll() error {
+// ListenAll listens on all the server addresses for incoming connections.
+// Call this method in client results in an error.
+func (m *Mux) ListenAll() error {
 	if m.isClient {
 		return stderror.ErrInvalidOperation
 	}
 	if len(m.users) == 0 {
 		return fmt.Errorf("no user found")
-	}
-	if m.serverHandler == nil {
-		return fmt.Errorf("no server handler found")
 	}
 	if len(m.endpoints) == 0 {
 		return fmt.Errorf("no server listening endpoint found")
@@ -201,31 +184,8 @@ func (m *Mux) ListenAndServeAll() error {
 	}
 	m.mu.Unlock()
 
-	for {
-		session, err := m.Accept()
-		if err != nil {
-			if stderror.IsClosed(err) {
-				return nil
-			}
-			return fmt.Errorf("Accept() failed: %v", err)
-		}
-		if log.IsLevelEnabled(log.TraceLevel) {
-			log.Tracef("Mux accepted %v", session)
-		}
-		go func() {
-			closed, err := m.serverHandler.Take(session)
-			if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
-				log.Debugf("Server handler got error for %v: %v", session, err)
-			}
-			if !closed {
-				session.Close()
-			}
-		}()
-
-		m.mu.Lock()
-		m.cleanUnderlay()
-		m.mu.Unlock()
-	}
+	<-m.done
+	return nil
 }
 
 // DialContext returns a network connection for the client to consume.
@@ -342,6 +302,7 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 			log.Debugf("Created new server underlay %v", underlay)
 			m.mu.Lock()
 			m.underlays = append(m.underlays, underlay)
+			m.cleanUnderlay()
 			m.mu.Unlock()
 			UnderlayPassiveOpens.Add(1)
 			currEst := UnderlayCurrEstablished.Add(1)
@@ -388,6 +349,7 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 		log.Debugf("Created new server underlay %v", underlay)
 		m.mu.Lock()
 		m.underlays = append(m.underlays, underlay)
+		m.cleanUnderlay()
 		m.mu.Unlock()
 		UnderlayPassiveOpens.Add(1)
 		currEst := UnderlayCurrEstablished.Add(1)
@@ -463,7 +425,7 @@ func (m *Mux) serverWrapTCPConn(rawConn net.Conn, mtu int, users map[string]*app
 }
 
 // cleanUnderlay removes closed underlays.
-// This method must be called when holding the lock.
+// This method MUST be called only when holding the lock.
 func (m *Mux) cleanUnderlay() {
 	remaining := make([]Underlay, 0)
 	for _, underlay := range m.underlays {

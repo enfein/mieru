@@ -75,6 +75,7 @@ type Underlay interface {
 	Done() chan struct{}
 }
 
+// underlayDescriptor implements UnderlayProperties.
 type underlayDescriptor struct {
 	mtu               int
 	ipVersion         util.IPVersion
@@ -83,24 +84,42 @@ type underlayDescriptor struct {
 	remoteAddr        net.Addr
 }
 
-var _ UnderlayProperties = underlayDescriptor{}
+var _ UnderlayProperties = &underlayDescriptor{}
 
-func (d underlayDescriptor) MTU() int {
+func (d *underlayDescriptor) MTU() int {
 	return d.mtu
 }
 
-func (d underlayDescriptor) IPVersion() util.IPVersion {
+func (d *underlayDescriptor) IPVersion() util.IPVersion {
 	return d.ipVersion
 }
 
-func (d underlayDescriptor) TransportProtocol() util.TransportProtocol {
+func (d *underlayDescriptor) TransportProtocol() util.TransportProtocol {
 	return d.transportProtocol
 }
 
-func (d underlayDescriptor) LocalAddr() net.Addr {
+func (d *underlayDescriptor) LocalAddr() net.Addr {
 	return d.localAddr
 }
 
-func (d underlayDescriptor) RemoteAddr() net.Addr {
+func (d *underlayDescriptor) RemoteAddr() net.Addr {
 	return d.remoteAddr
+}
+
+// NewUnderlayProperties creates a new instance of UnderlayProperties.
+func NewUnderlayProperties(mtu int, ipVersion util.IPVersion, transportProtocol util.TransportProtocol, localAddr net.Addr, remoteAddr net.Addr) UnderlayProperties {
+	d := &underlayDescriptor{
+		mtu:               mtu,
+		ipVersion:         ipVersion,
+		transportProtocol: transportProtocol,
+		localAddr:         localAddr,
+		remoteAddr:        remoteAddr,
+	}
+	if localAddr == nil {
+		d.localAddr = util.NilNetAddr()
+	}
+	if remoteAddr == nil {
+		d.remoteAddr = util.NilNetAddr()
+	}
+	return d
 }

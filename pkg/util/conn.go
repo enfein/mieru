@@ -46,11 +46,3 @@ func SendReceive(ctx context.Context, conn net.Conn, req []byte) (resp []byte, e
 	resp = resp[:n]
 	return
 }
-
-// ConnHandler defines a generic handler that can take the ownership of
-// a network connection.
-type ConnHandler interface {
-	// Take grabs the ownership of the network connection.
-	// The function returns when the handler returns the ownership.
-	Take(net.Conn) (closed bool, err error)
-}
