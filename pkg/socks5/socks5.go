@@ -5,12 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	mrand "math/rand"
 	"net"
 	"strconv"
 	"sync"
 
-	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/protocolv2"
@@ -48,21 +46,6 @@ var (
 	UDPAssociateOutPkts = metrics.RegisterMetric("socks5 UDP associate", "OutPkts")
 )
 
-// ProxyConfig is used to configure mieru proxy options.
-type ProxyConfig struct {
-	// NetworkType ("tcp", "udp", etc.) used when dial to the proxy.
-	NetworkType string
-
-	// Address is proxy server listening address, in host:port format.
-	Address string
-
-	// Password is used to derive the cipher block used for encryption.
-	Password []byte
-
-	// Dial is the function to dial to the proxy server.
-	Dial func(ctx context.Context, proxyNetwork, localAddr, proxyAddr string, block cipher.BlockCipher) (net.Conn, error)
-}
-
 // Config is used to setup and configure a socks5 server.
 type Config struct {
 	// Resolver can be provided to do custom name resolution.
@@ -79,9 +62,6 @@ type Config struct {
 
 	// Do socks5 authentication at proxy client side.
 	ClientSideAuthentication bool
-
-	// Mieru proxy configuration.
-	ProxyConf []ProxyConfig
 
 	// Mieru proxy multiplexer.
 	ProxyMux *protocolv2.Mux
@@ -110,6 +90,10 @@ func New(conf *Config) (*Server, error) {
 		if conf.BindIP == nil {
 			return nil, fmt.Errorf("set socks5 bind IP failed")
 		}
+	}
+
+	if conf.UseProxy && conf.ProxyMux == nil {
+		return nil, fmt.Errorf("ProxyMux must be set when proxy is enabled")
 	}
 
 	return &Server{
@@ -205,47 +189,9 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 	ctx := context.Background()
 	var proxyConn net.Conn
 	var err error
-	if s.config.ProxyMux != nil {
-		proxyConn, err = s.config.ProxyMux.DialContext(ctx)
-		if err != nil {
-			return fmt.Errorf("mux DialContext() failed: %w", err)
-		}
-	} else {
-		// If there are multiple proxy endpoints, randomly select one of them.
-		n := len(s.config.ProxyConf)
-		if n == 0 {
-			log.Fatalf("No proxy configuration is available in socks5 server config")
-		}
-		i := mrand.Intn(n)
-		proxyConf := s.config.ProxyConf[i]
-		if proxyConf.NetworkType == "" {
-			log.Fatalf("Proxy network type is not set in socks5 server config")
-		}
-		if proxyConf.Address == "" {
-			log.Fatalf("Proxy address is not set in socks5 server config")
-		}
-		if len(proxyConf.Password) == 0 {
-			log.Fatalf("Proxy password is not set in socks5 server config")
-		}
-		if proxyConf.Dial == nil {
-			log.Fatalf("Proxy dial function is not set in socks5 server config")
-		}
-
-		var block cipher.BlockCipher
-		if proxyConf.NetworkType == "tcp" {
-			block, err = cipher.BlockCipherFromPassword(proxyConf.Password, false)
-		} else if proxyConf.NetworkType == "udp" {
-			block, err = cipher.BlockCipherFromPassword(proxyConf.Password, true)
-		} else {
-			return fmt.Errorf("proxy network type %q is not supported", proxyConf.NetworkType)
-		}
-		if err != nil {
-			return fmt.Errorf("cipher.BlockCipherFromPassword() failed: %w", err)
-		}
-		proxyConn, err = proxyConf.Dial(ctx, proxyConf.NetworkType, "", proxyConf.Address, block)
-		if err != nil {
-			return fmt.Errorf("proxy Dial(%q, %q) failed: %w", proxyConf.NetworkType, proxyConf.Address, err)
-		}
+	proxyConn, err = s.config.ProxyMux.DialContext(ctx)
+	if err != nil {
+		return fmt.Errorf("mux DialContext() failed: %w", err)
 	}
 
 	if !s.config.ClientSideAuthentication {

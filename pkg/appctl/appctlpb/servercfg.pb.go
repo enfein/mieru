@@ -98,7 +98,7 @@ type ServerConfig struct {
 	// Server logging level.
 	LoggingLevel *LoggingLevel `protobuf:"varint,4,opt,name=loggingLevel,proto3,enum=appctl.LoggingLevel,oneof" json:"loggingLevel,omitempty"`
 	// Maximum transmission unit of L2 payload.
-	// This setting only applies to UDP protocol.
+	// This setting only applies to UDP protocol egress traffic.
 	Mtu *int32 `protobuf:"varint,5,opt,name=mtu,proto3,oneof" json:"mtu,omitempty"`
 }
 

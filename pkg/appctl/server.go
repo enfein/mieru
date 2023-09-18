@@ -23,16 +23,15 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"sync"
 	"sync/atomic"
 
 	pb "github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
+	"github.com/enfein/mieru/pkg/protocolv2"
 	"github.com/enfein/mieru/pkg/socks5"
 	"github.com/enfein/mieru/pkg/stderror"
-	"github.com/enfein/mieru/pkg/tcpsession"
 	"github.com/enfein/mieru/pkg/udpsession"
 	"github.com/enfein/mieru/pkg/util"
 	"google.golang.org/grpc"
@@ -100,57 +99,65 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 
 	SetAppStatus(pb.AppStatus_STARTING)
 
-	// Set MTU for UDP sessions.
+	mux := protocolv2.NewMux(false).SetServerUsers(UserListToMap(config.GetUsers()))
+	mtu := util.DefaultMTU
 	if config.GetMtu() != 0 {
-		udpsession.SetGlobalMTU(config.GetMtu())
+		mtu = int(config.GetMtu())
 	}
-
+	endpoints := make([]protocolv2.UnderlayProperties, 0)
+	listenIP := net.ParseIP(util.AllIPAddr())
+	ipVersion := util.GetIPVersion(listenIP.String())
+	if listenIP == nil {
+		return &pb.Empty{}, fmt.Errorf(stderror.ParseIPFailedErr, err)
+	}
 	n := len(config.GetPortBindings())
-	var initProxyTasks sync.WaitGroup
-	initProxyTasks.Add(n)
-
 	for i := 0; i < n; i++ {
-		// Create the egress socks5 server.
-		socks5Config := &socks5.Config{
-			AllowLocalDestination:    config.GetAdvancedSettings().GetAllowLocalDestination(),
-			ClientSideAuthentication: true,
-		}
-		socks5Server, err := socks5.New(socks5Config)
-		if err != nil {
-			return &pb.Empty{}, fmt.Errorf(stderror.CreateSocks5ServerFailedErr, err)
-		}
 		protocol := config.GetPortBindings()[i].GetProtocol()
 		port := config.GetPortBindings()[i].GetPort()
-		if err := GetSocks5ServerGroup().Add(protocol.String(), int(port), socks5Server); err != nil {
-			return &pb.Empty{}, fmt.Errorf(stderror.AddSocks5ServerToGroupFailedErr, err)
+		switch protocol {
+		case pb.TransportProtocol_TCP:
+			endpoint := protocolv2.NewUnderlayProperties(mtu, ipVersion, util.TCPTransport, &net.TCPAddr{IP: listenIP, Port: int(port)}, nil)
+			endpoints = append(endpoints, endpoint)
+		case pb.TransportProtocol_UDP:
+			endpoint := protocolv2.NewUnderlayProperties(mtu, ipVersion, util.UDPTransport, &net.UDPAddr{IP: listenIP, Port: int(port)}, nil)
+			endpoints = append(endpoints, endpoint)
+		default:
+			return &pb.Empty{}, fmt.Errorf(stderror.InvalidTransportProtocol)
 		}
-
-		// Run the egress socks5 server in the background.
-		go func() {
-			socks5Addr := util.MaybeDecorateIPv6(util.AllIPAddr()) + ":" + strconv.Itoa(int(port))
-			var l net.Listener
-			var err error
-			if protocol == pb.TransportProtocol_TCP {
-				l, err = tcpsession.ListenWithOptions(socks5Addr, UserListToMap(config.GetUsers()))
-				if err != nil {
-					log.Fatalf("tcpsession.ListenWithOptions(%q) failed: %v", socks5Addr, err)
-				}
-			} else if protocol == pb.TransportProtocol_UDP {
-				l, err = udpsession.ListenWithOptions(socks5Addr, UserListToMap(config.GetUsers()))
-				if err != nil {
-					log.Fatalf("udpsession.ListenWithOptions(%q) failed: %v", socks5Addr, err)
-				}
-			} else {
-				log.Fatalf("found unknown transport protocol %s in server config", protocol.String())
-			}
-			initProxyTasks.Done()
-			log.Infof("mieru server daemon socks5 server %q is running", socks5Addr)
-			if err = socks5Server.Serve(l); err != nil {
-				log.Fatalf("run socks5 server %q failed: %v", socks5Addr, err)
-			}
-			log.Infof("mieru server daemon socks5 server %q is stopped", socks5Addr)
-		}()
 	}
+	mux.SetEndpoints(endpoints)
+
+	// Set MTU for UDP sessions.
+	udpsession.SetGlobalMTU(mtu)
+
+	// Create the egress socks5 server.
+	socks5Config := &socks5.Config{
+		AllowLocalDestination:    config.GetAdvancedSettings().GetAllowLocalDestination(),
+		ClientSideAuthentication: true,
+	}
+	socks5Server, err := socks5.New(socks5Config)
+	if err != nil {
+		return &pb.Empty{}, fmt.Errorf(stderror.CreateSocks5ServerFailedErr, err)
+	}
+	if err = GetSocks5ServerGroup().Add("", 0, socks5Server); err != nil {
+		return &pb.Empty{}, fmt.Errorf(stderror.AddSocks5ServerToGroupFailedErr, err)
+	}
+
+	// Run the egress socks5 server in the background.
+	var initProxyTasks sync.WaitGroup
+	initProxyTasks.Add(1)
+	go func() {
+		if err = mux.Start(); err != nil {
+			log.Fatalf("socks5 server listening failed: %v", err)
+		}
+		initProxyTasks.Done()
+
+		log.Infof("mieru server daemon socks5 server is running")
+		if err = socks5Server.Serve(mux); err != nil {
+			log.Fatalf("run socks5 server failed: %v", err)
+		}
+		log.Infof("mieru server daemon socks5 server is stopped")
+	}()
 
 	initProxyTasks.Wait()
 	metrics.EnableLogging()

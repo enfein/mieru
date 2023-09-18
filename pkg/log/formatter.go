@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Default key names for the default fields
+// Default key names for the default fields.
 const (
 	defaultTimestampFormat = time.RFC3339
 	FieldKeyMsg            = "msg"
@@ -17,6 +17,11 @@ const (
 	FieldKeyFunc           = "func"
 	FieldKeyFile           = "file"
 )
+
+// LogPrefix is a fixed string printed at the beginning of each line
+// with DaemonFormatter. Set it as a build time variable to help debug
+// the program.
+var LogPrefix = ""
 
 // The Formatter interface is used to implement a custom Formatter. It takes an
 // `Entry`. It exposes all the fields, including the default ones:
@@ -33,7 +38,7 @@ type Formatter interface {
 }
 
 // CliFormatter is a log formatter that works best for command output.
-// It doesn't print time, level, or field data.
+// It doesn't print log prefix, time, level, or field data.
 type CliFormatter struct{}
 
 func (f *CliFormatter) Format(entry *Entry) ([]byte, error) {
@@ -88,6 +93,7 @@ func (f *DaemonFormatter) Format(entry *Entry) ([]byte, error) {
 		buf = &bytes.Buffer{}
 	}
 
+	buf.WriteString(LogPrefix)
 	for _, key := range orderedKeys {
 		var value string
 		switch {

@@ -30,7 +30,7 @@ import (
 
 const (
 	// Maximum protocol data unit supported in a single Write() call from application.
-	MaxPDU = 16 * 1024
+	maxPDU = 32 * 1024
 
 	// Maxinum number of transmission before marking the session as dead.
 	txCountLimit = 20
@@ -46,7 +46,7 @@ const (
 func MaxFragmentSize(mtu int, ipVersion util.IPVersion, transport util.TransportProtocol) int {
 	if transport == util.TCPTransport {
 		// No fragment needed.
-		return MaxPDU
+		return maxPDU
 	}
 
 	res := mtu - udpOverhead
@@ -143,20 +143,20 @@ func (s *segment) Fragment() uint8 {
 func (s *segment) Less(than *segment) bool {
 	mySeq, err := s.Seq()
 	if err != nil {
-		return false
+		panic(fmt.Sprintf("%v Seq() failed: %v", s, err))
 	}
 	otherSeq, err := than.Seq()
 	if err != nil {
-		return false
+		panic(fmt.Sprintf("%v Seq() failed: %v", than, err))
 	}
 	return mySeq < otherSeq
 }
 
 func (s *segment) String() string {
 	if s.transport == util.UDPTransport && (!util.IsZeroTime(s.txTime) || s.txTimeout != 0) {
-		return fmt.Sprintf("segment{metadata=%v, txCount=%v, fastAck=%v, txTime=%v, txTimeout=%v}", s.metadata, s.txCount, s.fastAck, s.txTime.Format(segmentTimeFormat), s.txTimeout)
+		return fmt.Sprintf("segment{metadata=%v, realPayloadLen=%v, txCount=%v, fastAck=%v, txTime=%v, txTimeout=%v}", s.metadata, len(s.payload), s.txCount, s.fastAck, s.txTime.Format(segmentTimeFormat), s.txTimeout)
 	}
-	return fmt.Sprintf("segment{metadata=%v}", s.metadata)
+	return fmt.Sprintf("segment{metadata=%v, realPayloadLen=%v}", s.metadata, len(s.payload))
 }
 
 func segmentLessFunc(a, b *segment) bool {
@@ -169,12 +169,11 @@ type segmentIterator func(*segment) bool
 
 // segmentTree is a B-tree to store multiple Segment in order.
 type segmentTree struct {
-	tr     *btree.BTreeG[*segment]
-	cap    int
-	mu     sync.Mutex
-	full   sync.Cond
-	empty  sync.Cond
-	series int
+	tr    *btree.BTreeG[*segment]
+	cap   int
+	mu    sync.Mutex
+	full  sync.Cond
+	empty sync.Cond
 }
 
 func newSegmentTree(capacity int) *segmentTree {
@@ -205,16 +204,10 @@ func (t *segmentTree) Insert(seg *segment) (ok bool) {
 	if t.tr.Len() >= t.cap {
 		return false
 	}
-	if seg.Fragment() == 0 {
-		t.series++
-	}
 	prev, replace := t.tr.ReplaceOrInsert(seg)
 	if replace {
 		if log.IsLevelEnabled(log.TraceLevel) {
 			log.Tracef("%v is replaced by %v", seg, prev)
-		}
-		if prev.Fragment() == 0 {
-			t.series--
 		}
 	} else {
 		t.empty.Broadcast()
@@ -236,16 +229,10 @@ func (t *segmentTree) InsertBlocking(seg *segment) {
 	for t.tr.Len() >= t.cap {
 		t.full.Wait()
 	}
-	if seg.Fragment() == 0 {
-		t.series++
-	}
 	prev, replace := t.tr.ReplaceOrInsert(seg)
 	if replace {
 		if log.IsLevelEnabled(log.TraceLevel) {
 			log.Tracef("%v is replaced by %v", seg, prev)
-		}
-		if prev.Fragment() == 0 {
-			t.series--
 		}
 	} else {
 		t.empty.Broadcast()
@@ -267,9 +254,6 @@ func (t *segmentTree) DeleteMin() (*segment, bool) {
 	}
 	if seg == nil {
 		panic("segmentTree.DeleteMin() return nil")
-	}
-	if seg.Fragment() == 0 {
-		t.series--
 	}
 	t.full.Broadcast()
 	return seg, true
@@ -301,9 +285,6 @@ func (t *segmentTree) DeleteMinIf(si segmentIterator) (*segment, bool) {
 		if seg == nil {
 			panic("segmentTree.DeleteMin() return nil")
 		}
-		if seg.Fragment() == 0 {
-			t.series--
-		}
 		t.full.Broadcast()
 	}
 	return seg, delete
@@ -315,11 +296,6 @@ func (t *segmentTree) Ascend(si segmentIterator) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.tr.Ascend(btree.ItemIteratorG[*segment](si))
-}
-
-// IsReadReady returns true if session is ready to read segments.
-func (t *segmentTree) IsReadReady() bool {
-	return t.series > 0
 }
 
 // MinSeq return the minimum sequence number in the SegmentTree.

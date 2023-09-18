@@ -61,7 +61,7 @@ func runClient(t *testing.T, properties UnderlayProperties, username, password [
 			}
 			defer conn.Close()
 			for i := 0; i < 100; i++ {
-				payloadSize := mrand.Intn(MaxPDU) + 1
+				payloadSize := mrand.Intn(maxPDU) + 1
 				payload := testtool.TestHelperGenRot13Input(payloadSize)
 				if _, err := conn.Write(payload); err != nil {
 					t.Errorf("Write() failed: %v", err)
@@ -100,19 +100,17 @@ func TestIPv4TCPUnderlay(t *testing.T) {
 		SetEndpoints([]UnderlayProperties{serverProperties})
 	testServer := testtool.NewTestHelperServer()
 
-	go func() {
-		if err := serverMux.ListenAll(); err != nil {
-			t.Errorf("[%s] ListenAll() failed: %v", time.Now().Format(testtool.TimeLayout), err)
-		}
-	}()
-	time.Sleep(500 * time.Millisecond)
+	if err := serverMux.Start(); err != nil {
+		t.Fatalf("[%s] Start() failed: %v", time.Now().Format(testtool.TimeLayout), err)
+	}
+	time.Sleep(100 * time.Millisecond)
 	go func() {
 		if err := testServer.Serve(serverMux); err != nil {
 			t.Errorf("[%s] Serve() failed: %v", time.Now().Format(testtool.TimeLayout), err)
 		}
 	}()
 	defer testServer.Close()
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	clientProperties := NewUnderlayProperties(1500, util.IPVersion4, util.TCPTransport, nil, &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
 	runClient(t, clientProperties, []byte("xiaochitang"), []byte("kuiranbudong"), 4)
@@ -134,19 +132,17 @@ func TestIPv6TCPUnderlay(t *testing.T) {
 		SetEndpoints([]UnderlayProperties{serverProperties})
 	testServer := testtool.NewTestHelperServer()
 
-	go func() {
-		if err := serverMux.ListenAll(); err != nil {
-			t.Errorf("[%s] ListenAll() failed: %v", time.Now().Format(testtool.TimeLayout), err)
-		}
-	}()
-	time.Sleep(500 * time.Millisecond)
+	if err := serverMux.Start(); err != nil {
+		t.Fatalf("[%s] Start() failed: %v", time.Now().Format(testtool.TimeLayout), err)
+	}
+	time.Sleep(100 * time.Millisecond)
 	go func() {
 		if err := testServer.Serve(serverMux); err != nil {
 			t.Errorf("[%s] Serve() failed: %v", time.Now().Format(testtool.TimeLayout), err)
 		}
 	}()
 	defer testServer.Close()
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	clientProperties := NewUnderlayProperties(1500, util.IPVersion6, util.TCPTransport, nil, &net.TCPAddr{IP: net.ParseIP("::1"), Port: port})
 	runClient(t, clientProperties, []byte("xiaochitang"), []byte("kuiranbudong"), 4)
@@ -168,19 +164,17 @@ func TestIPv4UDPUnderlay(t *testing.T) {
 		SetEndpoints([]UnderlayProperties{serverProperties})
 	testServer := testtool.NewTestHelperServer()
 
-	go func() {
-		if err := serverMux.ListenAll(); err != nil {
-			t.Errorf("[%s] ListenAll() failed: %v", time.Now().Format(testtool.TimeLayout), err)
-		}
-	}()
-	time.Sleep(500 * time.Millisecond)
+	if err := serverMux.Start(); err != nil {
+		t.Fatalf("[%s] Start() failed: %v", time.Now().Format(testtool.TimeLayout), err)
+	}
+	time.Sleep(100 * time.Millisecond)
 	go func() {
 		if err := testServer.Serve(serverMux); err != nil {
 			t.Errorf("[%s] Serve() failed: %v", time.Now().Format(testtool.TimeLayout), err)
 		}
 	}()
 	defer testServer.Close()
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	clientProperties := NewUnderlayProperties(1500, util.IPVersion4, util.UDPTransport, nil, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
 	runClient(t, clientProperties, []byte("xiaochitang"), []byte("kuiranbudong"), 4)
@@ -202,19 +196,17 @@ func TestIPv6UDPUnderlay(t *testing.T) {
 		SetEndpoints([]UnderlayProperties{serverProperties})
 	testServer := testtool.NewTestHelperServer()
 
-	go func() {
-		if err := serverMux.ListenAll(); err != nil {
-			t.Errorf("[%s] ListenAll() failed: %v", time.Now().Format(testtool.TimeLayout), err)
-		}
-	}()
-	time.Sleep(500 * time.Millisecond)
+	if err := serverMux.Start(); err != nil {
+		t.Fatalf("[%s] Start() failed: %v", time.Now().Format(testtool.TimeLayout), err)
+	}
+	time.Sleep(100 * time.Millisecond)
 	go func() {
 		if err := testServer.Serve(serverMux); err != nil {
 			t.Errorf("[%s] Serve() failed: %v", time.Now().Format(testtool.TimeLayout), err)
 		}
 	}()
 	defer testServer.Close()
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	clientProperties := NewUnderlayProperties(1500, util.IPVersion6, util.UDPTransport, nil, &net.UDPAddr{IP: net.ParseIP("::1"), Port: port})
 	runClient(t, clientProperties, []byte("xiaochitang"), []byte("kuiranbudong"), 4)

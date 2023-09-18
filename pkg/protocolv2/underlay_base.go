@@ -35,6 +35,9 @@ type baseUnderlay struct {
 
 	sessionMap    sync.Map      // Map<sessionID, *Session>
 	readySessions chan *Session // sessions that completed handshake and ready for consume
+
+	// ---- client fields ----
+	scheduler *ScheduleController
 }
 
 var (
@@ -47,6 +50,7 @@ func newBaseUnderlay(isClient bool, mtu int) *baseUnderlay {
 		mtu:           mtu,
 		done:          make(chan struct{}),
 		readySessions: make(chan *Session, 256),
+		scheduler:     &ScheduleController{},
 	}
 }
 
@@ -151,11 +155,27 @@ func (b *baseUnderlay) RemoveSession(s *Session) error {
 	s.conn = nil
 	s.forwardStateTo(sessionClosed)
 	metrics.CurrEstablished.Add(-1)
+
+	if b.isClient {
+		sessions := 0
+		b.sessionMap.Range(func(k, v any) bool {
+			sessions += 1
+			return false
+		})
+		if sessions == 0 {
+			b.scheduler.Disable()
+		}
+	}
+
 	return nil
 }
 
 func (b *baseUnderlay) RunEventLoop(ctx context.Context) error {
 	return stderror.ErrUnsupported
+}
+
+func (b *baseUnderlay) Scheduler() *ScheduleController {
+	return b.scheduler
 }
 
 func (b *baseUnderlay) Done() chan struct{} {

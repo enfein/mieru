@@ -175,14 +175,17 @@ func (s *Session) Read(b []byte) (n int, err error) {
 		log.Tracef("%v trying to read %d bytes", s, len(b))
 	}
 
-	// There are some remaining data that application
-	// failed to read last time due to short buffer.
+	// Read remaining data that application failed to read last time.
 	if len(s.unreadBuf) > 0 {
-		if len(b) < len(s.unreadBuf) {
-			return 0, io.ErrShortBuffer
-		}
 		n = copy(b, s.unreadBuf)
-		s.unreadBuf = nil
+		if n == len(s.unreadBuf) {
+			s.unreadBuf = nil
+		} else {
+			s.unreadBuf = s.unreadBuf[n:]
+		}
+		if log.IsLevelEnabled(log.TraceLevel) {
+			log.Tracef("%v read %d bytes", s, n)
+		}
 		metrics.InBytes.Add(int64(n))
 		return n, nil
 	}
@@ -202,7 +205,7 @@ func (s *Session) Read(b []byte) (n int, err error) {
 			return 0, stderror.ErrTimeout
 		default:
 		}
-		if !s.recvQueue.IsReadReady() {
+		if s.recvQueue.Len() == 0 {
 			time.Sleep(segmentRetryInterval)
 			continue
 		}
@@ -211,7 +214,7 @@ func (s *Session) Read(b []byte) (n int, err error) {
 		for {
 			seg, ok := s.recvQueue.DeleteMin()
 			if !ok {
-				return 0, stderror.ErrEmpty
+				break
 			}
 
 			if s.isClient && seg.metadata.Protocol() == openSessionResponse && (s.isState(sessionAttached) || s.isState(sessionOpening)) {
@@ -219,48 +222,44 @@ func (s *Session) Read(b []byte) (n int, err error) {
 				close(s.established)
 			}
 
-			if len(s.unreadBuf) == 0 {
-				s.unreadBuf = seg.payload
-			} else {
-				s.unreadBuf = append(s.unreadBuf, seg.payload...)
+			if s.unreadBuf == nil {
+				s.unreadBuf = make([]byte, 0)
 			}
-
-			fragment := seg.Fragment()
-			if fragment == 0 {
-				break
-			}
+			s.unreadBuf = append(s.unreadBuf, seg.payload...)
 		}
 		if len(s.unreadBuf) > 0 {
 			break
 		}
 	}
 
-	if len(b) < len(s.unreadBuf) {
-		return 0, io.ErrShortBuffer
-	}
 	n = copy(b, s.unreadBuf)
-	s.unreadBuf = nil
+	if n == len(s.unreadBuf) {
+		s.unreadBuf = nil
+	} else {
+		s.unreadBuf = s.unreadBuf[n:]
+	}
+	if log.IsLevelEnabled(log.TraceLevel) {
+		log.Tracef("%v read %d bytes", s, n)
+	}
 	metrics.InBytes.Add(int64(n))
 	return n, nil
 }
 
 // Write stores the data to send queue.
 func (s *Session) Write(b []byte) (n int, err error) {
-	if len(b) > MaxPDU {
-		return 0, io.ErrShortWrite
-	}
 	if s.isStateBefore(sessionAttached, false) {
 		return 0, fmt.Errorf("%v is not ready for Write()", s)
 	}
 	if s.isStateAfter(sessionClosed, true) {
 		return 0, io.ErrClosedPipe
 	}
+
 	s.wLock.Lock()
 	defer s.wLock.Unlock()
-
 	defer func() {
 		s.writeDeadline = util.ZeroTime()
 	}()
+
 	if s.isState(sessionAttached) {
 		if s.isClient {
 			// Send open session request.
@@ -277,7 +276,8 @@ func (s *Session) Write(b []byte) (n int, err error) {
 			s.nextSeq++
 			if len(b) <= maxSessionOpenPayload {
 				seg.metadata.(*sessionStruct).payloadLen = uint16(len(b))
-				seg.payload = b
+				seg.payload = make([]byte, len(b))
+				copy(seg.payload, b)
 			}
 			if log.IsLevelEnabled(log.TraceLevel) {
 				log.Tracef("%v writing %d bytes with open session request", s, len(seg.payload))
@@ -302,7 +302,8 @@ func (s *Session) Write(b []byte) (n int, err error) {
 			s.nextSeq++
 			if len(b) <= maxSessionOpenPayload {
 				seg.metadata.(*sessionStruct).payloadLen = uint16(len(b))
-				seg.payload = b
+				seg.payload = make([]byte, len(b))
+				copy(seg.payload, b)
 			}
 			if log.IsLevelEnabled(log.TraceLevel) {
 				log.Tracef("%v writing %d bytes with open session response", s, len(seg.payload))
@@ -315,70 +316,20 @@ func (s *Session) Write(b []byte) (n int, err error) {
 		}
 	}
 
-	var timeC <-chan time.Time
-	if !util.IsZeroTime(s.writeDeadline) {
-		timeC = time.After(time.Until(s.writeDeadline))
+	n = len(b)
+	if log.IsLevelEnabled(log.TraceLevel) {
+		log.Tracef("%v writing %d bytes", s, n)
 	}
-
-	nFragment := 1
-	fragmentSize := MaxFragmentSize(s.mtu, s.conn.IPVersion(), s.conn.TransportProtocol())
-	if len(b) > fragmentSize {
-		nFragment = (len(b)-1)/fragmentSize + 1
+	for len(b) > 0 {
+		sizeToSend := mathext.Min(len(b), maxPDU)
+		if _, err = s.writeChunk(b[:sizeToSend]); err != nil {
+			return 0, err
+		}
+		b = b[sizeToSend:]
 	}
 	if log.IsLevelEnabled(log.TraceLevel) {
-		log.Tracef("%v writing %d bytes with %d fragments", s, len(b), nFragment)
+		log.Tracef("%v wrote %d bytes", s, n)
 	}
-
-	ptr := b
-	for i := nFragment - 1; i >= 0; i-- {
-		var protocol uint8
-		if s.isClient {
-			protocol = uint8(dataClientToServer)
-		} else {
-			protocol = uint8(dataServerToClient)
-		}
-		partLen := mathext.Min(fragmentSize, len(ptr))
-		part := ptr[:partLen]
-		seg := &segment{
-			metadata: &dataAckStruct{
-				baseStruct: baseStruct{
-					protocol: protocol,
-				},
-				sessionID:  s.id,
-				seq:        s.nextSeq,
-				unAckSeq:   s.nextRecv,
-				windowSize: uint16(mathext.Max(0, int(s.sendAlgorithm.CongestionWindowSize())-s.recvBuf.Len())),
-				fragment:   uint8(i),
-				payloadLen: uint16(partLen),
-			},
-			payload:   part,
-			transport: s.conn.TransportProtocol(),
-		}
-		s.nextSeq++
-		for {
-			select {
-			case <-s.done:
-				return 0, io.EOF
-			case <-s.outputErr:
-				return 0, io.ErrClosedPipe
-			case <-timeC:
-				return 0, stderror.ErrTimeout
-			default:
-			}
-			ok := s.sendQueue.Insert(seg)
-			if ok {
-				break
-			}
-			time.Sleep(segmentRetryInterval)
-		}
-		ptr = ptr[partLen:]
-	}
-
-	if s.isClient {
-		s.readDeadline = time.Now().Add(serverRespTimeout)
-	}
-	n = len(b)
-	metrics.OutBytes.Add(int64(n))
 	return n, nil
 }
 
@@ -504,6 +455,76 @@ func (s *Session) forwardStateTo(new sessionState) {
 		log.Tracef("%v %v => %v", s, s.state, new)
 	}
 	s.state = new
+}
+
+func (s *Session) writeChunk(b []byte) (n int, err error) {
+	if len(b) > maxPDU {
+		return 0, io.ErrShortWrite
+	}
+
+	var timeC <-chan time.Time
+	if !util.IsZeroTime(s.writeDeadline) {
+		timeC = time.After(time.Until(s.writeDeadline))
+	}
+
+	nFragment := 1
+	fragmentSize := MaxFragmentSize(s.mtu, s.conn.IPVersion(), s.conn.TransportProtocol())
+	if len(b) > fragmentSize {
+		nFragment = (len(b)-1)/fragmentSize + 1
+	}
+
+	ptr := b
+	for i := nFragment - 1; i >= 0; i-- {
+		var protocol uint8
+		if s.isClient {
+			protocol = uint8(dataClientToServer)
+		} else {
+			protocol = uint8(dataServerToClient)
+		}
+		partLen := mathext.Min(fragmentSize, len(ptr))
+		part := ptr[:partLen]
+		seg := &segment{
+			metadata: &dataAckStruct{
+				baseStruct: baseStruct{
+					protocol: protocol,
+				},
+				sessionID:  s.id,
+				seq:        s.nextSeq,
+				unAckSeq:   s.nextRecv,
+				windowSize: uint16(mathext.Max(0, int(s.sendAlgorithm.CongestionWindowSize())-s.recvBuf.Len())),
+				fragment:   uint8(i),
+				payloadLen: uint16(partLen),
+			},
+			payload:   make([]byte, partLen),
+			transport: s.conn.TransportProtocol(),
+		}
+		copy(seg.payload, part)
+		s.nextSeq++
+		for {
+			select {
+			case <-s.done:
+				return 0, io.EOF
+			case <-s.outputErr:
+				return 0, io.ErrClosedPipe
+			case <-timeC:
+				return 0, stderror.ErrTimeout
+			default:
+			}
+			ok := s.sendQueue.Insert(seg)
+			if ok {
+				break
+			}
+			time.Sleep(segmentRetryInterval)
+		}
+		ptr = ptr[partLen:]
+	}
+
+	if s.isClient {
+		s.readDeadline = time.Now().Add(serverRespTimeout)
+	}
+	n = len(b)
+	metrics.OutBytes.Add(int64(n))
+	return n, nil
 }
 
 func (s *Session) runInputLoop(ctx context.Context) error {

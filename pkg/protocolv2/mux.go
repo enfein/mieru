@@ -159,9 +159,10 @@ func (m *Mux) Addr() net.Addr {
 	return util.NilNetAddr()
 }
 
-// ListenAll listens on all the server addresses for incoming connections.
+// Start listens on all the server addresses for incoming connections.
 // Call this method in client results in an error.
-func (m *Mux) ListenAll() error {
+// This method doesn't block.
+func (m *Mux) Start() error {
 	if m.isClient {
 		return stderror.ErrInvalidOperation
 	}
@@ -184,7 +185,6 @@ func (m *Mux) ListenAll() error {
 	}
 	m.mu.Unlock()
 
-	<-m.done
 	return nil
 }
 
@@ -209,64 +209,31 @@ func (m *Mux) DialContext(ctx context.Context) (net.Conn, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.used = true
-	var underlay Underlay
+	var err error
 
-	// Try to allocate a underlay for the session.
+	// Try to find a underlay for the session.
 	m.cleanUnderlay()
-	createNewUnderlay := true
-	if m.multiplexFactor > 0 {
-		reuseUnderlayFactor := len(m.underlays) * m.multiplexFactor
-		n := mrand.Intn(reuseUnderlayFactor + 1)
-		if n < reuseUnderlayFactor {
-			createNewUnderlay = false
-			underlay = m.underlays[n/m.multiplexFactor]
+	underlay := m.maybePickExistingUnderlay()
+	if underlay == nil {
+		underlay, err = m.newUnderlay(ctx)
+		if err != nil {
+			return nil, err
 		}
-	}
-	if createNewUnderlay {
-		i := mrand.Intn(len(m.endpoints))
-		p := m.endpoints[i]
-		switch p.TransportProtocol() {
-		case util.TCPTransport:
-			block, err := cipher.BlockCipherFromPassword(m.password, false)
-			if err != nil {
-				return nil, fmt.Errorf("cipher.BlockCipherFromPassword() failed: %v", err)
-			}
-			underlay, err = NewTCPUnderlay(ctx, p.RemoteAddr().Network(), "", p.RemoteAddr().String(), p.MTU(), block)
-			if err != nil {
-				return nil, fmt.Errorf("NewTCPUnderlay() failed: %v", err)
-			}
-		case util.UDPTransport:
-			block, err := cipher.BlockCipherFromPassword(m.password, true)
-			if err != nil {
-				return nil, fmt.Errorf("cipher.BlockCipherFromPassword() failed: %v", err)
-			}
-			underlay, err = NewUDPUnderlay(ctx, p.RemoteAddr().Network(), "", p.RemoteAddr().String(), p.MTU(), block)
-			if err != nil {
-				return nil, fmt.Errorf("NewUDPUnderlay() failed: %v", err)
-			}
-		default:
-			return nil, fmt.Errorf("unsupport transport protocol %v", p.TransportProtocol())
-		}
-		m.underlays = append(m.underlays, underlay)
-		UnderlayActiveOpens.Add(1)
-		currEst := UnderlayCurrEstablished.Add(1)
-		maxConn := UnderlayMaxConn.Load()
-		if currEst > maxConn {
-			UnderlayMaxConn.Store(currEst)
-		}
-		go func() {
-			err := underlay.RunEventLoop(ctx)
-			if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
-				log.Debugf("%v RunEventLoop(): %v", underlay, err)
-			}
-			underlay.Close()
-			UnderlayCurrEstablished.Add(-1)
-			// Dead underlay will be cleaned later.
-		}()
 	} else {
 		log.Debugf("Reuse existing underlay %v", underlay)
 	}
 
+	if ok := underlay.Scheduler().IncPending(); !ok {
+		// This underlay can't be used. Create a new one.
+		underlay, err = m.newUnderlay(ctx)
+		if err != nil {
+			return nil, err
+		}
+		underlay.Scheduler().IncPending()
+	}
+	defer func() {
+		underlay.Scheduler().DecPending()
+	}()
 	session := NewSession(mrand.Uint32(), true, underlay.MTU())
 	if err := underlay.AddSession(session, nil); err != nil {
 		return nil, fmt.Errorf("AddSession() failed: %v", err)
@@ -424,6 +391,79 @@ func (m *Mux) serverWrapTCPConn(rawConn net.Conn, mtu int, users map[string]*app
 	}
 }
 
+// newUnderlay returns a new underlay.
+// This method MUST be called only when holding the lock.
+func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
+	var underlay Underlay
+	i := mrand.Intn(len(m.endpoints))
+	p := m.endpoints[i]
+	switch p.TransportProtocol() {
+	case util.TCPTransport:
+		block, err := cipher.BlockCipherFromPassword(m.password, false)
+		if err != nil {
+			return nil, fmt.Errorf("cipher.BlockCipherFromPassword() failed: %v", err)
+		}
+		underlay, err = NewTCPUnderlay(ctx, p.RemoteAddr().Network(), "", p.RemoteAddr().String(), p.MTU(), block)
+		if err != nil {
+			return nil, fmt.Errorf("NewTCPUnderlay() failed: %v", err)
+		}
+	case util.UDPTransport:
+		block, err := cipher.BlockCipherFromPassword(m.password, true)
+		if err != nil {
+			return nil, fmt.Errorf("cipher.BlockCipherFromPassword() failed: %v", err)
+		}
+		underlay, err = NewUDPUnderlay(ctx, p.RemoteAddr().Network(), "", p.RemoteAddr().String(), p.MTU(), block)
+		if err != nil {
+			return nil, fmt.Errorf("NewUDPUnderlay() failed: %v", err)
+		}
+	default:
+		return nil, fmt.Errorf("unsupport transport protocol %v", p.TransportProtocol())
+	}
+	m.underlays = append(m.underlays, underlay)
+	UnderlayActiveOpens.Add(1)
+	currEst := UnderlayCurrEstablished.Add(1)
+	maxConn := UnderlayMaxConn.Load()
+	if currEst > maxConn {
+		UnderlayMaxConn.Store(currEst)
+	}
+	go func() {
+		err := underlay.RunEventLoop(ctx)
+		if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
+			log.Debugf("%v RunEventLoop(): %v", underlay, err)
+		}
+		underlay.Close()
+		UnderlayCurrEstablished.Add(-1)
+		// Dead underlay will be cleaned later.
+	}()
+	return underlay, nil
+}
+
+// maybePickExistingUnderlay returns either an existing underlay that
+// can be used by a session, or nil. In the later case a new underlay
+// should be created.
+// This method MUST be called only when holding the lock.
+func (m *Mux) maybePickExistingUnderlay() Underlay {
+	active := make([]Underlay, 0)
+	for _, underlay := range m.underlays {
+		select {
+		case <-underlay.Done():
+		default:
+			if !underlay.Scheduler().Disabled() {
+				active = append(active, underlay)
+			}
+		}
+	}
+
+	if m.multiplexFactor > 0 {
+		reuseUnderlayFactor := len(active) * m.multiplexFactor
+		n := mrand.Intn(reuseUnderlayFactor + 1)
+		if n < reuseUnderlayFactor {
+			return active[n/m.multiplexFactor]
+		}
+	}
+	return nil
+}
+
 // cleanUnderlay removes closed underlays.
 // This method MUST be called only when holding the lock.
 func (m *Mux) cleanUnderlay() {
@@ -432,7 +472,11 @@ func (m *Mux) cleanUnderlay() {
 		select {
 		case <-underlay.Done():
 		default:
-			remaining = append(remaining, underlay)
+			if underlay.Scheduler().Idle() {
+				underlay.Close()
+			} else {
+				remaining = append(remaining, underlay)
+			}
 		}
 	}
 	m.underlays = remaining

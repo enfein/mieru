@@ -36,7 +36,7 @@ func TestMaxFragmentSize(t *testing.T) {
 			1500,
 			util.IPVersion6,
 			util.TCPTransport,
-			MaxPDU,
+			maxPDU,
 		},
 		{
 			1500,
@@ -72,7 +72,7 @@ func TestMaxPaddingSize(t *testing.T) {
 			1500,
 			util.IPVersion6,
 			util.TCPTransport,
-			MaxPDU,
+			maxPDU,
 			255,
 			255,
 		},
@@ -132,8 +132,8 @@ func TestSegmentTree(t *testing.T) {
 	if ok := st.Insert(seg); ok {
 		t.Fatalf("ReplaceOrInsert() is not failing when tree is full")
 	}
-	if ready := st.IsReadReady(); !ready {
-		t.Fatalf("IsReadReady() returned false")
+	if st.Len() == 0 {
+		t.Fatalf("segment tree has 0 item")
 	}
 	minSeq, err := st.MinSeq()
 	if err != nil {

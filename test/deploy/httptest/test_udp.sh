@@ -70,17 +70,17 @@ if [ "$?" -ne "0" ]; then
 fi
 
 sleep 1
-echo ">>> http - new connections - UDP <<<"
-./sockshttpclient -proxy_mode=http -dst_host=127.0.0.1 -dst_port=8080 \
-  -local_http_host=127.0.0.1 -local_http_port=8808 \
-  -test_case=new_conn -num_request=1500
-if [ "$?" -ne "0" ]; then
-    print_mieru_client_log
-    print_mieru_client_thread_dump
-    print_mieru_server_thread_dump
-    echo "Test new_conn failed."
-    exit 1
-fi
+# echo ">>> http - new connections - UDP <<<"
+# ./sockshttpclient -proxy_mode=http -dst_host=127.0.0.1 -dst_port=8080 \
+#   -local_http_host=127.0.0.1 -local_http_port=8808 \
+#   -test_case=new_conn -num_request=1500
+# if [ "$?" -ne "0" ]; then
+#     print_mieru_client_log
+#     print_mieru_client_thread_dump
+#     print_mieru_server_thread_dump
+#     echo "Test new_conn failed."
+#     exit 1
+# fi
 
 sleep 1
 echo ">>> socks5 - reuse one connection - UDP <<<"

@@ -27,7 +27,7 @@ func IsClosed(err error) bool {
 		return true
 	}
 	s := strings.ToLower(err.Error())
-	return strings.Contains(s, "read/write on closed pipe") || strings.Contains(s, "use of closed network connection")
+	return strings.Contains(s, "use of closed network connection")
 }
 
 // IsConnRefused returns true if the cause of error is connection refused.

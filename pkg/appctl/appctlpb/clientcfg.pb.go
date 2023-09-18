@@ -47,7 +47,7 @@ type ClientProfile struct {
 	// A list of servers to connect.
 	Servers []*ServerEndpoint `protobuf:"bytes,3,rep,name=servers,proto3" json:"servers,omitempty"`
 	// Maximum transmission unit of L2 payload.
-	// This setting only applies to UDP protocol.
+	// This setting only applies to UDP protocol egress traffic.
 	Mtu *int32 `protobuf:"varint,4,opt,name=mtu,proto3,oneof" json:"mtu,omitempty"`
 }
 

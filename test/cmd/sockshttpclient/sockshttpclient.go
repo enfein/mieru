@@ -65,6 +65,7 @@ var (
 
 func init() {
 	log.SetFormatter(&log.DaemonFormatter{})
+	log.SetLevel("INFO")
 }
 
 func main() {
@@ -145,6 +146,7 @@ func main() {
 					CheckRedirect: func(req *http.Request, via []*http.Request) error {
 						return nil
 					},
+					Timeout: 5 * time.Second,
 				}
 			} else if *proxyMode == NoProxyMode {
 				conn, err = net.Dial("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
@@ -221,6 +223,7 @@ func CreateNewConnAndDoRequest(seq int, proxyMode string) {
 				CheckRedirect: func(req *http.Request, via []*http.Request) error {
 					return nil
 				},
+				Timeout: 5 * time.Second,
 			}
 		} else if proxyMode == NoProxyMode {
 			conn, err = net.Dial("tcp", *dstHost+":"+strconv.Itoa(*dstPort))

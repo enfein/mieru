@@ -33,9 +33,6 @@ const (
 	// kcpReservedSize is the reserved size at the front of KCP buffer.
 	kcpReservedSize = 0
 
-	// defaultMTU is the default MTU of packets in the network.
-	defaultMTU = 1400
-
 	// acceptBacklog is the maximum number of pending accept requests of a listener.
 	acceptBacklog = 1024
 
@@ -55,7 +52,7 @@ var (
 	replayCache = replay.NewCache(1024*1024*1024, 8*time.Minute)
 
 	// globalMTU is the L2 MTU used by all the UDP sessions.
-	globalMTU int32 = defaultMTU
+	globalMTU int32 = util.DefaultMTU
 )
 
 var (
@@ -1098,9 +1095,9 @@ func DialWithOptionsReturnConn(ctx context.Context, network, laddr, raddr string
 
 // SetGlobalMTU adjust the L2 MTU of all UDP sessions.
 // It does nothing if the MTU value is out of range.
-func SetGlobalMTU(mtu int32) {
+func SetGlobalMTU(mtu int) {
 	if mtu >= 1280 && mtu <= 1500 {
-		atomic.StoreInt32(&globalMTU, mtu)
-		log.Infof("UDP session MTU is set to %d", mtu)
+		atomic.StoreInt32(&globalMTU, int32(mtu))
+		log.Infof("UDP session MTU is set to %d", int32(mtu))
 	}
 }

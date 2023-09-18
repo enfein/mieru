@@ -44,7 +44,7 @@ message ServerConfig {
     optional LoggingLevel loggingLevel = 4;
 
     // Maximum transmission unit of L2 payload.
-    // This setting only applies to UDP protocol.
+    // This setting only applies to UDP protocol egress traffic.
     optional int32 mtu = 5;
 }
 

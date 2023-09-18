@@ -288,8 +288,8 @@ rpm-server-arm64: server-linux-arm64
 # Build binaries used in integration tests.
 .PHONY: test-binary
 test-binary:
-	CGO_ENABLED=0 go build cmd/mieru/mieru.go
-	CGO_ENABLED=0 go build cmd/mita/mita.go
+	CGO_ENABLED=0 go build -ldflags="-X 'github.com/enfein/mieru/pkg/log.LogPrefix=C '" cmd/mieru/mieru.go
+	CGO_ENABLED=0 go build -ldflags="-X 'github.com/enfein/mieru/pkg/log.LogPrefix=S '" cmd/mita/mita.go
 	CGO_ENABLED=0 go build test/cmd/httpserver/httpserver.go
 	CGO_ENABLED=0 go build test/cmd/sockshttpclient/sockshttpclient.go
 	CGO_ENABLED=0 go build test/cmd/socksudpclient/socksudpclient.go

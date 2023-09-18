@@ -71,6 +71,9 @@ type Underlay interface {
 	// The underlay needs to be closed when this returns.
 	RunEventLoop(context.Context) error
 
+	// Return the schedule controller.
+	Scheduler() *ScheduleController
+
 	// Indicate the underlay is closed.
 	Done() chan struct{}
 }

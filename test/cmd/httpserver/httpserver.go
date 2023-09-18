@@ -91,6 +91,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	flag.Parse()
 	log.SetFormatter(&log.DaemonFormatter{})
+	log.SetLevel("INFO")
 	fillData()
 	log.Infof("HTTP server data initialized.")
 	http.HandleFunc("/", handler)

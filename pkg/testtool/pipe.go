@@ -17,6 +17,7 @@ package testtool
 
 import (
 	"bytes"
+	"errors"
 	"io"
 )
 
@@ -47,16 +48,28 @@ type ioEndpoint struct {
 	direction ioDirection
 	buf1      *bytes.Buffer // forward writes to here
 	buf2      *bytes.Buffer // backward writes to here
+	closed    bool
 }
 
-func (e *ioEndpoint) Read(b []byte) (int, error) {
-	if e.direction == forward {
-		return e.buf2.Read(b)
+func (e *ioEndpoint) Read(b []byte) (n int, err error) {
+	if e.closed {
+		return 0, io.EOF
 	}
-	return e.buf1.Read(b)
+	if e.direction == forward {
+		n, err = e.buf2.Read(b)
+	} else {
+		n, err = e.buf1.Read(b)
+	}
+	if errors.Is(err, io.EOF) {
+		err = nil
+	}
+	return
 }
 
 func (e *ioEndpoint) Write(b []byte) (int, error) {
+	if e.closed {
+		return 0, io.ErrClosedPipe
+	}
 	if e.direction == forward {
 		return e.buf1.Write(b)
 	}
@@ -64,5 +77,6 @@ func (e *ioEndpoint) Write(b []byte) (int, error) {
 }
 
 func (e *ioEndpoint) Close() error {
+	e.closed = true
 	return nil
 }

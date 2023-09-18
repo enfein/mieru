@@ -34,7 +34,7 @@ message ClientProfile {
     repeated ServerEndpoint servers = 3;
 
     // Maximum transmission unit of L2 payload.
-    // This setting only applies to UDP protocol.
+    // This setting only applies to UDP protocol egress traffic.
     optional int32 mtu = 4;
 }
 

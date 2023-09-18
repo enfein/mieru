@@ -34,9 +34,9 @@ import (
 	"github.com/enfein/mieru/pkg/http2socks"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
+	"github.com/enfein/mieru/pkg/protocolv2"
 	"github.com/enfein/mieru/pkg/socks5"
 	"github.com/enfein/mieru/pkg/stderror"
-	"github.com/enfein/mieru/pkg/tcpsession"
 	"github.com/enfein/mieru/pkg/udpsession"
 	"github.com/enfein/mieru/pkg/util"
 	"google.golang.org/grpc"
@@ -332,7 +332,7 @@ var clientRunFunc = func(s []string) error {
 	}
 
 	// Collect remote proxy addresses and password.
-	proxyConfigs := make([]socks5.ProxyConfig, 0)
+	mux := protocolv2.NewMux(true).SetClientMultiplexFactor(1)
 	var hashedPassword []byte
 	activeProfile, err := appctl.GetActiveProfileFromConfig(config, config.GetActiveProfile())
 	if err != nil {
@@ -347,43 +347,54 @@ var clientRunFunc = func(s []string) error {
 	} else {
 		hashedPassword = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
 	}
+	mux = mux.SetClientPassword(hashedPassword)
+	mtu := util.DefaultMTU
+	if activeProfile.GetMtu() != 0 {
+		mtu = int(activeProfile.GetMtu())
+	}
+	endpoints := make([]protocolv2.UnderlayProperties, 0)
+	resolver := &util.DNSResolver{}
 	for _, serverInfo := range activeProfile.GetServers() {
 		var proxyHost string
+		var proxyIP net.IP
 		if serverInfo.GetDomainName() != "" {
 			proxyHost = serverInfo.GetDomainName()
+			proxyIP, err = resolver.LookupIP(context.Background(), proxyHost)
+			if err != nil {
+				return fmt.Errorf(stderror.LookupIPFailedErr, err)
+			}
 		} else {
 			proxyHost = serverInfo.GetIpAddress()
-		}
-		for _, bindingInfo := range serverInfo.GetPortBindings() {
-			proxyPort := bindingInfo.GetPort()
-			if bindingInfo.GetProtocol() == appctlpb.TransportProtocol_TCP {
-				proxyConfigs = append(proxyConfigs, socks5.ProxyConfig{
-					NetworkType: "tcp",
-					Address:     util.MaybeDecorateIPv6(proxyHost) + ":" + strconv.Itoa(int(proxyPort)),
-					Password:    hashedPassword,
-					Dial:        tcpsession.DialWithOptionsReturnConn,
-				})
-			} else if bindingInfo.GetProtocol() == appctlpb.TransportProtocol_UDP {
-				proxyConfigs = append(proxyConfigs, socks5.ProxyConfig{
-					NetworkType: "udp",
-					Address:     util.MaybeDecorateIPv6(proxyHost) + ":" + strconv.Itoa(int(proxyPort)),
-					Password:    hashedPassword,
-					Dial:        udpsession.DialWithOptionsReturnConn,
-				})
+			proxyIP = net.ParseIP(proxyHost)
+			if proxyIP == nil {
+				return fmt.Errorf(stderror.ParseIPFailedErr, err)
 			}
 		}
+		ipVersion := util.GetIPVersion(proxyIP.String())
+		for _, bindingInfo := range serverInfo.GetPortBindings() {
+			proxyPort := bindingInfo.GetPort()
+			switch bindingInfo.GetProtocol() {
+			case appctlpb.TransportProtocol_TCP:
+				endpoint := protocolv2.NewUnderlayProperties(mtu, ipVersion, util.TCPTransport, nil, &net.TCPAddr{IP: proxyIP, Port: int(proxyPort)})
+				endpoints = append(endpoints, endpoint)
+			case appctlpb.TransportProtocol_UDP:
+				endpoint := protocolv2.NewUnderlayProperties(mtu, ipVersion, util.UDPTransport, nil, &net.UDPAddr{IP: proxyIP, Port: int(proxyPort)})
+				endpoints = append(endpoints, endpoint)
+			default:
+				return fmt.Errorf(stderror.InvalidTransportProtocol)
+			}
+		}
+		mux.SetEndpoints(endpoints)
 	}
 
 	// Set MTU for UDP sessions.
-	if activeProfile.GetMtu() != 0 {
-		udpsession.SetGlobalMTU(activeProfile.GetMtu())
-	}
+	udpsession.SetGlobalMTU(mtu)
 
 	// Create the local socks5 server.
 	socks5Config := &socks5.Config{
 		UseProxy:                 true,
 		ClientSideAuthentication: true,
-		ProxyConf:                proxyConfigs,
+		ProxyMux:                 mux,
 	}
 	socks5Server, err := socks5.New(socks5Config)
 	if err != nil {

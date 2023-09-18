@@ -175,19 +175,6 @@ func (u *UDPUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
 	return nil
 }
 
-func (u *UDPUnderlay) RemoveSession(s *Session) error {
-	err := u.baseUnderlay.RemoveSession(s)
-	size := 0
-	u.sessionMap.Range(func(k, v any) bool {
-		size += 1
-		return false
-	})
-	if size == 0 {
-		u.Close()
-	}
-	return err
-}
-
 func (u *UDPUnderlay) RunEventLoop(ctx context.Context) error {
 	if u.conn == nil {
 		return stderror.ErrNullPointer

@@ -153,19 +153,6 @@ func (t *TCPUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
 	return nil
 }
 
-func (t *TCPUnderlay) RemoveSession(s *Session) error {
-	err := t.baseUnderlay.RemoveSession(s)
-	size := 0
-	t.sessionMap.Range(func(k, v any) bool {
-		size += 1
-		return false
-	})
-	if size == 0 {
-		t.Close()
-	}
-	return err
-}
-
 func (t *TCPUnderlay) RunEventLoop(ctx context.Context) error {
 	if t.conn == nil {
 		return stderror.ErrNullPointer

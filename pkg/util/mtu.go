@@ -1,4 +1,4 @@
-// Copyright (C) 2022  mieru authors
+// Copyright (C) 2023  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,25 +15,5 @@
 
 package util
 
-import (
-	"io"
-)
-
-// BidiCopy does bi-directional data copy.
-func BidiCopy(conn1, conn2 io.ReadWriteCloser, isClient bool) error {
-	errCh := make(chan error, 2)
-	go func() {
-		_, err := io.Copy(conn1, conn2)
-		conn1.Close()
-		errCh <- err
-	}()
-	go func() {
-		_, err := io.Copy(conn2, conn1)
-		conn2.Close()
-		errCh <- err
-	}()
-
-	err := <-errCh
-	<-errCh
-	return err
-}
+// DefaultMTU is the default MTU of L2 packets in the network.
+const DefaultMTU = 1400
