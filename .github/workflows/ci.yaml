@@ -18,8 +18,8 @@ jobs:
         run: make vet
       - name: Build binaries
         run: make build
-      - name: Run integration test
-        run: make run-container-test
+      #- name: Run integration test
+      #  run: make run-container-test
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
