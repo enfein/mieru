@@ -31,7 +31,7 @@ const (
 
 	// refreshInterval is the amount of time when the salt used to generate cipher block is changed.
 	// This is part of mieru protocol. This value should not be changed.
-	refreshInterval = 5 * time.Minute
+	refreshInterval = 1 * time.Minute
 )
 
 // pbkdf2Gen implements KeyGenerator with PBKDF2 algorithm.
@@ -60,7 +60,7 @@ func saltFromTime(t time.Time) [][]byte {
 	var salts [][]byte
 
 	for _, t := range times {
-		binary.LittleEndian.PutUint64(b, uint64(t.Unix()))
+		binary.BigEndian.PutUint64(b, uint64(t.Unix()))
 		sha := sha256.Sum256(b)
 		salts = append(salts, sha[:])
 	}

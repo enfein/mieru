@@ -169,11 +169,12 @@ type segmentIterator func(*segment) bool
 
 // segmentTree is a B-tree to store multiple Segment in order.
 type segmentTree struct {
-	tr    *btree.BTreeG[*segment]
-	cap   int
-	mu    sync.Mutex
-	full  sync.Cond
-	empty sync.Cond
+	tr                *btree.BTreeG[*segment]
+	cap               int
+	mu                sync.Mutex
+	full              sync.Cond
+	empty             sync.Cond
+	chanNotEmptyEvent chan struct{}
 }
 
 func newSegmentTree(capacity int) *segmentTree {
@@ -186,6 +187,7 @@ func newSegmentTree(capacity int) *segmentTree {
 	}
 	st.full = *sync.NewCond(&st.mu)
 	st.empty = *sync.NewCond(&st.mu)
+	st.chanNotEmptyEvent = make(chan struct{}, 1)
 	return st
 }
 
@@ -202,6 +204,7 @@ func (t *segmentTree) Insert(seg *segment) (ok bool) {
 	defer t.mu.Unlock()
 
 	if t.tr.Len() >= t.cap {
+		t.notifyNotEmpty()
 		return false
 	}
 	prev, replace := t.tr.ReplaceOrInsert(seg)
@@ -211,6 +214,7 @@ func (t *segmentTree) Insert(seg *segment) (ok bool) {
 		}
 	} else {
 		t.empty.Broadcast()
+		t.notifyNotEmpty()
 	}
 	return true
 }
@@ -227,6 +231,7 @@ func (t *segmentTree) InsertBlocking(seg *segment) {
 	defer t.mu.Unlock()
 
 	for t.tr.Len() >= t.cap {
+		t.notifyNotEmpty()
 		t.full.Wait()
 	}
 	prev, replace := t.tr.ReplaceOrInsert(seg)
@@ -236,6 +241,7 @@ func (t *segmentTree) InsertBlocking(seg *segment) {
 		}
 	} else {
 		t.empty.Broadcast()
+		t.notifyNotEmpty()
 	}
 }
 
@@ -245,7 +251,7 @@ func (t *segmentTree) DeleteMin() (*segment, bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if t.tr.Len() == 0 {
+	if t.Len() == 0 {
 		return nil, false
 	}
 	seg, ok := t.tr.DeleteMin()
@@ -256,6 +262,9 @@ func (t *segmentTree) DeleteMin() (*segment, bool) {
 		panic("segmentTree.DeleteMin() return nil")
 	}
 	t.full.Broadcast()
+	if t.Len() > 0 {
+		t.notifyNotEmpty()
+	}
 	return seg, true
 }
 
@@ -266,7 +275,7 @@ func (t *segmentTree) DeleteMinIf(si segmentIterator) (*segment, bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if t.tr.Len() == 0 {
+	if t.Len() == 0 {
 		return nil, false
 	}
 	seg, ok := t.tr.Min()
@@ -286,6 +295,9 @@ func (t *segmentTree) DeleteMinIf(si segmentIterator) (*segment, bool) {
 			panic("segmentTree.DeleteMin() return nil")
 		}
 		t.full.Broadcast()
+	}
+	if t.Len() > 0 {
+		t.notifyNotEmpty()
 	}
 	return seg, delete
 }
@@ -324,4 +336,11 @@ func (t *segmentTree) Len() int {
 // Remaining returns the remaining space of the tree before it is full.
 func (t *segmentTree) Remaining() int {
 	return t.cap - t.tr.Len()
+}
+
+func (t *segmentTree) notifyNotEmpty() {
+	select {
+	case t.chanNotEmptyEvent <- struct{}{}:
+	default:
+	}
 }

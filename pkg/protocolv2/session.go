@@ -33,13 +33,13 @@ import (
 )
 
 const (
-	segmentTreeCapacity = 4096
+	segmentTreeCapacity = 64 * 1024
 	segmentChanCapacity = 1024
-	minWindowSize       = 16
-	maxWindowSize       = 4096
 
-	segmentRetryInterval = 10 * time.Millisecond
-	segmentAckDelay      = 50 * time.Millisecond
+	minWindowSize = 16
+	maxWindowSize = 64 * 1024
+
+	segmentAckDelay = 50 * time.Millisecond
 
 	serverRespTimeout        = 10 * time.Second
 	sessionHeartbeatInterval = 5 * time.Second
@@ -120,7 +120,7 @@ var _ net.Conn = &Session{}
 // NewSession creates a new session.
 func NewSession(id uint32, isClient bool, mtu int) *Session {
 	rttStat := congestion.NewRTTStats()
-	rttStat.SetMaxAckDelay(2 * segmentRetryInterval)
+	rttStat.SetMaxAckDelay(segmentAckDelay)
 	rttStat.SetRTOMultiplier(1.5)
 	return &Session{
 		conn:             nil,
@@ -134,8 +134,8 @@ func NewSession(id uint32, isClient bool, mtu int) *Session {
 		ready:            make(chan struct{}),
 		established:      make(chan struct{}),
 		done:             make(chan struct{}),
-		inputErr:         make(chan error, 1),
-		outputErr:        make(chan error, 1),
+		inputErr:         make(chan error, 2),
+		outputErr:        make(chan error, 2),
 		sendQueue:        newSegmentTree(segmentTreeCapacity),
 		sendBuf:          newSegmentTree(segmentTreeCapacity),
 		recvBuf:          newSegmentTree(segmentTreeCapacity),
@@ -196,39 +196,38 @@ func (s *Session) Read(b []byte) (n int, err error) {
 	}
 
 	for {
-		select {
-		case <-s.done:
-			return 0, io.EOF
-		case <-s.inputErr:
-			return 0, io.ErrUnexpectedEOF
-		case <-timeC:
-			return 0, stderror.ErrTimeout
-		default:
-		}
-		if s.recvQueue.Len() == 0 {
-			time.Sleep(segmentRetryInterval)
-			continue
-		}
+		if s.recvQueue.Len() > 0 {
+			// Some segments in segment tree are ready to read.
+			for {
+				seg, ok := s.recvQueue.DeleteMin()
+				if !ok {
+					break
+				}
 
-		// Segments in segment tree are ready to read.
-		for {
-			seg, ok := s.recvQueue.DeleteMin()
-			if !ok {
+				if s.isClient && seg.metadata.Protocol() == openSessionResponse && (s.isState(sessionAttached) || s.isState(sessionOpening)) {
+					s.forwardStateTo(sessionEstablished)
+					close(s.established)
+				}
+
+				if s.unreadBuf == nil {
+					s.unreadBuf = make([]byte, 0)
+				}
+				s.unreadBuf = append(s.unreadBuf, seg.payload...)
+			}
+			if len(s.unreadBuf) > 0 {
 				break
 			}
-
-			if s.isClient && seg.metadata.Protocol() == openSessionResponse && (s.isState(sessionAttached) || s.isState(sessionOpening)) {
-				s.forwardStateTo(sessionEstablished)
-				close(s.established)
+		} else {
+			// Wait for incoming segments.
+			select {
+			case <-s.done:
+				return 0, io.EOF
+			case <-s.inputErr:
+				return 0, io.ErrUnexpectedEOF
+			case <-timeC:
+				return 0, stderror.ErrTimeout
+			case <-s.recvQueue.chanNotEmptyEvent:
 			}
-
-			if s.unreadBuf == nil {
-				s.unreadBuf = make([]byte, 0)
-			}
-			s.unreadBuf = append(s.unreadBuf, seg.payload...)
-		}
-		if len(s.unreadBuf) > 0 {
-			break
 		}
 	}
 
@@ -475,6 +474,15 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 
 	ptr := b
 	for i := nFragment - 1; i >= 0; i-- {
+		select {
+		case <-s.done:
+			return 0, io.EOF
+		case <-s.outputErr:
+			return 0, io.ErrClosedPipe
+		case <-timeC:
+			return 0, stderror.ErrTimeout
+		default:
+		}
 		var protocol uint8
 		if s.isClient {
 			protocol = uint8(dataClientToServer)
@@ -500,22 +508,7 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 		}
 		copy(seg.payload, part)
 		s.nextSeq++
-		for {
-			select {
-			case <-s.done:
-				return 0, io.EOF
-			case <-s.outputErr:
-				return 0, io.ErrClosedPipe
-			case <-timeC:
-				return 0, stderror.ErrTimeout
-			default:
-			}
-			ok := s.sendQueue.Insert(seg)
-			if ok {
-				break
-			}
-			time.Sleep(segmentRetryInterval)
-		}
+		s.sendQueue.InsertBlocking(seg)
 		ptr = ptr[partLen:]
 	}
 
@@ -545,136 +538,133 @@ func (s *Session) runInputLoop(ctx context.Context) error {
 }
 
 func (s *Session) runOutputLoop(ctx context.Context) error {
-	var lastErr error
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-s.done:
 			return nil
-		default:
-			if lastErr != nil {
-				s.outputErr <- lastErr
-				return lastErr
-			}
-			switch s.conn.TransportProtocol() {
-			case util.TCPTransport:
-				for {
-					seg, ok := s.sendQueue.DeleteMin()
-					if !ok {
-						time.Sleep(segmentRetryInterval)
-						break
-					}
-					if err := s.output(seg, nil); err != nil {
-						err = fmt.Errorf("output() failed: %w", err)
-						s.outputErr <- err
-						return err
-					}
+		case lastErr := <-s.outputErr:
+			return lastErr
+		case <-ticker.C:
+		case <-s.sendQueue.chanNotEmptyEvent:
+		}
+
+		switch s.conn.TransportProtocol() {
+		case util.TCPTransport:
+			for {
+				seg, ok := s.sendQueue.DeleteMin()
+				if !ok {
+					break
 				}
-			case util.UDPTransport:
-				needRetransmission := false
-				hasLoss := false
-				hasTimeout := false
-				// Resend segments in sendBuf.
-				s.sendBuf.Ascend(func(iter *segment) bool {
-					if iter.txCount >= txCountLimit {
-						lastErr = fmt.Errorf("too many retransmission of %v", iter)
+				if err := s.output(seg, nil); err != nil {
+					err = fmt.Errorf("output() failed: %w", err)
+					s.outputErr <- err
+					break
+				}
+			}
+		case util.UDPTransport:
+			needRetransmission := false
+			hasLoss := false
+			hasTimeout := false
+			// Resend segments in sendBuf.
+			s.sendBuf.Ascend(func(iter *segment) bool {
+				if iter.txCount >= txCountLimit {
+					s.outputErr <- fmt.Errorf("too many retransmission of %v", iter)
+					return false
+				}
+				if iter.fastAck >= fastAckLimit {
+					needRetransmission = true
+					hasLoss = true
+					iter.txCount++
+					iter.fastAck = 0
+					iter.txTime = time.Now()
+					iter.txTimeout = s.rttStat.RTO()
+					if err := s.output(iter, s.RemoteAddr()); err != nil {
+						s.outputErr <- fmt.Errorf("output() failed: %w", err)
 						return false
 					}
-					if iter.fastAck >= fastAckLimit {
-						needRetransmission = true
-						hasLoss = true
-						iter.txCount++
-						iter.fastAck = 0
-						iter.txTime = time.Now()
-						iter.txTimeout = s.rttStat.RTO()
-						if err := s.output(iter, s.RemoteAddr()); err != nil {
-							lastErr = fmt.Errorf("output() failed: %w", err)
-							return false
-						}
-						return true
-					}
-					if time.Since(iter.txTime) > iter.txTimeout {
-						needRetransmission = true
-						hasTimeout = true
-						iter.txCount++
-						iter.fastAck = 0
-						iter.txTime = time.Now()
-						iter.txTimeout = s.rttStat.RTO()
-						if err := s.output(iter, s.RemoteAddr()); err != nil {
-							lastErr = fmt.Errorf("output() failed: %w", err)
-							return false
-						}
-						return true
+					return true
+				}
+				if time.Since(iter.txTime) > iter.txTimeout {
+					needRetransmission = true
+					hasTimeout = true
+					iter.txCount++
+					iter.fastAck = 0
+					iter.txTime = time.Now()
+					iter.txTimeout = s.rttStat.RTO()
+					if err := s.output(iter, s.RemoteAddr()); err != nil {
+						s.outputErr <- fmt.Errorf("output() failed: %w", err)
+						return false
 					}
 					return true
-				})
-				if hasTimeout {
-					s.sendAlgorithm.OnTimeout()
-				} else if hasLoss {
-					s.sendAlgorithm.OnLoss()
 				}
-				// Send new segments in sendQueue.
-				segmentMoved := 0
-				if s.sendQueue.Len() > 0 {
-					maxSegmentToMove := mathext.Min(s.sendQueue.Len(), s.sendBuf.Remaining())
-					maxSegmentToMove = mathext.Min(maxSegmentToMove, int(s.sendAlgorithm.CongestionWindowSize()))
-					maxSegmentToMove = mathext.Min(maxSegmentToMove, int(s.remoteWindowSize))
-					for {
-						seg, deleted := s.sendQueue.DeleteMinIf(func(iter *segment) bool {
-							if segmentMoved >= maxSegmentToMove {
-								return false
-							}
-							segmentMoved++
-							return true
-						})
-						if !deleted {
-							break
-						}
-						seg.txCount++
-						seg.fastAck = 0
-						seg.txTime = time.Now()
-						seg.txTimeout = s.rttStat.RTO()
-						if err := s.output(seg, s.RemoteAddr()); err != nil {
-							err = fmt.Errorf("output() failed: %w", err)
-							s.outputErr <- err
-							return err
-						}
-						s.sendBuf.InsertBlocking(seg)
-					}
-				}
-				if !needRetransmission && segmentMoved == 0 {
-					// Send ACK or heartbeat if needed.
-					if (s.sendBuf.Len() > 0 && time.Since(s.lastTXTime) > segmentAckDelay) || time.Since(s.lastRXTime) > sessionHeartbeatInterval {
-						baseStruct := baseStruct{}
-						if s.isClient {
-							baseStruct.protocol = uint8(ackClientToServer)
-						} else {
-							baseStruct.protocol = uint8(ackServerToClient)
-						}
-						ackSeg := &segment{
-							metadata: &dataAckStruct{
-								baseStruct: baseStruct,
-								sessionID:  s.id,
-								seq:        uint32(mathext.Max(0, int(s.nextSeq)-1)),
-								unAckSeq:   s.nextRecv,
-								windowSize: uint16(mathext.Max(0, int(s.sendAlgorithm.CongestionWindowSize())-s.recvBuf.Len())),
-							},
-							transport: s.conn.TransportProtocol(),
-						}
-						if err := s.output(ackSeg, s.RemoteAddr()); err != nil {
-							err = fmt.Errorf("output() failed: %w", err)
-							s.outputErr <- err
-							return err
-						}
-					}
-				}
-				time.Sleep(segmentRetryInterval)
-			default:
-				err := fmt.Errorf("unsupported transport protocol %v", s.conn.TransportProtocol())
-				s.outputErr <- err
-				return err
+				return true
+			})
+			if hasTimeout {
+				s.sendAlgorithm.OnTimeout()
+			} else if hasLoss {
+				s.sendAlgorithm.OnLoss()
 			}
+			// Send new segments in sendQueue.
+			segmentMoved := 0
+			if s.sendQueue.Len() > 0 {
+				maxSegmentToMove := mathext.Min(s.sendQueue.Len(), s.sendBuf.Remaining())
+				maxSegmentToMove = mathext.Min(maxSegmentToMove, int(s.sendAlgorithm.CongestionWindowSize()))
+				maxSegmentToMove = mathext.Min(maxSegmentToMove, int(s.remoteWindowSize))
+				for {
+					seg, deleted := s.sendQueue.DeleteMinIf(func(iter *segment) bool {
+						if segmentMoved >= maxSegmentToMove {
+							return false
+						}
+						segmentMoved++
+						return true
+					})
+					if !deleted {
+						break
+					}
+					seg.txCount++
+					seg.fastAck = 0
+					seg.txTime = time.Now()
+					seg.txTimeout = s.rttStat.RTO()
+					if err := s.output(seg, s.RemoteAddr()); err != nil {
+						err = fmt.Errorf("output() failed: %w", err)
+						s.outputErr <- err
+						break
+					}
+					s.sendBuf.InsertBlocking(seg)
+				}
+			}
+			if !needRetransmission && segmentMoved == 0 {
+				// Send ACK or heartbeat if needed.
+				if (s.sendBuf.Len() > 0 && time.Since(s.lastTXTime) > segmentAckDelay) || time.Since(s.lastRXTime) > sessionHeartbeatInterval {
+					baseStruct := baseStruct{}
+					if s.isClient {
+						baseStruct.protocol = uint8(ackClientToServer)
+					} else {
+						baseStruct.protocol = uint8(ackServerToClient)
+					}
+					ackSeg := &segment{
+						metadata: &dataAckStruct{
+							baseStruct: baseStruct,
+							sessionID:  s.id,
+							seq:        uint32(mathext.Max(0, int(s.nextSeq)-1)),
+							unAckSeq:   s.nextRecv,
+							windowSize: uint16(mathext.Max(0, int(s.sendAlgorithm.CongestionWindowSize())-s.recvBuf.Len())),
+						},
+						transport: s.conn.TransportProtocol(),
+					}
+					if err := s.output(ackSeg, s.RemoteAddr()); err != nil {
+						err = fmt.Errorf("output() failed: %w", err)
+						s.outputErr <- err
+					}
+				}
+			}
+		default:
+			err := fmt.Errorf("unsupported transport protocol %v", s.conn.TransportProtocol())
+			s.outputErr <- err
 		}
 	}
 }

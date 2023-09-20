@@ -30,7 +30,7 @@ import (
 //
 //	0x00 + 2 bytes of original length + original content + 0xff
 //
-// the length is encoded with little endian.
+// the length is encoded with big endian.
 type UDPAssociateTunnelConn struct {
 	io.ReadWriteCloser
 }
@@ -48,7 +48,7 @@ func (c *UDPAssociateTunnelConn) Read(b []byte) (n int, err error) {
 	if _, err = io.ReadFull(c.ReadWriteCloser, lengthBytes); err != nil {
 		return 0, err
 	}
-	length := int(binary.LittleEndian.Uint16(lengthBytes))
+	length := int(binary.BigEndian.Uint16(lengthBytes))
 	if length > len(b) {
 		return 0, io.ErrShortBuffer
 	}
@@ -72,7 +72,7 @@ func (c *UDPAssociateTunnelConn) Write(b []byte) (int, error) {
 	}
 	data := make([]byte, 4+len(b))
 	data[0] = 0x00
-	binary.LittleEndian.PutUint16(data[1:], uint16(len(b)))
+	binary.BigEndian.PutUint16(data[1:], uint16(len(b)))
 	copy(data[3:], b)
 	data[3+len(b)] = 0xff
 

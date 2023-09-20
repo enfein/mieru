@@ -163,7 +163,7 @@ func (b *baseUnderlay) RemoveSession(s *Session) error {
 			return false
 		})
 		if sessions == 0 {
-			b.scheduler.Disable()
+			b.scheduler.TryDisable()
 		}
 	}
 

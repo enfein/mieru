@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/enfein/mieru/pkg/rng"
+	"github.com/enfein/mieru/pkg/util"
 )
 
 var (
@@ -29,10 +30,11 @@ var (
 
 // ScheduleController controls scheduling a new client session to a underlay.
 type ScheduleController struct {
-	pending     int
-	disable     bool
-	disableTime time.Time
-	mu          sync.Mutex
+	pending          int
+	lastScheduleTime time.Time
+	disable          bool
+	disableTime      time.Time
+	mu               sync.Mutex
 }
 
 // IncPending increases the number of pending sessions by 1.
@@ -43,6 +45,7 @@ func (c *ScheduleController) IncPending() (ok bool) {
 		return false
 	}
 	c.pending++
+	c.lastScheduleTime = time.Now()
 	return true
 }
 
@@ -54,6 +57,7 @@ func (c *ScheduleController) DecPending() (ok bool) {
 		return false
 	}
 	c.pending--
+	c.lastScheduleTime = time.Now()
 	return true
 }
 
@@ -71,11 +75,17 @@ func (c *ScheduleController) Idle() bool {
 	return c.disable && time.Since(c.disableTime) > scheduleIdleTime
 }
 
-// Disable disallow scheduling new sessions.
-func (c *ScheduleController) Disable() (ok bool) {
+// TryDisable tries to disallow scheduling new sessions.
+func (c *ScheduleController) TryDisable() (ok bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.pending > 0 {
+		return false
+	}
+	if util.IsZeroTime(c.lastScheduleTime) {
+		c.lastScheduleTime = time.Now()
+	}
+	if time.Since(c.lastScheduleTime) < scheduleIdleTime {
 		return false
 	}
 	if c.disable {
