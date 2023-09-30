@@ -28,7 +28,7 @@ sudo journalctl -u mita -xe --no-pager
 | :----: | :----: |
 | Linux | $HOME/.cache/mieru/ or $XDG_CACHE_HOME/mieru/ |
 | Mac OS | /Users/USERNAME/Library/Caches/mieru/ |
-| Windows | C:\Users\USERNAME\AppData\Local\mieru\ |
+| Windows | %USERPROFILE%\AppData\Local\mieru\ |
 
 每个日志文件的格式为 `yyyyMMdd_HHmm_PID.log`，其中 `yyyyMMdd_HHmm` 是 mieru 进程启动的时间，`PID` 是进程号码。每次重启 mieru 会生成一个新的日志文件。当日志文件的数量太多时，旧的文件会被自动删除。
 

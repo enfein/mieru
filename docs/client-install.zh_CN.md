@@ -14,58 +14,7 @@ mieru 客户端软件支持 Windows，Mac OS 和 Linux 系统。用户可以在 
 mieru apply config <FILE>
 ```
 
-指令来修改客户端的设置，这里的 `<FILE>` 是一个 JSON 格式的文件。我们在项目根目录下的 `configs/templates/client_config.json` 文件中提供了一个配置模板。该模板的内容如下所示：
-
-```js
-{
-    "profiles": [
-        {
-            "profileName": "default",
-            "user": {
-                "name": "<username@example.com>",
-                "password": "<your-password>"
-            },
-            "servers": [
-                {
-                    "ipAddress": "<1.1.1.1>",
-                    "domainName": "",
-                    "portBindings": [
-                        {
-                            "port": -1,
-                            "protocol": "TCP"
-                        }
-                    ]
-                }
-            ],
-            "mtu": 1400
-        }
-    ],
-    "activeProfile": "default",
-    "rpcPort": -1,
-    "socks5Port": -1,
-    "loggingLevel": "INFO",
-    "socks5ListenLAN": false,
-    "httpProxyPort": -1,
-    "httpProxyListenLAN": false
-}
-```
-
-请下载或复制这个模板，然后用文本编辑器修改如下的内容：
-
-1. 在 `profiles` -> `user` -> `name` 属性中，填写用户名。此处必须与代理服务器中的设置相同。
-2. 在 `profiles` -> `user` -> `password` 属性中，填写密码。此处必须与代理服务器中的设置相同。
-3. 在 `profiles` -> `servers` -> `ipAddress` 属性中，填写代理服务器的公网地址。支持 IPv4 和 IPv6 地址。
-4. 如果你为代理服务器注册了域名，请在 `profiles` -> `servers` -> `domainName` 中填写域名。否则，请勿修改这个属性。
-5. 在 `profiles` -> `servers` -> `portBindings` -> `port` 中填写 mita 监听的 TCP 或 UDP 端口号。这个端口号必须与代理服务器中的设置相同。
-6. 请为 `profiles` -> `mtu` 属性中指定一个从 1280 到 1500 之间的值。默认值为 1400。这个值可以与代理服务器中的设置不同。
-7. 请为 `rpcPort` 属性指定一个从 1025 到 65535 之间的数值。
-8. 请为 `socks5Port` 属性指定一个从 1025 到 65535 之间的数值。该端口不能与 `rpcPort` 相同。
-9. 如果客户端需要为局域网中的其他设备提供代理服务，请将 `socks5ListenLAN` 属性设置为 `true`。
-10. 如果要启动 HTTP / HTTPS 代理，请为 `httpProxyPort` 属性指定一个从 1025 到 65535 之间的数值。该端口不能与 `rpcPort` 和 `socks5Port` 相同。如果需要为局域网中的其他设备提供 HTTP / HTTPS 代理，请将 `httpProxyListenLAN` 属性设置为 `true`。如果不需要 HTTP / HTTPS 代理，请删除 `httpProxyPort` 和 `httpProxyListenLAN` 属性。
-
-如果你安装了多台代理服务器，或者一台服务器监听多个端口，可以把它们都添加到客户端设置中。每次发起新的连接时，mieru 会随机选取其中的一台服务器和一个端口。**如果使用了多台服务器，请确保每一台服务器都启动了 mita 代理服务。**
-
-上述设置的一个示例如下
+指令来修改客户端的设置，这里的 `<FILE>` 是一个 JSON 格式的配置文件。客户端配置的一个示例如下。
 
 ```js
 {
@@ -81,6 +30,10 @@ mieru apply config <FILE>
                     "ipAddress": "12.34.56.78",
                     "domainName": "",
                     "portBindings": [
+                        {
+                            "port": 2012,
+                            "protocol": "TCP"
+                        },
                         {
                             "port": 2027,
                             "protocol": "TCP"
@@ -100,6 +53,21 @@ mieru apply config <FILE>
     "httpProxyListenLAN": false
 }
 ```
+
+请用文本编辑器修改如下的内容：
+
+1. 在 `profiles` -> `user` -> `name` 属性中，填写用户名。此处必须与代理服务器中的设置相同。
+2. 在 `profiles` -> `user` -> `password` 属性中，填写密码。此处必须与代理服务器中的设置相同。
+3. 在 `profiles` -> `servers` -> `ipAddress` 属性中，填写代理服务器的公网地址。支持 IPv4 和 IPv6 地址。
+4. 如果你为代理服务器注册了域名，请在 `profiles` -> `servers` -> `domainName` 中填写域名。否则，请勿修改这个属性。
+5. 在 `profiles` -> `servers` -> `portBindings` -> `port` 中填写 mita 监听的 TCP 或 UDP 端口号。这个端口号必须与代理服务器中的设置相同。
+6. 请为 `profiles` -> `mtu` 属性中指定一个从 1280 到 1500 之间的值。默认值为 1400。这个值可以与代理服务器中的设置不同。
+7. 请为 `rpcPort` 属性指定一个从 1025 到 65535 之间的数值。
+8. 请为 `socks5Port` 属性指定一个从 1025 到 65535 之间的数值。该端口不能与 `rpcPort` 相同。
+9. 如果客户端需要为局域网中的其他设备提供代理服务，请将 `socks5ListenLAN` 属性设置为 `true`。
+10. 如果要启动 HTTP / HTTPS 代理，请为 `httpProxyPort` 属性指定一个从 1025 到 65535 之间的数值。该端口不能与 `rpcPort` 和 `socks5Port` 相同。如果需要为局域网中的其他设备提供 HTTP / HTTPS 代理，请将 `httpProxyListenLAN` 属性设置为 `true`。如果不需要 HTTP / HTTPS 代理，请删除 `httpProxyPort` 和 `httpProxyListenLAN` 属性。
+
+如果你安装了多台代理服务器，或者一台服务器监听多个端口，可以把它们都添加到客户端设置中。每次发起新的连接时，mieru 会随机选取其中的一台服务器和一个端口。**如果使用了多台服务器，请确保每一台服务器都启动了 mita 代理服务。**
 
 假设这个配置文件的文件名是 `client_config.json`，在修改完成之后，调用指令 `mieru apply config client_config.json` 写入该配置。
 

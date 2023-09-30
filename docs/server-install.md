@@ -1,7 +1,5 @@
 # Server Installation & Configuration
 
-We recommend that users with adequate money choose large foreign cloud service providers such as AWS (except Lightsail), Azure, and GCP, which generally do not have their IPs blocked. Do not use cloud computing services from unknown sources. Proxy servers take up very little CPU and memory resources, and the final network speed depends mainly on the server's network bandwidth and line quality.
-
 The proxy server software mita needs to run on Linux. We provide both debian and RPM installers for installing mita on Debian / Ubuntu and Fedora / CentOS / Red Hat Enterprise Linux series distributions.
 
 Before installation and configuration, connect to the server via SSH and then execute the following commands.
@@ -66,7 +64,7 @@ If the installation is just completed, the output will be `mieru server status i
 
 ## Modify proxy server settings
 
-The mieru proxy supports two different transport protocols, TCP and UDP. To understand the differences between the protocols, please read [mieru proxy protocols](https://github.com/enfein/mieru/blob/main/docs/protocol.md). This tutorial explains the TCP protocol as an example. To use the UDP protocol, replace `TCP` with `UDP` in all configuration files.
+The mieru proxy supports two different transport protocols, TCP and UDP. To understand the differences between the protocols, please read [mieru proxy protocols](https://github.com/enfein/mieru/blob/main/docs/protocol.md).
 
 Users should call
 
@@ -74,39 +72,7 @@ Users should call
 mita apply config <FILE>
 ```
 
-to modify the proxy server settings. Here `<FILE>` is a JSON formatted file. We provide a configuration template in the `configs/templates/server_config.json` file in the root of the project. The contents of this template are as follows.
-
-```js
-{
-    "portBindings": [
-        {
-            "port": -1,
-            "protocol": "TCP"
-        }
-    ],
-    "users": [
-        {
-            "name": "<username@example.com>",
-            "password": "<your-password>"
-        }
-    ],
-    "loggingLevel": "INFO",
-    "mtu": 1400
-}
-```
-
-Please download or copy this template to your server, open it in a text editor, and modify the following fields.
-
-1. The `portBindings` -> `port` property is the TCP or UDP port number that mita listens on, specify a value from 1025 to 65535. **Please make sure that the firewall allows communication using this port.**
-2. fill in the `users` -> `name` property with the user name.
-3. Fill in the `users` -> `password` property with the user's password.
-4. The `mtu` property is the maximum data link layer payload size when using the UDP proxy protocol. The default value is 1400. You can choose a value between 1280 and 1500.
-
-In addition to this, mita can listen to several different ports. We recommend using multiple ports in both server and client configurations to mitigate blocking.
-
-You can also create multiple users if you want to share the proxy for others to use.
-
-Here is an example of the server configuration file.
+to modify the proxy server settings. `<FILE>` is a JSON formatted configuration file. Below is an example of the server configuration file.
 
 ```js
 {
@@ -134,6 +100,16 @@ Here is an example of the server configuration file.
     "mtu": 1400
 }
 ```
+
+1. The `portBindings` -> `port` property is the TCP or UDP port number that mita listens on, specify a value from 1025 to 65535. **Please make sure that the firewall allows communication using this port.**
+2. The `portBindings` -> `protocol` property can be set to `TCP` or `UDP`.
+3. Fill in the `users` -> `name` property with the user name.
+4. Fill in the `users` -> `password` property with the user's password.
+5. The `mtu` property is the maximum data link layer payload size when using the UDP proxy protocol. The default value is 1400. You can choose a value between 1280 and 1500.
+
+In addition to this, mita can listen to several different ports. We recommend using multiple ports in both server and client configurations.
+
+You can also create multiple users if you want to share the proxy for others to use.
 
 Assuming that on the server, the configuration file name is `server_config.json`, call the command `mita apply config server_config.json` to write the configuration after the file is modified.
 

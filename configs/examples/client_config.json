@@ -12,6 +12,10 @@
                     "domainName": "",
                     "portBindings": [
                         {
+                            "port": 2012,
+                            "protocol": "TCP"
+                        },
+                        {
                             "port": 2027,
                             "protocol": "TCP"
                         }

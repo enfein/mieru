@@ -19,15 +19,15 @@ For an explanation of the mieru protocol, see [mieru Proxy Protocol](https://git
 
 ## Features
 
-1. mieru uses a high-strength AES-256-GCM encryption algorithm that generates encryption keys based on username, password and system time. With the current computing power, the data content transmitted by mieru cannot be cracked.
-2. mieru implements complete encryption of all transmitted content between the client and the proxy server, without transmitting any plaintext information. A network observer (e.g. GFW) only knows the time, the sending and receiving addresses of the packets, and the size of the packets. Other than that, the observer cannot get any other traffic information.
+1. mieru uses a high-strength AES-256-GCM encryption algorithm that generates encryption keys based on username, password and system time.
+2. mieru implements complete encryption of all transmitted content between the client and the proxy server, without transmitting any plaintext information.
 3. When mieru sends a packet, it is padded with random bytes at the end. Even when the same content is transmitted, the packet size varies.
 4. When using the UDP transport protocol, mieru does not require a handshake between client and server.
 5. When the server can not decrypt the data sent by the client, no content is returned. it is difficult for GFW to discover the mieru service through active probing.
 6. mieru supports multiple users sharing a single proxy server.
 7. mieru supports IPv4 and IPv6.
 8. mieru provides socks5, HTTP and HTTPS proxy.
-9. The client software supports Windows, Mac OS, Linux and Android systems. Android users should use SagerNet client version 0.8.1-rc02 or above, and install mieru plugin version 1.6.1 or above.
+9. The client software supports Windows, Mac OS, Linux and Android systems. Android users should use SagerNet client version 0.8.1-rc02 or above, and install mieru plugin.
 10. If you need advanced features like global proxy or customized routing rules, you can use mieru as the backend of a proxy platform such as clash.
 
 ## User Guide

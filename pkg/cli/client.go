@@ -37,7 +37,6 @@ import (
 	"github.com/enfein/mieru/pkg/protocolv2"
 	"github.com/enfein/mieru/pkg/socks5"
 	"github.com/enfein/mieru/pkg/stderror"
-	"github.com/enfein/mieru/pkg/udpsession"
 	"github.com/enfein/mieru/pkg/util"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -386,9 +385,6 @@ var clientRunFunc = func(s []string) error {
 		}
 		mux.SetEndpoints(endpoints)
 	}
-
-	// Set MTU for UDP sessions.
-	udpsession.SetGlobalMTU(mtu)
 
 	// Create the local socks5 server.
 	socks5Config := &socks5.Config{
