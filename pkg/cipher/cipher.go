@@ -254,8 +254,9 @@ func (c *AESGCMBlockCipher) increaseNonce() {
 		panic("implicit nonce mode is not enabled")
 	}
 	for i := range c.implicitNonce {
-		c.implicitNonce[i] += 1
-		if c.implicitNonce[i] != 0 {
+		j := len(c.implicitNonce) - 1 - i
+		c.implicitNonce[j] += 1
+		if c.implicitNonce[j] != 0 {
 			break
 		}
 	}

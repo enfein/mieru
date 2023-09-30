@@ -16,7 +16,6 @@
 package stderror
 
 const (
-	AddSocks5ServerToGroupFailedErr         = "add socks5 server to group failed: %w"
 	ClientConfigIsEmpty                     = "mieru client config is empty"
 	ClientConfigNotExist                    = "mieru client config file doesn't exist"
 	ClientGetActiveProfileFailedErr         = "mieru client get active profile failed: %w"

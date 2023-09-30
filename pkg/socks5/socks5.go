@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"strconv"
-	"sync"
 
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
@@ -288,54 +286,4 @@ func (s *Server) handleAuthentication(conn net.Conn) error {
 		return fmt.Errorf("write authentication response failed: %w", err)
 	}
 	return nil
-}
-
-// ServerGroup is a collection of socks5 servers that share the same lifecycle.
-type ServerGroup struct {
-	servers map[string]*Server
-	mu      sync.Mutex
-}
-
-// NewGroup creates a new ServerGroup.
-func NewGroup() *ServerGroup {
-	return &ServerGroup{
-		servers: make(map[string]*Server),
-	}
-}
-
-// Add adds a socks5 server into the ServerGroup.
-func (g *ServerGroup) Add(underlayProtocol string, port int, s *Server) error {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	key := underlayProtocol + "-" + strconv.Itoa(port)
-	if _, found := g.servers[key]; found {
-		return stderror.ErrAlreadyExist
-	}
-	if s == nil {
-		return stderror.ErrInvalidArgument
-	}
-	g.servers[key] = s
-	return nil
-}
-
-// CloseAndRemoveAll closes all the socks5 servers and clear the group.
-func (g *ServerGroup) CloseAndRemoveAll() error {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	var lastErr error
-	for _, l := range g.servers {
-		err := l.Close()
-		if err != nil {
-			lastErr = err
-		}
-	}
-	g.servers = make(map[string]*Server)
-	return lastErr
-}
-
-// IsEmpty returns true if the group has no socks5 server.
-func (g *ServerGroup) IsEmpty() bool {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	return len(g.servers) == 0
 }

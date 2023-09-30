@@ -44,6 +44,9 @@ var (
 	// Number of decryption using the stored cipher block but failed.
 	ServerFailedDirectDecrypt = metrics.RegisterMetric(ServerDecryptionMetricGroupName, "FailedDirectDecrypt")
 
+	// Number of decryption that iterates all possible cipher blocks.
+	ServerIterateDecrypt = metrics.RegisterMetric(ServerDecryptionMetricGroupName, "IterateDecrypt")
+
 	// Number of decryption that failed after iterating all possible cipher blocks.
 	ServerFailedIterateDecrypt = metrics.RegisterMetric(ServerDecryptionMetricGroupName, "FailedIterateDecrypt")
 )

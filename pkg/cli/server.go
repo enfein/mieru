@@ -335,9 +335,7 @@ var serverRunFunc = func(s []string) error {
 		if err != nil {
 			return fmt.Errorf(stderror.CreateSocks5ServerFailedErr, err)
 		}
-		if err = appctl.GetSocks5ServerGroup().Add("", 0, socks5Server); err != nil {
-			return fmt.Errorf(stderror.AddSocks5ServerToGroupFailedErr, err)
-		}
+		appctl.SetSocks5Server(socks5Server)
 
 		// Run the egress socks5 server in the background.
 		var proxyTasks sync.WaitGroup

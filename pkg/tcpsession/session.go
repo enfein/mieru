@@ -192,7 +192,7 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error, errType stderror.
 		s.recv = s.candidates[0].Clone()
 		firstRead = true
 		if s.recv.BlockContext().UserName != "" {
-			s.inBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, s.recv.BlockContext().UserName), metrics.UserMetricInBytes)
+			s.inBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, s.recv.BlockContext().UserName), metrics.UserMetricReadBytes)
 		}
 	}
 	if s.recv == nil {
@@ -205,7 +205,7 @@ func (s *TCPSession) readInternal(b []byte) (n int, err error, errType stderror.
 		s.recv = peerBlock.Clone()
 		firstRead = true
 		if s.recv.BlockContext().UserName != "" {
-			s.inBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, s.recv.BlockContext().UserName), metrics.UserMetricInBytes)
+			s.inBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, s.recv.BlockContext().UserName), metrics.UserMetricReadBytes)
 		}
 	} else {
 		decryptedLen, err = s.recv.Decrypt(encryptedLen)
@@ -351,7 +351,7 @@ func (s *TCPSession) writeChunk(b []byte) (n int, err error) {
 			}
 		}
 		if s.send.BlockContext().UserName != "" {
-			s.outBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, s.send.BlockContext().UserName), metrics.UserMetricOutBytes)
+			s.outBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, s.send.BlockContext().UserName), metrics.UserMetricWriteBytes)
 		}
 	}
 

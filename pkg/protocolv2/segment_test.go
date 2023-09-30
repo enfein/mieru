@@ -120,6 +120,9 @@ func TestSegmentLessFunc(t *testing.T) {
 func TestSegmentTree(t *testing.T) {
 	seg := &segment{
 		metadata: &dataAckStruct{
+			baseStruct: baseStruct{
+				protocol: uint8(dataClientToServer),
+			},
 			seq: 100,
 		},
 		payload: []byte{0},
@@ -189,6 +192,9 @@ func TestSegmentTreeConcurrent(t *testing.T) {
 		for ; i < 100; i++ {
 			seg := &segment{
 				metadata: &dataAckStruct{
+					baseStruct: baseStruct{
+						protocol: uint8(dataClientToServer),
+					},
 					sessionID: sessionID,
 					seq:       i,
 				},
@@ -250,16 +256,25 @@ func TestSegmentTreeDeleteMinIf(t *testing.T) {
 	st := newSegmentTree(3)
 	seg1 := &segment{
 		metadata: &dataAckStruct{
+			baseStruct: baseStruct{
+				protocol: uint8(dataClientToServer),
+			},
 			seq: 100,
 		},
 	}
 	seg2 := &segment{
 		metadata: &dataAckStruct{
+			baseStruct: baseStruct{
+				protocol: uint8(dataClientToServer),
+			},
 			seq: 200,
 		},
 	}
 	seg3 := &segment{
 		metadata: &dataAckStruct{
+			baseStruct: baseStruct{
+				protocol: uint8(dataClientToServer),
+			},
 			seq: 300,
 		},
 	}
@@ -295,16 +310,25 @@ func TestSegmentTreeAscend(t *testing.T) {
 	st := newSegmentTree(3)
 	seg1 := &segment{
 		metadata: &dataAckStruct{
+			baseStruct: baseStruct{
+				protocol: uint8(dataClientToServer),
+			},
 			seq: 100,
 		},
 	}
 	seg2 := &segment{
 		metadata: &dataAckStruct{
+			baseStruct: baseStruct{
+				protocol: uint8(dataClientToServer),
+			},
 			seq: 200,
 		},
 	}
 	seg3 := &segment{
 		metadata: &dataAckStruct{
+			baseStruct: baseStruct{
+				protocol: uint8(dataClientToServer),
+			},
 			seq: 300,
 		},
 	}

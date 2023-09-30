@@ -38,7 +38,7 @@ const (
 	ackServerToClient    protocolType = 9
 )
 
-func (p protocolType) equals(other byte) bool {
+func (p protocolType) Equals(other byte) bool {
 	return byte(p) == other
 }
 
@@ -71,10 +71,10 @@ func (p protocolType) String() string {
 
 const (
 	// Number of bytes used by metadata before encryption.
-	metadataLength = 32
+	MetadataLength = 32
 
-	// Maximum payload that cat be attached to open session request and response.
-	maxSessionOpenPayload = 1024
+	// Maximum payload that cat be attached to open session request and open session response.
+	MaxSessionOpenPayload = 1024
 )
 
 // metadata defines the methods supported by all metadata.
@@ -120,7 +120,7 @@ func (ss *sessionStruct) Protocol() protocolType {
 }
 
 func (ss *sessionStruct) Marshal() []byte {
-	b := make([]byte, metadataLength)
+	b := make([]byte, MetadataLength)
 	b[0] = ss.baseStruct.protocol
 	ss.baseStruct.timestamp = uint32(time.Now().Unix() / 60)
 	binary.BigEndian.PutUint32(b[2:], ss.baseStruct.timestamp)
@@ -134,10 +134,10 @@ func (ss *sessionStruct) Marshal() []byte {
 
 func (ss *sessionStruct) Unmarshal(b []byte) error {
 	// Check errors.
-	if len(b) != metadataLength {
-		return fmt.Errorf("input bytes: %d, want %d", len(b), metadataLength)
+	if len(b) != MetadataLength {
+		return fmt.Errorf("input bytes: %d, want %d", len(b), MetadataLength)
 	}
-	if !openSessionRequest.equals(b[0]) && !openSessionResponse.equals(b[0]) && !closeSessionRequest.equals(b[0]) && !closeSessionResponse.equals(b[0]) {
+	if !openSessionRequest.Equals(b[0]) && !openSessionResponse.Equals(b[0]) && !closeSessionRequest.Equals(b[0]) && !closeSessionResponse.Equals(b[0]) {
 		return fmt.Errorf("invalid protocol %d", b[0])
 	}
 	originalTimestamp := binary.BigEndian.Uint32(b[2:])
@@ -145,8 +145,8 @@ func (ss *sessionStruct) Unmarshal(b []byte) error {
 	if !mathext.WithinRange(currentTimestamp, originalTimestamp, 1) {
 		return fmt.Errorf("invalid timestamp %d", originalTimestamp*60)
 	}
-	if ss.payloadLen > 1024 {
-		return fmt.Errorf("payload size %d exceed maximum value 1024", ss.payloadLen)
+	if ss.payloadLen > MaxSessionOpenPayload {
+		return fmt.Errorf("payload size %d exceed maximum value %d", ss.payloadLen, MaxSessionOpenPayload)
 	}
 
 	// Do unmarshal.
@@ -180,9 +180,9 @@ type dataAckStruct struct {
 	baseStruct
 	sessionID  uint32 // byte 6 - 9: session ID number
 	seq        uint32 // byte 10 - 13: sequence number or ack number
-	unAckSeq   uint32 // byte 14 - 17: unacknowledged sequence number -- sequences smaller than this are acknowledged
+	unAckSeq   uint32 // byte 14 - 17: unacknowledged sequence number; sequences smaller than this are acknowledged
 	windowSize uint16 // byte 18 - 19: receive window size, in number of segments
-	fragment   uint8  // byte 20: fragment number, 0 is the last fragment
+	fragment   uint8  // byte 20: fragment number; this number reduces over time, 0 is the last fragment
 	prefixLen  uint8  // byte 21: length of prefix padding
 	payloadLen uint16 // byte 22 - 23: length of encapsulated payload, not including auth tag
 	suffixLen  uint8  // byte 24: length of suffix padding
@@ -193,7 +193,7 @@ func (das *dataAckStruct) Protocol() protocolType {
 }
 
 func (das *dataAckStruct) Marshal() []byte {
-	b := make([]byte, metadataLength)
+	b := make([]byte, MetadataLength)
 	b[0] = das.baseStruct.protocol
 	das.baseStruct.timestamp = uint32(time.Now().Unix() / 60)
 	binary.BigEndian.PutUint32(b[2:], das.baseStruct.timestamp)
@@ -210,10 +210,10 @@ func (das *dataAckStruct) Marshal() []byte {
 
 func (das *dataAckStruct) Unmarshal(b []byte) error {
 	// Check errors.
-	if len(b) != metadataLength {
-		return fmt.Errorf("input bytes: %d, want %d", len(b), metadataLength)
+	if len(b) != MetadataLength {
+		return fmt.Errorf("input bytes: %d, want %d", len(b), MetadataLength)
 	}
-	if !dataClientToServer.equals(b[0]) && !dataServerToClient.equals(b[0]) && !ackClientToServer.equals(b[0]) && !ackServerToClient.equals(b[0]) {
+	if !dataClientToServer.Equals(b[0]) && !dataServerToClient.Equals(b[0]) && !ackClientToServer.Equals(b[0]) && !ackServerToClient.Equals(b[0]) {
 		return fmt.Errorf("invalid protocol %d", b[0])
 	}
 	originalTimestamp := binary.BigEndian.Uint32(b[2:])

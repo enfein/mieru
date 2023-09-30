@@ -33,18 +33,12 @@ import (
 	"github.com/enfein/mieru/pkg/util"
 )
 
+const idleUnderlayTickerInterval = 5 * time.Second
+
 // Mux manages the sessions and underlays.
 type Mux struct {
-	isClient bool
-
-	// ---- client fields ----
-	password        []byte
-	multiplexFactor int
-
-	// ---- server fields ----
-	users map[string]*appctlpb.User
-
 	// ---- common fields ----
+	isClient    bool
 	endpoints   []UnderlayProperties
 	underlays   []Underlay
 	chAccept    chan net.Conn
@@ -52,6 +46,14 @@ type Mux struct {
 	used        bool
 	done        chan struct{}
 	mu          sync.Mutex
+	cleaner     *time.Ticker
+
+	// ---- client fields ----
+	password        []byte
+	multiplexFactor int
+
+	// ---- server fields ----
+	users map[string]*appctlpb.User
 }
 
 var _ net.Listener = &Mux{}
@@ -63,23 +65,40 @@ func NewMux(isClinet bool) *Mux {
 	} else {
 		log.Infof("Initializing server multiplexer")
 	}
-	return &Mux{
+	mux := &Mux{
 		isClient:    isClinet,
 		underlays:   make([]Underlay, 0),
-		chAccept:    make(chan net.Conn, 256),
+		chAccept:    make(chan net.Conn, sessionChanCapacity),
 		chAcceptErr: make(chan error, 1), // non-blocking
 		done:        make(chan struct{}),
+		cleaner:     time.NewTicker(idleUnderlayTickerInterval),
 	}
+
+	// Run idle underlay cleaner in the background.
+	go func() {
+		for {
+			select {
+			case <-mux.cleaner.C:
+				mux.mu.Lock()
+				mux.cleanUnderlay()
+				mux.mu.Unlock()
+			case <-mux.done:
+				mux.cleaner.Stop()
+				return
+			}
+		}
+	}()
+	return mux
 }
 
 func (m *Mux) SetClientPassword(password []byte) *Mux {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if !m.isClient {
-		log.Fatalf("Can't set client password in server mux")
+		panic("Can't set client password in server mux")
 	}
 	if m.used {
-		log.Fatalf("Can't set client password after mux is used")
+		panic("Can't set client password after mux is used")
 	}
 	m.password = password
 	return m
@@ -89,10 +108,10 @@ func (m *Mux) SetClientMultiplexFactor(n int) *Mux {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if !m.isClient {
-		log.Fatalf("Can't set multiplex factor in server mux")
+		panic("Can't set multiplex factor in server mux")
 	}
 	if m.used {
-		log.Fatalf("Can't set multiplex factor after mux is used")
+		panic("Can't set multiplex factor after mux is used")
 	}
 	m.multiplexFactor = mathext.Max(n, 0)
 	return m
@@ -102,10 +121,10 @@ func (m *Mux) SetServerUsers(users map[string]*appctlpb.User) *Mux {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.isClient {
-		log.Fatalf("Can't set server users in client mux")
+		panic("Can't set server users in client mux")
 	}
 	if m.used {
-		log.Fatalf("Can't set server users after mux is used")
+		panic("Can't set server users after mux is used")
 	}
 	m.users = users
 	return m
@@ -115,7 +134,7 @@ func (m *Mux) SetEndpoints(endpoints []UnderlayProperties) *Mux {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.used {
-		log.Fatalf("Can't set endpoints after mux is used")
+		panic("Can't set endpoints after mux is used")
 	}
 	m.endpoints = endpoints
 	return m
@@ -128,11 +147,13 @@ func (m *Mux) Accept() (net.Conn, error) {
 	case conn := <-m.chAccept:
 		return conn, nil
 	case <-m.done:
-		return nil, io.ErrClosedPipe
+		return nil, io.EOF
 	}
 }
 
 func (m *Mux) Close() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	select {
 	case <-m.done:
 		return nil
@@ -144,8 +165,6 @@ func (m *Mux) Close() error {
 	} else {
 		log.Infof("Closing server multiplexer")
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	for _, underlay := range m.underlays {
 		underlay.Close()
 	}
@@ -179,12 +198,11 @@ func (m *Mux) Start() error {
 	}
 
 	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.used = true
 	for _, p := range m.endpoints {
 		go m.acceptUnderlayLoop(p)
 	}
-	m.mu.Unlock()
-
 	return nil
 }
 
@@ -219,8 +237,9 @@ func (m *Mux) DialContext(ctx context.Context) (net.Conn, error) {
 		if err != nil {
 			return nil, err
 		}
+		log.Debugf("Created new underlay %v", underlay)
 	} else {
-		log.Debugf("Reuse existing underlay %v", underlay)
+		log.Debugf("Reusing existing underlay %v", underlay)
 	}
 
 	if ok := underlay.Scheduler().IncPending(); !ok {
@@ -229,6 +248,7 @@ func (m *Mux) DialContext(ctx context.Context) (net.Conn, error) {
 		if err != nil {
 			return nil, err
 		}
+		log.Debugf("Created yet another new underlay %v", underlay)
 		underlay.Scheduler().IncPending()
 	}
 	defer func() {
@@ -256,10 +276,10 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 		}
 		rawListener, err := listenConfig.Listen(context.Background(), network, laddr)
 		if err != nil {
-			m.chAcceptErr <- fmt.Errorf("net.ListenTCP() failed: %w", err)
+			m.chAcceptErr <- fmt.Errorf("Listen() failed: %w", err)
 			return
 		}
-		log.Infof("Mux listening to endpoint %s %s", network, laddr)
+		log.Infof("Mux is listening to endpoint %s %s", network, laddr)
 		for {
 			underlay, err := m.acceptTCPUnderlay(rawListener, properties)
 			if err != nil {
@@ -284,7 +304,6 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 					log.Debugf("%v RunEventLoop(): %v", underlay, err)
 				}
 				underlay.Close()
-				UnderlayCurrEstablished.Add(-1)
 			}()
 
 			go func() {
@@ -303,17 +322,17 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 	case "udp", "udp4", "udp6":
 		conn, err := net.ListenUDP(network, properties.LocalAddr().(*net.UDPAddr))
 		if err != nil {
-			m.chAcceptErr <- fmt.Errorf("net.ListenUDP() failed: %w", err)
+			m.chAcceptErr <- fmt.Errorf("ListenUDP() failed: %w", err)
 			return
 		}
-		log.Infof("Mux listening to endpoint %s %s", network, laddr)
+		log.Infof("Mux is listening to endpoint %s %s", network, laddr)
 		underlay := &UDPUnderlay{
 			baseUnderlay:      *newBaseUnderlay(false, properties.MTU()),
 			conn:              conn,
 			idleSessionTicker: time.NewTicker(idleSessionTickerInterval),
 			users:             m.users,
 		}
-		log.Debugf("Created new server underlay %v", underlay)
+		log.Infof("Created new server underlay %v", underlay)
 		m.mu.Lock()
 		m.underlays = append(m.underlays, underlay)
 		m.cleanUnderlay()
@@ -331,7 +350,6 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 				log.Debugf("%v RunEventLoop(): %v", underlay, err)
 			}
 			underlay.Close()
-			UnderlayCurrEstablished.Add(-1)
 		}()
 
 		go func() {
@@ -392,7 +410,7 @@ func (m *Mux) serverWrapTCPConn(rawConn net.Conn, mtu int, users map[string]*app
 }
 
 // newUnderlay returns a new underlay.
-// This method MUST be called only when holding the lock.
+// This method MUST be called only when holding the mu lock.
 func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 	var underlay Underlay
 	i := mrand.Intn(len(m.endpoints))
@@ -432,8 +450,6 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 			log.Debugf("%v RunEventLoop(): %v", underlay, err)
 		}
 		underlay.Close()
-		UnderlayCurrEstablished.Add(-1)
-		// Dead underlay will be cleaned later.
 	}()
 	return underlay, nil
 }
@@ -441,14 +457,14 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 // maybePickExistingUnderlay returns either an existing underlay that
 // can be used by a session, or nil. In the later case a new underlay
 // should be created.
-// This method MUST be called only when holding the lock.
+// This method MUST be called only when holding the mu lock.
 func (m *Mux) maybePickExistingUnderlay() Underlay {
 	active := make([]Underlay, 0)
 	for _, underlay := range m.underlays {
 		select {
 		case <-underlay.Done():
 		default:
-			if !underlay.Scheduler().Disabled() {
+			if !underlay.Scheduler().IsDisabled() {
 				active = append(active, underlay)
 			}
 		}
@@ -465,19 +481,24 @@ func (m *Mux) maybePickExistingUnderlay() Underlay {
 }
 
 // cleanUnderlay removes closed underlays.
-// This method MUST be called only when holding the lock.
+// This method MUST be called only when holding the mu lock.
 func (m *Mux) cleanUnderlay() {
 	remaining := make([]Underlay, 0)
+	cnt := 0
 	for _, underlay := range m.underlays {
 		select {
 		case <-underlay.Done():
 		default:
 			if underlay.Scheduler().Idle() {
 				underlay.Close()
+				cnt++
 			} else {
 				remaining = append(remaining, underlay)
 			}
 		}
 	}
 	m.underlays = remaining
+	if cnt > 0 {
+		log.Debugf("Mux cleaned %d underlays", cnt)
+	}
 }

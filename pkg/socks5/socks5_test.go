@@ -242,28 +242,3 @@ func TestSocks5UDPAssociation(t *testing.T) {
 		t.Errorf("UDPAssociateOutPkts value %d is not increased", UDPAssociateOutPkts.Load())
 	}
 }
-
-func TestServerGroup(t *testing.T) {
-	c := &Config{}
-	s1, err := New(c)
-	if err != nil {
-		t.Fatalf("New() failed: %v", err)
-	}
-	g := NewGroup()
-	port, err := util.UnusedUDPPort()
-	if err != nil {
-		t.Fatalf("util.UnusedUDPPort() failed: %v", err)
-	}
-	if err := g.Add("UDP", port, s1); err != nil {
-		t.Fatalf("Add() failed: %v", err)
-	}
-	if g.IsEmpty() {
-		t.Errorf("IsEmpty() = %v, want %v", true, false)
-	}
-	if err := g.CloseAndRemoveAll(); err != nil {
-		t.Fatalf("CloseAndRemoveAll() failed: %v", err)
-	}
-	if !g.IsEmpty() {
-		t.Errorf("After CloseAndRemoveAll(), IsEmpty() = %v, want %v", false, true)
-	}
-}

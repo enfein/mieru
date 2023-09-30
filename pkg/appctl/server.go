@@ -57,15 +57,19 @@ var (
 	serverRPCServerRef atomic.Pointer[grpc.Server]
 
 	// socks5ServerGroup is a collection of server socks5 servers.
-	socks5ServerGroup = socks5.NewGroup()
+	socks5ServerRef atomic.Pointer[socks5.Server]
 )
 
 func SetServerRPCServerRef(server *grpc.Server) {
 	serverRPCServerRef.Store(server)
 }
 
-func GetSocks5ServerGroup() *socks5.ServerGroup {
-	return socks5ServerGroup
+func GetSocks5Server() *socks5.Server {
+	return socks5ServerRef.Load()
+}
+
+func SetSocks5Server(server *socks5.Server) {
+	socks5ServerRef.Store(server)
 }
 
 // serverLifecycleService implements ServerLifecycleService defined in lifecycle.proto.
@@ -92,8 +96,8 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 	if err = ValidateFullServerConfig(config); err != nil {
 		return &pb.Empty{}, fmt.Errorf("ValidateFullServerConfig() failed: %w", err)
 	}
-	if !GetSocks5ServerGroup().IsEmpty() {
-		log.Infof("socks5 server(s) already exist")
+	if !(GetSocks5Server() == nil) {
+		log.Infof("socks5 server already exist")
 		return &pb.Empty{}, nil
 	}
 
@@ -139,9 +143,7 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 	if err != nil {
 		return &pb.Empty{}, fmt.Errorf(stderror.CreateSocks5ServerFailedErr, err)
 	}
-	if err = GetSocks5ServerGroup().Add("", 0, socks5Server); err != nil {
-		return &pb.Empty{}, fmt.Errorf(stderror.AddSocks5ServerToGroupFailedErr, err)
-	}
+	SetSocks5Server(socks5Server)
 
 	// Run the egress socks5 server in the background.
 	var initProxyTasks sync.WaitGroup
@@ -169,11 +171,12 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 func (s *serverLifecycleService) Stop(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
 	SetAppStatus(pb.AppStatus_STOPPING)
 	log.Infof("received stop request from RPC caller")
-	if !GetSocks5ServerGroup().IsEmpty() {
-		log.Infof("stopping socks5 server(s)")
-		if err := GetSocks5ServerGroup().CloseAndRemoveAll(); err != nil {
+	if !(GetSocks5Server() == nil) {
+		log.Infof("stopping socks5 server")
+		if err := GetSocks5Server().Close(); err != nil {
 			log.Infof("socks5 server Close() failed: %v", err)
 		}
+		SetSocks5Server(nil)
 	} else {
 		log.Infof("active socks5 servers not found")
 	}
@@ -185,11 +188,12 @@ func (s *serverLifecycleService) Stop(ctx context.Context, req *pb.Empty) (*pb.E
 func (s *serverLifecycleService) Exit(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
 	SetAppStatus(pb.AppStatus_STOPPING)
 	log.Infof("received exit request from RPC caller")
-	if !GetSocks5ServerGroup().IsEmpty() {
-		log.Infof("stopping socks5 server(s)")
-		if err := GetSocks5ServerGroup().CloseAndRemoveAll(); err != nil {
+	if !(GetSocks5Server() != nil) {
+		log.Infof("stopping socks5 server")
+		if err := GetSocks5Server().Close(); err != nil {
 			log.Infof("socks5 server Close() failed: %v", err)
 		}
+		SetSocks5Server(nil)
 	} else {
 		log.Infof("active socks5 servers not found")
 	}

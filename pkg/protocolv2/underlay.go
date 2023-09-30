@@ -43,10 +43,10 @@ type UnderlayProperties interface {
 	// The transport protocol used to implement the underlay.
 	TransportProtocol() util.TransportProtocol
 
-	// Implement the LocalAddr() method in net.Conn interface.
+	// LocalAddr implements net.Conn interface.
 	LocalAddr() net.Addr
 
-	// Implemeent the RemoteAddr() method in the net.Conn interface.
+	// RemoteAddr implements net.Conn interface.
 	RemoteAddr() net.Addr
 }
 

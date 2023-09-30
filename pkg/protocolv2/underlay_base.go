@@ -27,14 +27,20 @@ import (
 	"github.com/enfein/mieru/pkg/util"
 )
 
-// baseUnderlay contains a base implementation of underlay.
+const sessionChanCapacity = 64
+
+// baseUnderlay contains a partial implementation of underlay.
 type baseUnderlay struct {
-	isClient bool
-	mtu      int
-	done     chan struct{} // if the underlay is closed
+	isClient  bool
+	mtu       int
+	ipVersion util.IPVersion
+	done      chan struct{} // if the underlay is closed
 
 	sessionMap    sync.Map      // Map<sessionID, *Session>
 	readySessions chan *Session // sessions that completed handshake and ready for consume
+
+	sendMutex  sync.Mutex // protect writing data to the connection
+	closeMutex sync.Mutex // protect closing the connection
 
 	// ---- client fields ----
 	scheduler *ScheduleController
@@ -48,12 +54,14 @@ func newBaseUnderlay(isClient bool, mtu int) *baseUnderlay {
 	return &baseUnderlay{
 		isClient:      isClient,
 		mtu:           mtu,
+		ipVersion:     util.IPVersionUnknown,
 		done:          make(chan struct{}),
-		readySessions: make(chan *Session, 256),
+		readySessions: make(chan *Session, sessionChanCapacity),
 		scheduler:     &ScheduleController{},
 	}
 }
 
+// Accept implements net.Listener interface.
 func (b *baseUnderlay) Accept() (net.Conn, error) {
 	select {
 	case session := <-b.readySessions:
@@ -63,6 +71,7 @@ func (b *baseUnderlay) Accept() (net.Conn, error) {
 	}
 }
 
+// Close implements net.Listener interface. The caller must hold closeMutex lock.
 func (b *baseUnderlay) Close() error {
 	select {
 	case <-b.done:
@@ -77,9 +86,11 @@ func (b *baseUnderlay) Close() error {
 	})
 	b.sessionMap = sync.Map{}
 	close(b.done)
+	UnderlayCurrEstablished.Add(-1)
 	return nil
 }
 
+// Addr implements net.Listener interface.
 func (b *baseUnderlay) Addr() net.Addr {
 	return util.NilNetAddr()
 }
@@ -89,7 +100,7 @@ func (b *baseUnderlay) MTU() int {
 }
 
 func (b *baseUnderlay) IPVersion() util.IPVersion {
-	return util.IPVersionUnknown
+	return b.ipVersion
 }
 
 func (b *baseUnderlay) TransportProtocol() util.TransportProtocol {
@@ -111,7 +122,7 @@ func (b *baseUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
 	if s.id == 0 {
 		return fmt.Errorf("session ID can't be 0")
 	}
-	if s.state >= sessionAttached {
+	if s.isStateAfter(sessionAttached, true) {
 		return fmt.Errorf("session %d is already attached to a underlay", s.id)
 	}
 	if b.isClient && !s.isClient {
@@ -120,11 +131,8 @@ func (b *baseUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
 	if !b.isClient && s.isClient {
 		return fmt.Errorf("can't add a client session to a server underlay")
 	}
-
-	if s.id != 0 {
-		if _, loaded := b.sessionMap.LoadOrStore(s.id, s); loaded {
-			return stderror.ErrAlreadyExist
-		}
+	if _, loaded := b.sessionMap.LoadOrStore(s.id, s); loaded {
+		return stderror.ErrAlreadyExist
 	}
 	s.conn = b
 	s.remoteAddr = remoteAddr
@@ -147,16 +155,16 @@ func (b *baseUnderlay) RemoveSession(s *Session) error {
 	if s == nil {
 		return stderror.ErrNullPointer
 	}
-	if s.state < sessionAttached {
+	if s.isStateBefore(sessionAttached, false) {
 		return fmt.Errorf("session %d is not attached to this underlay", s.id)
 	}
 
 	b.sessionMap.Delete(s.id)
+	s.Close()
 	s.conn = nil
-	s.forwardStateTo(sessionClosed)
-	metrics.CurrEstablished.Add(-1)
 
 	if b.isClient {
+		// May disable scheduling if the underlay has no session.
 		sessions := 0
 		b.sessionMap.Range(func(k, v any) bool {
 			sessions += 1

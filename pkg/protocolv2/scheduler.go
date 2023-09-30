@@ -25,14 +25,15 @@ import (
 
 var (
 	// scheduleIdleTime determines when an idle underlay should be closed.
-	scheduleIdleTime = time.Duration(10+rng.FixedInt(21)) * time.Second
+	// It may take 5 seconds to 15 seconds in different machines.
+	scheduleIdleTime = time.Duration(5+rng.FixedInt(11)) * time.Second
 )
 
 // ScheduleController controls scheduling a new client session to a underlay.
 type ScheduleController struct {
-	pending          int
+	pending          int // number of pending sessions going to be scheduled
 	lastScheduleTime time.Time
-	disable          bool
+	disable          bool // if scheduling to the underlay is disabled
 	disableTime      time.Time
 	mu               sync.Mutex
 }
@@ -61,8 +62,8 @@ func (c *ScheduleController) DecPending() (ok bool) {
 	return true
 }
 
-// Disabled returns true if scheduling new sessions is disabled.
-func (c *ScheduleController) Disabled() bool {
+// IsDisabled returns true if scheduling new sessions to the underlay is disabled.
+func (c *ScheduleController) IsDisabled() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.disable
@@ -75,7 +76,7 @@ func (c *ScheduleController) Idle() bool {
 	return c.disable && time.Since(c.disableTime) > scheduleIdleTime
 }
 
-// TryDisable tries to disallow scheduling new sessions.
+// TryDisable tries to disable scheduling new sessions.
 func (c *ScheduleController) TryDisable() (ok bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

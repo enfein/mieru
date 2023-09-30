@@ -29,14 +29,11 @@ import (
 )
 
 const (
-	// Maximum protocol data unit supported in a single Write() call from application.
+	// Maximum protocol data unit to write without split to chunks.
 	maxPDU = 32 * 1024
 
-	// Maxinum number of transmission before marking the session as dead.
+	// Maxinum number of transmissions before marking the session as dead.
 	txCountLimit = 20
-
-	// Number of fast ack received before retransmission.
-	fastAckLimit = 3
 
 	// Format to print segment TX time.
 	segmentTimeFormat = "15:04:05.999"
@@ -93,7 +90,6 @@ type segment struct {
 	payload   []byte                 // also can be a fragment
 	transport util.TransportProtocol // transport protocol
 	txCount   byte                   // number of transmission times
-	fastAck   byte                   // accumulated out of order ACK
 	txTime    time.Time              // most recent tx time
 	txTimeout time.Duration          // need to receive ACK within this duration
 	block     cipher.BlockCipher     // cipher block to encrypt or decrypt the payload
@@ -140,21 +136,21 @@ func (s *segment) Fragment() uint8 {
 }
 
 // Less tests whether the current item is less than the given argument.
-func (s *segment) Less(than *segment) bool {
+func (s *segment) Less(other *segment) bool {
 	mySeq, err := s.Seq()
 	if err != nil {
 		panic(fmt.Sprintf("%v Seq() failed: %v", s, err))
 	}
-	otherSeq, err := than.Seq()
+	otherSeq, err := other.Seq()
 	if err != nil {
-		panic(fmt.Sprintf("%v Seq() failed: %v", than, err))
+		panic(fmt.Sprintf("%v Seq() failed: %v", other, err))
 	}
 	return mySeq < otherSeq
 }
 
 func (s *segment) String() string {
 	if s.transport == util.UDPTransport && (!util.IsZeroTime(s.txTime) || s.txTimeout != 0) {
-		return fmt.Sprintf("segment{metadata=%v, realPayloadLen=%v, txCount=%v, fastAck=%v, txTime=%v, txTimeout=%v}", s.metadata, len(s.payload), s.txCount, s.fastAck, s.txTime.Format(segmentTimeFormat), s.txTimeout)
+		return fmt.Sprintf("segment{metadata=%v, realPayloadLen=%v, txCount=%v, txTime=%v, txTimeout=%v}", s.metadata, len(s.payload), s.txCount, s.txTime.Format(segmentTimeFormat), s.txTimeout)
 	}
 	return fmt.Sprintf("segment{metadata=%v, realPayloadLen=%v}", s.metadata, len(s.payload))
 }
@@ -169,11 +165,11 @@ type segmentIterator func(*segment) bool
 
 // segmentTree is a B-tree to store multiple Segment in order.
 type segmentTree struct {
-	tr                *btree.BTreeG[*segment]
-	cap               int
+	tr  *btree.BTreeG[*segment]
+	cap int
+
 	mu                sync.Mutex
-	full              sync.Cond
-	empty             sync.Cond
+	notFull           sync.Cond
 	chanNotEmptyEvent chan struct{}
 }
 
@@ -185,8 +181,7 @@ func newSegmentTree(capacity int) *segmentTree {
 		tr:  btree.NewG(4, segmentLessFunc),
 		cap: capacity,
 	}
-	st.full = *sync.NewCond(&st.mu)
-	st.empty = *sync.NewCond(&st.mu)
+	st.notFull = *sync.NewCond(&st.mu)
 	st.chanNotEmptyEvent = make(chan struct{}, 1)
 	return st
 }
@@ -194,12 +189,9 @@ func newSegmentTree(capacity int) *segmentTree {
 // Insert adds a new segment to the tree.
 // It returns true if insert is successful.
 func (t *segmentTree) Insert(seg *segment) (ok bool) {
-	if seg == nil {
-		panic("Insert() nil segment")
-	}
-	if _, err := seg.Seq(); err != nil {
-		panic(fmt.Sprintf("%v Seq() failed: %v", seg, err))
-	}
+	t.checkNil(seg)
+	t.checkSeq(seg)
+	t.checkProtocolType(seg)
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -210,10 +202,9 @@ func (t *segmentTree) Insert(seg *segment) (ok bool) {
 	prev, replace := t.tr.ReplaceOrInsert(seg)
 	if replace {
 		if log.IsLevelEnabled(log.TraceLevel) {
-			log.Tracef("%v is replaced by %v", seg, prev)
+			log.Tracef("%v is replaced by %v", prev, seg)
 		}
 	} else {
-		t.empty.Broadcast()
 		t.notifyNotEmpty()
 	}
 	return true
@@ -221,26 +212,22 @@ func (t *segmentTree) Insert(seg *segment) (ok bool) {
 
 // InsertBlocking is same as Insert, but blocks when the tree is full.
 func (t *segmentTree) InsertBlocking(seg *segment) {
-	if seg == nil {
-		panic("Insert() nil segment")
-	}
-	if _, err := seg.Seq(); err != nil {
-		panic(fmt.Sprintf("%v Seq() failed: %v", seg, err))
-	}
+	t.checkNil(seg)
+	t.checkSeq(seg)
+	t.checkProtocolType(seg)
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
 	for t.tr.Len() >= t.cap {
 		t.notifyNotEmpty()
-		t.full.Wait()
+		t.notFull.Wait()
 	}
 	prev, replace := t.tr.ReplaceOrInsert(seg)
 	if replace {
 		if log.IsLevelEnabled(log.TraceLevel) {
-			log.Tracef("%v is replaced by %v", seg, prev)
+			log.Tracef("%v is replaced by %v", prev, seg)
 		}
 	} else {
-		t.empty.Broadcast()
 		t.notifyNotEmpty()
 	}
 }
@@ -261,7 +248,7 @@ func (t *segmentTree) DeleteMin() (*segment, bool) {
 	if seg == nil {
 		panic("segmentTree.DeleteMin() return nil")
 	}
-	t.full.Broadcast()
+	t.notFull.Broadcast()
 	if t.Len() > 0 {
 		t.notifyNotEmpty()
 	}
@@ -285,8 +272,8 @@ func (t *segmentTree) DeleteMinIf(si segmentIterator) (*segment, bool) {
 	if seg == nil {
 		panic("segmentTree.Min() return nil")
 	}
-	delete := si(seg)
-	if delete {
+	shouldDelete := si(seg)
+	if shouldDelete {
 		seg, ok = t.tr.DeleteMin()
 		if !ok {
 			panic("segmentTree.DeleteMin() is called when the tree is empty")
@@ -294,24 +281,26 @@ func (t *segmentTree) DeleteMinIf(si segmentIterator) (*segment, bool) {
 		if seg == nil {
 			panic("segmentTree.DeleteMin() return nil")
 		}
-		t.full.Broadcast()
+		t.notFull.Broadcast()
 	}
 	if t.Len() > 0 {
 		t.notifyNotEmpty()
 	}
-	return seg, delete
+	return seg, shouldDelete
 }
 
-// Ascend iterates the segment tree in ascending order,
-// until the iterator returns false.
+// Ascend iterates the segment tree in ascending order, until the iterator returns false.
+// Segments shouldn't be inserted or deleted during the iteration.
 func (t *segmentTree) Ascend(si segmentIterator) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.tr.Ascend(btree.ItemIteratorG[*segment](si))
 }
 
-// MinSeq return the minimum sequence number in the SegmentTree.
+// MinSeq returns the minimum sequence number in the SegmentTree.
 func (t *segmentTree) MinSeq() (uint32, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	seg, ok := t.tr.Min()
 	if !ok {
 		return 0, stderror.ErrEmpty
@@ -319,8 +308,10 @@ func (t *segmentTree) MinSeq() (uint32, error) {
 	return seg.Seq()
 }
 
-// MinSeq return the maximum sequence number in the SegmentTree.
+// MinSeq returns the maximum sequence number in the SegmentTree.
 func (t *segmentTree) MaxSeq() (uint32, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	seg, ok := t.tr.Max()
 	if !ok {
 		return 0, stderror.ErrEmpty
@@ -342,5 +333,31 @@ func (t *segmentTree) notifyNotEmpty() {
 	select {
 	case t.chanNotEmptyEvent <- struct{}{}:
 	default:
+	}
+}
+
+func (t *segmentTree) checkNil(seg *segment) {
+	if seg == nil {
+		panic("Inserting nil segment to the segment tree")
+	}
+}
+
+func (t *segmentTree) checkSeq(seg *segment) {
+	if _, err := seg.Seq(); err != nil {
+		panic(fmt.Sprintf("Failed to get sequence number from %v: %v", seg, err))
+	}
+}
+
+func (t *segmentTree) checkProtocolType(seg *segment) {
+	protocol := seg.metadata.Protocol()
+	switch protocol {
+	case openSessionRequest:
+	case openSessionResponse:
+	case closeSessionRequest:
+	case closeSessionResponse:
+	case dataClientToServer:
+	case dataServerToClient:
+	default:
+		panic(fmt.Sprintf("Inserting segment with unsupported type %v to the segment tree", protocol))
 	}
 }

@@ -16,7 +16,7 @@
 package stderror
 
 // ErrorType provides a marker of runtime error.
-type ErrorType int
+type ErrorType uint8
 
 const (
 	NO_ERROR ErrorType = iota

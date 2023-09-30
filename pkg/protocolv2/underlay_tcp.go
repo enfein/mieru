@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"sync"
 	"time"
 
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
+	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/replay"
 	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/stderror"
@@ -33,8 +33,7 @@ import (
 
 type TCPUnderlay struct {
 	baseUnderlay
-	conn      *net.TCPConn
-	ipVersion util.IPVersion
+	conn *net.TCPConn
 
 	send cipher.BlockCipher
 	recv cipher.BlockCipher
@@ -42,14 +41,11 @@ type TCPUnderlay struct {
 	// Candidates are block ciphers that can be used to encrypt or decrypt data.
 	// When isClient is true, there must be exactly 1 element in the slice.
 	candidates []cipher.BlockCipher
-
-	// sendMutex is used when write data to the connection.
-	sendMutex sync.Mutex
 }
 
 var _ Underlay = &TCPUnderlay{}
 
-var tcpReplayCache = replay.NewCache(16*1024*1024, 2*time.Minute)
+var tcpReplayCache = replay.NewCache(4*1024*1024, 2*time.Minute)
 
 // NewTCPUnderlay connects to the remote address "raddr" on the network "tcp"
 // with packet encryption. If "laddr" is empty, an automatic address is used.
@@ -58,7 +54,7 @@ func NewTCPUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, 
 	switch network {
 	case "tcp", "tcp4", "tcp6":
 	default:
-		return nil, fmt.Errorf("network %s is not supported for TCP underlay", network)
+		return nil, fmt.Errorf("network %s is not supported by TCP underlay", network)
 	}
 	if block.IsStateless() {
 		return nil, fmt.Errorf("TCP block cipher must not be stateless")
@@ -76,12 +72,13 @@ func NewTCPUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, 
 	if err != nil {
 		return nil, fmt.Errorf("DialContext() failed: %w", err)
 	}
-	log.Debugf("Created new client TCP underlay [%v - %v]", conn.LocalAddr(), conn.RemoteAddr())
-	return &TCPUnderlay{
+	t := &TCPUnderlay{
 		baseUnderlay: *newBaseUnderlay(true, mtu),
 		conn:         conn.(*net.TCPConn),
 		candidates:   []cipher.BlockCipher{block},
-	}, nil
+	}
+	log.Debugf("Created new client TCP underlay %v", t)
+	return t, nil
 }
 
 func (t *TCPUnderlay) String() string {
@@ -92,6 +89,8 @@ func (t *TCPUnderlay) String() string {
 }
 
 func (t *TCPUnderlay) Close() error {
+	t.closeMutex.Lock()
+	defer t.closeMutex.Unlock()
 	select {
 	case <-t.done:
 		return nil
@@ -122,10 +121,16 @@ func (t *TCPUnderlay) TransportProtocol() util.TransportProtocol {
 }
 
 func (t *TCPUnderlay) LocalAddr() net.Addr {
+	if t.conn == nil {
+		return util.NilNetAddr()
+	}
 	return t.conn.LocalAddr()
 }
 
 func (t *TCPUnderlay) RemoteAddr() net.Addr {
+	if t.conn == nil {
+		return util.NilNetAddr()
+	}
 	return t.conn.RemoteAddr()
 }
 
@@ -166,8 +171,11 @@ func (t *TCPUnderlay) RunEventLoop(ctx context.Context) error {
 			return nil
 		default:
 		}
-		seg, err := t.readOneSegment()
+		seg, err, errType := t.readOneSegment()
 		if err != nil {
+			if errType == stderror.CRYPTO_ERROR || errType == stderror.REPLAY_ERROR {
+				t.drainAfterError()
+			}
 			return fmt.Errorf("readOneSegment() failed: %w", err)
 		}
 		if log.IsLevelEnabled(log.TraceLevel) {
@@ -177,15 +185,15 @@ func (t *TCPUnderlay) RunEventLoop(ctx context.Context) error {
 			switch seg.metadata.Protocol() {
 			case openSessionRequest:
 				if err := t.onOpenSessionRequest(seg); err != nil {
-					return fmt.Errorf("onOpenSessionRequest() failed: %v", err)
+					return fmt.Errorf("onOpenSessionRequest() failed: %w", err)
 				}
 			case openSessionResponse:
 				if err := t.onOpenSessionResponse(seg); err != nil {
-					return fmt.Errorf("onOpenSessionResponse() failed: %v", err)
+					return fmt.Errorf("onOpenSessionResponse() failed: %w", err)
 				}
 			case closeSessionRequest, closeSessionResponse:
 				if err := t.onCloseSession(seg); err != nil {
-					return fmt.Errorf("onCloseSession() failed: %v", err)
+					return fmt.Errorf("onCloseSession() failed: %w", err)
 				}
 			default:
 				panic(fmt.Sprintf("Protocol %d is a session protocol but not recognized by TCP underlay", seg.metadata.Protocol()))
@@ -195,11 +203,28 @@ func (t *TCPUnderlay) RunEventLoop(ctx context.Context) error {
 			session, ok := t.sessionMap.Load(das.sessionID)
 			if !ok {
 				log.Debugf("Session %d is not registered to %v", das.sessionID, t)
+				// Request the peer to close the session.
+				closeReq := &segment{
+					metadata: &sessionStruct{
+						baseStruct: baseStruct{
+							protocol: uint8(closeSessionRequest),
+						},
+						sessionID:  das.sessionID,
+						seq:        das.unAckSeq,
+						statusCode: 0,
+						payloadLen: 0,
+					},
+					transport: t.TransportProtocol(),
+				}
+				if err := t.writeOneSegment(closeReq); err != nil {
+					return fmt.Errorf("writeOneSegment() failed: %w", err)
+				}
 				continue
 			}
 			session.(*Session).recvChan <- seg
+		} else {
+			log.Debugf("Ignore unknown protocol %d", seg.metadata.Protocol())
 		}
-		// Ignore other protocols.
 	}
 }
 
@@ -216,7 +241,7 @@ func (t *TCPUnderlay) onOpenSessionRequest(seg *segment) error {
 	}
 	_, found := t.sessionMap.Load(sessionID)
 	if found {
-		return fmt.Errorf("session ID %d is already used", sessionID)
+		return fmt.Errorf("%v received open session request, but session ID %d is already used", t, sessionID)
 	}
 	session := NewSession(sessionID, t.isClient, t.MTU())
 	t.AddSession(session, nil)
@@ -244,7 +269,8 @@ func (t *TCPUnderlay) onCloseSession(seg *segment) error {
 	sessionID := ss.sessionID
 	session, found := t.sessionMap.Load(sessionID)
 	if !found {
-		return fmt.Errorf("session ID %d is not found", sessionID)
+		log.Debugf("%v received close session request or response, but session ID %d is not found", t, sessionID)
+		return nil
 	}
 	s := session.(*Session)
 	s.recvChan <- seg
@@ -253,12 +279,12 @@ func (t *TCPUnderlay) onCloseSession(seg *segment) error {
 	return nil
 }
 
-func (t *TCPUnderlay) readOneSegment() (*segment, error) {
+func (t *TCPUnderlay) readOneSegment() (*segment, error, stderror.ErrorType) {
 	var firstRead bool
 	var err error
 
 	// Read encrypted metadata.
-	readLen := metadataLength + cipher.DefaultOverhead
+	readLen := MetadataLength + cipher.DefaultOverhead
 	if t.recv == nil {
 		// In the first Read, also include nonce.
 		firstRead = true
@@ -266,12 +292,13 @@ func (t *TCPUnderlay) readOneSegment() (*segment, error) {
 	}
 	encryptedMeta := make([]byte, readLen)
 	if _, err := io.ReadFull(t.conn, encryptedMeta); err != nil {
-		return nil, fmt.Errorf("metadata: read %d bytes from TCPUnderlay failed: %w", readLen, err)
+		return nil, fmt.Errorf("metadata: read %d bytes from TCPUnderlay failed: %w", readLen, err), stderror.NETWORK_ERROR
 	}
+	metrics.InBytes.Add(int64(len(encryptedMeta)))
 	if tcpReplayCache.IsDuplicate(encryptedMeta[:cipher.DefaultOverhead], replay.EmptyTag) {
 		if firstRead {
 			replay.NewSession.Add(1)
-			return nil, fmt.Errorf("found possible replay attack in %v", t)
+			return nil, fmt.Errorf("found possible replay attack in %v", t), stderror.REPLAY_ERROR
 		} else {
 			replay.KnownSession.Add(1)
 		}
@@ -285,18 +312,30 @@ func (t *TCPUnderlay) readOneSegment() (*segment, error) {
 	if t.recv == nil {
 		var peerBlock cipher.BlockCipher
 		peerBlock, decryptedMeta, err = cipher.SelectDecrypt(encryptedMeta, cipher.CloneBlockCiphers(t.candidates))
+		cipher.ServerIterateDecrypt.Add(1)
 		if err != nil {
-			return nil, fmt.Errorf("cipher.SelectDecrypt() failed: %w", err)
+			cipher.ServerFailedIterateDecrypt.Add(1)
+			return nil, fmt.Errorf("cipher.SelectDecrypt() failed: %w", err), stderror.CRYPTO_ERROR
 		}
 		t.recv = peerBlock.Clone()
 	} else {
 		decryptedMeta, err = t.recv.Decrypt(encryptedMeta)
+		if t.isClient {
+			cipher.ClientDirectDecrypt.Add(1)
+		} else {
+			cipher.ServerDirectDecrypt.Add(1)
+		}
 		if err != nil {
-			return nil, fmt.Errorf("Decrypt() failed: %w", err)
+			if t.isClient {
+				cipher.ClientFailedDirectDecrypt.Add(1)
+			} else {
+				cipher.ServerFailedDirectDecrypt.Add(1)
+			}
+			return nil, fmt.Errorf("Decrypt() failed: %w", err), stderror.CRYPTO_ERROR
 		}
 	}
-	if len(decryptedMeta) != metadataLength {
-		return nil, fmt.Errorf("decrypted metadata size %d is unexpected", len(decryptedMeta))
+	if len(decryptedMeta) != MetadataLength {
+		return nil, fmt.Errorf("decrypted metadata size %d is unexpected", len(decryptedMeta)), stderror.PROTOCOL_ERROR
 	}
 
 	// Read payload and construct segment.
@@ -304,86 +343,112 @@ func (t *TCPUnderlay) readOneSegment() (*segment, error) {
 	if isSessionProtocol(protocolType(p)) {
 		ss := &sessionStruct{}
 		if err := ss.Unmarshal(decryptedMeta); err != nil {
-			return nil, fmt.Errorf("Unmarshal() to sessionStruct failed: %w", err)
+			return nil, fmt.Errorf("Unmarshal() to sessionStruct failed: %w", err), stderror.PROTOCOL_ERROR
 		}
 		return t.readSessionSegment(ss)
 	} else if isDataAckProtocol(protocolType(p)) {
 		das := &dataAckStruct{}
 		if err := das.Unmarshal(decryptedMeta); err != nil {
-			return nil, fmt.Errorf("Unmarshal() to dataAckStruct failed: %w", err)
+			return nil, fmt.Errorf("Unmarshal() to dataAckStruct failed: %w", err), stderror.PROTOCOL_ERROR
 		}
 		return t.readDataAckSegment(das)
 	}
-
-	return nil, fmt.Errorf("unable to handle protocol %d", p)
+	return nil, fmt.Errorf("unable to handle protocol %d", p), stderror.PROTOCOL_ERROR
 }
 
-func (t *TCPUnderlay) readSessionSegment(ss *sessionStruct) (*segment, error) {
+func (t *TCPUnderlay) readSessionSegment(ss *sessionStruct) (*segment, error, stderror.ErrorType) {
 	var decryptedPayload []byte
 	var err error
 
 	if ss.payloadLen > 0 {
 		encryptedPayload := make([]byte, ss.payloadLen+cipher.DefaultOverhead)
 		if _, err := io.ReadFull(t.conn, encryptedPayload); err != nil {
-			return nil, fmt.Errorf("payload: read %d bytes from TCPUnderlay failed: %w", ss.payloadLen+cipher.DefaultOverhead, err)
+			return nil, fmt.Errorf("payload: read %d bytes from TCPUnderlay failed: %w", ss.payloadLen+cipher.DefaultOverhead, err), stderror.NETWORK_ERROR
 		}
+		metrics.InBytes.Add(int64(len(encryptedPayload)))
 		if tcpReplayCache.IsDuplicate(encryptedPayload[:cipher.DefaultOverhead], replay.EmptyTag) {
 			replay.KnownSession.Add(1)
 		}
 		decryptedPayload, err = t.recv.Decrypt(encryptedPayload)
+		if t.isClient {
+			cipher.ClientDirectDecrypt.Add(1)
+		} else {
+			cipher.ServerDirectDecrypt.Add(1)
+		}
 		if err != nil {
-			return nil, fmt.Errorf("Decrypt() failed: %w", err)
+			if t.isClient {
+				cipher.ClientFailedDirectDecrypt.Add(1)
+			} else {
+				cipher.ServerFailedDirectDecrypt.Add(1)
+			}
+			return nil, fmt.Errorf("Decrypt() failed: %w", err), stderror.CRYPTO_ERROR
 		}
 	}
 	if ss.suffixLen > 0 {
 		padding := make([]byte, ss.suffixLen)
 		if _, err := io.ReadFull(t.conn, padding); err != nil {
-			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", ss.suffixLen, err)
+			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", ss.suffixLen, err), stderror.NETWORK_ERROR
 		}
+		metrics.InBytes.Add(int64(len(padding)))
 	}
 
 	return &segment{
 		metadata:  ss,
 		payload:   decryptedPayload,
 		transport: util.TCPTransport,
-	}, nil
+		block:     t.recv,
+	}, nil, stderror.NO_ERROR
 }
 
-func (t *TCPUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error) {
+func (t *TCPUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error, stderror.ErrorType) {
 	var decryptedPayload []byte
 	var err error
 
 	if das.prefixLen > 0 {
 		padding1 := make([]byte, das.prefixLen)
 		if _, err := io.ReadFull(t.conn, padding1); err != nil {
-			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", das.prefixLen, err)
+			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", das.prefixLen, err), stderror.NETWORK_ERROR
 		}
+		metrics.InBytes.Add(int64(len(padding1)))
 	}
 	if das.payloadLen > 0 {
 		encryptedPayload := make([]byte, das.payloadLen+cipher.DefaultOverhead)
 		if _, err := io.ReadFull(t.conn, encryptedPayload); err != nil {
-			return nil, fmt.Errorf("payload: read %d bytes from TCPUnderlay failed: %w", das.payloadLen+cipher.DefaultOverhead, err)
+			return nil, fmt.Errorf("payload: read %d bytes from TCPUnderlay failed: %w", das.payloadLen+cipher.DefaultOverhead, err), stderror.NETWORK_ERROR
 		}
+		metrics.InBytes.Add(int64(len(encryptedPayload)))
 		if tcpReplayCache.IsDuplicate(encryptedPayload[:cipher.DefaultOverhead], replay.EmptyTag) {
 			replay.KnownSession.Add(1)
 		}
 		decryptedPayload, err = t.recv.Decrypt(encryptedPayload)
+		if t.isClient {
+			cipher.ClientDirectDecrypt.Add(1)
+		} else {
+			cipher.ServerDirectDecrypt.Add(1)
+		}
 		if err != nil {
-			return nil, fmt.Errorf("Decrypt() failed: %w", err)
+			if t.isClient {
+				cipher.ClientFailedDirectDecrypt.Add(1)
+			} else {
+				cipher.ServerFailedDirectDecrypt.Add(1)
+			}
+			return nil, fmt.Errorf("Decrypt() failed: %w", err), stderror.CRYPTO_ERROR
 		}
 	}
 	if das.suffixLen > 0 {
 		padding2 := make([]byte, das.suffixLen)
 		if _, err := io.ReadFull(t.conn, padding2); err != nil {
-			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", das.suffixLen, err)
+			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", das.suffixLen, err), stderror.NETWORK_ERROR
 		}
+		metrics.InBytes.Add(int64(len(padding2)))
 	}
 
 	return &segment{
 		metadata:  das,
 		payload:   decryptedPayload,
 		transport: util.TCPTransport,
-	}, nil
+		block:     t.recv,
+	}, nil, stderror.NO_ERROR
 }
 
 func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
@@ -422,6 +487,8 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 		if _, err := t.conn.Write(dataToSend); err != nil {
 			return fmt.Errorf("Write() failed: %w", err)
 		}
+		metrics.OutBytes.Add(int64(len(dataToSend)))
+		metrics.OutPaddingBytes.Add(int64(len(padding)))
 	} else if das, ok := toDataAckStruct(seg.metadata); ok {
 		paddingLen1 := rng.Intn(MaxPaddingSize(t.mtu, t.IPVersion(), t.TransportProtocol(), int(das.payloadLen), 0) + 1)
 		paddingLen2 := rng.Intn(MaxPaddingSize(t.mtu, t.IPVersion(), t.TransportProtocol(), int(das.payloadLen), paddingLen1) + 1)
@@ -453,6 +520,9 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 		if _, err := t.conn.Write(dataToSend); err != nil {
 			return fmt.Errorf("Write() failed: %w", err)
 		}
+		metrics.OutBytes.Add(int64(len(dataToSend)))
+		metrics.OutPaddingBytes.Add(int64(len(padding1)))
+		metrics.OutPaddingBytes.Add(int64(len(padding2)))
 	} else {
 		return stderror.ErrInvalidArgument
 	}
@@ -475,4 +545,30 @@ func (t *TCPUnderlay) maybeInitSendBlockCipher() error {
 		}
 	}
 	return nil
+}
+
+// drainAfterError continues to read some data from the TCP connection after
+// an error happened to confuse possible attacks.
+func (t *TCPUnderlay) drainAfterError() {
+	// Set TCP read deadline to avoid being blocked forever.
+	timeoutMillis := rng.IntRange(1000, 10000)
+	timeoutMillis += rng.FixedInt(50000) // Maximum 60 seconds.
+	t.conn.SetReadDeadline(time.Now().Add(time.Duration(timeoutMillis) * time.Millisecond))
+
+	// Determine the read buffer size.
+	bufSizeType := rng.FixedInt(4)
+	bufSize := 1 << (12 + bufSizeType) // 4, 8, 16, 32 KB
+	buf := make([]byte, bufSize)
+
+	// Determine the number of bytes to read.
+	// Minimum 2 bytes, maximum bufSize bytes.
+	minRead := rng.IntRange(2, bufSize-254)
+	minRead += rng.FixedInt(256)
+
+	n, err := io.ReadAtLeast(t.conn, buf, minRead)
+	if err != nil {
+		log.Debugf("%v read after TCP error failed to complete: %v", t, err)
+	} else {
+		log.Debugf("%v read at least %d bytes after TCP error", t, n)
+	}
 }

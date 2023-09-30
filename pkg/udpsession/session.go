@@ -986,8 +986,8 @@ func (l *Listener) packetInput(raw []byte, addr net.Addr) {
 				s = newUDPSession(conv, l.conn, false, addr, block)
 				s.SetPollIntervalMs(1)
 				if block.BlockContext().UserName != "" {
-					s.inBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, block.BlockContext().UserName), metrics.UserMetricInBytes)
-					s.outBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, block.BlockContext().UserName), metrics.UserMetricOutBytes)
+					s.inBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, block.BlockContext().UserName), metrics.UserMetricReadBytes)
+					s.outBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, block.BlockContext().UserName), metrics.UserMetricWriteBytes)
 				}
 				s.inputToKCP(data)
 				l.sessionLock.Lock()

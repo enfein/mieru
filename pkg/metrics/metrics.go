@@ -19,8 +19,8 @@ const (
 	// MetricGroup name format for each user.
 	UserMetricGroupFormat = "user - %s"
 
-	UserMetricInBytes  = "InBytes"
-	UserMetricOutBytes = "OutBytes"
+	UserMetricReadBytes  = "ReadBytes"
+	UserMetricWriteBytes = "WriteBytes"
 )
 
 var (
