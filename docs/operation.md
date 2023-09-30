@@ -10,7 +10,7 @@ The configuration file of the mieru client is also a binary file. It is stored i
 | :----: | :----: |
 | Linux | $HOME/.config/mieru/client.conf.pb |
 | Mac OS | /Users/USERNAME/Library/Application Support/mieru/client.conf.pb |
-| Windows | C:\Users\USERNAME\AppData\Roaming\mieru\client.conf.pb |
+| Windows | %USERPROFILE%\AppData\Roaming\mieru\client.conf.pb |
 
 ## View mita proxy server log
 
