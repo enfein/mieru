@@ -10,7 +10,7 @@
 | :----: | :----: |
 | Linux | $HOME/.config/mieru/client.conf.pb |
 | Mac OS | /Users/USERNAME/Library/Application Support/mieru/client.conf.pb |
-| Windows | C:\Users\USERNAME\AppData\Roaming\mieru\client.conf.pb |
+| Windows | %USERPROFILE%\AppData\Roaming\mieru\client.conf.pb |
 
 ## 查看代理服务器 mita 的日志
 
