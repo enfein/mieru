@@ -3,6 +3,7 @@ on: [workflow_dispatch]
 jobs:
   run-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - name: Check out repository code
         uses: actions/checkout@v3
