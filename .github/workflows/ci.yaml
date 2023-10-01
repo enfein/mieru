@@ -1,9 +1,9 @@
 name: CI
 on: [push, pull_request, workflow_dispatch]
 jobs:
-  run-test:
+  run-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
       - name: Check out repository code
         uses: actions/checkout@v3
@@ -19,8 +19,6 @@ jobs:
         run: make vet
       - name: Build binaries
         run: make build
-      - name: Run integration test
-        run: make run-container-test
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:

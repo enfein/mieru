@@ -1,4 +1,4 @@
-name: 'speed test'
+name: 'integration test'
 on: [workflow_dispatch]
 jobs:
   run-test:
@@ -11,7 +11,5 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: 1.20.8
-      - name: Build test binaries
-        run: make test-binary
-      - name: Run speed test
-        run: sudo ./test/deploy/packetdrop/test.sh
+      - name: Run integration test
+        run: make run-container-test
