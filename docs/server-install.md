@@ -8,16 +8,16 @@ Before installation and configuration, connect to the server via SSH and then ex
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.15.1/mita_1.15.1_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v2.0.0/mita_2.0.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.15.1/mita_1.15.1_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v2.0.0/mita_2.0.0_arm64.deb
 
 # Fedora / CentOS / Red Hat Enterprise Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.15.1/mita-1.15.1-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v2.0.0/mita-2.0.0-1.x86_64.rpm
 
 # Fedora / CentOS / Red Hat Enterprise Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v1.15.1/mita-1.15.1-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v2.0.0/mita-2.0.0-1.aarch64.rpm
 ```
 
 If the above link is blocked, please use your browser to download and install from the GitHub Releases page.
@@ -26,16 +26,16 @@ If the above link is blocked, please use your browser to download and install fr
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_1.15.1_amd64.deb
+sudo dpkg -i mita_2.0.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_1.15.1_arm64.deb
+sudo dpkg -i mita_2.0.0_arm64.deb
 
 # Fedora / CentOS / Red Hat Enterprise Linux - X86_64
-sudo rpm -Uvh --force mita-1.15.1-1.x86_64.rpm
+sudo rpm -Uvh --force mita-2.0.0-1.x86_64.rpm
 
 # Fedora / CentOS / Red Hat Enterprise Linux - ARM 64
-sudo rpm -Uvh --force mita-1.15.1-1.aarch64.rpm
+sudo rpm -Uvh --force mita-2.0.0-1.aarch64.rpm
 ```
 
 ## Grant permissions
