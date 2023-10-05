@@ -101,8 +101,8 @@ type Session struct {
 	lastTXTime time.Time // last timestamp when a segment is sent
 	unreadBuf  []byte    // payload removed from the recvQueue that haven't been read by application
 
-	readBytes  *metrics.Metric // number of bytes delivered to the application
-	writeBytes *metrics.Metric // number of bytes sent from the application
+	readBytes  metrics.Metric // number of bytes delivered to the application
+	writeBytes metrics.Metric // number of bytes sent from the application
 
 	rttStat          *congestion.RTTStats
 	sendAlgorithm    *congestion.CubicSendAlgorithm

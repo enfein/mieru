@@ -34,7 +34,10 @@
                     ]
                 }
             ],
-            "mtu": 1350
+            "mtu": 1350,
+            "multiplexing": {
+                "level": "MULTIPLEXING_HIGH"
+            }
         },
         {
             "profileName": "new",
@@ -53,7 +56,10 @@
                     ]
                 }
             ],
-            "mtu": 1400
+            "mtu": 1400,
+            "multiplexing": {
+                "level": "MULTIPLEXING_OFF"
+            }
         }
     ],
     "activeProfile": "new",

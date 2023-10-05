@@ -331,7 +331,7 @@ var clientRunFunc = func(s []string) error {
 	}
 
 	// Collect remote proxy addresses and password.
-	mux := protocolv2.NewMux(true).SetClientMultiplexFactor(1)
+	mux := protocolv2.NewMux(true)
 	var hashedPassword []byte
 	activeProfile, err := appctl.GetActiveProfileFromConfig(config, config.GetActiveProfile())
 	if err != nil {
@@ -351,6 +351,18 @@ var clientRunFunc = func(s []string) error {
 	if activeProfile.GetMtu() != 0 {
 		mtu = int(activeProfile.GetMtu())
 	}
+	multiplexFactor := 1
+	switch activeProfile.GetMultiplexing().GetLevel() {
+	case appctlpb.MultiplexingLevel_MULTIPLEXING_OFF:
+		multiplexFactor = 0
+	case appctlpb.MultiplexingLevel_MULTIPLEXING_LOW:
+		multiplexFactor = 1
+	case appctlpb.MultiplexingLevel_MULTIPLEXING_MIDDLE:
+		multiplexFactor = 2
+	case appctlpb.MultiplexingLevel_MULTIPLEXING_HIGH:
+		multiplexFactor = 3
+	}
+	mux = mux.SetClientMultiplexFactor(multiplexFactor)
 	endpoints := make([]protocolv2.UnderlayProperties, 0)
 	resolver := &util.DNSResolver{}
 	for _, serverInfo := range activeProfile.GetServers() {

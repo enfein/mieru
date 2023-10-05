@@ -357,6 +357,7 @@ protobuf:
 		"${ROOT}/pkg/appctl/proto/endpoint.proto" \
 		"${ROOT}/pkg/appctl/proto/lifecycle.proto" \
 		"${ROOT}/pkg/appctl/proto/logging.proto" \
+		"${ROOT}/pkg/appctl/proto/multiplexing.proto" \
 		"${ROOT}/pkg/appctl/proto/servercfg.proto" \
 		"${ROOT}/pkg/appctl/proto/user.proto"
 

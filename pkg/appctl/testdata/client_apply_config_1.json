@@ -17,7 +17,10 @@
                     ]
                 }
             ],
-            "mtu": 1300
+            "mtu": 1300,
+            "multiplexing": {
+                "level": "MULTIPLEXING_LOW"
+            }
         }
     ],
     "activeProfile": "default",

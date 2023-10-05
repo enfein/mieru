@@ -19,6 +19,7 @@ package appctl;
 
 import "endpoint.proto";
 import "logging.proto";
+import "multiplexing.proto";
 import "user.proto";
 
 option go_package = "github.com/enfein/mieru/pkg/appctl/appctlpb";
@@ -36,6 +37,9 @@ message ClientProfile {
     // Maximum transmission unit of L2 payload.
     // This setting only applies to UDP protocol egress traffic.
     optional int32 mtu = 4;
+
+    // Multiplexing behaviors.
+    optional MultiplexingConfig multiplexing = 5;
 }
 
 message ClientAdvancedSettings {}

@@ -28,7 +28,10 @@
                         }
                     ]
                 }
-            ]
+            ],
+            "multiplexing": {
+                "level": "MULTIPLEXING_HIGH"
+            }
         }
     ],
     "activeProfile": "default",

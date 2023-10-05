@@ -29,7 +29,10 @@
                     ]
                 }
             ],
-            "mtu": 1460
+            "mtu": 1460,
+            "multiplexing": {
+                "level": "MULTIPLEXING_HIGH"
+            }
         }
     ],
     "activeProfile": "default",

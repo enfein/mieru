@@ -114,6 +114,7 @@ func (m *Mux) SetClientMultiplexFactor(n int) *Mux {
 		panic("Can't set multiplex factor after mux is used")
 	}
 	m.multiplexFactor = mathext.Max(n, 0)
+	log.Infof("Mux multiplexing factor is set to %d", m.multiplexFactor)
 	return m
 }
 
