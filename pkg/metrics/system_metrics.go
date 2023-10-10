@@ -25,23 +25,23 @@ const (
 
 var (
 	// Max number of connections ever reached.
-	MaxConn = RegisterMetric("connections", "MaxConn")
+	MaxConn = RegisterMetric("connections", "MaxConn", GAUGE)
 
 	// Accumulated active open connections.
-	ActiveOpens = RegisterMetric("connections", "ActiveOpens")
+	ActiveOpens = RegisterMetric("connections", "ActiveOpens", COUNTER)
 
 	// Accumulated passive open connections.
-	PassiveOpens = RegisterMetric("connections", "PassiveOpens")
+	PassiveOpens = RegisterMetric("connections", "PassiveOpens", COUNTER)
 
 	// Current number of established connections.
-	CurrEstablished = RegisterMetric("connections", "CurrEstablished")
+	CurrEstablished = RegisterMetric("connections", "CurrEstablished", GAUGE)
 
 	// Number of bytes receive from proxy connections.
-	InBytes = RegisterMetric("traffic", "InBytes")
+	InBytes = RegisterMetric("traffic", "InBytes", COUNTER)
 
 	// Number of bytes send to proxy connections.
-	OutBytes = RegisterMetric("traffic", "OutBytes")
+	OutBytes = RegisterMetric("traffic", "OutBytes", COUNTER)
 
 	// Number of padding bytes send to proxy connections.
-	OutPaddingBytes = RegisterMetric("traffic", "OutPaddingBytes")
+	OutPaddingBytes = RegisterMetric("traffic", "OutPaddingBytes", COUNTER)
 )

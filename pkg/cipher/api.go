@@ -33,22 +33,22 @@ const (
 
 var (
 	// Number of decryption using the cipher block associated with the connection.
-	ClientDirectDecrypt = metrics.RegisterMetric(ClientDecryptionMetricGroupName, "DirectDecrypt")
+	ClientDirectDecrypt = metrics.RegisterMetric(ClientDecryptionMetricGroupName, "DirectDecrypt", metrics.COUNTER)
 
 	// Number of decryption using the stored cipher block but failed.
-	ClientFailedDirectDecrypt = metrics.RegisterMetric(ClientDecryptionMetricGroupName, "FailedDirectDecrypt")
+	ClientFailedDirectDecrypt = metrics.RegisterMetric(ClientDecryptionMetricGroupName, "FailedDirectDecrypt", metrics.COUNTER)
 
 	// Number of decryption using the cipher block associated with the connection.
-	ServerDirectDecrypt = metrics.RegisterMetric(ServerDecryptionMetricGroupName, "DirectDecrypt")
+	ServerDirectDecrypt = metrics.RegisterMetric(ServerDecryptionMetricGroupName, "DirectDecrypt", metrics.COUNTER)
 
 	// Number of decryption using the stored cipher block but failed.
-	ServerFailedDirectDecrypt = metrics.RegisterMetric(ServerDecryptionMetricGroupName, "FailedDirectDecrypt")
+	ServerFailedDirectDecrypt = metrics.RegisterMetric(ServerDecryptionMetricGroupName, "FailedDirectDecrypt", metrics.COUNTER)
 
 	// Number of decryption that iterates all possible cipher blocks.
-	ServerIterateDecrypt = metrics.RegisterMetric(ServerDecryptionMetricGroupName, "IterateDecrypt")
+	ServerIterateDecrypt = metrics.RegisterMetric(ServerDecryptionMetricGroupName, "IterateDecrypt", metrics.COUNTER)
 
 	// Number of decryption that failed after iterating all possible cipher blocks.
-	ServerFailedIterateDecrypt = metrics.RegisterMetric(ServerDecryptionMetricGroupName, "FailedIterateDecrypt")
+	ServerFailedIterateDecrypt = metrics.RegisterMetric(ServerDecryptionMetricGroupName, "FailedIterateDecrypt", metrics.COUNTER)
 )
 
 // BlockCipher is an interface of block encryption and decryption.

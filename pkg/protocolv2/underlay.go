@@ -24,12 +24,12 @@ import (
 )
 
 var (
-	UnderlayMaxConn         = metrics.RegisterMetric("underlay", "MaxConn")
-	UnderlayActiveOpens     = metrics.RegisterMetric("underlay", "ActiveOpens")
-	UnderlayPassiveOpens    = metrics.RegisterMetric("underlay", "PassiveOpens")
-	UnderlayCurrEstablished = metrics.RegisterMetric("underlay", "CurrEstablished")
-	UnderlayMalformedUDP    = metrics.RegisterMetric("underlay", "UnderlayMalformedUDP")
-	UnderlayUnsolicitedUDP  = metrics.RegisterMetric("underlay", "UnsolicitedUDP")
+	UnderlayMaxConn         = metrics.RegisterMetric("underlay", "MaxConn", metrics.GAUGE)
+	UnderlayActiveOpens     = metrics.RegisterMetric("underlay", "ActiveOpens", metrics.COUNTER)
+	UnderlayPassiveOpens    = metrics.RegisterMetric("underlay", "PassiveOpens", metrics.COUNTER)
+	UnderlayCurrEstablished = metrics.RegisterMetric("underlay", "CurrEstablished", metrics.GAUGE)
+	UnderlayMalformedUDP    = metrics.RegisterMetric("underlay", "UnderlayMalformedUDP", metrics.COUNTER)
+	UnderlayUnsolicitedUDP  = metrics.RegisterMetric("underlay", "UnsolicitedUDP", metrics.COUNTER)
 )
 
 // UnderlayProperties defines network properties of a underlay.

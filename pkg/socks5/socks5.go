@@ -23,25 +23,18 @@ const (
 )
 
 var (
-	HandshakeErrors          = metrics.RegisterMetric("socks5", "HandshakeErrors")
-	DNSResolveErrors         = metrics.RegisterMetric("socks5", "DNSResolveErrors")
-	UnsupportedCommandErrors = metrics.RegisterMetric("socks5", "UnsupportedCommandErrors")
-	NetworkUnreachableErrors = metrics.RegisterMetric("socks5", "NetworkUnreachableErrors")
-	HostUnreachableErrors    = metrics.RegisterMetric("socks5", "HostUnreachableErrors")
-	ConnectionRefusedErrors  = metrics.RegisterMetric("socks5", "ConnectionRefusedErrors")
-	UDPAssociateErrors       = metrics.RegisterMetric("socks5", "UDPAssociateErrors")
+	HandshakeErrors          = metrics.RegisterMetric("socks5", "HandshakeErrors", metrics.COUNTER)
+	DNSResolveErrors         = metrics.RegisterMetric("socks5", "DNSResolveErrors", metrics.COUNTER)
+	UnsupportedCommandErrors = metrics.RegisterMetric("socks5", "UnsupportedCommandErrors", metrics.COUNTER)
+	NetworkUnreachableErrors = metrics.RegisterMetric("socks5", "NetworkUnreachableErrors", metrics.COUNTER)
+	HostUnreachableErrors    = metrics.RegisterMetric("socks5", "HostUnreachableErrors", metrics.COUNTER)
+	ConnectionRefusedErrors  = metrics.RegisterMetric("socks5", "ConnectionRefusedErrors", metrics.COUNTER)
+	UDPAssociateErrors       = metrics.RegisterMetric("socks5", "UDPAssociateErrors", metrics.COUNTER)
 
-	// Incoming UDP association bytes.
-	UDPAssociateInBytes = metrics.RegisterMetric("socks5 UDP associate", "InBytes")
-
-	// Outgoing UDP association bytes.
-	UDPAssociateOutBytes = metrics.RegisterMetric("socks5 UDP associate", "OutBytes")
-
-	// Incoming UDP association packets.
-	UDPAssociateInPkts = metrics.RegisterMetric("socks5 UDP associate", "InPkts")
-
-	// Outgoing UDP association packets.
-	UDPAssociateOutPkts = metrics.RegisterMetric("socks5 UDP associate", "OutPkts")
+	UDPAssociateInBytes  = metrics.RegisterMetric("socks5 UDP associate", "InBytes", metrics.COUNTER)
+	UDPAssociateOutBytes = metrics.RegisterMetric("socks5 UDP associate", "OutBytes", metrics.COUNTER)
+	UDPAssociateInPkts   = metrics.RegisterMetric("socks5 UDP associate", "InPkts", metrics.COUNTER)
+	UDPAssociateOutPkts  = metrics.RegisterMetric("socks5 UDP associate", "OutPkts", metrics.COUNTER)
 )
 
 // Config is used to setup and configure a socks5 server.

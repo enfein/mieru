@@ -15,34 +15,22 @@
 
 package metrics
 
-import (
-	"sync/atomic"
-)
+import "testing"
 
-// Gauge holds a named int64 value.
-type Gauge struct {
-	name  string
-	value atomic.Int64
-}
+func TestGauge(t *testing.T) {
+	g := &Gauge{name: "gauge"}
 
-var _ Metric = &Gauge{}
+	if g.Name() != "gauge" {
+		t.Errorf("Name() = %v, want %v", g.Name(), "gauge")
+	}
+	if g.Type() != GAUGE {
+		t.Errorf("Type() = %v, want %v", g.Type(), GAUGE)
+	}
 
-func (g *Gauge) Name() string {
-	return g.name
-}
-
-func (g *Gauge) Type() MetricType {
-	return GAUGE
-}
-
-func (g *Gauge) Add(delta int64) int64 {
-	return g.value.Add(delta)
-}
-
-func (g *Gauge) Load() int64 {
-	return g.value.Load()
-}
-
-func (g *Gauge) Store(val int64) {
-	g.value.Store(val)
+	g.Store(10)
+	g.Add(-5)
+	val := g.Load()
+	if val != 5 {
+		t.Errorf("Load() = %v, want %v", val, 5)
+	}
 }

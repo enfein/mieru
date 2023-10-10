@@ -29,10 +29,10 @@ const (
 
 var (
 	// Number of replay packets sent from a new session.
-	NewSession = metrics.RegisterMetric("replay", "NewSession")
+	NewSession = metrics.RegisterMetric("replay", "NewSession", metrics.COUNTER)
 
 	// Number of replay packets sent from a known session.
-	KnownSession = metrics.RegisterMetric("replay", "KnownSession")
+	KnownSession = metrics.RegisterMetric("replay", "KnownSession", metrics.COUNTER)
 )
 
 // ReplayCache stores the signature of recent decrypted packets to avoid

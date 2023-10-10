@@ -32,9 +32,9 @@ import (
 var (
 	HTTPMetricGroupName = "HTTP proxy"
 
-	HTTPRequests     = metrics.RegisterMetric(HTTPMetricGroupName, "Requests")
-	HTTPConnErrors   = metrics.RegisterMetric(HTTPMetricGroupName, "ConnErrors")
-	HTTPSchemeErrors = metrics.RegisterMetric(HTTPMetricGroupName, "SchemeErrors")
+	HTTPRequests     = metrics.RegisterMetric(HTTPMetricGroupName, "Requests", metrics.COUNTER)
+	HTTPConnErrors   = metrics.RegisterMetric(HTTPMetricGroupName, "ConnErrors", metrics.COUNTER)
+	HTTPSchemeErrors = metrics.RegisterMetric(HTTPMetricGroupName, "SchemeErrors", metrics.COUNTER)
 )
 
 // hopByHopHeaders are HTTP headers that need to be removed by intermediaries.

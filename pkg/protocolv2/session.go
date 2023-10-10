@@ -642,10 +642,10 @@ func (s *Session) input(seg *segment) error {
 	if seg.block != nil {
 		s.block = seg.block
 		if s.readBytes == nil && s.block.BlockContext().UserName != "" {
-			s.readBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, s.block.BlockContext().UserName), metrics.UserMetricReadBytes)
+			s.readBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, s.block.BlockContext().UserName), metrics.UserMetricReadBytes, metrics.COUNTER_TIME_SERIES)
 		}
 		if s.writeBytes == nil && s.block.BlockContext().UserName != "" {
-			s.writeBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, s.block.BlockContext().UserName), metrics.UserMetricWriteBytes)
+			s.writeBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, s.block.BlockContext().UserName), metrics.UserMetricWriteBytes, metrics.COUNTER_TIME_SERIES)
 		}
 	}
 	s.lastRXTime = time.Now()

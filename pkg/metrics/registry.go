@@ -16,6 +16,7 @@
 package metrics
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -25,13 +26,24 @@ var metricMap sync.Map
 // RegisterMetric registers a new metric.
 // The caller should not take the ownership of the returned pointer.
 // If the same metric is registered multiple times, the pointer to the first object is returned.
-func RegisterMetric(groupName, metricName string) Metric {
+func RegisterMetric(groupName, metricName string, metricType MetricType) Metric {
 	group, _ := metricMap.LoadOrStore(groupName, &MetricGroup{
 		name: groupName,
 	})
 	metricGroup := group.(*MetricGroup)
 	metricGroup.EnableLogging()
-	metric, _ := metricGroup.metrics.LoadOrStore(metricName, &Gauge{name: metricName})
+	var m Metric
+	switch metricType {
+	case COUNTER:
+		m = &Counter{name: metricName}
+	case COUNTER_TIME_SERIES:
+		m = &Counter{name: metricName, timeSeries: true}
+	case GAUGE:
+		m = &Gauge{name: metricName}
+	default:
+		panic(fmt.Sprintf("unrecognized metric type %v", metricType))
+	}
+	metric, _ := metricGroup.metrics.LoadOrStore(metricName, m)
 	return metric.(Metric)
 }
 
