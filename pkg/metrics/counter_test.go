@@ -16,8 +16,11 @@
 package metrics
 
 import (
+	mrand "math/rand"
 	"testing"
 	"time"
+
+	"github.com/enfein/mieru/pkg/log"
 )
 
 func TestCounter(t *testing.T) {
@@ -67,5 +70,33 @@ func TestCounter(t *testing.T) {
 		if value != tc.value {
 			t.Errorf("DeltaBetween() = %v, want %v", value, tc.value)
 		}
+	}
+}
+
+func TestRollUp(t *testing.T) {
+	log.SetOutputToTest(t)
+	c := &Counter{name: "counter", timeSeries: true}
+	timestamps := make([]int64, 1000000)
+	now := time.Now().UnixMilli()
+	for i := 1000000 - 1; i >= 0; i-- {
+		now -= mrand.Int63n(1000)
+		timestamps[i] = now
+	}
+	var total int64
+	for i := 0; i < 1000000; i++ {
+		v := mrand.Int63n(1000)
+		c.addWithTime(v, time.UnixMilli(timestamps[i]))
+		total += v
+	}
+	t.Logf("Length of history is %d", len(c.history))
+	if c.value != total {
+		t.Fatalf("Got counter value %d, want %d", c.value, total)
+	}
+	var sum int64
+	for _, r := range c.history {
+		sum += r.delta
+	}
+	if sum != total {
+		t.Errorf("History sum up to %d, want %d", sum, total)
 	}
 }

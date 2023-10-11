@@ -142,8 +142,11 @@ func (c *Counter) rollUp() {
 		return
 	}
 	c.doRollUp(noRollUp, toMinute, rollUpSecondToMinute, time.Minute)
+	c.doRollUp(toMinute, toMinute, rollUpSecondToMinute, time.Minute)
 	c.doRollUp(toMinute, toHour, rollUpMinuteToHour, time.Hour)
+	c.doRollUp(toHour, toHour, rollUpMinuteToHour, time.Hour)
 	c.doRollUp(toHour, toDay, rollUpHourToDay, 24*time.Hour)
+	c.doRollUp(toDay, toDay, rollUpHourToDay, 24*time.Hour)
 }
 
 func (c *Counter) doRollUp(fromLabel, toLabel rollUpLabel, rollUpDuration, truncateDuration time.Duration) {
@@ -182,6 +185,9 @@ func (c *Counter) doRollUp(fromLabel, toLabel rollUpLabel, rollUpDuration, trunc
 			}
 		}
 	}
+	if last != nil {
+		newHistory = append(newHistory, *last)
+	}
 	c.history = newHistory
 }
 
@@ -189,4 +195,8 @@ type record struct {
 	time  time.Time
 	delta int64
 	label rollUpLabel
+}
+
+func (r *record) String() string {
+	return fmt.Sprintf("record{time=%s, delta=%d, label=%d}", r.time.Format(time.RFC3339Nano), r.delta, r.label)
 }
