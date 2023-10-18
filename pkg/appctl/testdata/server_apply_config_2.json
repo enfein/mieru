@@ -20,7 +20,17 @@
         },
         {
             "name": "user2",
-            "password": "c30ce98ebe45"
+            "password": "c30ce98ebe45",
+            "quotas": [
+                {
+                    "days": 7,
+                    "megabytes": 1000
+                },
+                {
+                    "days": 30,
+                    "megabytes": 2000
+                }
+            ]
         }
     ],
     "loggingLevel": "INFO",

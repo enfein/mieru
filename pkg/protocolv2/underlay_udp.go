@@ -55,7 +55,7 @@ type UDPUnderlay struct {
 	block      cipher.BlockCipher
 
 	// ---- server fields ----
-	users map[string]*appctlpb.User // registered users
+	users map[string]*appctlpb.User
 }
 
 var _ Underlay = &UDPUnderlay{}
@@ -277,7 +277,8 @@ func (u *UDPUnderlay) onOpenSessionRequest(seg *segment, remoteAddr net.Addr) er
 		log.Debugf("%v received open session request, but session ID %d is already used", u, sessionID)
 		return nil
 	}
-	session := NewSession(sessionID, u.isClient, u.MTU())
+	session := NewSession(sessionID, false, u.MTU())
+	session.users = u.users
 	u.AddSession(session, remoteAddr)
 	session.recvChan <- seg
 	u.readySessions <- session

@@ -196,7 +196,3 @@ type record struct {
 	delta int64
 	label rollUpLabel
 }
-
-func (r *record) String() string {
-	return fmt.Sprintf("record{time=%s, delta=%d, label=%d}", r.time.Format(time.RFC3339Nano), r.delta, r.label)
-}

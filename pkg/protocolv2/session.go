@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/congestion"
 	"github.com/enfein/mieru/pkg/log"
@@ -81,6 +82,8 @@ type Session struct {
 	mtu        int          // L2 maxinum transmission unit
 	remoteAddr net.Addr     // specify remote network address, used by UDP
 	state      sessionState // session state
+	status     statusCode   // session status
+	users      map[string]*appctlpb.User
 
 	ready         chan struct{} // indicate the session is ready to use
 	done          chan struct{} // indicate the session is complete
@@ -129,6 +132,7 @@ func NewSession(id uint32, isClient bool, mtu int) *Session {
 		isClient:         isClient,
 		mtu:              mtu,
 		state:            sessionInit,
+		status:           statusOK,
 		ready:            make(chan struct{}),
 		done:             make(chan struct{}),
 		readDeadline:     util.ZeroTime(),
@@ -317,7 +321,7 @@ func (s *Session) Close() error {
 	}
 
 	log.Debugf("Closing %v", s)
-	if s.isState(sessionEstablished) {
+	if s.isState(sessionAttached) || s.isState(sessionEstablished) {
 		// Send closeSessionRequest, but don't wait for closeSessionResponse,
 		// because the underlay connection may be already broken.
 		// The closeSessionRequest won't be sent again.
@@ -326,8 +330,9 @@ func (s *Session) Close() error {
 				baseStruct: baseStruct{
 					protocol: uint8(closeSessionRequest),
 				},
-				sessionID: s.id,
-				seq:       s.nextSend,
+				sessionID:  s.id,
+				seq:        s.nextSend,
+				statusCode: uint8(s.status),
 			},
 			transport: s.conn.TransportProtocol(),
 		}
@@ -343,6 +348,14 @@ func (s *Session) Close() error {
 			log.Debugf("Unsupported transport protocol %v", s.conn.TransportProtocol())
 		}
 	}
+
+	// Wait for sendQueue to flush.
+	timeC := time.After(time.Second)
+	select {
+	case <-timeC:
+	case <-s.sendQueue.chanEmptyEvent:
+	}
+
 	s.forwardStateTo(sessionClosed)
 	close(s.done)
 	metrics.CurrEstablished.Add(-1)
@@ -711,9 +724,28 @@ func (s *Session) inputData(seg *segment) error {
 
 	if !s.isClient && seg.metadata.Protocol() == openSessionRequest {
 		s.wLock.Lock()
-		defer s.wLock.Unlock()
 		if s.isState(sessionAttached) {
 			// Server needs to send open session response.
+			// Check user quota if we can identify the user.
+			var userName string
+			if seg.block != nil && seg.block.BlockContext().UserName != "" {
+				userName = seg.block.BlockContext().UserName
+			} else if s.block != nil && s.block.BlockContext().UserName != "" {
+				userName = s.block.BlockContext().UserName
+			}
+			if userName != "" {
+				quotaOK, err := s.checkQuota(userName)
+				if err != nil {
+					log.Debugf("%v checkQuota() failed: %v", s, err)
+				}
+				if !quotaOK {
+					s.status = statusQuotaExhausted
+					log.Debugf("Closing %v because user %s used all the quota", s, userName)
+					s.wLock.Unlock()
+					s.Close()
+					return nil
+				}
+			}
 			seg4 := &segment{
 				metadata: &sessionStruct{
 					baseStruct: baseStruct{
@@ -731,6 +763,7 @@ func (s *Session) inputData(seg *segment) error {
 			s.sendQueue.InsertBlocking(seg4)
 			s.forwardStateTo(sessionEstablished)
 		}
+		s.wLock.Unlock()
 	}
 	return nil
 }
@@ -774,7 +807,7 @@ func (s *Session) inputClose(seg *segment) error {
 				},
 				sessionID:  s.id,
 				seq:        s.nextSend,
-				statusCode: 0,
+				statusCode: uint8(statusOK),
 				payloadLen: 0,
 			},
 			transport: s.conn.TransportProtocol(),
@@ -829,4 +862,41 @@ func (s *Session) output(seg *segment, remoteAddr net.Addr) error {
 	}
 	s.lastTXTime = time.Now()
 	return nil
+}
+
+func (s *Session) checkQuota(userName string) (ok bool, err error) {
+	if len(s.users) == 0 {
+		return true, fmt.Errorf("no registered user")
+	}
+	user, found := s.users[userName]
+	if !found {
+		return true, fmt.Errorf("user %s is not found", userName)
+	}
+	if len(user.GetQuotas()) == 0 {
+		return true, nil
+	}
+
+	metricGroupName := fmt.Sprintf(metrics.UserMetricGroupFormat, userName)
+	metricGroup := metrics.GetMetricGroupByName(metricGroupName)
+	if metricGroup == nil {
+		return true, fmt.Errorf("metric group %s is not found", metricGroupName)
+	}
+	readBytes, found := metricGroup.GetMetric(metrics.UserMetricReadBytes)
+	if !found {
+		return true, fmt.Errorf("metric %s in group %s is not found", metrics.UserMetricReadBytes, metricGroupName)
+	}
+	writeBytes, found := metricGroup.GetMetric(metrics.UserMetricWriteBytes)
+	if !found {
+		return true, fmt.Errorf("metric %s in group %s is not found", metrics.UserMetricWriteBytes, metricGroupName)
+	}
+	for _, quota := range user.GetQuotas() {
+		now := time.Now()
+		then := now.Add(-time.Duration(quota.GetDays()) * 24 * time.Hour)
+		totalBytes := readBytes.(*metrics.Counter).DeltaBetween(then, now)
+		totalBytes += writeBytes.(*metrics.Counter).DeltaBetween(then, now)
+		if totalBytes/1048576 > int64(quota.GetMegabytes()) {
+			return false, nil
+		}
+	}
+	return true, nil
 }

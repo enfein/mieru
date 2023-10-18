@@ -58,6 +58,15 @@ type MetricGroup struct {
 	enableLogging atomic.Bool
 }
 
+// GetMetric returns one metric from the metric group.
+func (g *MetricGroup) GetMetric(name string) (Metric, bool) {
+	v, ok := g.metrics.Load(name)
+	if !ok {
+		return nil, false
+	}
+	return v.(Metric), true
+}
+
 // IsLoggingEnabled returns if logging is enabled in this MetricGroup.
 func (g *MetricGroup) IsLoggingEnabled() bool {
 	return g.enableLogging.Load()

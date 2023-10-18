@@ -11,12 +11,10 @@
             "password": "fa7206ed2a94",
             "quotas": [
                 {
-                    "days": 7,
-                    "megabytes": 1000
+                    "days": 1,
+                    "megabytes": 0
                 }
             ]
         }
-    ],
-    "loggingLevel": "DEBUG",
-    "mtu": 1300
+    ]
 }

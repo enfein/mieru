@@ -22,6 +22,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
@@ -41,6 +42,9 @@ type TCPUnderlay struct {
 	// Candidates are block ciphers that can be used to encrypt or decrypt data.
 	// When isClient is true, there must be exactly 1 element in the slice.
 	candidates []cipher.BlockCipher
+
+	// ---- server fields ----
+	users map[string]*appctlpb.User
 }
 
 var _ Underlay = &TCPUnderlay{}
@@ -243,7 +247,8 @@ func (t *TCPUnderlay) onOpenSessionRequest(seg *segment) error {
 	if found {
 		return fmt.Errorf("%v received open session request, but session ID %d is already used", t, sessionID)
 	}
-	session := NewSession(sessionID, t.isClient, t.MTU())
+	session := NewSession(sessionID, false, t.MTU())
+	session.users = t.users
 	t.AddSession(session, nil)
 	session.recvChan <- seg
 	t.readySessions <- session

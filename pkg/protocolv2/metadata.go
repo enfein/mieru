@@ -69,6 +69,24 @@ func (p protocolType) String() string {
 	}
 }
 
+type statusCode byte
+
+const (
+	statusOK             statusCode = 0
+	statusQuotaExhausted statusCode = 1
+)
+
+func (c statusCode) String() string {
+	switch c {
+	case statusOK:
+		return "OK"
+	case statusQuotaExhausted:
+		return "quotaExhausted"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 const (
 	// Number of bytes used by metadata before encryption.
 	MetadataLength = 32

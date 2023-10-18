@@ -19,8 +19,6 @@ import (
 	mrand "math/rand"
 	"testing"
 	"time"
-
-	"github.com/enfein/mieru/pkg/log"
 )
 
 func TestCounter(t *testing.T) {
@@ -74,7 +72,6 @@ func TestCounter(t *testing.T) {
 }
 
 func TestRollUp(t *testing.T) {
-	log.SetOutputToTest(t)
 	c := &Counter{name: "counter", timeSeries: true}
 	timestamps := make([]int64, 1000000)
 	now := time.Now().UnixMilli()

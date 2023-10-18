@@ -32,4 +32,18 @@ message User {
     // Hashed password.
     // Stored with hex encoding.
     optional string hashedPassword = 3;
+
+    // User quotas.
+    // This has no effect at the client side.
+    repeated Quota quotas = 4;
+}
+
+message Quota {
+
+    // Number of days to renew the quota.
+    // The renew is rolling based.
+    optional int32 days = 1;
+
+    // Number of megabytes the user allowed to send and receive.
+    optional int32 megabytes = 2;
 }

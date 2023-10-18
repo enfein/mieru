@@ -484,6 +484,9 @@ func DeleteServerUsers(names []string) error {
 // 2. for each user
 // 2.1. user name is not empty
 // 2.2. user has either a password or a hashed password
+// 2.3. for each quota
+// 2.3.1. number of days is valid
+// 2.3.2. traffic volume in megabyte is valid
 // 3. if set, MTU is valid
 func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 	for _, portBinding := range patch.GetPortBindings() {
@@ -502,6 +505,14 @@ func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 		}
 		if user.GetPassword() == "" && user.GetHashedPassword() == "" {
 			return fmt.Errorf("user password is not set")
+		}
+		for _, quota := range user.GetQuotas() {
+			if quota.GetDays() <= 0 {
+				return fmt.Errorf("quota: number of days %d is invalid", quota.GetDays())
+			}
+			if quota.GetMegabytes() <= 0 {
+				return fmt.Errorf("quota: traffic volume in megabyte %d is invalid", quota.GetMegabytes())
+			}
 		}
 	}
 	if patch.GetMtu() != 0 && (patch.GetMtu() < 1280 || patch.GetMtu() > 1500) {

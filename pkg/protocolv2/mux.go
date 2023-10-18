@@ -407,6 +407,7 @@ func (m *Mux) serverWrapTCPConn(rawConn net.Conn, mtu int, users map[string]*app
 		baseUnderlay: *newBaseUnderlay(false, mtu),
 		conn:         rawConn.(*net.TCPConn),
 		candidates:   blocks,
+		users:        users,
 	}
 }
 

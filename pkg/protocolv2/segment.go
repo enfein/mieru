@@ -170,6 +170,7 @@ type segmentTree struct {
 
 	mu                sync.Mutex
 	notFull           sync.Cond
+	chanEmptyEvent    chan struct{}
 	chanNotEmptyEvent chan struct{}
 }
 
@@ -182,6 +183,7 @@ func newSegmentTree(capacity int) *segmentTree {
 		cap: capacity,
 	}
 	st.notFull = *sync.NewCond(&st.mu)
+	st.chanEmptyEvent = make(chan struct{}, 1)
 	st.chanNotEmptyEvent = make(chan struct{}, 1)
 	return st
 }
@@ -251,6 +253,8 @@ func (t *segmentTree) DeleteMin() (*segment, bool) {
 	t.notFull.Broadcast()
 	if t.Len() > 0 {
 		t.notifyNotEmpty()
+	} else {
+		t.notifyEmpty()
 	}
 	return seg, true
 }
@@ -285,6 +289,8 @@ func (t *segmentTree) DeleteMinIf(si segmentIterator) (*segment, bool) {
 	}
 	if t.Len() > 0 {
 		t.notifyNotEmpty()
+	} else {
+		t.notifyEmpty()
 	}
 	return seg, shouldDelete
 }
@@ -327,6 +333,13 @@ func (t *segmentTree) Len() int {
 // Remaining returns the remaining space of the tree before it is full.
 func (t *segmentTree) Remaining() int {
 	return t.cap - t.tr.Len()
+}
+
+func (t *segmentTree) notifyEmpty() {
+	select {
+	case t.chanEmptyEvent <- struct{}{}:
+	default:
+	}
 }
 
 func (t *segmentTree) notifyNotEmpty() {
