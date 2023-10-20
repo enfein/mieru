@@ -68,15 +68,14 @@ To determine if the connectivity is OK, you can look at the client logs. For exa
 
 ```
 INFO [metrics]
-INFO [metrics - cipher - client] DirectDecrypt=9012 FailedDirectDecrypt=0
-INFO [metrics - connections] ActiveOpens=2 CurrEstablished=2 MaxConn=2 PassiveOpens=0
-INFO [metrics - errors] KCPInErrors=0 KCPReceiveErrors=0 KCPSendErrors=0 TCPReceiveErrors=0 TCPSendErrors=0 UDPInErrors=0
-INFO [metrics - HTTP proxy] ConnErrors=0 Requests=2 SchemeErrors=0
-INFO [metrics - KCP] BytesReceived=7844876 BytesSent=1262416 FastRetransSegs=0 InSegs=9014 LostSegs=10 OutOfWindowSegs=64 OutSegs=9016 RepeatSegs=25 RetransSegs=10
+INFO [metrics - cipher - client] DirectDecrypt=9187 FailedDirectDecrypt=0
+INFO [metrics - connections] ActiveOpens=44 CurrEstablished=1 MaxConn=2 PassiveOpens=0
+INFO [metrics - HTTP proxy] ConnErrors=0 Requests=0 SchemeErrors=0
 INFO [metrics - replay] KnownSession=0 NewSession=0
 INFO [metrics - socks5] ConnectionRefusedErrors=0 DNSResolveErrors=0 HandshakeErrors=0 HostUnreachableErrors=0 NetworkUnreachableErrors=0 UDPAssociateErrors=0 UnsupportedCommandErrors=0
-INFO [metrics - socks5 UDP associate] InBytes=0 InPkts=0 OutBytes=0 OutPkts=0
-INFO [metrics - traffic] InBytes=8326343 OutBytes=2252569 OutPaddingBytes=515475
+INFO [metrics - socks5 UDP associate] InBytes=3106936 InPkts=4399 OutBytes=3106340 OutPkts=4398
+INFO [metrics - traffic] InBytes=3883129 OutBytes=3867440 OutPaddingBytes=422090
+INFO [metrics - underlay] ActiveOpens=4 CurrEstablished=4 MaxConn=4 PassiveOpens=0 UnderlayMalformedUDP=0 UnsolicitedUDP=0
 ```
 
 if the value of `CurrEstablished` is not 0, there is an active connection between the client and the server at this moment; if the value of `DirectDecrypt` is not 0, the client has successfully decrypted the response packets sent by the server.

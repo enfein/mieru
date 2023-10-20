@@ -17,14 +17,41 @@ package protocolv2
 
 import (
 	crand "crypto/rand"
+	"fmt"
+	mrand "math/rand"
+
+	"github.com/enfein/mieru/pkg/rng"
+	"github.com/enfein/mieru/pkg/util"
 )
 
-func newPadding(length int) []byte {
+var (
+	recommendedConsecutiveASCIILen = 32 + rng.FixedInt(33)
+)
+
+type paddingOpts struct {
+	// The maxinum length of padding.
+	maxLen int
+
+	// The mininum length of consecutive ASCII characters.
+	// This implies the mininum length of padding.
+	minConsecutiveASCIILen int
+}
+
+func newPadding(opts paddingOpts) []byte {
+	if opts.maxLen < opts.minConsecutiveASCIILen {
+		panic(fmt.Sprintf("Invalid padding options: maxLen %d is smaller than minConsecutiveASCIILen %d", opts.maxLen, opts.minConsecutiveASCIILen))
+	}
+	length := rng.Intn(opts.maxLen-opts.minConsecutiveASCIILen+1) + opts.minConsecutiveASCIILen
 	p := make([]byte, length)
 	for {
 		if _, err := crand.Read(p); err == nil {
 			break
 		}
 	}
+	beginIdx := 0
+	if length > opts.minConsecutiveASCIILen {
+		beginIdx = mrand.Intn(length - opts.minConsecutiveASCIILen)
+	}
+	util.ToPrintableChar(p, beginIdx, beginIdx+opts.minConsecutiveASCIILen)
 	return p
 }

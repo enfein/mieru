@@ -25,6 +25,7 @@ import (
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
+	"github.com/enfein/mieru/pkg/mathext"
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/replay"
 	"github.com/enfein/mieru/pkg/rng"
@@ -465,9 +466,12 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 	defer t.sendMutex.Unlock()
 
 	if ss, ok := toSessionStruct(seg.metadata); ok {
-		suffixLen := rng.Intn(MaxPaddingSize(t.mtu, t.IPVersion(), t.TransportProtocol(), int(ss.payloadLen), 0) + 1)
-		ss.suffixLen = uint8(suffixLen)
-		padding := newPadding(suffixLen)
+		maxPaddingSize := MaxPaddingSize(t.mtu, t.IPVersion(), t.TransportProtocol(), int(ss.payloadLen), 0)
+		padding := newPadding(paddingOpts{
+			maxLen:                 maxPaddingSize,
+			minConsecutiveASCIILen: mathext.Max(maxPaddingSize, recommendedConsecutiveASCIILen),
+		})
+		ss.suffixLen = uint8(len(padding))
 		if log.IsLevelEnabled(log.TraceLevel) {
 			log.Tracef("%v is sending %v", t, seg)
 		}
@@ -495,12 +499,14 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 		metrics.OutBytes.Add(int64(len(dataToSend)))
 		metrics.OutPaddingBytes.Add(int64(len(padding)))
 	} else if das, ok := toDataAckStruct(seg.metadata); ok {
-		paddingLen1 := rng.Intn(MaxPaddingSize(t.mtu, t.IPVersion(), t.TransportProtocol(), int(das.payloadLen), 0) + 1)
-		paddingLen2 := rng.Intn(MaxPaddingSize(t.mtu, t.IPVersion(), t.TransportProtocol(), int(das.payloadLen), paddingLen1) + 1)
-		das.prefixLen = uint8(paddingLen1)
-		das.suffixLen = uint8(paddingLen2)
-		padding1 := newPadding(paddingLen1)
-		padding2 := newPadding(paddingLen2)
+		padding1 := newPadding(paddingOpts{
+			maxLen: MaxPaddingSize(t.mtu, t.IPVersion(), t.TransportProtocol(), int(das.payloadLen), 0),
+		})
+		padding2 := newPadding(paddingOpts{
+			maxLen: MaxPaddingSize(t.mtu, t.IPVersion(), t.TransportProtocol(), int(das.payloadLen), len(padding1)),
+		})
+		das.prefixLen = uint8(len(padding1))
+		das.suffixLen = uint8(len(padding2))
 		if log.IsLevelEnabled(log.TraceLevel) {
 			log.Tracef("%v is sending %v", t, seg)
 		}

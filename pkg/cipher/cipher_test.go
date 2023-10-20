@@ -20,6 +20,8 @@ import (
 	crand "crypto/rand"
 	mrand "math/rand"
 	"testing"
+
+	"github.com/enfein/mieru/pkg/util"
 )
 
 func TestDefaultNonceSize(t *testing.T) {
@@ -233,7 +235,7 @@ func TestAESGCMBlockCipherNewNonce(t *testing.T) {
 			if j >= noncePrintablePrefixLen {
 				break
 			}
-			if b < printableCharSub || b > printableCharSup {
+			if b < util.PrintableCharSub || b > util.PrintableCharSup {
 				t.Fatalf("Byte %v in position %d is not a printable ASCII character", b, j)
 			}
 			distribution[b]++

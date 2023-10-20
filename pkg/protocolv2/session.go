@@ -818,7 +818,11 @@ func (s *Session) inputClose(seg *segment) error {
 			return fmt.Errorf("output() failed: %v", err)
 		}
 		// Immediately shutdown event loop.
-		log.Debugf("Remote requested to shut down %v", s)
+		if seg.metadata.(*sessionStruct).statusCode == uint8(statusQuotaExhausted) {
+			log.Infof("Remote requested to shut down the session because user has exhausted quota")
+		} else {
+			log.Debugf("Remote requested to shut down %v", s)
+		}
 		s.forwardStateTo(sessionClosed)
 		select {
 		case <-s.done:
