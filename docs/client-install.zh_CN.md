@@ -31,7 +31,7 @@ mieru apply config <FILE>
                     "domainName": "",
                     "portBindings": [
                         {
-                            "port": 2012,
+                            "portRange": "2012-2022",
                             "protocol": "TCP"
                         },
                         {
@@ -41,7 +41,10 @@ mieru apply config <FILE>
                     ]
                 }
             ],
-            "mtu": 1400
+            "mtu": 1400,
+            "multiplexing": {
+                "level": "MULTIPLEXING_HIGH"
+            }
         }
     ],
     "activeProfile": "default",
@@ -60,12 +63,13 @@ mieru apply config <FILE>
 2. 在 `profiles` -> `user` -> `password` 属性中，填写密码。此处必须与代理服务器中的设置相同。
 3. 在 `profiles` -> `servers` -> `ipAddress` 属性中，填写代理服务器的公网地址。支持 IPv4 和 IPv6 地址。
 4. 如果你为代理服务器注册了域名，请在 `profiles` -> `servers` -> `domainName` 中填写域名。否则，请勿修改这个属性。
-5. 在 `profiles` -> `servers` -> `portBindings` -> `port` 中填写 mita 监听的 TCP 或 UDP 端口号。这个端口号必须与代理服务器中的设置相同。
+5. 在 `profiles` -> `servers` -> `portBindings` -> `port` 中填写 mita 监听的 TCP 或 UDP 端口号。这个端口号必须与代理服务器中的设置相同。如果想要监听连续的端口号，也可以改为使用 `portRange` 属性。
 6. 请为 `profiles` -> `mtu` 属性中指定一个从 1280 到 1500 之间的值。默认值为 1400。这个值可以与代理服务器中的设置不同。
-7. 请为 `rpcPort` 属性指定一个从 1025 到 65535 之间的数值。
-8. 请为 `socks5Port` 属性指定一个从 1025 到 65535 之间的数值。该端口不能与 `rpcPort` 相同。
-9. 如果客户端需要为局域网中的其他设备提供代理服务，请将 `socks5ListenLAN` 属性设置为 `true`。
-10. 如果要启动 HTTP / HTTPS 代理，请为 `httpProxyPort` 属性指定一个从 1025 到 65535 之间的数值。该端口不能与 `rpcPort` 和 `socks5Port` 相同。如果需要为局域网中的其他设备提供 HTTP / HTTPS 代理，请将 `httpProxyListenLAN` 属性设置为 `true`。如果不需要 HTTP / HTTPS 代理，请删除 `httpProxyPort` 和 `httpProxyListenLAN` 属性。
+7. 如果想要调整多路复用的频率，是更多地创建新连接，还是更多地重用旧连接，可以为 `profiles` -> `multiplexing` -> `level` 属性设定一个值。这里可以使用的值包括 `MULTIPLEXING_OFF`, `MULTIPLEXING_LOW`, `MULTIPLEXING_MIDDLE`, `MULTIPLEXING_HIGH`。其中 `MULTIPLEXING_OFF` 会关闭多路复用功能。默认值为 `MULTIPLEXING_LOW`。
+8. 请为 `rpcPort` 属性指定一个从 1025 到 65535 之间的数值。
+9. 请为 `socks5Port` 属性指定一个从 1025 到 65535 之间的数值。该端口不能与 `rpcPort` 相同。
+10. 如果客户端需要为局域网中的其他设备提供代理服务，请将 `socks5ListenLAN` 属性设置为 `true`。
+11. 如果要启动 HTTP / HTTPS 代理，请为 `httpProxyPort` 属性指定一个从 1025 到 65535 之间的数值。该端口不能与 `rpcPort` 和 `socks5Port` 相同。如果需要为局域网中的其他设备提供 HTTP / HTTPS 代理，请将 `httpProxyListenLAN` 属性设置为 `true`。如果不需要 HTTP / HTTPS 代理，请删除 `httpProxyPort` 和 `httpProxyListenLAN` 属性。
 
 如果你安装了多台代理服务器，或者一台服务器监听多个端口，可以把它们都添加到客户端设置中。每次发起新的连接时，mieru 会随机选取其中的一台服务器和一个端口。**如果使用了多台服务器，请确保每一台服务器都启动了 mita 代理服务。**
 

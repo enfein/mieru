@@ -26,8 +26,16 @@ enum TransportProtocol {
 }
 
 message PortBinding {
+    // A single port number.
+    // This field can't be set with portRange at the same time.
     optional int32 port = 1;
+
     optional TransportProtocol protocol = 2;
+
+    // A port number range.
+    // For example, "8000-9000" contains 1001 ports from 8000 to 9000.
+    // This field can't be set with port at the same time.
+    optional string portRange = 3;
 }
 
 message ServerEndpoint {

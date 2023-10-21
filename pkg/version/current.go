@@ -16,5 +16,5 @@
 package version
 
 const (
-	AppVersion = "2.0.0"
+	AppVersion = "2.1.0"
 )

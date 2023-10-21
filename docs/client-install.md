@@ -31,7 +31,7 @@ to modify the proxy client settings. `<FILE>` is a JSON formatted configuration 
                     "domainName": "",
                     "portBindings": [
                         {
-                            "port": 2012,
+                            "portRange": "2012-2022",
                             "protocol": "TCP"
                         },
                         {
@@ -41,7 +41,10 @@ to modify the proxy client settings. `<FILE>` is a JSON formatted configuration 
                     ]
                 }
             ],
-            "mtu": 1400
+            "mtu": 1400,
+            "multiplexing": {
+                "level": "MULTIPLEXING_HIGH"
+            }
         }
     ],
     "activeProfile": "default",
@@ -60,12 +63,13 @@ Please use a text editor to modify the following fields.
 2. In the `profiles` -> `user` -> `password` property, fill in the password. This must be the same as the setting in the proxy server.
 3. In the `profiles` -> `servers` -> `ipAddress` property, fill in the public address of the proxy server. Both IPv4 and IPv6 addresses are supported.
 4. If you have registered a domain name for the proxy server, please fill in the domain name in `profiles` -> `servers` -> `domainName`. Otherwise, do not modify this property.
-5. Fill in `profiles` -> `servers` -> `portBindings` -> `port` with the TCP or UDP port number that mita is listening on. The port number must be the same as the one set in the proxy server.
+5. Fill in `profiles` -> `servers` -> `portBindings` -> `port` with the TCP or UDP port number that mita is listening to. The port number must be the same as the one set in the proxy server. If you want to listen to a range of consecutive port numbers, you can also use the `portRange` property instead.
 6. Specify a value between 1280 and 1500 for the `profiles` -> `mtu` property. The default value is 1400. This value can be different from the setting in the proxy server.
-7. Please specify a value between 1025 and 65535 for the `rpcPort` property.
-8. Please specify a value between 1025 and 65535 for the `socks5Port` property. This port cannot be the same as `rpcPort`.
-9. If the client needs to provide proxy services to other devices on the LAN, set the `socks5ListenLAN` property to `true`.
-10. If you want to enable HTTP / HTTPS proxy, Please specify a value between 1025 and 65535 for the `httpProxyPort` property. This port cannot be the same as `rpcPort` or `socks5Port`. If the client needs to provide HTTP / HTTPS proxy services to other devices on the LAN, set the `httpProxyListenLAN` property to `true`. If you want to disable HTTP / HTTPS proxy, please delete `httpProxyPort` and `httpProxyListenLAN` property.
+7. If you want to adjust the frequency of multiplexing, you can set a value for the `profiles` -> `multiplexing` -> `level` property. The values you can use here include `MULTIPLEXING_OFF`, `MULTIPLEXING_LOW`, `MULTIPLEXING_MIDDLE`, and `MULTIPLEXING_HIGH`. `MULTIPLEXING_OFF` will disable multiplexing, and the default value is `MULTIPLEXING_LOW`.
+8. Please specify a value between 1025 and 65535 for the `rpcPort` property.
+9. Please specify a value between 1025 and 65535 for the `socks5Port` property. This port cannot be the same as `rpcPort`.
+10. If the client needs to provide proxy services to other devices on the LAN, set the `socks5ListenLAN` property to `true`.
+11. If you want to enable HTTP / HTTPS proxy, Please specify a value between 1025 and 65535 for the `httpProxyPort` property. This port cannot be the same as `rpcPort` or `socks5Port`. If the client needs to provide HTTP / HTTPS proxy services to other devices on the LAN, set the `httpProxyListenLAN` property to `true`. If you want to disable HTTP / HTTPS proxy, please delete `httpProxyPort` and `httpProxyListenLAN` property.
 
 If you have multiple proxy servers installed, or one server listening on multiple ports, you can add them all to the client settings. Each time a new connection is created, mieru will randomly select one of the servers and one of the ports. **If you are using multiple servers, make sure that each server has the mita proxy service started.**
 

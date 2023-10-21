@@ -382,7 +382,11 @@ var clientRunFunc = func(s []string) error {
 			}
 		}
 		ipVersion := util.GetIPVersion(proxyIP.String())
-		for _, bindingInfo := range serverInfo.GetPortBindings() {
+		portBindings, err := appctl.FlatPortBindings(serverInfo.GetPortBindings())
+		if err != nil {
+			return fmt.Errorf(stderror.InvalidPortBindingsErr, err)
+		}
+		for _, bindingInfo := range portBindings {
 			proxyPort := bindingInfo.GetPort()
 			switch bindingInfo.GetProtocol() {
 			case appctlpb.TransportProtocol_TCP:

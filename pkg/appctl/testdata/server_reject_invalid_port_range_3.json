@@ -1,0 +1,14 @@
+{
+    "portBindings": [
+        {
+            "protocol": "UDP",
+            "portRange": "8964-8954"
+        }
+    ],
+    "users": [
+        {
+            "name": "user1",
+            "password": "fa7206ed2a94"
+        }
+    ]
+}

@@ -8,16 +8,16 @@
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v2.0.0/mita_2.0.0_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v2.1.0/mita_2.1.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v2.0.0/mita_2.0.0_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v2.1.0/mita_2.1.0_arm64.deb
 
-# Fedora / CentOS / Red Hat Enterprise Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v2.0.0/mita-2.0.0-1.x86_64.rpm
+# Fedora / CentOS / RedHat - X86_64
+curl -LSO https://github.com/enfein/mieru/releases/download/v2.1.0/mita-2.1.0-1.x86_64.rpm
 
-# Fedora / CentOS / Red Hat Enterprise Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v2.0.0/mita-2.0.0-1.aarch64.rpm
+# Fedora / CentOS / RedHat - ARM 64
+curl -LSO https://github.com/enfein/mieru/releases/download/v2.1.0/mita-2.1.0-1.aarch64.rpm
 ```
 
 如果上述链接被墙，请翻墙后使用浏览器从 GitHub Releases 页面下载安装。
@@ -26,16 +26,16 @@ curl -LSO https://github.com/enfein/mieru/releases/download/v2.0.0/mita-2.0.0-1.
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_2.0.0_amd64.deb
+sudo dpkg -i mita_2.1.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_2.0.0_arm64.deb
+sudo dpkg -i mita_2.1.0_arm64.deb
 
-# Fedora / CentOS / Red Hat Enterprise Linux - X86_64
-sudo rpm -Uvh --force mita-2.0.0-1.x86_64.rpm
+# Fedora / CentOS / RedHat - X86_64
+sudo rpm -Uvh --force mita-2.1.0-1.x86_64.rpm
 
-# Fedora / CentOS / Red Hat Enterprise Linux - ARM 64
-sudo rpm -Uvh --force mita-2.0.0-1.aarch64.rpm
+# Fedora / CentOS / RedHat - ARM 64
+sudo rpm -Uvh --force mita-2.1.0-1.aarch64.rpm
 ```
 
 ## 赋予当前用户操作 mita 的权限，需要重启服务器使此设置生效
@@ -78,7 +78,7 @@ mita apply config <FILE>
 {
     "portBindings": [
         {
-            "port": 2012,
+            "portRange": "2012-2022",
             "protocol": "TCP"
         },
         {
@@ -89,7 +89,17 @@ mita apply config <FILE>
     "users": [
         {
             "name": "ducaiguozei",
-            "password": "xijinping"
+            "password": "xijinping",
+            "quotas": [
+                {
+                    "days": 1,
+                    "megabytes": 1024
+                },
+                {
+                    "days": 30,
+                    "megabytes": 10240
+                }
+            ]
         },
         {
             "name": "meiyougongchandang",
@@ -101,11 +111,12 @@ mita apply config <FILE>
 }
 ```
 
-1. `portBindings` -> `port` 属性是 mita 监听的 TCP 或 UDP 端口号，请指定一个从 1025 到 65535 之间的值。**请确保防火墙允许使用该端口进行通信。**
+1. `portBindings` -> `port` 属性是 mita 监听的 TCP 或 UDP 端口号，请指定一个从 1025 到 65535 之间的值。如果想要监听连续的端口号，也可以改为使用 `portRange` 属性。**请确保防火墙允许使用这些端口进行通信。**
 2. `portBindings` -> `protocol` 属性可以使用 `TCP` 或者 `UDP`。
 3. 在 `users` -> `name` 属性中填写用户名。
 4. 在 `users` -> `password` 属性中填写该用户的密码。
-5. `mtu` 属性是使用 UDP 代理协议时，数据链路层最大的载荷大小。默认值是 1400，可以选择 1280 到 1500 之间的值。
+5. 如有需要，可以使用 `users` -> `quotas` 属性限制用户可以使用的流量。在上面的例子中，用户 "ducaiguozei" 在 1 天时间内最多可以使用 1 GB 流量，在 30 天时间内最多可以使用 10 GB 流量。
+6. `mtu` 属性是使用 UDP 代理协议时，数据链路层最大的载荷大小。默认值是 1400，可以选择 1280 到 1500 之间的值。
 
 除此之外，mita 可以监听多个不同的端口。我们建议在服务器和客户端配置中使用多个端口。
 

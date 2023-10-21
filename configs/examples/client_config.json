@@ -12,7 +12,7 @@
                     "domainName": "",
                     "portBindings": [
                         {
-                            "port": 2012,
+                            "portRange": "2012-2022",
                             "protocol": "TCP"
                         },
                         {
@@ -22,7 +22,10 @@
                     ]
                 }
             ],
-            "mtu": 1400
+            "mtu": 1400,
+            "multiplexing": {
+                "level": "MULTIPLEXING_HIGH"
+            }
         }
     ],
     "activeProfile": "default",

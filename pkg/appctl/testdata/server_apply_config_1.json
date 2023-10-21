@@ -2,7 +2,7 @@
     "portBindings": [
         {
             "port": 8000,
-            "protocol": "UDP"
+            "protocol": "TCP"
         }
     ],
     "users": [

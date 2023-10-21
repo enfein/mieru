@@ -113,10 +113,14 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 	if listenIP == nil {
 		return &pb.Empty{}, fmt.Errorf(stderror.ParseIPFailedErr, err)
 	}
-	n := len(config.GetPortBindings())
+	portBindings, err := FlatPortBindings(config.GetPortBindings())
+	if err != nil {
+		return &pb.Empty{}, fmt.Errorf(stderror.InvalidPortBindingsErr, err)
+	}
+	n := len(portBindings)
 	for i := 0; i < n; i++ {
-		protocol := config.GetPortBindings()[i].GetProtocol()
-		port := config.GetPortBindings()[i].GetPort()
+		protocol := portBindings[i].GetProtocol()
+		port := portBindings[i].GetPort()
 		switch protocol {
 		case pb.TransportProtocol_TCP:
 			endpoint := protocolv2.NewUnderlayProperties(mtu, ipVersion, util.TCPTransport, &net.TCPAddr{IP: listenIP, Port: int(port)}, nil)
@@ -478,9 +482,7 @@ func DeleteServerUsers(names []string) error {
 // ValidateServerConfigPatch validates a patch of server config.
 //
 // A server config patch must satisfy:
-// 1. for each port binding
-// 1.1. port number is valid
-// 1.2. protocol is valid
+// 1. port bindings are valid
 // 2. for each user
 // 2.1. user name is not empty
 // 2.2. user has either a password or a hashed password
@@ -489,15 +491,8 @@ func DeleteServerUsers(names []string) error {
 // 2.3.2. traffic volume in megabyte is valid
 // 3. if set, MTU is valid
 func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
-	for _, portBinding := range patch.GetPortBindings() {
-		port := portBinding.GetPort()
-		protocol := portBinding.GetProtocol()
-		if port < 1 || port > 65535 {
-			return fmt.Errorf("port number %d is invalid", port)
-		}
-		if protocol == pb.TransportProtocol_UNKNOWN_TRANSPORT_PROTOCOL {
-			return fmt.Errorf("protocol is not set")
-		}
+	if _, err := FlatPortBindings(patch.GetPortBindings()); err != nil {
+		return err
 	}
 	for _, user := range patch.GetUsers() {
 		if user.GetName() == "" {

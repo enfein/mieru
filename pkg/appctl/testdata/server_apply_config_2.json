@@ -2,15 +2,15 @@
     "portBindings": [
         {
             "port": 9000,
+            "protocol": "TCP"
+        },
+        {
+            "portRange": "10000-11000",
             "protocol": "UDP"
         },
         {
-            "port": 10000,
-            "protocol": "UDP"
-        },
-        {
-            "port": 11000,
-            "protocol": "UDP"
+            "portRange": "12000-13000",
+            "protocol": "TCP"
         }
     ],
     "users": [

@@ -1,7 +1,7 @@
 {
     "portBindings": [
         {
-            "port": 8964,
+            "portRange": "8964-8965",
             "protocol": "UDP"
         },
         {
@@ -27,5 +27,5 @@
         "allowLocalDestination": true
     },
     "loggingLevel": "INFO",
-    "mtu": 1460
+    "mtu": 1480
 }

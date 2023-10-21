@@ -15,7 +15,7 @@
                             "protocol": "TCP"
                         },
                         {
-                            "port": 9999,
+                            "portRange": "9999-9999",
                             "protocol": "TCP"
                         },
                         {

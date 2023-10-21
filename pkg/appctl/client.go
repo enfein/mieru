@@ -329,9 +329,7 @@ func DeleteClientConfigProfile(profileName string) error {
 // 2.5. it has at least 1 server, and for each server
 // 2.5.1. the server has either IP address or domain name
 // 2.5.2. if set, server's IP address is parsable
-// 2.5.3. the server has at least 1 port binding, and for each port binding
-// 2.5.3.1. port number is valid
-// 2.5.3.2. protocol is valid
+// 2.5.3. the server has at least 1 port binding, and all port bindings are valid
 // 2.6. if set, MTU is valid
 func ValidateClientConfigPatch(patch *pb.ClientConfig) error {
 	for _, profile := range patch.GetProfiles() {
@@ -364,13 +362,8 @@ func ValidateClientConfigPatch(patch *pb.ClientConfig) error {
 			if len(portBindings) == 0 {
 				return fmt.Errorf("server port binding is not set")
 			}
-			for _, binding := range portBindings {
-				if binding.GetPort() < 1 || binding.GetPort() > 65535 {
-					return fmt.Errorf("server port number %d is invalid", binding.GetPort())
-				}
-				if binding.GetProtocol() == pb.TransportProtocol_UNKNOWN_TRANSPORT_PROTOCOL {
-					return fmt.Errorf("server protocol is not set")
-				}
+			if _, err := FlatPortBindings(portBindings); err != nil {
+				return err
 			}
 		}
 		if profile.GetMtu() != 0 && (profile.GetMtu() < 1280 || profile.GetMtu() > 1500) {

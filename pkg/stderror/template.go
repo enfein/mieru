@@ -33,6 +33,7 @@ const (
 	GetServerConfigFailedErr                = "get mieru server config failed: %w"
 	GetServerStatusFailedErr                = "get mieru server status failed: %w"
 	GetThreadDumpFailedErr                  = "get thread dump failed: %w"
+	InvalidPortBindingsErr                  = "invalid port bindings: %w"
 	InvalidTransportProtocol                = "invalid transport protocol"
 	LoadClientConfigFailedErr               = "load mieru client config failed: %w"
 	LoadServerConfigFailedErr               = "load mieru server config failed: %w"

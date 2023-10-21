@@ -305,10 +305,14 @@ var serverRunFunc = func(s []string) error {
 		if listenIP == nil {
 			return fmt.Errorf(stderror.ParseIPFailedErr, err)
 		}
-		n := len(config.GetPortBindings())
+		portBindings, err := appctl.FlatPortBindings(config.GetPortBindings())
+		if err != nil {
+			return fmt.Errorf(stderror.InvalidPortBindingsErr, err)
+		}
+		n := len(portBindings)
 		for i := 0; i < n; i++ {
-			protocol := config.GetPortBindings()[i].GetProtocol()
-			port := config.GetPortBindings()[i].GetPort()
+			protocol := portBindings[i].GetProtocol()
+			port := portBindings[i].GetPort()
 			switch protocol {
 			case appctlpb.TransportProtocol_TCP:
 				endpoint := protocolv2.NewUnderlayProperties(mtu, ipVersion, util.TCPTransport, &net.TCPAddr{IP: listenIP, Port: int(port)}, nil)
