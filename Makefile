@@ -40,7 +40,7 @@ build: bin deb rpm
 
 # Build binaries.
 .PHONY: bin
-bin: lib client-mac client-linux client-windows-amd64 server-linux
+bin: lib client-android client-linux client-mac client-windows-amd64 server-linux
 
 # Compile go libraries and run unit tests.
 .PHONY: lib
@@ -49,33 +49,33 @@ lib: fmt
 	CGO_ENABLED=0 go test -timeout=1m0s -coverprofile coverage.out ./...
 	go tool cover -html coverage.out -o coverage.html
 
-# Build MacOS clients.
-.PHONY: client-mac
-client-mac: client-mac-amd64 client-mac-arm64
+# Build Android clients.
+.PHONY: client-android
+client-android: client-android-amd64 client-android-arm64
 
-# Build MacOS amd64 client.
-.PHONY: client-mac-amd64
-client-mac-amd64:
-	mkdir -p release/macos/amd64
-	env GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/macos/amd64/mieru cmd/mieru/mieru.go
-	cd release/macos/amd64;\
-		sha256sum mieru > mieru_${VERSION}_macos_amd64.sha256.txt;\
-		tar -zcvf mieru_${VERSION}_macos_amd64.tar.gz mieru;\
-		sha256sum mieru_${VERSION}_macos_amd64.tar.gz > mieru_${VERSION}_macos_amd64.tar.gz.sha256.txt
-	mv release/macos/amd64/mieru_${VERSION}_macos_amd64.tar.gz release/
-	mv release/macos/amd64/mieru_${VERSION}_macos_amd64.tar.gz.sha256.txt release/
+# Build Android amd64 client.
+.PHONY: client-android-amd64
+client-android-amd64:
+	mkdir -p release/android/amd64
+	env GOOS=android GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/android/amd64/mieru cmd/mieru/mieru.go
+	cd release/android/amd64;\
+		sha256sum mieru > mieru_${VERSION}_android_amd64.sha256.txt;\
+		tar -zcvf mieru_${VERSION}_android_amd64.tar.gz mieru;\
+		sha256sum mieru_${VERSION}_android_amd64.tar.gz > mieru_${VERSION}_android_amd64.tar.gz.sha256.txt
+	mv release/android/amd64/mieru_${VERSION}_android_amd64.tar.gz release/
+	mv release/android/amd64/mieru_${VERSION}_android_amd64.tar.gz.sha256.txt release/
 
-# Build MacOS arm64 client.
-.PHONY: client-mac-arm64
-client-mac-arm64:
-	mkdir -p release/macos/arm64
-	env GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/macos/arm64/mieru cmd/mieru/mieru.go
-	cd release/macos/arm64;\
-		sha256sum mieru > mieru_${VERSION}_macos_arm64.sha256.txt;\
-		tar -zcvf mieru_${VERSION}_macos_arm64.tar.gz mieru;\
-		sha256sum mieru_${VERSION}_macos_arm64.tar.gz > mieru_${VERSION}_macos_arm64.tar.gz.sha256.txt
-	mv release/macos/arm64/mieru_${VERSION}_macos_arm64.tar.gz release/
-	mv release/macos/arm64/mieru_${VERSION}_macos_arm64.tar.gz.sha256.txt release/
+# Build Android arm64 client.
+.PHONY: client-android-arm64
+client-android-arm64:
+	mkdir -p release/android/arm64
+	env GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/android/arm64/mieru cmd/mieru/mieru.go
+	cd release/android/arm64;\
+		sha256sum mieru > mieru_${VERSION}_android_arm64.sha256.txt;\
+		tar -zcvf mieru_${VERSION}_android_arm64.tar.gz mieru;\
+		sha256sum mieru_${VERSION}_android_arm64.tar.gz > mieru_${VERSION}_android_arm64.tar.gz.sha256.txt
+	mv release/android/arm64/mieru_${VERSION}_android_arm64.tar.gz release/
+	mv release/android/arm64/mieru_${VERSION}_android_arm64.tar.gz.sha256.txt release/
 
 # Build linux clients.
 .PHONY: client-linux
@@ -128,6 +128,34 @@ client-linux-riscv64:
 		sha256sum mieru_${VERSION}_linux_riscv64.tar.gz > mieru_${VERSION}_linux_riscv64.tar.gz.sha256.txt
 	mv release/linux/riscv64/mieru_${VERSION}_linux_riscv64.tar.gz release/
 	mv release/linux/riscv64/mieru_${VERSION}_linux_riscv64.tar.gz.sha256.txt release/
+
+# Build MacOS clients.
+.PHONY: client-mac
+client-mac: client-mac-amd64 client-mac-arm64
+
+# Build MacOS amd64 client.
+.PHONY: client-mac-amd64
+client-mac-amd64:
+	mkdir -p release/macos/amd64
+	env GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/macos/amd64/mieru cmd/mieru/mieru.go
+	cd release/macos/amd64;\
+		sha256sum mieru > mieru_${VERSION}_macos_amd64.sha256.txt;\
+		tar -zcvf mieru_${VERSION}_macos_amd64.tar.gz mieru;\
+		sha256sum mieru_${VERSION}_macos_amd64.tar.gz > mieru_${VERSION}_macos_amd64.tar.gz.sha256.txt
+	mv release/macos/amd64/mieru_${VERSION}_macos_amd64.tar.gz release/
+	mv release/macos/amd64/mieru_${VERSION}_macos_amd64.tar.gz.sha256.txt release/
+
+# Build MacOS arm64 client.
+.PHONY: client-mac-arm64
+client-mac-arm64:
+	mkdir -p release/macos/arm64
+	env GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/macos/arm64/mieru cmd/mieru/mieru.go
+	cd release/macos/arm64;\
+		sha256sum mieru > mieru_${VERSION}_macos_arm64.sha256.txt;\
+		tar -zcvf mieru_${VERSION}_macos_arm64.tar.gz mieru;\
+		sha256sum mieru_${VERSION}_macos_arm64.tar.gz > mieru_${VERSION}_macos_arm64.tar.gz.sha256.txt
+	mv release/macos/arm64/mieru_${VERSION}_macos_arm64.tar.gz release/
+	mv release/macos/arm64/mieru_${VERSION}_macos_arm64.tar.gz.sha256.txt release/
 
 # Build windows amd64 client.
 .PHONY: client-windows-amd64
@@ -353,6 +381,7 @@ protobuf:
 		--proto_path="${ROOT}/pkg" \
 		"${ROOT}/pkg/appctl/proto/clientcfg.proto" \
 		"${ROOT}/pkg/appctl/proto/debug.proto" \
+		"${ROOT}/pkg/appctl/proto/egress.proto" \
 		"${ROOT}/pkg/appctl/proto/empty.proto" \
 		"${ROOT}/pkg/appctl/proto/endpoint.proto" \
 		"${ROOT}/pkg/appctl/proto/lifecycle.proto" \
