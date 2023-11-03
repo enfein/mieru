@@ -21,10 +21,10 @@ option go_package = "github.com/enfein/mieru/pkg/appctl/appctlpb";
 
 enum ProxyProtocol {
     UNKNOWN_PROXY_PROTOCOL = 0;
-    SOCKS5 = 1;
+    SOCKS5_PROXY_PROTOCOL = 1;
 }
 
-message EgressItem {
+message EgressRule {
     // A list of CIDR to match the rule.
     // Use "*" to match all IP addresses.
     repeated string ipRanges = 1;

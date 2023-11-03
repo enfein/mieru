@@ -17,6 +17,7 @@ syntax = "proto3";
 
 package appctl;
 
+import "egress.proto";
 import "empty.proto";
 import "endpoint.proto";
 import "logging.proto";
@@ -46,6 +47,9 @@ message ServerConfig {
     // Maximum transmission unit of L2 payload.
     // This setting only applies to UDP protocol egress traffic.
     optional int32 mtu = 5;
+
+    // Egress traffic rules.
+    repeated EgressRule egress = 6;
 }
 
 service ServerConfigService {

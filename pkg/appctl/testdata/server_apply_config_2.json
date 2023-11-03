@@ -34,5 +34,14 @@
         }
     ],
     "loggingLevel": "INFO",
-    "mtu": 1400
+    "mtu": 1400,
+    "egress": [
+        {
+            "ipRanges": ["*"],
+            "domainNames": ["*"],
+            "proxyProtocol": "SOCKS5_PROXY_PROTOCOL",
+            "proxyHost": "localhost",
+            "proxyPort": 8964
+        }
+    ]
 }

@@ -490,6 +490,14 @@ func DeleteServerUsers(names []string) error {
 // 2.3.1. number of days is valid
 // 2.3.2. traffic volume in megabyte is valid
 // 3. if set, MTU is valid
+// 4. there is maximum 1 egress
+// 5. for each egress
+// 5.1. either IP ranges or domain names is not empty
+// 5.2. IP ranges are empty or "*"
+// 5.3. domain names are empty or "*"
+// 5.4. proxy protocol is supported
+// 5.5. proxy host is not empty
+// 5.6. proxy port is valid
 func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 	if _, err := FlatPortBindings(patch.GetPortBindings()); err != nil {
 		return err
@@ -512,6 +520,33 @@ func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 	}
 	if patch.GetMtu() != 0 && (patch.GetMtu() < 1280 || patch.GetMtu() > 1500) {
 		return fmt.Errorf("MTU value %d is out of range, valid range is [1280, 1500]", patch.GetMtu())
+	}
+	if len(patch.GetEgress()) > 1 {
+		return fmt.Errorf("only 1 egress rule is supported")
+	}
+	for _, egress := range patch.GetEgress() {
+		if len(egress.GetIpRanges()) == 0 && len(egress.GetDomainNames()) == 0 {
+			return fmt.Errorf("neither IP ranges nor domain names is specified in the egress rule")
+		}
+		if len(egress.GetIpRanges()) != 0 {
+			if len(egress.GetIpRanges()) != 1 || egress.GetIpRanges()[0] != "*" {
+				return fmt.Errorf("%q is the only supported IP ranges value", "*")
+			}
+		}
+		if len(egress.GetDomainNames()) != 0 {
+			if len(egress.GetDomainNames()) != 1 || egress.GetDomainNames()[0] != "*" {
+				return fmt.Errorf("%q is the only supported domain names value", "*")
+			}
+		}
+		if egress.GetProxyProtocol() == pb.ProxyProtocol_UNKNOWN_PROXY_PROTOCOL {
+			return fmt.Errorf("egress proxy protocol is not set")
+		}
+		if egress.GetProxyHost() == "" {
+			return fmt.Errorf("egress proxy host is not set")
+		}
+		if egress.GetProxyPort() < 1 || egress.GetProxyPort() > 65535 {
+			return fmt.Errorf("egress proxy port number %d is invalid", egress.GetProxyPort())
+		}
 	}
 	return nil
 }
@@ -564,12 +599,12 @@ func serverConfigFilePath() (string, ConfigFileType, error) {
 // mergeServerConfig merges the source client config into destination.
 // If a user is specified in source, it is added to destination, or replacing existing user in destination.
 func mergeServerConfig(dst, src *pb.ServerConfig) error {
-	// Port bindings: if src is not empty, replace dst with src.
-	var mergedPortBindings []*pb.PortBinding
-	if len(src.GetPortBindings()) != 0 {
-		mergedPortBindings = src.GetPortBindings()
+	// Port bindings: if src is set, replace dst with src.
+	var portBindings []*pb.PortBinding
+	if src.PortBindings != nil {
+		portBindings = src.GetPortBindings()
 	} else {
-		mergedPortBindings = dst.GetPortBindings()
+		portBindings = dst.GetPortBindings()
 	}
 
 	// Users: merge src into dst.
@@ -609,12 +644,21 @@ func mergeServerConfig(dst, src *pb.ServerConfig) error {
 		mtu = dst.GetMtu()
 	}
 
+	// Egress: if src is set, replace dst with src.
+	var egress []*pb.EgressRule
+	if src.Egress != nil {
+		egress = src.GetEgress()
+	} else {
+		egress = dst.GetEgress()
+	}
+
 	proto.Reset(dst)
-	dst.PortBindings = mergedPortBindings
+	dst.PortBindings = portBindings
 	dst.Users = mergedUsers
 	dst.AdvancedSettings = advancedSettings
 	dst.LoggingLevel = &loggingLevel
 	dst.Mtu = proto.Int32(mtu)
+	dst.Egress = egress
 	return nil
 }
 
