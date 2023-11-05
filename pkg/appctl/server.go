@@ -490,14 +490,17 @@ func DeleteServerUsers(names []string) error {
 // 2.3.1. number of days is valid
 // 2.3.2. traffic volume in megabyte is valid
 // 3. if set, MTU is valid
-// 4. there is maximum 1 egress
-// 5. for each egress
-// 5.1. either IP ranges or domain names is not empty
-// 5.2. IP ranges are empty or "*"
-// 5.3. domain names are empty or "*"
-// 5.4. proxy protocol is supported
-// 5.5. proxy host is not empty
-// 5.6. proxy port is valid
+// 4. for each egress proxy
+// 4.1. name is not empty
+// 4.2. name is unique
+// 4.3. protocol is valid
+// 4.4. host is not empty
+// 4.5. port is valid
+// 5. there is maximum 1 egress rule
+// 5.1. the IP ranges must be "*"
+// 5.2. the domain names must be "*"
+// 5.3. the action must be "PROXY"
+// 5.4. the proxy name is defined
 func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 	if _, err := FlatPortBindings(patch.GetPortBindings()); err != nil {
 		return err
@@ -521,31 +524,51 @@ func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 	if patch.GetMtu() != 0 && (patch.GetMtu() < 1280 || patch.GetMtu() > 1500) {
 		return fmt.Errorf("MTU value %d is out of range, valid range is [1280, 1500]", patch.GetMtu())
 	}
-	if len(patch.GetEgress()) > 1 {
-		return fmt.Errorf("only 1 egress rule is supported")
-	}
-	for _, egress := range patch.GetEgress() {
-		if len(egress.GetIpRanges()) == 0 && len(egress.GetDomainNames()) == 0 {
-			return fmt.Errorf("neither IP ranges nor domain names is specified in the egress rule")
+	usedProxyNames := map[string]bool{}
+	for _, proxy := range patch.GetEgress().GetProxies() {
+		if proxy.GetName() == "" {
+			return fmt.Errorf("egress proxy name is empty")
 		}
-		if len(egress.GetIpRanges()) != 0 {
-			if len(egress.GetIpRanges()) != 1 || egress.GetIpRanges()[0] != "*" {
-				return fmt.Errorf("%q is the only supported IP ranges value", "*")
-			}
+		if _, found := usedProxyNames[proxy.GetName()]; found {
+			return fmt.Errorf("found duplicate egress proxy name %q", proxy.GetName())
 		}
-		if len(egress.GetDomainNames()) != 0 {
-			if len(egress.GetDomainNames()) != 1 || egress.GetDomainNames()[0] != "*" {
-				return fmt.Errorf("%q is the only supported domain names value", "*")
-			}
-		}
-		if egress.GetProxyProtocol() == pb.ProxyProtocol_UNKNOWN_PROXY_PROTOCOL {
+		usedProxyNames[proxy.GetName()] = true
+		if proxy.GetProtocol() == pb.ProxyProtocol_UNKNOWN_PROXY_PROTOCOL {
 			return fmt.Errorf("egress proxy protocol is not set")
 		}
-		if egress.GetProxyHost() == "" {
+		if proxy.GetHost() == "" {
 			return fmt.Errorf("egress proxy host is not set")
 		}
-		if egress.GetProxyPort() < 1 || egress.GetProxyPort() > 65535 {
-			return fmt.Errorf("egress proxy port number %d is invalid", egress.GetProxyPort())
+		if proxy.GetPort() < 1 || proxy.GetPort() > 65535 {
+			return fmt.Errorf("egress proxy port number %d is invalid", proxy.GetPort())
+		}
+	}
+	if len(patch.GetEgress().GetRules()) > 1 {
+		return fmt.Errorf("found %d egress rules, maximum number of supported rules is 1", len(patch.GetEgress().GetRules()))
+	}
+	if len(patch.GetEgress().GetRules()) == 1 {
+		rule := patch.GetEgress().GetRules()[0]
+		if len(rule.GetIpRanges()) != 1 || rule.GetIpRanges()[0] != "*" {
+			return fmt.Errorf("egress rule: the only supported IP range value is %q", "*")
+		}
+		if len(rule.GetDomainNames()) != 1 || rule.GetDomainNames()[0] != "*" {
+			return fmt.Errorf("egress rule: the only supported domain name value is %q", "*")
+		}
+		if rule.GetAction() != pb.EgressAction_PROXY {
+			return fmt.Errorf("egress rule: the only supported action is %q", pb.EgressAction_PROXY.String())
+		}
+		if rule.GetProxyName() == "" {
+			return fmt.Errorf("egress rule: proxy name is not set")
+		}
+		foundProxy := false
+		for _, proxy := range patch.GetEgress().GetProxies() {
+			if proxy.GetName() == rule.GetProxyName() {
+				foundProxy = true
+				break
+			}
+		}
+		if !foundProxy {
+			return fmt.Errorf("egress rule: proxy %q is not defined", rule.GetProxyName())
 		}
 	}
 	return nil
@@ -643,9 +666,7 @@ func mergeServerConfig(dst, src *pb.ServerConfig) error {
 	} else {
 		mtu = dst.GetMtu()
 	}
-
-	// Egress: if src is set, replace dst with src.
-	var egress []*pb.EgressRule
+	var egress *pb.Egress
 	if src.Egress != nil {
 		egress = src.GetEgress()
 	} else {

@@ -35,13 +35,22 @@
     ],
     "loggingLevel": "INFO",
     "mtu": 1400,
-    "egress": [
-        {
-            "ipRanges": ["*"],
-            "domainNames": ["*"],
-            "proxyProtocol": "SOCKS5_PROXY_PROTOCOL",
-            "proxyHost": "localhost",
-            "proxyPort": 8964
-        }
-    ]
+    "egress": {
+        "proxies": [
+            {
+                "name": "warp",
+                "protocol": "SOCKS5_PROXY_PROTOCOL",
+                "host": "localhost",
+                "port": 1080
+            }
+        ],
+        "rules": [
+            {
+                "ipRanges": ["*"],
+                "domainNames": ["*"],
+                "action": "PROXY",
+                "proxyName": "warp"
+            }
+        ]
+    }
 }

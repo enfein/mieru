@@ -48,8 +48,8 @@ message ServerConfig {
     // This setting only applies to UDP protocol egress traffic.
     optional int32 mtu = 5;
 
-    // Egress traffic rules.
-    repeated EgressRule egress = 6;
+    // Egress proxies and rules.
+    optional Egress egress = 6;
 }
 
 service ServerConfigService {
