@@ -24,7 +24,7 @@ type Input struct {
 
 type Action struct {
 	Action appctlpb.EgressAction
-	Proxy  appctlpb.EgressProxy
+	Proxy  *appctlpb.EgressProxy
 }
 
 type Controller interface {
