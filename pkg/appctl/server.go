@@ -27,6 +27,7 @@ import (
 	"sync/atomic"
 
 	pb "github.com/enfein/mieru/pkg/appctl/appctlpb"
+	"github.com/enfein/mieru/pkg/egress"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/protocolv2"
@@ -37,17 +38,13 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const (
-	// ServerUDS is the UNIX domain socket that server is listening to RPC requests.
-	ServerUDS = "/var/run/mita.sock"
-)
-
 var (
 	// ServerRPCServerStarted is closed when server RPC server is started.
 	ServerRPCServerStarted chan struct{} = make(chan struct{})
 
 	cachedServerConfigDir      string = "/etc/mita"
 	cachedServerConfigFilePath string = "/etc/mita/server.conf.pb"
+	cachedServerUDS            string = "/var/run/mita.sock"
 
 	// serverIOLock is required to load server config and store server config.
 	serverIOLock sync.Mutex
@@ -69,6 +66,15 @@ func GetSocks5Server() *socks5.Server {
 
 func SetSocks5Server(server *socks5.Server) {
 	socks5ServerRef.Store(server)
+}
+
+// ServerUDS returns the UNIX domain socket that mita server
+// is listening to RPC requests.
+func ServerUDS() string {
+	if v, found := os.LookupEnv("MITA_UDS_PATH"); found {
+		cachedServerUDS = v
+	}
+	return cachedServerUDS
 }
 
 // serverLifecycleService implements ServerLifecycleService defined in lifecycle.proto.
@@ -138,6 +144,7 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 	socks5Config := &socks5.Config{
 		AllowLocalDestination:    config.GetAdvancedSettings().GetAllowLocalDestination(),
 		ClientSideAuthentication: true,
+		EgressController:         egress.NewSocks5Controller(config.GetEgress()),
 	}
 	socks5Server, err := socks5.New(socks5Config)
 	if err != nil {
@@ -236,7 +243,7 @@ func NewServerLifecycleService() *serverLifecycleService {
 
 // NewServerLifecycleRPCClient creates a new ServerLifecycleService RPC client.
 func NewServerLifecycleRPCClient() (pb.ServerLifecycleServiceClient, error) {
-	rpcAddr := "unix://" + ServerUDS
+	rpcAddr := "unix://" + ServerUDS()
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), RPCTimeout)
 	defer cancelFunc()
 	conn, err := grpc.DialContext(timedctx, rpcAddr, grpc.WithInsecure())
@@ -277,7 +284,7 @@ func NewServerConfigService() *serverConfigService {
 
 // NewServerConfigRPCClient creates a new ServerConfigService RPC client.
 func NewServerConfigRPCClient() (pb.ServerConfigServiceClient, error) {
-	rpcAddr := "unix://" + ServerUDS
+	rpcAddr := "unix://" + ServerUDS()
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), RPCTimeout)
 	defer cancelFunc()
 	conn, err := grpc.DialContext(timedctx, rpcAddr, grpc.WithInsecure())

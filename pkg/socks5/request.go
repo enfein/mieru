@@ -45,6 +45,7 @@ type AddrSpec struct {
 	FQDN string
 	IP   net.IP
 	Port int
+	Raw  []byte
 }
 
 func (a *AddrSpec) String() string {
@@ -56,7 +57,7 @@ func (a *AddrSpec) String() string {
 
 // Address returns a string suitable to dial; prefer returning IP-based
 // address, fallback to FQDN
-func (a AddrSpec) Address() string {
+func (a *AddrSpec) Address() string {
 	if len(a.IP) != 0 {
 		return net.JoinHostPort(a.IP.String(), strconv.Itoa(a.Port))
 	}
@@ -71,6 +72,8 @@ type Request struct {
 	Command uint8
 	// AddrSpec of the desired destination.
 	DestAddr *AddrSpec
+	// Raw request bytes.
+	Raw []byte
 }
 
 // NewRequest creates a new Request from the tcp connection.
@@ -96,6 +99,7 @@ func NewRequest(conn io.Reader) (*Request, error) {
 		Version:  socks5Version,
 		Command:  header[1],
 		DestAddr: dest,
+		Raw:      append(header, dest.Raw...),
 	}, nil
 }
 
@@ -169,7 +173,7 @@ func (s *Server) handleConnect(ctx context.Context, req *Request, conn io.ReadWr
 		return fmt.Errorf("failed to send reply: %w", err)
 	}
 
-	return util.BidiCopy(conn, target, false)
+	return util.BidiCopy(conn, target)
 }
 
 // handleBind is used to handle a bind command.
@@ -515,6 +519,7 @@ func readAddrSpec(r io.Reader) (*AddrSpec, error) {
 	if _, err := io.ReadFull(r, addrType); err != nil {
 		return nil, err
 	}
+	d.Raw = append(d.Raw, addrType...)
 
 	// Handle on a per type basis.
 	switch addrType[0] {
@@ -524,25 +529,26 @@ func readAddrSpec(r io.Reader) (*AddrSpec, error) {
 			return nil, err
 		}
 		d.IP = net.IP(addr)
-
+		d.Raw = append(d.Raw, addr...)
 	case ipv6Address:
 		addr := make([]byte, 16)
 		if _, err := io.ReadFull(r, addr); err != nil {
 			return nil, err
 		}
 		d.IP = net.IP(addr)
-
+		d.Raw = append(d.Raw, addr...)
 	case fqdnAddress:
-		if _, err := io.ReadFull(r, addrType); err != nil {
+		addrLen := []byte{0}
+		if _, err := io.ReadFull(r, addrLen); err != nil {
 			return nil, err
 		}
-		addrLen := int(addrType[0])
-		fqdn := make([]byte, addrLen)
+		fqdn := make([]byte, int(addrLen[0]))
 		if _, err := io.ReadFull(r, fqdn); err != nil {
 			return nil, err
 		}
 		d.FQDN = string(fqdn)
-
+		d.Raw = append(d.Raw, addrLen...)
+		d.Raw = append(d.Raw, fqdn...)
 	default:
 		return nil, errUnrecognizedAddrType
 	}
@@ -553,7 +559,7 @@ func readAddrSpec(r io.Reader) (*AddrSpec, error) {
 		return nil, err
 	}
 	d.Port = (int(port[0]) << 8) | int(port[1])
-
+	d.Raw = append(d.Raw, port...)
 	return d, nil
 }
 

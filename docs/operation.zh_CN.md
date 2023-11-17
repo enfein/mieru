@@ -101,4 +101,5 @@ mieru 为了防止 GFW 主动探测，增强了服务器端的隐蔽性，但是
 - `MIERU_CONFIG_JSON_FILE` 从这个路径加载 JSON 格式的客户端配置文件。通常用于同时运行多个客户端进程。
 - `MIERU_CONFIG_FILE` 从这个路径加载 protocol buffer 格式的客户端配置文件。
 - `MITA_LOG_NO_TIMESTAMP` 这个值非空时，服务器日志不打印时间戳。因为 journald 已经提供了时间戳，我们默认开启这项设置，以避免打印重复的时间戳。
+- `MITA_UDS_PATH` 使用这个路径创建服务器 UNIX domain socket 文件。默认的路径是 `/var/run/mita.sock`。
 - `MITA_INSECURE_UDS` 这个值非空时，不强制修改服务器 UNIX domain socket 文件 `/var/run/mita.sock` 的用户和访问权限。这个设置可以用于某些非常受限（例如不能创建新用户）的系统中。

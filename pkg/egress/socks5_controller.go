@@ -30,7 +30,7 @@ var (
 
 func NewSocks5Controller(config *appctlpb.Egress) *Socks5Controller {
 	if config == nil {
-		panic("appctlpb.Egress is nil")
+		config = &appctlpb.Egress{}
 	}
 	return &Socks5Controller{
 		config: config,

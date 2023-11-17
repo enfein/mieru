@@ -1,0 +1,22 @@
+{
+    "portBindings": [
+        {
+            "port": 5000,
+            "protocol": "TCP"
+        },
+        {
+            "port": 5000,
+            "protocol": "UDP"
+        }
+    ],
+    "users": [
+        {
+            "name": "meiyougongchandang",
+            "password": "caiyouxinzhongguo"
+        }
+    ],
+    "advancedSettings": {
+        "allowLocalDestination": true
+    },
+    "loggingLevel": "INFO"
+}

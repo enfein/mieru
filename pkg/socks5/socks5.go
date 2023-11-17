@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 
+	"github.com/enfein/mieru/pkg/appctl/appctlpb"
+	"github.com/enfein/mieru/pkg/egress"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/protocolv2"
@@ -39,6 +42,12 @@ var (
 
 // Config is used to setup and configure a socks5 server.
 type Config struct {
+	// Mieru proxy multiplexer.
+	ProxyMux *protocolv2.Mux
+
+	// Egress controller.
+	EgressController egress.Controller
+
 	// Resolver can be provided to do custom name resolution.
 	Resolver *util.DNSResolver
 
@@ -53,9 +62,6 @@ type Config struct {
 
 	// Do socks5 authentication at proxy client side.
 	ClientSideAuthentication bool
-
-	// Mieru proxy multiplexer.
-	ProxyMux *protocolv2.Mux
 }
 
 // Server is responsible for accepting connections and handling
@@ -70,6 +76,15 @@ type Server struct {
 
 // New creates a new Server and potentially returns an error.
 func New(conf *Config) (*Server, error) {
+	if conf.UseProxy && conf.ProxyMux == nil {
+		return nil, fmt.Errorf("ProxyMux must be set when proxy is enabled")
+	}
+
+	// Ensure we have a egress controller.
+	if conf.EgressController == nil {
+		conf.EgressController = egress.AlwaysDirectController{}
+	}
+
 	// Ensure we have a DNS resolver.
 	if conf.Resolver == nil {
 		conf.Resolver = &util.DNSResolver{}
@@ -81,10 +96,6 @@ func New(conf *Config) (*Server, error) {
 		if conf.BindIP == nil {
 			return nil, fmt.Errorf("set socks5 bind IP failed")
 		}
-	}
-
-	if conf.UseProxy && conf.ProxyMux == nil {
-		return nil, fmt.Errorf("ProxyMux must be set when proxy is enabled")
 	}
 
 	return &Server{
@@ -208,7 +219,7 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 		}()
 		return BidiCopyUDP(udpAssociateConn, WrapUDPAssociateTunnel(proxyConn))
 	}
-	return util.BidiCopy(conn, proxyConn, true)
+	return util.BidiCopy(conn, proxyConn)
 }
 
 func (s *Server) serverServeConn(conn net.Conn) error {
@@ -229,9 +240,22 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 		return fmt.Errorf("failed to read destination address: %w", err)
 	}
 
-	// Process the client request.
-	if err := s.handleRequest(context.Background(), request, conn); err != nil {
-		return fmt.Errorf("handleRequest() failed: %w", err)
+	action := s.config.EgressController.FindAction(egress.Input{
+		Protocol: appctlpb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL,
+		Data:     request.Raw,
+	})
+	switch action.Action {
+	case appctlpb.EgressAction_DIRECT:
+		if err := s.handleRequest(context.Background(), request, conn); err != nil {
+			return fmt.Errorf("handleRequest() failed: %w", err)
+		}
+	case appctlpb.EgressAction_PROXY:
+		if action.Proxy == nil {
+			return fmt.Errorf("egress action is PROXY but proxy info is unavailable")
+		}
+		return s.handleForwarding(conn, action.Proxy.GetHost(), action.Proxy.GetPort())
+	case appctlpb.EgressAction_REJECT:
+		return fmt.Errorf("connection is rejected by egress rules")
 	}
 	return nil
 }
@@ -279,4 +303,31 @@ func (s *Server) handleAuthentication(conn net.Conn) error {
 		return fmt.Errorf("write authentication response failed: %w", err)
 	}
 	return nil
+}
+
+func (s *Server) handleForwarding(conn net.Conn, forwardHost string, forwardPort int32) error {
+	proxyConn, err := net.Dial("tcp", util.MaybeDecorateIPv6(forwardHost)+":"+strconv.Itoa(int(forwardPort)))
+	if err != nil {
+		HandshakeErrors.Add(1)
+		return fmt.Errorf("dial to egress proxy failed: %w", err)
+	}
+
+	// Authenticate with the egress proxy.
+	if _, err := proxyConn.Write([]byte{socks5Version, 1, noAuth}); err != nil {
+		HandshakeErrors.Add(1)
+		proxyConn.Close()
+		return fmt.Errorf("failed to write socks5 auth header to egress proxy: %w", err)
+	}
+	resp := []byte{0, 0}
+	if _, err := io.ReadFull(proxyConn, resp); err != nil {
+		HandshakeErrors.Add(1)
+		proxyConn.Close()
+		return fmt.Errorf("failed to read socks5 auth response from egress proxy: %w", err)
+	}
+	if resp[0] != socks5Version || resp[1] != noAuth {
+		HandshakeErrors.Add(1)
+		proxyConn.Close()
+		return fmt.Errorf("got unexpected socks5 auth response from egress proxy: %v", resp)
+	}
+	return util.BidiCopy(conn, proxyConn)
 }

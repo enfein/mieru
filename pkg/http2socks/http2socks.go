@@ -121,7 +121,7 @@ func (p *Proxy) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 		httpConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
-		util.BidiCopy(httpConn, socksConn, true)
+		util.BidiCopy(httpConn, socksConn)
 	} else {
 		// HTTP
 		tr := &http.Transport{

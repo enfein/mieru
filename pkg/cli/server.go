@@ -30,6 +30,7 @@ import (
 	"github.com/enfein/mieru/pkg/appctl"
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
+	"github.com/enfein/mieru/pkg/egress"
 	"github.com/enfein/mieru/pkg/http2socks"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
@@ -230,7 +231,7 @@ var serverRunFunc = func(s []string) error {
 
 	// Run the RPC server in the background.
 	go func() {
-		rpcAddr := appctl.ServerUDS
+		rpcAddr := appctl.ServerUDS()
 		if err := syscall.Unlink(rpcAddr); err != nil {
 			// Unlink() fails when the file path doesn't exist, which is not a big problem.
 			log.Debugf("syscall.Unlink(%q) failed: %v", rpcAddr, err)
@@ -330,6 +331,7 @@ var serverRunFunc = func(s []string) error {
 		socks5Config := &socks5.Config{
 			AllowLocalDestination:    config.GetAdvancedSettings().GetAllowLocalDestination(),
 			ClientSideAuthentication: true,
+			EgressController:         egress.NewSocks5Controller(config.GetEgress()),
 		}
 		socks5Server, err := socks5.New(socks5Config)
 		if err != nil {
@@ -412,7 +414,7 @@ var serverStatusFunc = func(s []string) error {
 				cmd := strings.Join(s, " ")
 				return fmt.Errorf("unable to determine the OS user which executed command %q", cmd)
 			}
-			return fmt.Errorf("unable to connect to mieru server daemon through %q, please retry after running \"sudo usermod -a -G mita %s\" command and reboot the system", appctl.ServerUDS, currentUser.Username)
+			return fmt.Errorf("unable to connect to mieru server daemon via %q, please retry after running \"sudo usermod -a -G mita %s\" command and reboot the system", appctl.ServerUDS(), currentUser.Username)
 		} else {
 			return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
 		}
@@ -635,11 +637,11 @@ func updateServerUDSPermission() error {
 	if err != nil {
 		return fmt.Errorf("convert mieru UID with strconv.Atoi(%q) failed: %w", mitaGidStr, err)
 	}
-	if err = os.Chown(appctl.ServerUDS, rootUid, mitaGid); err != nil {
-		return fmt.Errorf("os.Chown(%q) failed: %w", appctl.ServerUDS, err)
+	if err = os.Chown(appctl.ServerUDS(), rootUid, mitaGid); err != nil {
+		return fmt.Errorf("os.Chown(%q) failed: %w", appctl.ServerUDS(), err)
 	}
-	if err = os.Chmod(appctl.ServerUDS, 0770); err != nil {
-		return fmt.Errorf("os.Chmod(%q) failed: %w", appctl.ServerUDS, err)
+	if err = os.Chmod(appctl.ServerUDS(), 0770); err != nil {
+		return fmt.Errorf("os.Chmod(%q) failed: %w", appctl.ServerUDS(), err)
 	}
 	return nil
 }

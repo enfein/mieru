@@ -20,7 +20,7 @@ import (
 )
 
 // BidiCopy does bi-directional data copy.
-func BidiCopy(conn1, conn2 io.ReadWriteCloser, isClient bool) error {
+func BidiCopy(conn1, conn2 io.ReadWriteCloser) error {
 	errCh := make(chan error, 2)
 	go func() {
 		_, err := io.Copy(conn1, conn2)

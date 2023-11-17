@@ -1,0 +1,33 @@
+{
+    "profiles": [
+        {
+            "profileName": "ducaiguozei",
+            "user": {
+                "name": "ducaiguozei",
+                "password": "xijinping"
+            },
+            "servers": [
+                {
+                    "ipAddress": "127.0.0.1",
+                    "portBindings": [
+                        {
+                            "port": 3000,
+                            "protocol": "TCP"
+                        },
+                        {
+                            "port": 3000,
+                            "protocol": "TCP"
+                        }
+                    ]
+                }
+            ],
+            "multiplexing": {
+                "level": "MULTIPLEXING_HIGH"
+            }
+        }
+    ],
+    "activeProfile": "ducaiguozei",
+    "socks5Port": 2000,
+    "loggingLevel": "INFO",
+    "socks5ListenLAN": false
+}

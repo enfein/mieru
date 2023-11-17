@@ -328,13 +328,15 @@ test-binary:
 test-container: test-binary
 	if [ ! -z $$(command -v docker) ]; then\
 		docker build -t mieru_httptest:${SHORT_SHA} -f test/deploy/httptest/Dockerfile .;\
-		rm -f mieru mita httpserver sockshttpclient socksudpclient udpserver;\
+		docker build -t mieru_proxychain:${SHORT_SHA} -f test/deploy/proxychain/Dockerfile .;\
 	fi
+	rm -f mieru mita httpserver sockshttpclient socksudpclient udpserver
 
 # Run docker integration tests.
 .PHONY: run-container-test
 run-container-test: test-container
 	if [ ! -z $$(command -v docker) ]; then\
+		docker run mieru_proxychain:${SHORT_SHA};\
 		docker run mieru_httptest:${SHORT_SHA};\
 	fi
 

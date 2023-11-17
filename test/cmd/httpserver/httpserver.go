@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// httpserver is a simple HTTP server listening on port 8080.
+// httpserver is a simple HTTP server.
 // There are 100 pre-filled data blocks: 90 blocks have 64 KiB data, 10 blocks have 1 MiB data.
 // If flag "-huge" is set, there is a single block with 256 MiB data.
 // When a request comes in, a random block is selected, and the block as well as its SHA-1 value
@@ -27,6 +27,7 @@ import (
 	"flag"
 	mrand "math/rand"
 	"net/http"
+	"strconv"
 
 	"github.com/enfein/mieru/pkg/log"
 )
@@ -36,7 +37,10 @@ var (
 	sha1CheckSum = make(map[int][]byte)
 )
 
-var huge = flag.Bool("huge", false, "Generate huge data size: 256 MiB")
+var (
+	huge = flag.Bool("huge", false, "Generate huge data size: 256 MiB")
+	port = flag.Int("port", 8080, "HTTP server listening port")
+)
 
 const (
 	// Data size in bytes.
@@ -95,5 +99,5 @@ func main() {
 	fillData()
 	log.Infof("HTTP server data initialized.")
 	http.HandleFunc("/", handler)
-	http.ListenAndServe(":8080", nil)
+	http.ListenAndServe(":"+strconv.Itoa(*port), nil)
 }

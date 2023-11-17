@@ -101,4 +101,5 @@ If necessary, you can use environment variables to control the behavior of the s
 - `MIERU_CONFIG_JSON_FILE` loads the JSON client configuration file from this path. Typically used to run multiple client processes simultaneously.
 - `MIERU_CONFIG_FILE` loads the protocol buffer client configuration file from this path.
 - If `MITA_LOG_NO_TIMESTAMP` is not empty, the server log does not print timestamps. Since journald already provides timestamps, we enable this by default to avoid printing duplicate timestamps.
+- `MITA_UDS_PATH` creates the server UNIX domain socket file using this path. The default path is `/var/run/mita.sock`.
 - If `MITA_INSECURE_UDS` is not empty, do not enforce the user and access rights to the server UNIX domain socket file `/var/run/mita.sock`. This setting can be used on systems that are very restricted (e.g., cannot create new users).

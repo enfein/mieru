@@ -1,0 +1,33 @@
+{
+    "profiles": [
+        {
+            "profileName": "meiyougongchandang",
+            "user": {
+                "name": "meiyougongchandang",
+                "password": "caiyouxinzhongguo"
+            },
+            "servers": [
+                {
+                    "ipAddress": "127.0.0.1",
+                    "portBindings": [
+                        {
+                            "port": 5000,
+                            "protocol": "TCP"
+                        },
+                        {
+                            "port": 5000,
+                            "protocol": "TCP"
+                        }
+                    ]
+                }
+            ],
+            "multiplexing": {
+                "level": "MULTIPLEXING_HIGH"
+            }
+        }
+    ],
+    "activeProfile": "meiyougongchandang",
+    "socks5Port": 4000,
+    "loggingLevel": "INFO",
+    "socks5ListenLAN": false
+}
