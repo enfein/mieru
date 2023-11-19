@@ -26,25 +26,56 @@ function print_mieru_client_log() {
     echo "==========  END OF MIERU CLIENT LOG  =========="
 }
 
-function delete_mieru_client_log() {
-    rm -rf $HOME/.cache/mieru/*.log
-}
-
 function print_mieru_server_thread_dump() {
-    echo "========== BEGIN OF MIERU SERVER THREAD DUMP =========="
-    ./mita get thread-dump
-    echo "==========  END OF MIERU SERVER THREAD DUMP  =========="
+    echo "========== BEGIN OF MIERU SERVER THREAD DUMP 1 =========="
+    MITA_UDS_PATH=/var/run/mita1.sock MITA_CONFIG_JSON_FILE=/test/server1.json ./mita get thread-dump
+    echo "==========  END OF MIERU SERVER THREAD DUMP 1  =========="
+    echo "========== BEGIN OF MIERU SERVER THREAD DUMP 2 =========="
+    MITA_UDS_PATH=/var/run/mita2.sock MITA_CONFIG_JSON_FILE=/test/server2.json ./mita2 get thread-dump
+    echo "==========  END OF MIERU SERVER THREAD DUMP 2  =========="
 }
 
 function print_mieru_client_thread_dump() {
-    echo "========== BEGIN OF MIERU CLIENT THREAD DUMP =========="
-    ./mieru get thread-dump
-    echo "==========  END OF MIERU CLIENT THREAD DUMP  =========="
+    echo "========== BEGIN OF MIERU CLIENT THREAD DUMP 1 =========="
+    MIERU_CONFIG_JSON_FILE=/test/client1.json ./mieru get thread-dump
+    echo "==========  END OF MIERU CLIENT THREAD DUMP 1  =========="
+    echo "========== BEGIN OF MIERU CLIENT THREAD DUMP 2 =========="
+    MIERU_CONFIG_JSON_FILE=/test/client2.json ./mieru2 get thread-dump
+    echo "==========  END OF MIERU CLIENT THREAD DUMP 2  =========="
 }
 
 # Start http server.
 ./httpserver -port=6000 &
 sleep 2
+
+# Start server 2.
+MITA_UDS_PATH=/var/run/mita2.sock MITA_CONFIG_JSON_FILE=/test/server2.json ./mita2 run &
+sleep 1
+
+# Start client 2.
+MIERU_CONFIG_JSON_FILE=/test/client2.json ./mieru2 run &
+sleep 1
+
+# Start server 1.
+MITA_UDS_PATH=/var/run/mita1.sock MITA_CONFIG_JSON_FILE=/test/server1.json ./mita run &
+sleep 1
+
+# Start client 1.
+MIERU_CONFIG_JSON_FILE=/test/client1.json ./mieru run &
+sleep 1
+
+set +e
+echo ">>> socks5 - new connections <<<"
+./sockshttpclient -dst_host=127.0.0.1 -dst_port=6000 \
+  -local_proxy_host=127.0.0.1 -local_proxy_port=2000 \
+  -test_case=new_conn -num_request=1000
+if [ "$?" -ne "0" ]; then
+    print_mieru_client_log
+    print_mieru_client_thread_dump
+    print_mieru_server_thread_dump
+    echo "Test socks5 new_conn failed."
+    exit 1
+fi
 
 echo "Test is successful."
 exit 0

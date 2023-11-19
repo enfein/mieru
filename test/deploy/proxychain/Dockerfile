@@ -20,7 +20,7 @@ FROM ubuntu:22.04
 WORKDIR /test
 
 # Copy binaries, data and test script into the container.
-COPY mieru mita httpserver sockshttpclient \
+COPY mieru mieru2 mita mita2 httpserver sockshttpclient \
     test/deploy/proxychain/client1.json test/deploy/proxychain/client2.json \
     test/deploy/proxychain/server1.json test/deploy/proxychain/server2.json \
     test/deploy/proxychain/test.sh /test/

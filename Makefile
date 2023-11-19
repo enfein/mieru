@@ -316,8 +316,10 @@ rpm-server-arm64: server-linux-arm64
 # Build binaries used in integration tests.
 .PHONY: test-binary
 test-binary:
-	CGO_ENABLED=0 go build -ldflags="-X 'github.com/enfein/mieru/pkg/log.LogPrefix=C '" cmd/mieru/mieru.go
-	CGO_ENABLED=0 go build -ldflags="-X 'github.com/enfein/mieru/pkg/log.LogPrefix=S '" cmd/mita/mita.go
+	CGO_ENABLED=0 go build -ldflags="-X 'github.com/enfein/mieru/pkg/log.LogPrefix=C'" -o mieru cmd/mieru/mieru.go
+	CGO_ENABLED=0 go build -ldflags="-X 'github.com/enfein/mieru/pkg/log.LogPrefix=S'" -o mita cmd/mita/mita.go
+	CGO_ENABLED=0 go build -ldflags="-X 'github.com/enfein/mieru/pkg/log.LogPrefix=C2'" -o mieru2 cmd/mieru/mieru.go
+	CGO_ENABLED=0 go build -ldflags="-X 'github.com/enfein/mieru/pkg/log.LogPrefix=S2'" -o mita2 cmd/mita/mita.go
 	CGO_ENABLED=0 go build test/cmd/httpserver/httpserver.go
 	CGO_ENABLED=0 go build test/cmd/sockshttpclient/sockshttpclient.go
 	CGO_ENABLED=0 go build test/cmd/socksudpclient/socksudpclient.go
@@ -330,7 +332,7 @@ test-container: test-binary
 		docker build -t mieru_httptest:${SHORT_SHA} -f test/deploy/httptest/Dockerfile .;\
 		docker build -t mieru_proxychain:${SHORT_SHA} -f test/deploy/proxychain/Dockerfile .;\
 	fi
-	rm -f mieru mita httpserver sockshttpclient socksudpclient udpserver
+	rm -f mieru mieru2 mita mita2 httpserver sockshttpclient socksudpclient udpserver
 
 # Run docker integration tests.
 .PHONY: run-container-test

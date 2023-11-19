@@ -244,6 +244,7 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 		Protocol: appctlpb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL,
 		Data:     request.Raw,
 	})
+	log.Debugf("Egress decision of socks5 request %v is %s", request.Raw, action.Action.String())
 	switch action.Action {
 	case appctlpb.EgressAction_DIRECT:
 		if err := s.handleRequest(context.Background(), request, conn); err != nil {
@@ -253,7 +254,7 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 		if action.Proxy == nil {
 			return fmt.Errorf("egress action is PROXY but proxy info is unavailable")
 		}
-		return s.handleForwarding(conn, action.Proxy.GetHost(), action.Proxy.GetPort())
+		return s.handleForwarding(request, conn, action.Proxy.GetHost(), action.Proxy.GetPort())
 	case appctlpb.EgressAction_REJECT:
 		return fmt.Errorf("connection is rejected by egress rules")
 	}
@@ -305,7 +306,7 @@ func (s *Server) handleAuthentication(conn net.Conn) error {
 	return nil
 }
 
-func (s *Server) handleForwarding(conn net.Conn, forwardHost string, forwardPort int32) error {
+func (s *Server) handleForwarding(req *Request, conn net.Conn, forwardHost string, forwardPort int32) error {
 	proxyConn, err := net.Dial("tcp", util.MaybeDecorateIPv6(forwardHost)+":"+strconv.Itoa(int(forwardPort)))
 	if err != nil {
 		HandshakeErrors.Add(1)
@@ -328,6 +329,11 @@ func (s *Server) handleForwarding(conn net.Conn, forwardHost string, forwardPort
 		HandshakeErrors.Add(1)
 		proxyConn.Close()
 		return fmt.Errorf("got unexpected socks5 auth response from egress proxy: %v", resp)
+	}
+	if _, err := proxyConn.Write(req.Raw); err != nil {
+		HandshakeErrors.Add(1)
+		proxyConn.Close()
+		return fmt.Errorf("failed to write socks5 request to egress proxy: %w", err)
 	}
 	return util.BidiCopy(conn, proxyConn)
 }

@@ -16,7 +16,7 @@
                         },
                         {
                             "port": 3000,
-                            "protocol": "TCP"
+                            "protocol": "UDP"
                         }
                     ]
                 }
@@ -27,6 +27,7 @@
         }
     ],
     "activeProfile": "ducaiguozei",
+    "rpcPort": 2001,
     "socks5Port": 2000,
     "loggingLevel": "INFO",
     "socks5ListenLAN": false

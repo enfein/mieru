@@ -16,7 +16,7 @@
                         },
                         {
                             "port": 5000,
-                            "protocol": "TCP"
+                            "protocol": "UDP"
                         }
                     ]
                 }
@@ -27,6 +27,7 @@
         }
     ],
     "activeProfile": "meiyougongchandang",
+    "rpcPort": 4001,
     "socks5Port": 4000,
     "loggingLevel": "INFO",
     "socks5ListenLAN": false

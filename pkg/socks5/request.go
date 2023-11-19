@@ -446,6 +446,7 @@ func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, err
 	if _, err := proxyConn.Write(connReq); err != nil {
 		return nil, fmt.Errorf("failed to write connection request to the server: %w", err)
 	}
+	log.Debugf("Sent socks5 request %v to server", connReq)
 
 	// Get server connection response.
 	connResp := make([]byte, 4)
