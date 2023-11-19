@@ -1,0 +1,42 @@
+{
+    "portBindings": [
+        {
+            "portRange": "2012-2022",
+            "protocol": "TCP"
+        },
+        {
+            "port": 2027,
+            "protocol": "TCP"
+        }
+    ],
+    "users": [
+        {
+            "name": "ducaiguozei",
+            "password": "xijinping"
+        },
+        {
+            "name": "meiyougongchandang",
+            "password": "caiyouxinzhongguo"
+        }
+    ],
+    "loggingLevel": "INFO",
+    "mtu": 1400,
+    "egress": {
+        "proxies": [
+            {
+                "name": "cloudflare",
+                "protocol": "SOCKS5_PROXY_PROTOCOL",
+                "host": "127.0.0.1",
+                "port": 4000
+            }
+        ],
+        "rules": [
+            {
+                "ipRanges": ["*"],
+                "domainNames": ["*"],
+                "action": "PROXY",
+                "proxyName": "cloudflare"
+            }
+        ]
+    }
+}

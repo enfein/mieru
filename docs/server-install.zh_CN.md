@@ -8,16 +8,16 @@
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v2.1.0/mita_2.1.0_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v2.2.0/mita_2.2.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v2.1.0/mita_2.1.0_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v2.2.0/mita_2.2.0_arm64.deb
 
 # Fedora / CentOS / RedHat - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v2.1.0/mita-2.1.0-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v2.2.0/mita-2.2.0-1.x86_64.rpm
 
 # Fedora / CentOS / RedHat - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v2.1.0/mita-2.1.0-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v2.2.0/mita-2.2.0-1.aarch64.rpm
 ```
 
 如果上述链接被墙，请翻墙后使用浏览器从 GitHub Releases 页面下载安装。
@@ -26,16 +26,16 @@ curl -LSO https://github.com/enfein/mieru/releases/download/v2.1.0/mita-2.1.0-1.
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_2.1.0_amd64.deb
+sudo dpkg -i mita_2.2.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_2.1.0_arm64.deb
+sudo dpkg -i mita_2.2.0_arm64.deb
 
 # Fedora / CentOS / RedHat - X86_64
-sudo rpm -Uvh --force mita-2.1.0-1.x86_64.rpm
+sudo rpm -Uvh --force mita-2.2.0-1.x86_64.rpm
 
 # Fedora / CentOS / RedHat - ARM 64
-sudo rpm -Uvh --force mita-2.1.0-1.aarch64.rpm
+sudo rpm -Uvh --force mita-2.2.0-1.aarch64.rpm
 ```
 
 ## 赋予当前用户操作 mita 的权限，需要重启服务器使此设置生效
@@ -89,17 +89,7 @@ mita apply config <FILE>
     "users": [
         {
             "name": "ducaiguozei",
-            "password": "xijinping",
-            "quotas": [
-                {
-                    "days": 1,
-                    "megabytes": 1024
-                },
-                {
-                    "days": 30,
-                    "megabytes": 10240
-                }
-            ]
+            "password": "xijinping"
         },
         {
             "name": "meiyougongchandang",
@@ -115,8 +105,7 @@ mita apply config <FILE>
 2. `portBindings` -> `protocol` 属性可以使用 `TCP` 或者 `UDP`。
 3. 在 `users` -> `name` 属性中填写用户名。
 4. 在 `users` -> `password` 属性中填写该用户的密码。
-5. 如有需要，可以使用 `users` -> `quotas` 属性限制用户可以使用的流量。在上面的例子中，用户 "ducaiguozei" 在 1 天时间内最多可以使用 1 GB 流量，在 30 天时间内最多可以使用 10 GB 流量。
-6. `mtu` 属性是使用 UDP 代理协议时，数据链路层最大的载荷大小。默认值是 1400，可以选择 1280 到 1500 之间的值。
+5. `mtu` 属性是使用 UDP 代理协议时，数据链路层最大的载荷大小。默认值是 1400，可以选择 1280 到 1500 之间的值。
 
 除此之外，mita 可以监听多个不同的端口。我们建议在服务器和客户端配置中使用多个端口。
 
@@ -161,6 +150,119 @@ mita stop
 注意，每次使用 `mita apply config <FILE>` 修改设置后，需要用 `mita stop` 和 `mita start` 重启代理服务，才能使新设置生效。
 
 启动代理服务后，请继续进行[客户端安装与配置](https://github.com/enfein/mieru/blob/main/docs/client-install.zh_CN.md)。
+
+## 高级设置
+
+### 配置出站代理
+
+出站代理功能允许 mieru 与其他代理工具结合构成链式代理。链式代理的网络拓扑结构的一个例子如下图所示：
+
+```
+mieru 客户端 -> GFW -> mita 服务器 -> cloudflare 代理客户端 -> cloudflare CDN -> 目标网址
+```
+
+通过链式代理，目标网址看到的 IP 地址是 cloudflare CDN 的地址，而不是 mita 服务器的地址。
+
+下面是配置链式代理的一个例子。
+
+```js
+{
+    "portBindings": [
+        {
+            "portRange": "2012-2022",
+            "protocol": "TCP"
+        },
+        {
+            "port": 2027,
+            "protocol": "TCP"
+        }
+    ],
+    "users": [
+        {
+            "name": "ducaiguozei",
+            "password": "xijinping"
+        },
+        {
+            "name": "meiyougongchandang",
+            "password": "caiyouxinzhongguo"
+        }
+    ],
+    "loggingLevel": "INFO",
+    "mtu": 1400,
+    "egress": {
+        "proxies": [
+            {
+                "name": "cloudflare",
+                "protocol": "SOCKS5_PROXY_PROTOCOL",
+                "host": "127.0.0.1",
+                "port": 4000
+            }
+        ],
+        "rules": [
+            {
+                "ipRanges": ["*"],
+                "domainNames": ["*"],
+                "action": "PROXY",
+                "proxyName": "cloudflare"
+            }
+        ]
+    }
+}
+```
+
+1. 在 `egress` -> `proxies` 属性中列举出站代理服务器的信息。当前版本只支持 socks5 出站，因此 `protocol` 的值必须设定为 `SOCKS5_PROXY_PROTOCOL`。
+2. 在 `egress` -> `rules` 属性中列举出站规则。当前版本最多允许用户添加一条规则，且 `ipRanges`, `domainNames` 和 `action` 的值必须与上面的例子相同。`proxyName` 需要指向一个 `egress` -> `proxies` 属性中存在的代理。
+
+如果想要关闭出站代理功能，将 `egress` 属性设置为空 `{}` 即可。
+
+注意，链式代理和嵌套代理不同。嵌套代理的网络拓扑结构的一个例子如下图所示：
+
+```
+Tor 浏览器 -> mieru 客户端 -> GFW -> mita 服务器 -> Tor 网络 -> 目标网址
+```
+
+关于如何在 Tor 浏览器上配置嵌套代理，请参见[翻墙安全指南](https://github.com/enfein/mieru/blob/main/docs/security.zh_CN.md)。
+
+### 限制用户流量
+
+我们可以使用 `users` -> `quotas` 属性限制用户可以使用的流量大小。例如，如果想让用户 "ducaiguozei" 在 1 天时间内最多使用 1 GB 流量，并且在 30 天时间内最多使用 10 GB 流量，可以应用下面的设置。
+
+```js
+{
+    "portBindings": [
+        {
+            "portRange": "2012-2022",
+            "protocol": "TCP"
+        },
+        {
+            "port": 2027,
+            "protocol": "TCP"
+        }
+    ],
+    "users": [
+        {
+            "name": "ducaiguozei",
+            "password": "xijinping",
+            "quotas": [
+                {
+                    "days": 1,
+                    "megabytes": 1024
+                },
+                {
+                    "days": 30,
+                    "megabytes": 10240
+                }
+            ]
+        },
+        {
+            "name": "meiyougongchandang",
+            "password": "caiyouxinzhongguo"
+        }
+    ],
+    "loggingLevel": "INFO",
+    "mtu": 1400
+}
+```
 
 ## 【可选】安装 NTP 网络时间同步服务
 

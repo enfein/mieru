@@ -12,7 +12,17 @@
     "users": [
         {
             "name": "ducaiguozei",
-            "password": "xijinping"
+            "password": "xijinping",
+            "quotas": [
+                {
+                    "days": 1,
+                    "megabytes": 1024
+                },
+                {
+                    "days": 30,
+                    "megabytes": 10240
+                }
+            ]
         },
         {
             "name": "meiyougongchandang",
