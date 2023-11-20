@@ -56,26 +56,32 @@ client-android: client-android-amd64 client-android-arm64
 # Build Android amd64 client.
 .PHONY: client-android-amd64
 client-android-amd64:
-	mkdir -p release/android/amd64
-	env GOOS=android GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/android/amd64/mieru cmd/mieru/mieru.go
-	cd release/android/amd64;\
+	if [ ! -z $$(command -v gcc) ]; then\
+		mkdir -p release/android/amd64;\
+		env GOOS=android GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/android/amd64/mieru cmd/mieru/mieru.go;\
+		cd release/android/amd64;\
 		sha256sum mieru > mieru_${VERSION}_android_amd64.sha256.txt;\
 		tar -zcvf mieru_${VERSION}_android_amd64.tar.gz mieru;\
-		sha256sum mieru_${VERSION}_android_amd64.tar.gz > mieru_${VERSION}_android_amd64.tar.gz.sha256.txt
-	mv release/android/amd64/mieru_${VERSION}_android_amd64.tar.gz release/
-	mv release/android/amd64/mieru_${VERSION}_android_amd64.tar.gz.sha256.txt release/
+		sha256sum mieru_${VERSION}_android_amd64.tar.gz > mieru_${VERSION}_android_amd64.tar.gz.sha256.txt;\
+		cd "${ROOT}";\
+		mv release/android/amd64/mieru_${VERSION}_android_amd64.tar.gz release/;\
+		mv release/android/amd64/mieru_${VERSION}_android_amd64.tar.gz.sha256.txt release/;\
+	fi
 
 # Build Android arm64 client.
 .PHONY: client-android-arm64
 client-android-arm64:
-	mkdir -p release/android/arm64
-	env GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/android/arm64/mieru cmd/mieru/mieru.go
-	cd release/android/arm64;\
+	if [ ! -z $$(command -v gcc) ]; then\
+		mkdir -p release/android/arm64;\
+		env GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/android/arm64/mieru cmd/mieru/mieru.go;\
+		cd release/android/arm64;\
 		sha256sum mieru > mieru_${VERSION}_android_arm64.sha256.txt;\
 		tar -zcvf mieru_${VERSION}_android_arm64.tar.gz mieru;\
-		sha256sum mieru_${VERSION}_android_arm64.tar.gz > mieru_${VERSION}_android_arm64.tar.gz.sha256.txt
-	mv release/android/arm64/mieru_${VERSION}_android_arm64.tar.gz release/
-	mv release/android/arm64/mieru_${VERSION}_android_arm64.tar.gz.sha256.txt release/
+		sha256sum mieru_${VERSION}_android_arm64.tar.gz > mieru_${VERSION}_android_arm64.tar.gz.sha256.txt;\
+		cd "${ROOT}";\
+		mv release/android/arm64/mieru_${VERSION}_android_arm64.tar.gz release/;\
+		mv release/android/arm64/mieru_${VERSION}_android_arm64.tar.gz.sha256.txt release/;\
+	fi
 
 # Build linux clients.
 .PHONY: client-linux

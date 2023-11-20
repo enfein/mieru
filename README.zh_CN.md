@@ -26,7 +26,8 @@ mieru 的翻墙原理与 shadowsocks / v2ray 等软件类似，在客户端和�
 7. mieru 支持 IPv4 和 IPv6。
 8. mieru 提供 socks5, HTTP 和 HTTPS 代理。
 9. 客户端软件支持 Windows, Mac OS 和 Linux 系统。
-10. 如果需要全局代理或自定义路由规则等高级功能，可以将 mieru 作为 clash 等代理平台的后端。
+10. 服务器软件支持 socks5 出站（链式代理）。
+11. 如果需要全局代理或自定义路由规则等高级功能，可以将 mieru 作为 clash 等代理平台的后端。
 
 ## 使用教程
 
@@ -50,6 +51,10 @@ mieru 的翻墙原理与 shadowsocks / v2ray 等软件类似，在客户端和�
 - sha256sum
 - tar
 - zip
+
+编译 Android 可执行文件需要：
+
+- gcc
 
 编译 debian 安装包需要：
 

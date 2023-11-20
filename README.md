@@ -28,7 +28,8 @@ For an explanation of the mieru protocol, see [mieru Proxy Protocol](https://git
 7. mieru supports IPv4 and IPv6.
 8. mieru provides socks5, HTTP and HTTPS proxy.
 9. The client software supports Windows, Mac OS and Linux.
-10. If you need advanced features like global proxy or customized routing rules, you can use mieru as the backend of a proxy platform such as clash.
+10. The server software supports socks5 outbound (proxy chain).
+11. If you need advanced features like global proxy or customized routing rules, you can use mieru as the backend of a proxy platform such as clash.
 
 ## User Guide
 
@@ -52,6 +53,10 @@ The following softwares are required for compilation.
 - sha256sum
 - tar
 - zip
+
+To build Android executable files:
+
+- gcc
 
 To build debian packages:
 
