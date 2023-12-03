@@ -6,11 +6,11 @@
 
 客户端软件 mieru 的配置文件同样是一个二进制文件。它在不同操作系统中存储的位置如下表所示
 
-| Operating System | Configuration File Path |
-| :----: | :----: |
-| Linux | $HOME/.config/mieru/client.conf.pb |
-| Mac OS | /Users/USERNAME/Library/Application Support/mieru/client.conf.pb |
-| Windows | %USERPROFILE%\AppData\Roaming\mieru\client.conf.pb |
+| 操作系统 | 配置文件位置 | 示例 |
+| :----: | :----: | :----: |
+| Linux | $HOME/.config/mieru/client.conf.pb | /home/enfein/.config/mieru/client.conf.pb |
+| Mac OS | $HOME/Library/Application Support/mieru/client.conf.pb | /Users/enfein/Library/Application Support/mieru/client.conf.pb |
+| Windows | %USERPROFILE%\AppData\Roaming\mieru\client.conf.pb | C:\Users\enfein\AppData\Roaming\mieru\client.conf.pb |
 
 ## 查看代理服务器 mita 的日志
 
@@ -24,11 +24,11 @@ sudo journalctl -u mita -xe --no-pager
 
 客户端 mieru 的日志存放位置如下表所示
 
-| Operating System | Configuration File Path |
-| :----: | :----: |
-| Linux | $HOME/.cache/mieru/ or $XDG_CACHE_HOME/mieru/ |
-| Mac OS | /Users/USERNAME/Library/Caches/mieru/ |
-| Windows | %USERPROFILE%\AppData\Local\mieru\ |
+| 操作系统 | 日志文件位置 | 示例 |
+| :----: | :----: | :----: |
+| Linux | $HOME/.cache/mieru/ or $XDG_CACHE_HOME/mieru/ | /home/enfein/.cache/mieru/ |
+| Mac OS | $HOME/Library/Caches/mieru/ | /Users/enfein/Library/Caches/mieru/ |
+| Windows | %USERPROFILE%\AppData\Local\mieru\ | C:\Users\enfein\AppData\Local\mieru\ |
 
 每个日志文件的格式为 `yyyyMMdd_HHmm_PID.log`，其中 `yyyyMMdd_HHmm` 是 mieru 进程启动的时间，`PID` 是进程号码。每次重启 mieru 会生成一个新的日志文件。当日志文件的数量太多时，旧的文件会被自动删除。
 

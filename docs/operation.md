@@ -6,11 +6,11 @@ The configuration of the mita proxy server is stored in `/etc/mita/server.conf.p
 
 The configuration file of the mieru client is also a binary file. It is stored in the following locations in different operating systems.
 
-| Operating System | Configuration File Path |
-| :----: | :----: |
-| Linux | $HOME/.config/mieru/client.conf.pb |
-| Mac OS | /Users/USERNAME/Library/Application Support/mieru/client.conf.pb |
-| Windows | %USERPROFILE%\AppData\Roaming\mieru\client.conf.pb |
+| Operating System | Configuration File Path | Example Path |
+| :----: | :----: | :----: |
+| Linux | $HOME/.config/mieru/client.conf.pb | /home/enfein/.config/mieru/client.conf.pb |
+| Mac OS | $HOME/Library/Application Support/mieru/client.conf.pb | /Users/enfein/Library/Application Support/mieru/client.conf.pb |
+| Windows | %USERPROFILE%\AppData\Roaming\mieru\client.conf.pb | C:\Users\enfein\AppData\Roaming\mieru\client.conf.pb |
 
 ## View mita proxy server log
 
@@ -24,11 +24,11 @@ sudo journalctl -u mita -xe --no-pager
 
 The location of the client mieru log files is shown in the following table.
 
-| Operating System | Configuration File Path |
-| :----: | :----: |
-| Linux | $HOME/.cache/mieru/ or $XDG_CACHE_HOME/mieru/ |
-| Mac OS | /Users/USERNAME/Library/Caches/mieru/ |
-| Windows | %USERPROFILE%\AppData\Local\mieru\ |
+| Operating System | Log Files Path | Example Path |
+| :----: | :----: | :----: |
+| Linux | $HOME/.cache/mieru/ or $XDG_CACHE_HOME/mieru/ | /home/enfein/.cache/mieru/ |
+| Mac OS | $HOME/Library/Caches/mieru/ | /Users/enfein/Library/Caches/mieru/ |
+| Windows | %USERPROFILE%\AppData\Local\mieru\ | C:\Users\enfein\AppData\Local\mieru\ |
 
 Each log file uses the format `yyyyMMdd_HHmm_PID.log`, where `yyyyMMdd_HHmm` is the time when the mieru process was started and `PID` is the process number. Each time mieru is restarted, a new log file is generated. When there are too many log files, the old ones will be deleted automatically.
 
