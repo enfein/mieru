@@ -60,7 +60,7 @@ systemctl status mita
 mita status
 ```
 
-如果刚刚完成安装，此时的输出为 `mieru server status is "IDLE"`，表示 mita 还没有开始监听来自 mieru 客户端的请求。
+如果刚刚完成安装，此时的输出为 `mita server status is "IDLE"`，表示 mita 还没有开始监听来自 mieru 客户端的请求。
 
 ## 修改代理服务器设置
 
@@ -139,7 +139,7 @@ mita start
 mita status
 ```
 
-查询工作状态，这里如果返回 `mieru server status is "RUNNING"`，说明代理服务正在运行，可以开始相应客户端的请求了。
+查询工作状态，这里如果返回 `mita server status is "RUNNING"`，说明代理服务正在运行，可以开始相应客户端的请求了。
 
 如果想要停止代理服务，请使用指令
 

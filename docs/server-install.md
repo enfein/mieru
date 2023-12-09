@@ -60,7 +60,7 @@ If the output contains `active (running)`, it means that the mita daemon is alre
 mita status
 ```
 
-If the installation is just completed, the output will be `mieru server status is "IDLE"`, indicating that mita has not yet listening to requests from the mieru client.
+If the installation is just completed, the output will be `mita server status is "IDLE"`, indicating that mita has not yet listening to requests from the mieru client.
 
 ## Modify proxy server settings
 
@@ -139,7 +139,7 @@ Then, use command
 mita status
 ```
 
-to check working status. If `mieru server status is "RUNNING"` is returned here, it means that the proxy service is running and can process client requests.
+to check working status. If `mita server status is "RUNNING"` is returned here, it means that the proxy service is running and can process client requests.
 
 If you want to stop the proxy service, use command
 

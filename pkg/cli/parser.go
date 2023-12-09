@@ -71,7 +71,7 @@ func ParseAndExecute() error {
 	}
 	if !found {
 		cmd := strings.Join(args, " ")
-		return fmt.Errorf("%q is not a valid command. see \"%s help\" to get the list of supported commands", cmd, binaryName)
+		return fmt.Errorf("%q is not a valid command. Run \"%s help\" to get the list of supported commands", cmd, binaryName)
 	}
 	return nil
 }

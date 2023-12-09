@@ -184,32 +184,78 @@ func RegisterClientCommands() {
 }
 
 var clientHelpFunc = func(s []string) error {
-	format := "  %-32v%-46v"
-	helpCmd := fmt.Sprintf(format, "help", "Show mieru client help")
-	startCmd := fmt.Sprintf(format, "start", "Start mieru client")
-	stopCmd := fmt.Sprintf(format, "stop", "Stop mieru client")
-	statusCmd := fmt.Sprintf(format, "status", "Check mieru client status")
-	applyConfigCmd := fmt.Sprintf(format, "apply config <FILE>", "Apply client configuration from JSON file")
-	describeConfigCmd := fmt.Sprintf(format, "describe config", "Show current client configuration")
-	importConfigCmd := fmt.Sprintf(format, "import config <URL>", "Import client configuration from URL")
-	exportConfigCmd := fmt.Sprintf(format, "export config", "Export client configuration as URL")
-	deleteProfileCmd := fmt.Sprintf(format, "delete profile <PROFILE_NAME>", "Delete a client configuration profile")
-	versionCmd := fmt.Sprintf(format, "version", "Show mieru client version")
-	checkUpdateCmd := fmt.Sprintf(format, "check update", "Check mieru client update")
-	log.Infof("Usage: %s <COMMAND> [<ARGS>]", binaryName)
-	log.Infof("")
-	log.Infof("Commands:")
-	log.Infof("%s", helpCmd)
-	log.Infof("%s", startCmd)
-	log.Infof("%s", stopCmd)
-	log.Infof("%s", statusCmd)
-	log.Infof("%s", applyConfigCmd)
-	log.Infof("%s", describeConfigCmd)
-	log.Infof("%s", importConfigCmd)
-	log.Infof("%s", exportConfigCmd)
-	log.Infof("%s", deleteProfileCmd)
-	log.Infof("%s", versionCmd)
-	log.Infof("%s", checkUpdateCmd)
+	helpFmt := helpFormatter{
+		appName: "mieru",
+		entries: []helpCmdEntry{
+			{
+				cmd:  "help",
+				help: "Show mieru client help.",
+			},
+			{
+				cmd:  "start",
+				help: "Start mieru client in background.",
+			},
+			{
+				cmd:  "stop",
+				help: "Stop mieru client.",
+			},
+			{
+				cmd:  "status",
+				help: "Check mieru client status.",
+			},
+			{
+				cmd:  "apply config <FILE>",
+				help: "Apply client configuration from JSON file.",
+			},
+			{
+				cmd:  "describe config",
+				help: "Show current client configuration.",
+			},
+			{
+				cmd:  "import config <URL>",
+				help: "Import client configuration from URL.",
+			},
+			{
+				cmd:  "export config",
+				help: "Export client configuration as URL.",
+			},
+			{
+				cmd:  "delete profile <PROFILE_NAME>",
+				help: "Delete an inactive client configuration profile.",
+			},
+			{
+				cmd:  "version",
+				help: "Show mieru client version.",
+			},
+			{
+				cmd:  "check update",
+				help: "Check mieru client update.",
+			},
+		},
+		advanced: []helpCmdEntry{
+			{
+				cmd:  "run",
+				help: "Run mieru client in foreground.",
+			},
+			{
+				cmd:  "get thread-dump",
+				help: "Get mieru client thread dump.",
+			},
+			{
+				cmd:  "get heap-profile <GZ_FILE>",
+				help: "Get mieru client heap profile and save results to the file.",
+			},
+			{
+				cmd:  "profile cpu start <GZ_FILE>",
+				help: "Start mieru client CPU profile and save results to the file.",
+			},
+			{
+				cmd:  "profile cpu stop",
+				help: "Stop mieru client CPU profile.",
+			},
+		},
+	}
+	helpFmt.print()
 	return nil
 }
 

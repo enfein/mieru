@@ -164,28 +164,70 @@ func RegisterServerCommands() {
 }
 
 var serverHelpFunc = func(s []string) error {
-	format := "  %-32v%-46v"
-	helpCmd := fmt.Sprintf(format, "help", "Show mieru server help")
-	startCmd := fmt.Sprintf(format, "start", "Start mieru server")
-	stopCmd := fmt.Sprintf(format, "stop", "Stop mieru server")
-	statusCmd := fmt.Sprintf(format, "status", "Check mieru server status")
-	applyConfigCmd := fmt.Sprintf(format, "apply config <FILE>", "Apply server configuration from JSON file")
-	describeConfigCmd := fmt.Sprintf(format, "describe config", "Show current server configuration")
-	deleteUserCmd := fmt.Sprintf(format, "delete user <USER_NAME>", "Delete users from server configuration")
-	versionCmd := fmt.Sprintf(format, "version", "Show mieru server version")
-	checkUpdateCmd := fmt.Sprintf(format, "check update", "Check mieru server update")
-	log.Infof("Usage: %s <COMMAND> [<ARGS>]", binaryName)
-	log.Infof("")
-	log.Infof("Commands:")
-	log.Infof("%s", helpCmd)
-	log.Infof("%s", startCmd)
-	log.Infof("%s", stopCmd)
-	log.Infof("%s", statusCmd)
-	log.Infof("%s", applyConfigCmd)
-	log.Infof("%s", describeConfigCmd)
-	log.Infof("%s", deleteUserCmd)
-	log.Infof("%s", versionCmd)
-	log.Infof("%s", checkUpdateCmd)
+	helpFmt := helpFormatter{
+		appName: "mita",
+		entries: []helpCmdEntry{
+			{
+				cmd:  "help",
+				help: "Show mita server help.",
+			},
+			{
+				cmd:  "start",
+				help: "Start mita server proxy service.",
+			},
+			{
+				cmd:  "stop",
+				help: "Stop mita server proxy service.",
+			},
+			{
+				cmd:  "status",
+				help: "Check mita server proxy service status.",
+			},
+			{
+				cmd:  "apply config <FILE>",
+				help: "Apply server configuration from JSON file.",
+			},
+			{
+				cmd:  "describe config",
+				help: "Show current server configuration.",
+			},
+			{
+				cmd:  "delete user <USER_NAME>",
+				help: "Delete a user from server configuration.",
+			},
+			{
+				cmd:  "version",
+				help: "Show mita server version.",
+			},
+			{
+				cmd:  "check update",
+				help: "Check mita server update.",
+			},
+		},
+		advanced: []helpCmdEntry{
+			{
+				cmd:  "run",
+				help: "Run mita server in foreground.",
+			},
+			{
+				cmd:  "get thread-dump",
+				help: "Get mita server thread dump.",
+			},
+			{
+				cmd:  "get heap-profile <GZ_FILE>",
+				help: "Get mita server heap profile and save results to the file.",
+			},
+			{
+				cmd:  "profile cpu start <GZ_FILE>",
+				help: "Start mita server CPU profile and save results to the file.",
+			},
+			{
+				cmd:  "profile cpu stop",
+				help: "Stop mita server CPU profile.",
+			},
+		},
+	}
+	helpFmt.print()
 	return nil
 }
 
@@ -198,7 +240,7 @@ var serverStartFunc = func(s []string) error {
 		return fmt.Errorf(stderror.ServerNotRunningErr, err)
 	}
 	if err := appctl.IsServerProxyRunning(appStatus); err == nil {
-		log.Infof("mieru server proxy is running")
+		log.Infof("mita server proxy is running")
 		return nil
 	}
 
@@ -213,7 +255,7 @@ var serverStartFunc = func(s []string) error {
 	if err != nil {
 		return fmt.Errorf(stderror.StartServerProxyFailedErr, err)
 	}
-	log.Infof("mieru server proxy is started")
+	log.Infof("mita server proxy is started")
 	return nil
 }
 
@@ -250,11 +292,11 @@ var serverRunFunc = func(s []string) error {
 		appctlpb.RegisterServerLifecycleServiceServer(grpcServer, appctl.NewServerLifecycleService())
 		appctlpb.RegisterServerConfigServiceServer(grpcServer, appctl.NewServerConfigService())
 		close(appctl.ServerRPCServerStarted)
-		log.Infof("mieru server daemon RPC server is running")
+		log.Infof("mita server daemon RPC server is running")
 		if err = grpcServer.Serve(rpcListener); err != nil {
 			log.Fatalf("run gRPC server failed: %v", err)
 		}
-		log.Infof("mieru server daemon RPC server is stopped")
+		log.Infof("mita server daemon RPC server is stopped")
 		rpcTasks.Done()
 	}()
 	<-appctl.ServerRPCServerStarted
@@ -350,11 +392,11 @@ var serverRunFunc = func(s []string) error {
 			}
 			initProxyTasks.Done()
 
-			log.Infof("mieru server daemon socks5 server is running")
+			log.Infof("mita server daemon socks5 server is running")
 			if err = socks5Server.Serve(mux); err != nil {
 				log.Fatalf("run socks5 server failed: %v", err)
 			}
-			log.Infof("mieru server daemon socks5 server is stopped")
+			log.Infof("mita server daemon socks5 server is stopped")
 			proxyTasks.Done()
 		}()
 
@@ -372,7 +414,7 @@ var serverRunFunc = func(s []string) error {
 	// Stop CPU profiling, if previously started.
 	pprof.StopCPUProfile()
 
-	log.Infof("mieru server daemon exit now")
+	log.Infof("mita server daemon exit now")
 	return nil
 }
 
@@ -398,7 +440,7 @@ var serverStopFunc = func(s []string) error {
 	if _, err = client.Stop(timedctx, &appctlpb.Empty{}); err != nil {
 		return fmt.Errorf(stderror.StopServerProxyFailedErr, err)
 	}
-	log.Infof("mieru server proxy is stopped")
+	log.Infof("mita server proxy is stopped")
 	return nil
 }
 
@@ -414,7 +456,7 @@ var serverStatusFunc = func(s []string) error {
 				cmd := strings.Join(s, " ")
 				return fmt.Errorf("unable to determine the OS user which executed command %q", cmd)
 			}
-			return fmt.Errorf("unable to connect to mieru server daemon via %q, please retry after running \"sudo usermod -a -G mita %s\" command and reboot the system", appctl.ServerUDS(), currentUser.Username)
+			return fmt.Errorf("unable to connect to mita server daemon via %q, please retry after running \"sudo usermod -a -G mita %s\" command and reboot the system", appctl.ServerUDS(), currentUser.Username)
 		} else {
 			return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
 		}
@@ -425,7 +467,7 @@ var serverStatusFunc = func(s []string) error {
 	if err := appctl.IsServerProxyRunning(appStatus); err != nil {
 		log.Infof("%s", err.Error())
 	} else {
-		log.Infof("mieru server status is %q", appctlpb.AppStatus_RUNNING.String())
+		log.Infof("mita server status is %q", appctlpb.AppStatus_RUNNING.String())
 	}
 	return nil
 }
@@ -635,7 +677,7 @@ func updateServerUDSPermission() error {
 	}
 	mitaGid, err := strconv.Atoi(mitaGidStr)
 	if err != nil {
-		return fmt.Errorf("convert mieru UID with strconv.Atoi(%q) failed: %w", mitaGidStr, err)
+		return fmt.Errorf("convert mita UID with strconv.Atoi(%q) failed: %w", mitaGidStr, err)
 	}
 	if err = os.Chown(appctl.ServerUDS(), rootUid, mitaGid); err != nil {
 		return fmt.Errorf("os.Chown(%q) failed: %w", appctl.ServerUDS(), err)

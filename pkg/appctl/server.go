@@ -1,4 +1,4 @@
-// Copyright (C) 2021  mieru authors
+// Copyright (C) 2023  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -161,11 +161,11 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 		}
 		initProxyTasks.Done()
 
-		log.Infof("mieru server daemon socks5 server is running")
+		log.Infof("mita server daemon socks5 server is running")
 		if err = socks5Server.Serve(mux); err != nil {
 			log.Fatalf("run socks5 server failed: %v", err)
 		}
-		log.Infof("mieru server daemon socks5 server is stopped")
+		log.Infof("mita server daemon socks5 server is stopped")
 	}()
 
 	initProxyTasks.Wait()
@@ -315,7 +315,7 @@ func IsServerDaemonRunning(appStatus *pb.AppStatusMsg) error {
 		return fmt.Errorf("AppStatusMsg is nil")
 	}
 	if appStatus.GetStatus() == pb.AppStatus_UNKNOWN {
-		return fmt.Errorf("mieru server status is %q", appStatus.GetStatus().String())
+		return fmt.Errorf("mita server status is %q", appStatus.GetStatus().String())
 	}
 	return nil
 }
@@ -326,7 +326,7 @@ func IsServerProxyRunning(appStatus *pb.AppStatusMsg) error {
 		return err
 	}
 	if appStatus.GetStatus() != pb.AppStatus_RUNNING {
-		return fmt.Errorf("mieru server status is %q", appStatus.GetStatus().String())
+		return fmt.Errorf("mita server status is %q", appStatus.GetStatus().String())
 	}
 	return nil
 }
@@ -586,7 +586,7 @@ func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 // In addition to ValidateServerConfigPatch, it also validates:
 // 1. there is at least 1 port binding
 //
-// It is not an error if no user is configured. However mieru won't be functional.
+// It is not an error if no user is configured. However mita won't be functional.
 func ValidateFullServerConfig(config *pb.ServerConfig) error {
 	if err := ValidateServerConfigPatch(config); err != nil {
 		return err
