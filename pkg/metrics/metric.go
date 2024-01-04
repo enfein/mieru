@@ -16,7 +16,11 @@
 package metrics
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -101,6 +105,8 @@ func (g *MetricGroup) NewLogFields() log.Fields {
 // MetricGroupList is a list of MetricGroup.
 type MetricGroupList []*MetricGroup
 
+var _ json.Marshaler = MetricGroupList{}
+
 // Append adds a new MetricGroup to the end of list.
 func (l MetricGroupList) Append(group *MetricGroup) MetricGroupList {
 	return append(l, group)
@@ -122,4 +128,50 @@ func (l MetricGroupList) Swap(i, j int) {
 	tmp := l[i]
 	l[i] = l[j]
 	l[j] = tmp
+}
+
+// MarshalJSON export the content of MetricGroupList in JSON format.
+func (l MetricGroupList) MarshalJSON() ([]byte, error) {
+	sort.Sort(l)
+
+	var sb strings.Builder
+	sb.WriteString("{")
+	for i := 0; i < l.Len(); i++ {
+		g := l[i]
+		fmt.Fprintf(&sb, `"%s": {`, g.name)
+		gl := 0
+		g.metrics.Range(func(k, v any) bool {
+			gl++
+			return true
+		})
+		j := 0
+		g.metrics.Range(func(k, v any) bool {
+			m := v.(Metric)
+			fmt.Fprintf(&sb, `"%s": %d`, m.Name(), m.Load())
+			if j != gl-1 {
+				sb.WriteString(", ")
+			}
+			j++
+			return true
+		})
+		sb.WriteString("}") // end of metric group
+		if i != l.Len()-1 {
+			sb.WriteString(", ")
+		}
+	}
+	sb.WriteString("}") // end of metric group list
+
+	// Add trailing new line.
+	if runtime.GOOS == "windows" {
+		sb.WriteRune(0x0d)
+	}
+	sb.WriteRune(0x0a)
+
+	// Make JSON pretty.
+	raw := []byte(sb.String())
+	var b bytes.Buffer
+	if err := json.Indent(&b, raw, "", "    "); err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
 }
