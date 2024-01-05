@@ -29,6 +29,7 @@ import (
 
 	pb "github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/log"
+	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/socks5"
 	"github.com/enfein/mieru/pkg/stderror"
 	"google.golang.org/grpc"
@@ -104,6 +105,14 @@ func (c *clientLifecycleService) Exit(ctx context.Context, req *pb.Empty) (*pb.E
 	}
 	log.Infof("completed exit request from RPC caller")
 	return &pb.Empty{}, nil
+}
+
+func (c *clientLifecycleService) GetMetrics(ctx context.Context, req *pb.Empty) (*pb.Metrics, error) {
+	b, err := metrics.GetMetricsAsJSON()
+	if err != nil {
+		return &pb.Metrics{}, err
+	}
+	return &pb.Metrics{Json: proto.String(string(b))}, nil
 }
 
 func (c *clientLifecycleService) GetThreadDump(ctx context.Context, req *pb.Empty) (*pb.ThreadDump, error) {

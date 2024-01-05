@@ -19,6 +19,7 @@ package appctl;
 
 import "debug.proto";
 import "empty.proto";
+import "metrics.proto";
 
 option go_package = "github.com/enfein/mieru/pkg/appctl/appctlpb";
 
@@ -49,6 +50,9 @@ service ClientLifecycleService {
     // Quit client daemon.
     rpc Exit(Empty) returns (Empty);
 
+    // Get client metrics.
+    rpc GetMetrics(Empty) returns (Metrics);
+
     // Generate a thread dump of client daemon.
     rpc GetThreadDump(Empty) returns (ThreadDump);
 
@@ -74,6 +78,9 @@ service ServerLifecycleService {
 
     // Quit server daemon.
     rpc Exit(Empty) returns (Empty);
+
+    // Get server metrics.
+    rpc GetMetrics(Empty) returns (Metrics);
 
     // Generate a thread dump of server daemon.
     rpc GetThreadDump(Empty) returns (ThreadDump);

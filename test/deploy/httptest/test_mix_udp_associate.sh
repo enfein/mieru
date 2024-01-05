@@ -76,6 +76,14 @@ fi
 ./mieru get heap-profile /test/mieru.associate.heap.gz
 ./mita get heap-profile /test/mita.associate.heap.gz
 
+# Print metrics.
+echo "client metrics"
+./mieru get metrics
+sleep 1
+echo "server metrics"
+./mita get metrics
+sleep 1
+
 # Stop mieru client.
 ./mieru stop
 if [[ "$?" -ne 0 ]]; then

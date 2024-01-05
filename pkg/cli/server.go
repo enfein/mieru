@@ -124,6 +124,13 @@ func RegisterServerCommands() {
 		checkUpdateFunc,
 	)
 	RegisterCallback(
+		[]string{"", "get", "metrics"},
+		func(s []string) error {
+			return unexpectedArgsError(s, 3)
+		},
+		serverGetMetricsFunc,
+	)
+	RegisterCallback(
 		[]string{"", "get", "thread-dump"},
 		func(s []string) error {
 			return unexpectedArgsError(s, 3)
@@ -194,6 +201,10 @@ var serverHelpFunc = func(s []string) error {
 			{
 				cmd:  "delete user <USER_NAME>",
 				help: "Delete a user from server configuration.",
+			},
+			{
+				cmd:  "get metrics",
+				help: "Get mita server metrics.",
 			},
 			{
 				cmd:  "version",
@@ -572,6 +583,29 @@ var serverDeleteUserFunc = func(s []string) error {
 	if err != nil {
 		return fmt.Errorf(stderror.SetServerConfigFailedErr, err)
 	}
+	return nil
+}
+
+var serverGetMetricsFunc = func(s []string) error {
+	appStatus, err := appctl.GetServerStatusWithRPC(context.Background())
+	if err != nil {
+		return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
+	}
+	if err := appctl.IsServerDaemonRunning(appStatus); err != nil {
+		return fmt.Errorf(stderror.ServerNotRunningErr, err)
+	}
+
+	client, err := appctl.NewServerLifecycleRPCClient()
+	if err != nil {
+		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
+	}
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
+	defer cancelFunc()
+	metrics, err := client.GetMetrics(timedctx, &appctlpb.Empty{})
+	if err != nil {
+		return fmt.Errorf(stderror.GetMetricsFailedErr, err)
+	}
+	log.Infof("%s", metrics.GetJson())
 	return nil
 }
 

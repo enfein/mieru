@@ -36,6 +36,7 @@ const _ = grpc.SupportPackageIsVersion7
 const (
 	ClientLifecycleService_GetStatus_FullMethodName       = "/appctl.ClientLifecycleService/GetStatus"
 	ClientLifecycleService_Exit_FullMethodName            = "/appctl.ClientLifecycleService/Exit"
+	ClientLifecycleService_GetMetrics_FullMethodName      = "/appctl.ClientLifecycleService/GetMetrics"
 	ClientLifecycleService_GetThreadDump_FullMethodName   = "/appctl.ClientLifecycleService/GetThreadDump"
 	ClientLifecycleService_StartCPUProfile_FullMethodName = "/appctl.ClientLifecycleService/StartCPUProfile"
 	ClientLifecycleService_StopCPUProfile_FullMethodName  = "/appctl.ClientLifecycleService/StopCPUProfile"
@@ -50,6 +51,8 @@ type ClientLifecycleServiceClient interface {
 	GetStatus(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*AppStatusMsg, error)
 	// Quit client daemon.
 	Exit(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
+	// Get client metrics.
+	GetMetrics(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Metrics, error)
 	// Generate a thread dump of client daemon.
 	GetThreadDump(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ThreadDump, error)
 	// Start CPU profiling.
@@ -80,6 +83,15 @@ func (c *clientLifecycleServiceClient) GetStatus(ctx context.Context, in *Empty,
 func (c *clientLifecycleServiceClient) Exit(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
 	err := c.cc.Invoke(ctx, ClientLifecycleService_Exit_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *clientLifecycleServiceClient) GetMetrics(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Metrics, error) {
+	out := new(Metrics)
+	err := c.cc.Invoke(ctx, ClientLifecycleService_GetMetrics_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -130,6 +142,8 @@ type ClientLifecycleServiceServer interface {
 	GetStatus(context.Context, *Empty) (*AppStatusMsg, error)
 	// Quit client daemon.
 	Exit(context.Context, *Empty) (*Empty, error)
+	// Get client metrics.
+	GetMetrics(context.Context, *Empty) (*Metrics, error)
 	// Generate a thread dump of client daemon.
 	GetThreadDump(context.Context, *Empty) (*ThreadDump, error)
 	// Start CPU profiling.
@@ -150,6 +164,9 @@ func (UnimplementedClientLifecycleServiceServer) GetStatus(context.Context, *Emp
 }
 func (UnimplementedClientLifecycleServiceServer) Exit(context.Context, *Empty) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Exit not implemented")
+}
+func (UnimplementedClientLifecycleServiceServer) GetMetrics(context.Context, *Empty) (*Metrics, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetMetrics not implemented")
 }
 func (UnimplementedClientLifecycleServiceServer) GetThreadDump(context.Context, *Empty) (*ThreadDump, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetThreadDump not implemented")
@@ -209,6 +226,24 @@ func _ClientLifecycleService_Exit_Handler(srv interface{}, ctx context.Context, 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ClientLifecycleServiceServer).Exit(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ClientLifecycleService_GetMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClientLifecycleServiceServer).GetMetrics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ClientLifecycleService_GetMetrics_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClientLifecycleServiceServer).GetMetrics(ctx, req.(*Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -301,6 +336,10 @@ var ClientLifecycleService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ClientLifecycleService_Exit_Handler,
 		},
 		{
+			MethodName: "GetMetrics",
+			Handler:    _ClientLifecycleService_GetMetrics_Handler,
+		},
+		{
 			MethodName: "GetThreadDump",
 			Handler:    _ClientLifecycleService_GetThreadDump_Handler,
 		},
@@ -326,6 +365,7 @@ const (
 	ServerLifecycleService_Start_FullMethodName           = "/appctl.ServerLifecycleService/Start"
 	ServerLifecycleService_Stop_FullMethodName            = "/appctl.ServerLifecycleService/Stop"
 	ServerLifecycleService_Exit_FullMethodName            = "/appctl.ServerLifecycleService/Exit"
+	ServerLifecycleService_GetMetrics_FullMethodName      = "/appctl.ServerLifecycleService/GetMetrics"
 	ServerLifecycleService_GetThreadDump_FullMethodName   = "/appctl.ServerLifecycleService/GetThreadDump"
 	ServerLifecycleService_StartCPUProfile_FullMethodName = "/appctl.ServerLifecycleService/StartCPUProfile"
 	ServerLifecycleService_StopCPUProfile_FullMethodName  = "/appctl.ServerLifecycleService/StopCPUProfile"
@@ -344,6 +384,8 @@ type ServerLifecycleServiceClient interface {
 	Stop(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 	// Quit server daemon.
 	Exit(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
+	// Get server metrics.
+	GetMetrics(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Metrics, error)
 	// Generate a thread dump of server daemon.
 	GetThreadDump(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ThreadDump, error)
 	// Start CPU profiling.
@@ -398,6 +440,15 @@ func (c *serverLifecycleServiceClient) Exit(ctx context.Context, in *Empty, opts
 	return out, nil
 }
 
+func (c *serverLifecycleServiceClient) GetMetrics(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Metrics, error) {
+	out := new(Metrics)
+	err := c.cc.Invoke(ctx, ServerLifecycleService_GetMetrics_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *serverLifecycleServiceClient) GetThreadDump(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ThreadDump, error) {
 	out := new(ThreadDump)
 	err := c.cc.Invoke(ctx, ServerLifecycleService_GetThreadDump_FullMethodName, in, out, opts...)
@@ -446,6 +497,8 @@ type ServerLifecycleServiceServer interface {
 	Stop(context.Context, *Empty) (*Empty, error)
 	// Quit server daemon.
 	Exit(context.Context, *Empty) (*Empty, error)
+	// Get server metrics.
+	GetMetrics(context.Context, *Empty) (*Metrics, error)
 	// Generate a thread dump of server daemon.
 	GetThreadDump(context.Context, *Empty) (*ThreadDump, error)
 	// Start CPU profiling.
@@ -472,6 +525,9 @@ func (UnimplementedServerLifecycleServiceServer) Stop(context.Context, *Empty) (
 }
 func (UnimplementedServerLifecycleServiceServer) Exit(context.Context, *Empty) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Exit not implemented")
+}
+func (UnimplementedServerLifecycleServiceServer) GetMetrics(context.Context, *Empty) (*Metrics, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetMetrics not implemented")
 }
 func (UnimplementedServerLifecycleServiceServer) GetThreadDump(context.Context, *Empty) (*ThreadDump, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetThreadDump not implemented")
@@ -571,6 +627,24 @@ func _ServerLifecycleService_Exit_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ServerLifecycleService_GetMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerLifecycleServiceServer).GetMetrics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerLifecycleService_GetMetrics_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerLifecycleServiceServer).GetMetrics(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ServerLifecycleService_GetThreadDump_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
 	if err := dec(in); err != nil {
@@ -665,6 +739,10 @@ var ServerLifecycleService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Exit",
 			Handler:    _ServerLifecycleService_Exit_Handler,
+		},
+		{
+			MethodName: "GetMetrics",
+			Handler:    _ServerLifecycleService_GetMetrics_Handler,
 		},
 		{
 			MethodName: "GetThreadDump",

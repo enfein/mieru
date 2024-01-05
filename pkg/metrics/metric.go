@@ -19,7 +19,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -139,33 +138,28 @@ func (l MetricGroupList) MarshalJSON() ([]byte, error) {
 	for i := 0; i < l.Len(); i++ {
 		g := l[i]
 		fmt.Fprintf(&sb, `"%s": {`, g.name)
-		gl := 0
-		g.metrics.Range(func(k, v any) bool {
-			gl++
-			return true
-		})
-		j := 0
+		metrics := make(map[string]int64)
+		names := make([]string, 0)
 		g.metrics.Range(func(k, v any) bool {
 			m := v.(Metric)
-			fmt.Fprintf(&sb, `"%s": %d`, m.Name(), m.Load())
-			if j != gl-1 {
-				sb.WriteString(", ")
-			}
-			j++
+			metrics[m.Name()] = m.Load()
+			names = append(names, m.Name())
 			return true
 		})
+		sort.Strings(names)
+		for j := 0; j < len(names); j++ {
+			name := names[j]
+			fmt.Fprintf(&sb, `"%s": %d`, name, metrics[name])
+			if j != len(names)-1 {
+				sb.WriteString(", ")
+			}
+		}
 		sb.WriteString("}") // end of metric group
 		if i != l.Len()-1 {
 			sb.WriteString(", ")
 		}
 	}
 	sb.WriteString("}") // end of metric group list
-
-	// Add trailing new line.
-	if runtime.GOOS == "windows" {
-		sb.WriteRune(0x0d)
-	}
-	sb.WriteRune(0x0a)
 
 	// Make JSON pretty.
 	raw := []byte(sb.String())

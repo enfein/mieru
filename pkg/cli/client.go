@@ -144,6 +144,13 @@ func RegisterClientCommands() {
 		checkUpdateFunc,
 	)
 	RegisterCallback(
+		[]string{"", "get", "metrics"},
+		func(s []string) error {
+			return unexpectedArgsError(s, 3)
+		},
+		clientGetMetricsFunc,
+	)
+	RegisterCallback(
 		[]string{"", "get", "thread-dump"},
 		func(s []string) error {
 			return unexpectedArgsError(s, 3)
@@ -222,6 +229,10 @@ var clientHelpFunc = func(s []string) error {
 			{
 				cmd:  "delete profile <PROFILE_NAME>",
 				help: "Delete an inactive client configuration profile.",
+			},
+			{
+				cmd:  "get metrics",
+				help: "Get mieru client metrics.",
 			},
 			{
 				cmd:  "version",
@@ -607,6 +618,26 @@ var clientDeleteProfileFunc = func(s []string) error {
 		return fmt.Errorf(stderror.LoadClientConfigFailedErr, err)
 	}
 	return appctl.DeleteClientConfigProfile(s[3])
+}
+
+var clientGetMetricsFunc = func(s []string) error {
+	if err := appctl.IsClientDaemonRunning(context.Background()); err != nil {
+		log.Infof(stderror.ClientNotRunning)
+		return nil
+	}
+
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
+	defer cancelFunc()
+	client, err := appctl.NewClientLifecycleRPCClient(timedctx)
+	if err != nil {
+		return fmt.Errorf(stderror.CreateClientLifecycleRPCClientFailedErr, err)
+	}
+	metrics, err := client.GetMetrics(timedctx, &appctlpb.Empty{})
+	if err != nil {
+		return fmt.Errorf(stderror.GetMetricsFailedErr, err)
+	}
+	log.Infof("%s", metrics.GetJson())
+	return nil
 }
 
 var clientGetThreadDumpFunc = func(s []string) error {

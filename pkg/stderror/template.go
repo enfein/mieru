@@ -30,6 +30,7 @@ const (
 	ExitFailedErr                           = "process exit failed: %w"
 	GetClientConfigFailedErr                = "get mieru client config failed: %w"
 	GetHeapProfileFailedErr                 = "get heap profile failed: %w"
+	GetMetricsFailedErr                     = "get metrics failed: %w"
 	GetServerConfigFailedErr                = "get mieru server config failed: %w"
 	GetServerStatusFailedErr                = "get mieru server status failed: %w"
 	GetThreadDumpFailedErr                  = "get thread dump failed: %w"

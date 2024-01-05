@@ -217,6 +217,14 @@ func (s *serverLifecycleService) Exit(ctx context.Context, req *pb.Empty) (*pb.E
 	return &pb.Empty{}, nil
 }
 
+func (s *serverLifecycleService) GetMetrics(ctx context.Context, req *pb.Empty) (*pb.Metrics, error) {
+	b, err := metrics.GetMetricsAsJSON()
+	if err != nil {
+		return &pb.Metrics{}, err
+	}
+	return &pb.Metrics{Json: proto.String(string(b))}, nil
+}
+
 func (s *serverLifecycleService) GetThreadDump(ctx context.Context, req *pb.Empty) (*pb.ThreadDump, error) {
 	return &pb.ThreadDump{ThreadDump: proto.String(string(getThreadDump()))}, nil
 }

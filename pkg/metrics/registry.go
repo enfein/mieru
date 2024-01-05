@@ -56,3 +56,16 @@ func GetMetricGroupByName(groupName string) *MetricGroup {
 	}
 	return group.(*MetricGroup)
 }
+
+// GetMetricsAsJSON returns a JSON representation of all the metrics.
+func GetMetricsAsJSON() ([]byte, error) {
+	list := MetricGroupList{}
+	metricMap.Range(func(k, v any) bool {
+		group := v.(*MetricGroup)
+		if group.IsLoggingEnabled() {
+			list = list.Append(group)
+		}
+		return true
+	})
+	return list.MarshalJSON()
+}
