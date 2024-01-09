@@ -95,7 +95,7 @@ mieru start
 
 mieru 客户端不会与系统一同启动。在重新启动计算机后，需要手动使用 `mieru start` 指令启动客户端。
 
-**Windows 用户请注意，在命令提示符或 Powershell 中使用 `mieru start` 指令启动客户端之后，请勿关闭命令提示符或 Powershell 窗口。关闭窗口将导致 mieru 客户端停止运行。**
+**Windows 用户请注意，在命令提示符或 Powershell 中使用 `mieru start` 指令启动客户端之后，请勿关闭命令提示符或 Powershell 窗口。关闭窗口将导致 mieru 客户端停止运行。** 使用第三方软件 https://github.com/cr4zyfish/TrayApp 可以解决这个问题。
 
 如果需要停止 mieru 客户端，请输入指令
 

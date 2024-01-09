@@ -95,7 +95,7 @@ If the output shows `mieru client is started, listening to 127.0.0.1:xxxx`, it m
 
 The mieru client will not be started automatically with system boot. After restarting the computer, you need to start the client manually with the `mieru start` command.
 
-**Windows users should note that after starting the client with the `mieru start` command at the command prompt or Powershell, do not close the command prompt or Powershell window. Closing the window will cause the mieru client to exit.**
+**Windows users should note that after starting the client with the `mieru start` command at the command prompt or Powershell, do not close the command prompt or Powershell window. Closing the window will cause the mieru client to exit.** Using a third party software at https://github.com/cr4zyfish/TrayApp can solve this issue.
 
 If you need to stop the mieru client, enter the following command
 
