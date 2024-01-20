@@ -31,6 +31,7 @@ import (
 	"github.com/enfein/mieru/pkg/replay"
 	"github.com/enfein/mieru/pkg/stderror"
 	"github.com/enfein/mieru/pkg/util"
+	"github.com/enfein/mieru/pkg/util/sockopts"
 )
 
 const (
@@ -89,6 +90,11 @@ func NewUDPUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, 
 	if err != nil {
 		return nil, fmt.Errorf("net.ListenUDP() failed: %w", err)
 	}
+	rawConn, err := conn.SyscallConn()
+	if err != nil {
+		return nil, fmt.Errorf("SyscallConn() failed: %w", err)
+	}
+	rawConn.Control(sockopts.ReuseAddrPortRaw())
 	u := &UDPUnderlay{
 		baseUnderlay:      *newBaseUnderlay(true, mtu),
 		conn:              conn,

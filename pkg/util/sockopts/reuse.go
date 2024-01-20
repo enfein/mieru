@@ -15,13 +15,23 @@
 
 //go:build !(android || linux)
 
-package util
+package sockopts
 
 import (
 	"syscall"
 )
 
-// ReuseAddrPort does nothing outside Linux platform.
-func ReuseAddrPort(network, address string, conn syscall.RawConn) error {
-	return nil
+// ReuseAddrPort does nothing outside Android and Linux platform.
+func ReuseAddrPort() Control {
+	return func(network, address string, conn syscall.RawConn) error {
+		return nil
+	}
+}
+
+func ReuseAddrPortRaw() RawControl {
+	return func(fd uintptr) {}
+}
+
+func ReuseAddrPortRawErr() RawControlErr {
+	return func(fd uintptr) error { return nil }
 }

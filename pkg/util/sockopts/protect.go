@@ -1,4 +1,4 @@
-// Copyright (C) 2022  mieru authors
+// Copyright (C) 2024  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,31 +13,19 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//go:build android || linux
+//go:build !android
 
-package util
+package sockopts
 
-import (
-	"syscall"
+import "syscall"
 
-	"golang.org/x/sys/unix"
-)
+// ProtectPath does nothing outside Android platform.
+func ProtectPath(protectPath string) Control {
+	return func(network, address string, conn syscall.RawConn) error {
+		return nil
+	}
+}
 
-// ReuseAddrPort sets SO_REUSEADDR and SO_REUSEPORT options to a given connection.
-func ReuseAddrPort(network, address string, conn syscall.RawConn) error {
-	var err error
-	// See syscall.RawConn.Control
-	conn.Control(func(fd uintptr) {
-		// Set SO_REUSEADDR
-		err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEADDR, 1)
-		if err != nil {
-			return
-		}
-		// Set SO_REUSEPORT
-		err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
-		if err != nil {
-			return
-		}
-	})
-	return err
+func ProtectPathRaw(protectPath string) RawControl {
+	return func(fd uintptr) {}
 }

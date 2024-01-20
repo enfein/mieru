@@ -31,6 +31,7 @@ import (
 	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/stderror"
 	"github.com/enfein/mieru/pkg/util"
+	"github.com/enfein/mieru/pkg/util/sockopts"
 )
 
 type TCPUnderlay struct {
@@ -64,7 +65,9 @@ func NewTCPUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, 
 	if block.IsStateless() {
 		return nil, fmt.Errorf("TCP block cipher must not be stateless")
 	}
-	dialer := net.Dialer{}
+	dialer := net.Dialer{
+		Control: sockopts.ReuseAddrPort(),
+	}
 	if laddr != "" {
 		tcpLocalAddr, err := net.ResolveTCPAddr(network, laddr)
 		if err != nil {

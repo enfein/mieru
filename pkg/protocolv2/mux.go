@@ -31,6 +31,7 @@ import (
 	"github.com/enfein/mieru/pkg/mathext"
 	"github.com/enfein/mieru/pkg/stderror"
 	"github.com/enfein/mieru/pkg/util"
+	"github.com/enfein/mieru/pkg/util/sockopts"
 )
 
 const idleUnderlayTickerInterval = 5 * time.Second
@@ -273,7 +274,7 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 	switch network {
 	case "tcp", "tcp4", "tcp6":
 		listenConfig := net.ListenConfig{
-			Control: util.ReuseAddrPort,
+			Control: sockopts.ReuseAddrPort(),
 		}
 		rawListener, err := listenConfig.Listen(context.Background(), network, laddr)
 		if err != nil {
@@ -326,6 +327,12 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 			m.chAcceptErr <- fmt.Errorf("ListenUDP() failed: %w", err)
 			return
 		}
+		rawConn, err := conn.SyscallConn()
+		if err != nil {
+			m.chAcceptErr <- fmt.Errorf("SyscallConn() failed: %w", err)
+			return
+		}
+		rawConn.Control(sockopts.ReuseAddrPortRaw())
 		log.Infof("Mux is listening to endpoint %s %s", network, laddr)
 		underlay := &UDPUnderlay{
 			baseUnderlay:      *newBaseUnderlay(false, properties.MTU()),
