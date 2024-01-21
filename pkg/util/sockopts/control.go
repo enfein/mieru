@@ -15,7 +15,12 @@
 
 package sockopts
 
-import "syscall"
+import (
+	"fmt"
+	"net"
+	"os"
+	"syscall"
+)
 
 // Control is the Control function used by net.Dialer and net.ListenConfig.
 type Control = func(network, address string, c syscall.RawConn) error
@@ -39,4 +44,31 @@ func Append(prev, next Control) Control {
 		}
 		return next(network, address, c)
 	}
+}
+
+// ListenConfigWithControls returns a net.ListenConfig with
+// all the recommended controls applied.
+func ListenConfigWithControls() net.ListenConfig {
+	var protectPathControl Control
+	if path, found := os.LookupEnv("MIERU_PROTECT_PATH"); found {
+		protectPathControl = ProtectPath(path)
+	}
+	return net.ListenConfig{
+		Control: Append(ReuseAddrPort(), protectPathControl),
+	}
+}
+
+// ApplyUDPControls applies all the recommended controls to the UDP connection.
+func ApplyUDPControls(conn *net.UDPConn) error {
+	rawConn, err := conn.SyscallConn()
+	if err != nil {
+		return fmt.Errorf("SyscallConn() failed: %w", err)
+	}
+	if err := rawConn.Control(ReuseAddrPortRaw()); err != nil {
+		return err
+	}
+	if path, found := os.LookupEnv("MIERU_PROTECT_PATH"); found {
+		return rawConn.Control(ProtectPathRaw(path))
+	}
+	return nil
 }

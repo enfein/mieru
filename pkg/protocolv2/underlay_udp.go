@@ -90,11 +90,9 @@ func NewUDPUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, 
 	if err != nil {
 		return nil, fmt.Errorf("net.ListenUDP() failed: %w", err)
 	}
-	rawConn, err := conn.SyscallConn()
-	if err != nil {
-		return nil, fmt.Errorf("SyscallConn() failed: %w", err)
+	if err := sockopts.ApplyUDPControls(conn); err != nil {
+		return nil, fmt.Errorf("ApplyUDPControls() failed: %w", err)
 	}
-	rawConn.Control(sockopts.ReuseAddrPortRaw())
 	u := &UDPUnderlay{
 		baseUnderlay:      *newBaseUnderlay(true, mtu),
 		conn:              conn,

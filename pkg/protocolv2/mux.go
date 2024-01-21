@@ -273,9 +273,7 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 	network := properties.LocalAddr().Network()
 	switch network {
 	case "tcp", "tcp4", "tcp6":
-		listenConfig := net.ListenConfig{
-			Control: sockopts.ReuseAddrPort(),
-		}
+		listenConfig := sockopts.ListenConfigWithControls()
 		rawListener, err := listenConfig.Listen(context.Background(), network, laddr)
 		if err != nil {
 			m.chAcceptErr <- fmt.Errorf("Listen() failed: %w", err)
@@ -327,12 +325,10 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 			m.chAcceptErr <- fmt.Errorf("ListenUDP() failed: %w", err)
 			return
 		}
-		rawConn, err := conn.SyscallConn()
-		if err != nil {
-			m.chAcceptErr <- fmt.Errorf("SyscallConn() failed: %w", err)
+		if err := sockopts.ApplyUDPControls(conn); err != nil {
+			m.chAcceptErr <- fmt.Errorf("ApplyUDPControls() failed: %w", err)
 			return
 		}
-		rawConn.Control(sockopts.ReuseAddrPortRaw())
 		log.Infof("Mux is listening to endpoint %s %s", network, laddr)
 		underlay := &UDPUnderlay{
 			baseUnderlay:      *newBaseUnderlay(false, properties.MTU()),

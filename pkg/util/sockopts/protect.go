@@ -29,3 +29,7 @@ func ProtectPath(protectPath string) Control {
 func ProtectPathRaw(protectPath string) RawControl {
 	return func(fd uintptr) {}
 }
+
+func ProtectPathRawErr(protectPath string) RawControlErr {
+	return func(fd uintptr) error { return nil }
+}

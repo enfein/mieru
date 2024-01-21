@@ -38,6 +38,7 @@ import (
 	"github.com/enfein/mieru/pkg/socks5"
 	"github.com/enfein/mieru/pkg/stderror"
 	"github.com/enfein/mieru/pkg/util"
+	"github.com/enfein/mieru/pkg/util/sockopts"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 )
@@ -369,7 +370,8 @@ var clientRunFunc = func(s []string) error {
 		wg.Add(1)
 		go func() {
 			rpcAddr := "localhost:" + strconv.Itoa(int(config.GetRpcPort()))
-			rpcListener, err := net.Listen("tcp", rpcAddr)
+			listenConfig := sockopts.ListenConfigWithControls()
+			rpcListener, err := listenConfig.Listen(context.Background(), "tcp", rpcAddr)
 			if err != nil {
 				log.Fatalf("listen on RPC address tcp %q failed: %v", rpcAddr, err)
 			}
@@ -480,7 +482,8 @@ var clientRunFunc = func(s []string) error {
 	}
 	wg.Add(1)
 	go func(socks5Addr string) {
-		l, err := net.Listen("tcp", socks5Addr)
+		listenConfig := sockopts.ListenConfigWithControls()
+		l, err := listenConfig.Listen(context.Background(), "tcp", socks5Addr)
 		if err != nil {
 			log.Fatalf("listen on socks5 address tcp %q failed: %v", socks5Addr, err)
 		}

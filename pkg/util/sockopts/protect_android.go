@@ -17,17 +17,52 @@
 
 package sockopts
 
-import "syscall"
+import (
+	"fmt"
+	"syscall"
+)
 
 // ProtectPath is a UNIX domain socket that Android VPN service is listening to.
 // By sending the file descriptor of the connection to the socket via out-of-band
 // channel, the connection will be protected by the Android VPN service.
 func ProtectPath(protectPath string) Control {
 	return func(network, address string, conn syscall.RawConn) error {
-		return nil
+		var err error
+		conn.Control(func(fd uintptr) { err = ProtectPathRawErr(protectPath)(fd) })
+		return err
 	}
 }
 
 func ProtectPathRaw(protectPath string) RawControl {
-	return func(fd uintptr) {}
+	return func(fd uintptr) {
+		ProtectPathRawErr(protectPath)(fd)
+	}
+}
+
+func ProtectPathRawErr(protectPath string) RawControlErr {
+	return func(fd uintptr) error {
+		socket, err := syscall.Socket(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
+		if err != nil {
+			return fmt.Errorf("open protect socket failed: %w", err)
+		}
+		defer syscall.Close(socket)
+		err = syscall.Connect(socket, &syscall.SockaddrUnix{Name: protectPath})
+		if err != nil {
+			return fmt.Errorf("connect to protect path %q failed: %w", protectPath, err)
+		}
+		oob := syscall.UnixRights(fd)
+		dummy := []byte{1}
+		err = syscall.Sendmsg(socket, dummy, oob, nil, 0)
+		if err != nil {
+			return fmt.Errorf("Sendmsg() failed: %w", err)
+		}
+		n, err := syscall.Read(socket, dummy)
+		if err != nil {
+			return fmt.Errorf("Read() failed: %w", err)
+		}
+		if n != 1 {
+			return fmt.Errorf("failed to protect file descriptor %d", fd)
+		}
+		return nil
+	}
 }
