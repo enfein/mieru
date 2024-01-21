@@ -50,7 +50,7 @@ func ProtectPathRawErr(protectPath string) RawControlErr {
 		if err != nil {
 			return fmt.Errorf("connect to protect path %q failed: %w", protectPath, err)
 		}
-		oob := syscall.UnixRights(fd)
+		oob := syscall.UnixRights(int(fd))
 		dummy := []byte{1}
 		err = syscall.Sendmsg(socket, dummy, oob, nil, 0)
 		if err != nil {
