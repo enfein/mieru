@@ -35,13 +35,14 @@ import (
 )
 
 const (
-	segmentTreeCapacity = 64 * 1024
+	segmentTreeCapacity = 16 * 1024
 	segmentChanCapacity = 1024
 
 	minWindowSize = 16
-	maxWindowSize = 64 * 1024
+	maxWindowSize = 16 * 1024
 
-	segmentAckDelay = 50 * time.Millisecond
+	segmentAckDelay        = 50 * time.Millisecond
+	segmentAckMask  uint32 = 0xfffffff0
 
 	serverRespTimeout        = 10 * time.Second
 	sessionHeartbeatInterval = 5 * time.Second
@@ -98,11 +99,12 @@ type Session struct {
 	recvQueue *segmentTree  // segments waiting to be read by application
 	recvChan  chan *segment // channel to receive segments from underlay
 
-	nextSend   uint32    // next sequence number to send a segment
-	nextRecv   uint32    // next sequence number to receive
-	lastRXTime time.Time // last timestamp when a segment is received
-	lastTXTime time.Time // last timestamp when a segment is sent
-	unreadBuf  []byte    // payload removed from the recvQueue that haven't been read by application
+	nextSend      uint32    // next sequence number to send a segment
+	nextRecv      uint32    // next sequence number to receive
+	lastRecvAcked uint32    // last receive sequence number that is acked
+	lastRXTime    time.Time // last timestamp when a segment is received
+	lastTXTime    time.Time // last timestamp when a segment is sent
+	unreadBuf     []byte    // payload removed from the recvQueue that haven't been read by application
 
 	readBytes  metrics.Metric // number of bytes delivered to the application
 	writeBytes metrics.Metric // number of bytes sent from the application
@@ -114,6 +116,7 @@ type Session struct {
 	wg    sync.WaitGroup
 	rLock sync.Mutex
 	wLock sync.Mutex
+	cLock sync.Mutex
 	sLock sync.Mutex
 }
 
@@ -252,6 +255,7 @@ func (s *Session) Read(b []byte) (n int, err error) {
 func (s *Session) Write(b []byte) (n int, err error) {
 	s.wLock.Lock()
 	defer s.wLock.Unlock()
+
 	if s.isStateBefore(sessionAttached, false) {
 		return 0, fmt.Errorf("%v is not ready for Write()", s)
 	}
@@ -311,8 +315,8 @@ func (s *Session) Write(b []byte) (n int, err error) {
 
 // Close terminates the session.
 func (s *Session) Close() error {
-	s.wLock.Lock()
-	defer s.wLock.Unlock()
+	s.cLock.Lock()
+	defer s.cLock.Unlock()
 	select {
 	case <-s.done:
 		s.forwardStateTo(sessionClosed)
@@ -321,6 +325,10 @@ func (s *Session) Close() error {
 	}
 
 	log.Debugf("Closing %v", s)
+	s.sendQueue.DeleteAll()
+	s.sendBuf.DeleteAll()
+	s.recvBuf.DeleteAll()
+	s.recvQueue.DeleteAll()
 	if s.isState(sessionAttached) || s.isState(sessionEstablished) {
 		// Send closeSessionRequest, but don't wait for closeSessionResponse,
 		// because the underlay connection may be already broken.
@@ -557,6 +565,10 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 					iter.txCount++
 					iter.txTime = time.Now()
 					iter.txTimeout = s.rttStat.RTO() * time.Duration(math.Pow(txTimeoutBackOff, float64(iter.txCount)))
+					if isDataAckProtocol(iter.metadata.Protocol()) {
+						das, _ := toDataAckStruct(iter.metadata)
+						das.unAckSeq = s.nextRecv
+					}
 					if err := s.output(iter, s.RemoteAddr()); err != nil {
 						err = fmt.Errorf("output() failed: %w", err)
 						log.Debugf("%v %v", s, err)
@@ -592,6 +604,10 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 					seg.txCount++
 					seg.txTime = time.Now()
 					seg.txTimeout = s.rttStat.RTO() * time.Duration(math.Pow(txTimeoutBackOff, float64(seg.txCount)))
+					if isDataAckProtocol(seg.metadata.Protocol()) {
+						das, _ := toDataAckStruct(seg.metadata)
+						das.unAckSeq = s.nextRecv
+					}
 					s.sendBuf.InsertBlocking(seg)
 					if err := s.output(seg, s.RemoteAddr()); err != nil {
 						err = fmt.Errorf("output() failed: %w", err)
@@ -605,7 +621,10 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 
 			// Send ACK or heartbeat if needed.
 			if !hasTimeout && segmentMoved == 0 {
-				if (s.recvBuf.Len() > 0 && time.Since(s.lastTXTime) > segmentAckDelay) || time.Since(s.lastTXTime) > sessionHeartbeatInterval {
+				exceedAckDelay := s.recvBuf.Len() > 0 && time.Since(s.lastTXTime) > segmentAckDelay
+				periodicAck := s.nextRecv&segmentAckMask > s.lastRecvAcked
+				exceedHeartbeatInterval := time.Since(s.lastTXTime) > sessionHeartbeatInterval
+				if exceedAckDelay || periodicAck || exceedHeartbeatInterval {
 					baseStruct := baseStruct{}
 					if s.isClient {
 						baseStruct.protocol = uint8(ackClientToServer)
@@ -628,6 +647,7 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 						s.outputErr <- err
 						s.Close()
 					}
+					s.lastRecvAcked = s.nextRecv & segmentAckMask
 				}
 			}
 		default:
@@ -797,7 +817,6 @@ func (s *Session) inputAck(seg *segment) error {
 
 func (s *Session) inputClose(seg *segment) error {
 	s.wLock.Lock()
-	defer s.wLock.Unlock()
 	if seg.metadata.Protocol() == closeSessionRequest {
 		// Send close session response.
 		seg2 := &segment{
@@ -815,6 +834,7 @@ func (s *Session) inputClose(seg *segment) error {
 		s.nextSend++
 		// The response will not retry if it is not delivered.
 		if err := s.output(seg2, s.RemoteAddr()); err != nil {
+			s.wLock.Unlock()
 			return fmt.Errorf("output() failed: %v", err)
 		}
 		// Immediately shutdown event loop.
@@ -823,23 +843,13 @@ func (s *Session) inputClose(seg *segment) error {
 		} else {
 			log.Debugf("Remote requested to shut down %v", s)
 		}
-		s.forwardStateTo(sessionClosed)
-		select {
-		case <-s.done:
-		default:
-			close(s.done)
-			metrics.CurrEstablished.Add(-1)
-		}
+		s.wLock.Unlock()
+		s.Close()
 	} else if seg.metadata.Protocol() == closeSessionResponse {
 		// Immediately shutdown event loop.
 		log.Debugf("Remote received the request from %v to shut down", s)
-		s.forwardStateTo(sessionClosed)
-		select {
-		case <-s.done:
-		default:
-			close(s.done)
-			metrics.CurrEstablished.Add(-1)
-		}
+		s.wLock.Unlock()
+		s.Close()
 	}
 	return nil
 }

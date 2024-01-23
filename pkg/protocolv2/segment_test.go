@@ -178,6 +178,17 @@ func TestSegmentTree(t *testing.T) {
 	if st.Remaining() != 1 {
 		t.Fatalf("Remaining() = %d, want %d", st.Remaining(), 1)
 	}
+
+	if ok := st.Insert(seg); !ok {
+		t.Fatalf("ReplaceOrInsert() failed")
+	}
+	st.DeleteAll()
+	if st.Len() != 0 {
+		t.Fatalf("Len() = %d, want %d", st.Len(), 0)
+	}
+	if st.Remaining() != 1 {
+		t.Fatalf("Remaining() = %d, want %d", st.Remaining(), 1)
+	}
 }
 
 func TestSegmentTreeConcurrent(t *testing.T) {

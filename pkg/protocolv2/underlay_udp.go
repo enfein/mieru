@@ -357,7 +357,8 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 		encryptedMeta := b[:udpNonHeaderPosition]
 		if udpReplayCache.IsDuplicate(encryptedMeta[:cipher.DefaultOverhead], addr.String()) {
 			replay.NewSession.Add(1)
-			return nil, nil, fmt.Errorf("found possible replay attack in %v from %v", u, addr)
+			log.Debugf("found possible replay attack in %v from %v", u, addr)
+			continue
 		}
 		nonce := encryptedMeta[:cipher.DefaultNonceSize]
 
@@ -435,11 +436,21 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 		if isSessionProtocol(protocolType(p)) {
 			ss := &sessionStruct{}
 			if err := ss.Unmarshal(decryptedMeta); err != nil {
-				return nil, nil, fmt.Errorf("Unmarshal() to sessionStruct failed: %w", err)
+				if u.isClient {
+					return nil, nil, fmt.Errorf("Unmarshal() to sessionStruct failed: %w", err)
+				} else {
+					log.Debugf("%v Unmarshal() to sessionStruct failed: %v", u, err)
+					continue
+				}
 			}
 			seg, err = u.readSessionSegment(ss, nonce, b[udpNonHeaderPosition:], blockCipher)
 			if err != nil {
-				return nil, nil, err
+				if u.isClient {
+					return nil, nil, err
+				} else {
+					log.Debugf("%v readSessionSegment() failed: %v", u, err)
+					continue
+				}
 			}
 			if blockCipher != nil {
 				seg.block = blockCipher
@@ -448,11 +459,21 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 		} else if isDataAckProtocol(protocolType(p)) {
 			das := &dataAckStruct{}
 			if err := das.Unmarshal(decryptedMeta); err != nil {
-				return nil, nil, fmt.Errorf("Unmarshal() to dataAckStruct failed: %w", err)
+				if u.isClient {
+					return nil, nil, fmt.Errorf("Unmarshal() to dataAckStruct failed: %w", err)
+				} else {
+					log.Debugf("%v Unmarshal() to dataAckStruct failed: %v", u, err)
+					continue
+				}
 			}
 			seg, err = u.readDataAckSegment(das, nonce, b[udpNonHeaderPosition:], blockCipher)
 			if err != nil {
-				return nil, nil, err
+				if u.isClient {
+					return nil, nil, err
+				} else {
+					log.Debugf("%v readDataAckSegment() failed: %v", u, err)
+					continue
+				}
 			}
 			if blockCipher != nil {
 				seg.block = blockCipher

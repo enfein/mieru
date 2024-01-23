@@ -295,6 +295,16 @@ func (t *segmentTree) DeleteMinIf(si segmentIterator) (*segment, bool) {
 	return seg, shouldDelete
 }
 
+// DeleteAll clears all the items from the tree.
+func (t *segmentTree) DeleteAll() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.tr.Clear(false)
+	t.notifyEmpty()
+	t.notFull.Broadcast()
+}
+
 // Ascend iterates the segment tree in ascending order, until the iterator returns false.
 // Segments shouldn't be inserted or deleted during the iteration.
 func (t *segmentTree) Ascend(si segmentIterator) {

@@ -82,6 +82,9 @@ func (b *baseUnderlay) Close() error {
 	b.sessionMap.Range(func(k, v any) bool {
 		s := v.(*Session)
 		s.Close()
+		s.wg.Wait()
+		s.conn = nil
+		s = nil
 		return true
 	})
 	b.sessionMap = sync.Map{}
@@ -161,7 +164,9 @@ func (b *baseUnderlay) RemoveSession(s *Session) error {
 
 	b.sessionMap.Delete(s.id)
 	s.Close()
+	s.wg.Wait()
 	s.conn = nil
+	s = nil
 
 	if b.isClient {
 		// May disable scheduling if the underlay has no session.
