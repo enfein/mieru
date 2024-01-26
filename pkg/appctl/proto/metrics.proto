@@ -22,3 +22,7 @@ option go_package = "github.com/enfein/mieru/pkg/appctl/appctlpb";
 message Metrics {
     optional string json = 1;
 }
+
+message SessionInfo {
+    repeated string table = 1;
+}

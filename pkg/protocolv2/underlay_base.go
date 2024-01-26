@@ -183,6 +183,16 @@ func (b *baseUnderlay) RemoveSession(s *Session) error {
 	return nil
 }
 
+func (b *baseUnderlay) Sessions() []SessionInfo {
+	res := make([]SessionInfo, 0)
+	b.sessionMap.Range(func(k, v any) bool {
+		s := v.(*Session)
+		res = append(res, s.ToSessionInfo())
+		return false
+	})
+	return res
+}
+
 func (b *baseUnderlay) RunEventLoop(ctx context.Context) error {
 	return stderror.ErrUnsupported
 }

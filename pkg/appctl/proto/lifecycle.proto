@@ -53,6 +53,9 @@ service ClientLifecycleService {
     // Get client metrics.
     rpc GetMetrics(Empty) returns (Metrics);
 
+    // Get client session information.
+    rpc GetSessionInfo(Empty) returns (SessionInfo);
+
     // Generate a thread dump of client daemon.
     rpc GetThreadDump(Empty) returns (ThreadDump);
 
@@ -76,11 +79,17 @@ service ServerLifecycleService {
     // Stop proxy in server application.
     rpc Stop(Empty) returns (Empty);
 
+    // Reload server configuration.
+    rpc Reload(Empty) returns (Empty);
+
     // Quit server daemon.
     rpc Exit(Empty) returns (Empty);
 
     // Get server metrics.
     rpc GetMetrics(Empty) returns (Metrics);
+
+    // Get server session information.
+    rpc GetSessionInfo(Empty) returns (SessionInfo);
 
     // Generate a thread dump of server daemon.
     rpc GetThreadDump(Empty) returns (ThreadDump);

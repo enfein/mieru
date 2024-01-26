@@ -67,6 +67,9 @@ type Underlay interface {
 	// The session is destroyed when this returns.
 	RemoveSession(*Session) error
 
+	// Returns information of all the sessions.
+	Sessions() []SessionInfo
+
 	// Run event loop.
 	// The underlay needs to be closed when this returns.
 	RunEventLoop(context.Context) error

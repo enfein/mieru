@@ -22,6 +22,7 @@ import (
 	"io"
 	mrand "math/rand"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -506,4 +507,43 @@ func (m *Mux) cleanUnderlay() {
 	if cnt > 0 {
 		log.Debugf("Mux cleaned %d underlays", cnt)
 	}
+}
+
+// ExportSessionInfoTable returns multiple lines of strings that display
+// session info in a table format.
+func (m *Mux) ExportSessionInfoTable() []string {
+	header := SessionInfo{
+		ID:         "Session ID",
+		Protocol:   "Protocol",
+		LocalAddr:  "Local Address",
+		RemoteAddr: "Remote Address",
+		State:      "State",
+	}
+	info := []SessionInfo{header}
+	m.mu.Lock()
+	for _, underlay := range m.underlays {
+		info = append(info, underlay.Sessions()...)
+	}
+	m.mu.Unlock()
+
+	var idLen, protocolLen, localAddrLen, remoteAddrLen, stateLen int
+	for _, si := range info {
+		idLen = mathext.Max(idLen, len(si.ID))
+		protocolLen = mathext.Max(protocolLen, len(si.Protocol))
+		localAddrLen = mathext.Max(localAddrLen, len(si.LocalAddr))
+		remoteAddrLen = mathext.Max(remoteAddrLen, len(si.RemoteAddr))
+		stateLen = mathext.Max(stateLen, len(si.State))
+	}
+	res := make([]string, 0)
+	delim := "    "
+	for _, si := range info {
+		line := make([]string, 0)
+		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", idLen)+"s", si.ID))
+		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", protocolLen)+"s", si.Protocol))
+		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", localAddrLen)+"s", si.LocalAddr))
+		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", remoteAddrLen)+"s", si.RemoteAddr))
+		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", stateLen)+"s", si.State))
+		res = append(res, strings.Join(line, delim))
+	}
+	return res
 }

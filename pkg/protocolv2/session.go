@@ -62,13 +62,13 @@ const (
 func (ss sessionState) String() string {
 	switch ss {
 	case sessionInit:
-		return "sessionInit"
+		return "INITIALIZED"
 	case sessionAttached:
-		return "sessionAttached"
+		return "ATTACHED"
 	case sessionEstablished:
-		return "sessionEstablished"
+		return "ESTABLISHED"
 	case sessionClosed:
-		return "sessionClosed"
+		return "CLOSED"
 	default:
 		return "UNKNOWN"
 	}
@@ -398,6 +398,24 @@ func (s *Session) SetReadDeadline(t time.Time) error {
 func (s *Session) SetWriteDeadline(t time.Time) error {
 	s.writeDeadline = t
 	return nil
+}
+
+// ToSessionInfo creates related SessionInfo structure.
+func (s *Session) ToSessionInfo() SessionInfo {
+	info := SessionInfo{
+		ID:         fmt.Sprintf("%d", s.id),
+		LocalAddr:  s.LocalAddr().String(),
+		RemoteAddr: s.RemoteAddr().String(),
+		State:      s.state.String(),
+	}
+	if _, ok := s.conn.(*TCPUnderlay); ok {
+		info.Protocol = "TCP"
+	} else if _, ok := s.conn.(*UDPUnderlay); ok {
+		info.Protocol = "UDP"
+	} else {
+		info.Protocol = "UNKNOWN"
+	}
+	return info
 }
 
 func (s *Session) isState(target sessionState) bool {
@@ -913,4 +931,13 @@ func (s *Session) checkQuota(userName string) (ok bool, err error) {
 		}
 	}
 	return true, nil
+}
+
+// SessionInfo provides a string representation of a Session.
+type SessionInfo struct {
+	ID         string
+	Protocol   string
+	LocalAddr  string
+	RemoteAddr string
+	State      string
 }

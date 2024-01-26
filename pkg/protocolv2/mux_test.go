@@ -78,6 +78,10 @@ func runClient(t *testing.T, properties UnderlayProperties, username, password [
 					t.Errorf("Received unexpected response")
 				}
 			}
+			sessionInfoTable := clientMux.ExportSessionInfoTable()
+			if len(sessionInfoTable) < 2 {
+				t.Errorf("connection is not shown in the session info table: %v", sessionInfoTable)
+			}
 		}()
 	}
 	wg.Wait()
