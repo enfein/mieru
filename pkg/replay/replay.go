@@ -16,7 +16,7 @@
 package replay
 
 import (
-	"encoding/binary"
+	"hash/fnv"
 	"sync"
 	"time"
 
@@ -129,9 +129,7 @@ func (c *ReplayCache) Clear() {
 }
 
 func (c *ReplayCache) computeSignature(data []byte) uint64 {
-	signature := [8]byte{}
-	for i, v := range data {
-		signature[i&0x7] ^= v
-	}
-	return binary.BigEndian.Uint64(signature[:])
+	hash := fnv.New64a()
+	hash.Write(data)
+	return hash.Sum64()
 }
