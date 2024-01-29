@@ -515,9 +515,13 @@ func (m *Mux) ExportSessionInfoTable() []string {
 	header := SessionInfo{
 		ID:         "Session ID",
 		Protocol:   "Protocol",
-		LocalAddr:  "Local Address",
-		RemoteAddr: "Remote Address",
+		LocalAddr:  "Local",
+		RemoteAddr: "Remote",
 		State:      "State",
+		RecvQBuf:   "Recv Q+Buf",
+		SendQBuf:   "Send Q+Buf",
+		LastRecv:   "Last Recv",
+		LastSend:   "Last Send",
 	}
 	info := []SessionInfo{header}
 	m.mu.Lock()
@@ -526,16 +530,20 @@ func (m *Mux) ExportSessionInfoTable() []string {
 	}
 	m.mu.Unlock()
 
-	var idLen, protocolLen, localAddrLen, remoteAddrLen, stateLen int
+	var idLen, protocolLen, localAddrLen, remoteAddrLen, stateLen, recvQLen, sendQLen, lastRecvLen, lastSendLen int
 	for _, si := range info {
 		idLen = mathext.Max(idLen, len(si.ID))
 		protocolLen = mathext.Max(protocolLen, len(si.Protocol))
 		localAddrLen = mathext.Max(localAddrLen, len(si.LocalAddr))
 		remoteAddrLen = mathext.Max(remoteAddrLen, len(si.RemoteAddr))
 		stateLen = mathext.Max(stateLen, len(si.State))
+		recvQLen = mathext.Max(recvQLen, len(si.RecvQBuf))
+		sendQLen = mathext.Max(sendQLen, len(si.SendQBuf))
+		lastRecvLen = mathext.Max(lastRecvLen, len(si.LastRecv))
+		lastSendLen = mathext.Max(lastSendLen, len(si.LastSend))
 	}
 	res := make([]string, 0)
-	delim := "    "
+	delim := "  "
 	for _, si := range info {
 		line := make([]string, 0)
 		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", idLen)+"s", si.ID))
@@ -543,6 +551,10 @@ func (m *Mux) ExportSessionInfoTable() []string {
 		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", localAddrLen)+"s", si.LocalAddr))
 		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", remoteAddrLen)+"s", si.RemoteAddr))
 		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", stateLen)+"s", si.State))
+		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", recvQLen)+"s", si.RecvQBuf))
+		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", sendQLen)+"s", si.SendQBuf))
+		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", lastRecvLen)+"s", si.LastRecv))
+		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", lastSendLen)+"s", si.LastSend))
 		res = append(res, strings.Join(line, delim))
 	}
 	return res

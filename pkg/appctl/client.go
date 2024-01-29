@@ -30,6 +30,7 @@ import (
 	pb "github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
+	"github.com/enfein/mieru/pkg/protocolv2"
 	"github.com/enfein/mieru/pkg/socks5"
 	"github.com/enfein/mieru/pkg/stderror"
 	"google.golang.org/grpc"
@@ -63,6 +64,9 @@ var (
 
 	// clientSocks5ServerRef holds a pointer to client socks5 server.
 	clientSocks5ServerRef atomic.Pointer[socks5.Server]
+
+	// clientMuxRef holds a pointer to client multiplexier.
+	clientMuxRef atomic.Pointer[protocolv2.Mux]
 )
 
 func SetClientRPCServerRef(server *grpc.Server) {
@@ -71,6 +75,10 @@ func SetClientRPCServerRef(server *grpc.Server) {
 
 func SetClientSocks5ServerRef(server *socks5.Server) {
 	clientSocks5ServerRef.Store(server)
+}
+
+func SetClientMuxRef(mux *protocolv2.Mux) {
+	clientMuxRef.Store(mux)
 }
 
 // clientLifecycleService implements ClientLifecycleService defined in lifecycle.proto.
@@ -113,6 +121,14 @@ func (c *clientLifecycleService) GetMetrics(ctx context.Context, req *pb.Empty) 
 		return &pb.Metrics{}, err
 	}
 	return &pb.Metrics{Json: proto.String(string(b))}, nil
+}
+
+func (c *clientLifecycleService) GetSessionInfo(context.Context, *pb.Empty) (*pb.SessionInfo, error) {
+	mux := clientMuxRef.Load()
+	if mux == nil {
+		return &pb.SessionInfo{}, fmt.Errorf("client multiplexier is unavailable")
+	}
+	return &pb.SessionInfo{Table: mux.ExportSessionInfoTable()}, nil
 }
 
 func (c *clientLifecycleService) GetThreadDump(ctx context.Context, req *pb.Empty) (*pb.ThreadDump, error) {

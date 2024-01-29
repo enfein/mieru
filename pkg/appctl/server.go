@@ -52,20 +52,23 @@ var (
 	// serverRPCServerRef holds a pointer to server RPC server.
 	serverRPCServerRef atomic.Pointer[grpc.Server]
 
-	// socks5ServerGroup is a collection of server socks5 servers.
+	// socks5ServerGroup holds a pointer to server socks5 server.
 	socks5ServerRef atomic.Pointer[socks5.Server]
+
+	// serverMuxRef holds a pointer to server multiplexier.
+	serverMuxRef atomic.Pointer[protocolv2.Mux]
 )
 
 func SetServerRPCServerRef(server *grpc.Server) {
 	serverRPCServerRef.Store(server)
 }
 
-func GetSocks5Server() *socks5.Server {
-	return socks5ServerRef.Load()
-}
-
 func SetSocks5Server(server *socks5.Server) {
 	socks5ServerRef.Store(server)
+}
+
+func SetServerMuxRef(mux *protocolv2.Mux) {
+	serverMuxRef.Store(mux)
 }
 
 // ServerUDS returns the UNIX domain socket that mita server
@@ -101,7 +104,7 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 	if err = ValidateFullServerConfig(config); err != nil {
 		return &pb.Empty{}, fmt.Errorf("ValidateFullServerConfig() failed: %w", err)
 	}
-	if !(GetSocks5Server() == nil) {
+	if socks5ServerRef.Load() != nil {
 		log.Infof("socks5 server already exist")
 		return &pb.Empty{}, nil
 	}
@@ -109,6 +112,7 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 	SetAppStatus(pb.AppStatus_STARTING)
 
 	mux := protocolv2.NewMux(false).SetServerUsers(UserListToMap(config.GetUsers()))
+	SetServerMuxRef(mux)
 	mtu := util.DefaultMTU
 	if config.GetMtu() != 0 {
 		mtu = int(config.GetMtu())
@@ -178,9 +182,9 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 func (s *serverLifecycleService) Stop(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
 	SetAppStatus(pb.AppStatus_STOPPING)
 	log.Infof("received stop request from RPC caller")
-	if !(GetSocks5Server() == nil) {
+	if socks5ServerRef.Load() != nil {
 		log.Infof("stopping socks5 server")
-		if err := GetSocks5Server().Close(); err != nil {
+		if err := socks5ServerRef.Load().Close(); err != nil {
 			log.Infof("socks5 server Close() failed: %v", err)
 		}
 		SetSocks5Server(nil)
@@ -195,9 +199,9 @@ func (s *serverLifecycleService) Stop(ctx context.Context, req *pb.Empty) (*pb.E
 func (s *serverLifecycleService) Exit(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
 	SetAppStatus(pb.AppStatus_STOPPING)
 	log.Infof("received exit request from RPC caller")
-	if !(GetSocks5Server() != nil) {
+	if socks5ServerRef.Load() != nil {
 		log.Infof("stopping socks5 server")
-		if err := GetSocks5Server().Close(); err != nil {
+		if err := socks5ServerRef.Load().Close(); err != nil {
 			log.Infof("socks5 server Close() failed: %v", err)
 		}
 		SetSocks5Server(nil)
@@ -223,6 +227,14 @@ func (s *serverLifecycleService) GetMetrics(ctx context.Context, req *pb.Empty) 
 		return &pb.Metrics{}, err
 	}
 	return &pb.Metrics{Json: proto.String(string(b))}, nil
+}
+
+func (s *serverLifecycleService) GetSessionInfo(context.Context, *pb.Empty) (*pb.SessionInfo, error) {
+	mux := serverMuxRef.Load()
+	if mux == nil {
+		return &pb.SessionInfo{}, fmt.Errorf("server multiplexier is unavailable")
+	}
+	return &pb.SessionInfo{Table: mux.ExportSessionInfoTable()}, nil
 }
 
 func (s *serverLifecycleService) GetThreadDump(ctx context.Context, req *pb.Empty) (*pb.ThreadDump, error) {

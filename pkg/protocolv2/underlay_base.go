@@ -188,7 +188,7 @@ func (b *baseUnderlay) Sessions() []SessionInfo {
 	b.sessionMap.Range(func(k, v any) bool {
 		s := v.(*Session)
 		res = append(res, s.ToSessionInfo())
-		return false
+		return true
 	})
 	return res
 }

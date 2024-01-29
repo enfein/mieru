@@ -131,6 +131,13 @@ func RegisterServerCommands() {
 		serverGetMetricsFunc,
 	)
 	RegisterCallback(
+		[]string{"", "get", "connections"},
+		func(s []string) error {
+			return unexpectedArgsError(s, 3)
+		},
+		serverGetConnectionsFunc,
+	)
+	RegisterCallback(
 		[]string{"", "get", "thread-dump"},
 		func(s []string) error {
 			return unexpectedArgsError(s, 3)
@@ -205,6 +212,10 @@ var serverHelpFunc = func(s []string) error {
 			{
 				cmd:  "get metrics",
 				help: "Get mita server metrics.",
+			},
+			{
+				cmd:  "get connections",
+				help: "Get mita server connections.",
 			},
 			{
 				cmd:  "version",
@@ -349,6 +360,7 @@ var serverRunFunc = func(s []string) error {
 		appctl.SetAppStatus(appctlpb.AppStatus_STARTING)
 
 		mux := protocolv2.NewMux(false).SetServerUsers(appctl.UserListToMap(config.GetUsers()))
+		appctl.SetServerMuxRef(mux)
 		mtu := util.DefaultMTU
 		if config.GetMtu() != 0 {
 			mtu = int(config.GetMtu())
@@ -606,6 +618,31 @@ var serverGetMetricsFunc = func(s []string) error {
 		return fmt.Errorf(stderror.GetMetricsFailedErr, err)
 	}
 	log.Infof("%s", metrics.GetJson())
+	return nil
+}
+
+var serverGetConnectionsFunc = func(s []string) error {
+	appStatus, err := appctl.GetServerStatusWithRPC(context.Background())
+	if err != nil {
+		return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
+	}
+	if err := appctl.IsServerDaemonRunning(appStatus); err != nil {
+		return fmt.Errorf(stderror.ServerNotRunningErr, err)
+	}
+
+	client, err := appctl.NewServerLifecycleRPCClient()
+	if err != nil {
+		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
+	}
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
+	defer cancelFunc()
+	info, err := client.GetSessionInfo(timedctx, &appctlpb.Empty{})
+	if err != nil {
+		return fmt.Errorf(stderror.GetConnectionsFailedErr, err)
+	}
+	for _, line := range info.GetTable() {
+		log.Infof("%s", line)
+	}
 	return nil
 }
 

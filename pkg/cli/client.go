@@ -152,6 +152,13 @@ func RegisterClientCommands() {
 		clientGetMetricsFunc,
 	)
 	RegisterCallback(
+		[]string{"", "get", "connections"},
+		func(s []string) error {
+			return unexpectedArgsError(s, 3)
+		},
+		clientGetConnectionsFunc,
+	)
+	RegisterCallback(
 		[]string{"", "get", "thread-dump"},
 		func(s []string) error {
 			return unexpectedArgsError(s, 3)
@@ -234,6 +241,10 @@ var clientHelpFunc = func(s []string) error {
 			{
 				cmd:  "get metrics",
 				help: "Get mieru client metrics.",
+			},
+			{
+				cmd:  "get connections",
+				help: "Get mieru client connections.",
 			},
 			{
 				cmd:  "version",
@@ -391,6 +402,7 @@ var clientRunFunc = func(s []string) error {
 
 	// Collect remote proxy addresses and password.
 	mux := protocolv2.NewMux(true)
+	appctl.SetClientMuxRef(mux)
 	var hashedPassword []byte
 	activeProfile, err := appctl.GetActiveProfileFromConfig(config, config.GetActiveProfile())
 	if err != nil {
@@ -640,6 +652,28 @@ var clientGetMetricsFunc = func(s []string) error {
 		return fmt.Errorf(stderror.GetMetricsFailedErr, err)
 	}
 	log.Infof("%s", metrics.GetJson())
+	return nil
+}
+
+var clientGetConnectionsFunc = func(s []string) error {
+	if err := appctl.IsClientDaemonRunning(context.Background()); err != nil {
+		log.Infof(stderror.ClientNotRunning)
+		return nil
+	}
+
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
+	defer cancelFunc()
+	client, err := appctl.NewClientLifecycleRPCClient(timedctx)
+	if err != nil {
+		return fmt.Errorf(stderror.CreateClientLifecycleRPCClientFailedErr, err)
+	}
+	info, err := client.GetSessionInfo(timedctx, &appctlpb.Empty{})
+	if err != nil {
+		return fmt.Errorf(stderror.GetConnectionsFailedErr, err)
+	}
+	for _, line := range info.GetTable() {
+		log.Infof("%s", line)
+	}
 	return nil
 }
 

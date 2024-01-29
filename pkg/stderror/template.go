@@ -29,6 +29,7 @@ const (
 	DecodeHashedPasswordFailedErr           = "decode hashed password failed: %w"
 	ExitFailedErr                           = "process exit failed: %w"
 	GetClientConfigFailedErr                = "get mieru client config failed: %w"
+	GetConnectionsFailedErr                 = "get connections failed: %w"
 	GetHeapProfileFailedErr                 = "get heap profile failed: %w"
 	GetMetricsFailedErr                     = "get metrics failed: %w"
 	GetServerConfigFailedErr                = "get mieru server config failed: %w"
