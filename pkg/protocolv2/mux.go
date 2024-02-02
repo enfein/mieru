@@ -126,10 +126,16 @@ func (m *Mux) SetServerUsers(users map[string]*appctlpb.User) *Mux {
 	if m.isClient {
 		panic("Can't set server users in client mux")
 	}
-	if m.used {
-		panic("Can't set server users after mux is used")
-	}
 	m.users = users
+	if m.used {
+		// Update the users in UDPUnderlay.
+		// Don't update TCPUnderlay and Session, so existing connections still work.
+		for _, underlay := range m.underlays {
+			if udpUnderlay, ok := underlay.(*UDPUnderlay); ok {
+				udpUnderlay.users = m.users
+			}
+		}
+	}
 	return m
 }
 
@@ -262,6 +268,57 @@ func (m *Mux) DialContext(ctx context.Context) (net.Conn, error) {
 		return nil, fmt.Errorf("AddSession() failed: %v", err)
 	}
 	return session, nil
+}
+
+// ExportSessionInfoTable returns multiple lines of strings that display
+// session info in a table format.
+func (m *Mux) ExportSessionInfoTable() []string {
+	header := SessionInfo{
+		ID:         "Session ID",
+		Protocol:   "Protocol",
+		LocalAddr:  "Local",
+		RemoteAddr: "Remote",
+		State:      "State",
+		RecvQBuf:   "Recv Q+Buf",
+		SendQBuf:   "Send Q+Buf",
+		LastRecv:   "Last Recv",
+		LastSend:   "Last Send",
+	}
+	info := []SessionInfo{header}
+	m.mu.Lock()
+	for _, underlay := range m.underlays {
+		info = append(info, underlay.Sessions()...)
+	}
+	m.mu.Unlock()
+
+	var idLen, protocolLen, localAddrLen, remoteAddrLen, stateLen, recvQLen, sendQLen, lastRecvLen, lastSendLen int
+	for _, si := range info {
+		idLen = mathext.Max(idLen, len(si.ID))
+		protocolLen = mathext.Max(protocolLen, len(si.Protocol))
+		localAddrLen = mathext.Max(localAddrLen, len(si.LocalAddr))
+		remoteAddrLen = mathext.Max(remoteAddrLen, len(si.RemoteAddr))
+		stateLen = mathext.Max(stateLen, len(si.State))
+		recvQLen = mathext.Max(recvQLen, len(si.RecvQBuf))
+		sendQLen = mathext.Max(sendQLen, len(si.SendQBuf))
+		lastRecvLen = mathext.Max(lastRecvLen, len(si.LastRecv))
+		lastSendLen = mathext.Max(lastSendLen, len(si.LastSend))
+	}
+	res := make([]string, 0)
+	delim := "  "
+	for _, si := range info {
+		line := make([]string, 0)
+		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", idLen)+"s", si.ID))
+		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", protocolLen)+"s", si.Protocol))
+		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", localAddrLen)+"s", si.LocalAddr))
+		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", remoteAddrLen)+"s", si.RemoteAddr))
+		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", stateLen)+"s", si.State))
+		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", recvQLen)+"s", si.RecvQBuf))
+		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", sendQLen)+"s", si.SendQBuf))
+		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", lastRecvLen)+"s", si.LastRecv))
+		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", lastSendLen)+"s", si.LastSend))
+		res = append(res, strings.Join(line, delim))
+	}
+	return res
 }
 
 func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
@@ -507,55 +564,4 @@ func (m *Mux) cleanUnderlay() {
 	if cnt > 0 {
 		log.Debugf("Mux cleaned %d underlays", cnt)
 	}
-}
-
-// ExportSessionInfoTable returns multiple lines of strings that display
-// session info in a table format.
-func (m *Mux) ExportSessionInfoTable() []string {
-	header := SessionInfo{
-		ID:         "Session ID",
-		Protocol:   "Protocol",
-		LocalAddr:  "Local",
-		RemoteAddr: "Remote",
-		State:      "State",
-		RecvQBuf:   "Recv Q+Buf",
-		SendQBuf:   "Send Q+Buf",
-		LastRecv:   "Last Recv",
-		LastSend:   "Last Send",
-	}
-	info := []SessionInfo{header}
-	m.mu.Lock()
-	for _, underlay := range m.underlays {
-		info = append(info, underlay.Sessions()...)
-	}
-	m.mu.Unlock()
-
-	var idLen, protocolLen, localAddrLen, remoteAddrLen, stateLen, recvQLen, sendQLen, lastRecvLen, lastSendLen int
-	for _, si := range info {
-		idLen = mathext.Max(idLen, len(si.ID))
-		protocolLen = mathext.Max(protocolLen, len(si.Protocol))
-		localAddrLen = mathext.Max(localAddrLen, len(si.LocalAddr))
-		remoteAddrLen = mathext.Max(remoteAddrLen, len(si.RemoteAddr))
-		stateLen = mathext.Max(stateLen, len(si.State))
-		recvQLen = mathext.Max(recvQLen, len(si.RecvQBuf))
-		sendQLen = mathext.Max(sendQLen, len(si.SendQBuf))
-		lastRecvLen = mathext.Max(lastRecvLen, len(si.LastRecv))
-		lastSendLen = mathext.Max(lastSendLen, len(si.LastSend))
-	}
-	res := make([]string, 0)
-	delim := "  "
-	for _, si := range info {
-		line := make([]string, 0)
-		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", idLen)+"s", si.ID))
-		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", protocolLen)+"s", si.Protocol))
-		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", localAddrLen)+"s", si.LocalAddr))
-		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", remoteAddrLen)+"s", si.RemoteAddr))
-		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", stateLen)+"s", si.State))
-		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", recvQLen)+"s", si.RecvQBuf))
-		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", sendQLen)+"s", si.SendQBuf))
-		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", lastRecvLen)+"s", si.LastRecv))
-		line = append(line, fmt.Sprintf("%-"+fmt.Sprintf("%d", lastSendLen)+"s", si.LastSend))
-		res = append(res, strings.Join(line, delim))
-	}
-	return res
 }

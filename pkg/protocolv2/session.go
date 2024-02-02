@@ -571,15 +571,17 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 				}
 			}
 		case util.UDPTransport:
+			closeSession := false
 			hasTimeout := false
 
 			// Resend segments in sendBuf.
+			// To avoid deadlock, session can't be closed inside Ascend().
 			s.sendBuf.Ascend(func(iter *segment) bool {
 				if iter.txCount >= txCountLimit {
 					err := fmt.Errorf("too many retransmission of %v", iter)
 					log.Debugf("%v is unhealthy: %v", s, err)
 					s.outputErr <- err
-					s.Close()
+					closeSession = true
 					return false
 				}
 				if time.Since(iter.txTime) > iter.txTimeout {
@@ -595,13 +597,16 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 						err = fmt.Errorf("output() failed: %w", err)
 						log.Debugf("%v %v", s, err)
 						s.outputErr <- err
-						s.Close()
+						closeSession = true
 						return false
 					}
 					return true
 				}
 				return true
 			})
+			if closeSession {
+				s.Close()
+			}
 			if hasTimeout {
 				s.sendAlgorithm.OnTimeout()
 			}
