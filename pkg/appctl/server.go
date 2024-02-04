@@ -97,12 +97,12 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 	if err != nil {
 		return &pb.Empty{}, fmt.Errorf("LoadServerConfig() failed: %w", err)
 	}
+	if err = ValidateFullServerConfig(config); err != nil {
+		return &pb.Empty{}, fmt.Errorf("ValidateFullServerConfig() failed: %w", err)
+	}
 	loggingLevel := config.GetLoggingLevel().String()
 	if loggingLevel != pb.LoggingLevel_DEFAULT.String() {
 		log.SetLevel(loggingLevel)
-	}
-	if err = ValidateFullServerConfig(config); err != nil {
-		return &pb.Empty{}, fmt.Errorf("ValidateFullServerConfig() failed: %w", err)
 	}
 	if socks5ServerRef.Load() != nil {
 		log.Infof("socks5 server already exist")
@@ -193,6 +193,29 @@ func (s *serverLifecycleService) Stop(ctx context.Context, req *pb.Empty) (*pb.E
 	}
 	SetAppStatus(pb.AppStatus_IDLE)
 	log.Infof("completed stop request from RPC caller")
+	return &pb.Empty{}, nil
+}
+
+func (s *serverLifecycleService) Reload(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
+	log.Infof("received start request from RPC caller")
+	config, err := LoadServerConfig()
+	if err != nil {
+		return &pb.Empty{}, fmt.Errorf("LoadServerConfig() failed: %w", err)
+	}
+	if err = ValidateFullServerConfig(config); err != nil {
+		return &pb.Empty{}, fmt.Errorf("ValidateFullServerConfig() failed: %w", err)
+	}
+	mux := serverMuxRef.Load()
+	// Adjust portBindings.
+	// Adjust users.
+	if mux != nil {
+		mux.SetServerUsers(UserListToMap(config.GetUsers()))
+	}
+	// Adjust loggingLevel.
+	loggingLevel := config.GetLoggingLevel().String()
+	if loggingLevel != pb.LoggingLevel_DEFAULT.String() {
+		log.SetLevel(loggingLevel)
+	}
 	return &pb.Empty{}, nil
 }
 

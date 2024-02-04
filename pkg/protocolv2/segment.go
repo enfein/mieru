@@ -240,7 +240,7 @@ func (t *segmentTree) DeleteMin() (*segment, bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if t.Len() == 0 {
+	if t.tr.Len() == 0 {
 		return nil, false
 	}
 	seg, ok := t.tr.DeleteMin()
@@ -251,7 +251,7 @@ func (t *segmentTree) DeleteMin() (*segment, bool) {
 		panic("segmentTree.DeleteMin() return nil")
 	}
 	t.notFull.Broadcast()
-	if t.Len() > 0 {
+	if t.tr.Len() > 0 {
 		t.notifyNotEmpty()
 	} else {
 		t.notifyEmpty()
@@ -266,7 +266,7 @@ func (t *segmentTree) DeleteMinIf(si segmentIterator) (*segment, bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if t.Len() == 0 {
+	if t.tr.Len() == 0 {
 		return nil, false
 	}
 	seg, ok := t.tr.Min()
@@ -287,7 +287,7 @@ func (t *segmentTree) DeleteMinIf(si segmentIterator) (*segment, bool) {
 		}
 		t.notFull.Broadcast()
 	}
-	if t.Len() > 0 {
+	if t.tr.Len() > 0 {
 		t.notifyNotEmpty()
 	} else {
 		t.notifyEmpty()
@@ -337,11 +337,15 @@ func (t *segmentTree) MaxSeq() (uint32, error) {
 
 // Len returns the current size of the tree.
 func (t *segmentTree) Len() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	return t.tr.Len()
 }
 
 // Remaining returns the remaining space of the tree before it is full.
 func (t *segmentTree) Remaining() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	return t.cap - t.tr.Len()
 }
 

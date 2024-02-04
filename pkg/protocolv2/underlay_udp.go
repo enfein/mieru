@@ -194,12 +194,16 @@ func (u *UDPUnderlay) RunEventLoop(ctx context.Context) error {
 			// Close idle sessions.
 			u.sessionMap.Range(func(k, v any) bool {
 				session := v.(*Session)
+				select {
+				case <-session.done:
+					log.Debugf("Found closed %v", session)
+					if err := u.RemoveSession(session); err != nil {
+						log.Debugf("%v RemoveSession() failed: %v", u, err)
+					}
+				default:
+				}
 				if time.Since(session.lastRXTime) > idleSessionTimeout {
 					log.Debugf("Found idle %v", session)
-					if err := session.Close(); err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
-						log.Debugf("%v Close() failed: %v", session, err)
-					}
-					session.wg.Wait()
 					if err := u.RemoveSession(session); err != nil {
 						log.Debugf("%v RemoveSession() failed: %v", u, err)
 					}
