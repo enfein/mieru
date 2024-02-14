@@ -449,7 +449,7 @@ var clientRunFunc = func(s []string) error {
 			proxyHost = serverInfo.GetIpAddress()
 			proxyIP = net.ParseIP(proxyHost)
 			if proxyIP == nil {
-				return fmt.Errorf(stderror.ParseIPFailedErr, err)
+				return fmt.Errorf(stderror.ParseIPFailed)
 			}
 		}
 		ipVersion := util.GetIPVersion(proxyIP.String())

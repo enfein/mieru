@@ -117,30 +117,9 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 	if config.GetMtu() != 0 {
 		mtu = int(config.GetMtu())
 	}
-	endpoints := make([]protocolv2.UnderlayProperties, 0)
-	listenIP := net.ParseIP(util.AllIPAddr())
-	ipVersion := util.GetIPVersion(listenIP.String())
-	if listenIP == nil {
-		return &pb.Empty{}, fmt.Errorf(stderror.ParseIPFailedErr, err)
-	}
-	portBindings, err := FlatPortBindings(config.GetPortBindings())
+	endpoints, err := PortBindingsToUnderlayProperties(config.GetPortBindings(), mtu)
 	if err != nil {
-		return &pb.Empty{}, fmt.Errorf(stderror.InvalidPortBindingsErr, err)
-	}
-	n := len(portBindings)
-	for i := 0; i < n; i++ {
-		protocol := portBindings[i].GetProtocol()
-		port := portBindings[i].GetPort()
-		switch protocol {
-		case pb.TransportProtocol_TCP:
-			endpoint := protocolv2.NewUnderlayProperties(mtu, ipVersion, util.TCPTransport, &net.TCPAddr{IP: listenIP, Port: int(port)}, nil)
-			endpoints = append(endpoints, endpoint)
-		case pb.TransportProtocol_UDP:
-			endpoint := protocolv2.NewUnderlayProperties(mtu, ipVersion, util.UDPTransport, &net.UDPAddr{IP: listenIP, Port: int(port)}, nil)
-			endpoints = append(endpoints, endpoint)
-		default:
-			return &pb.Empty{}, fmt.Errorf(stderror.InvalidTransportProtocol)
-		}
+		return &pb.Empty{}, err
 	}
 	mux.SetEndpoints(endpoints)
 
@@ -205,16 +184,29 @@ func (s *serverLifecycleService) Reload(ctx context.Context, req *pb.Empty) (*pb
 	if err = ValidateFullServerConfig(config); err != nil {
 		return &pb.Empty{}, fmt.Errorf("ValidateFullServerConfig() failed: %w", err)
 	}
-	mux := serverMuxRef.Load()
-	// Adjust portBindings.
-	// Adjust users.
-	if mux != nil {
-		mux.SetServerUsers(UserListToMap(config.GetUsers()))
-	}
+
 	// Adjust loggingLevel.
+	// This needs to happen before adjusting other settings.
 	loggingLevel := config.GetLoggingLevel().String()
 	if loggingLevel != pb.LoggingLevel_DEFAULT.String() {
 		log.SetLevel(loggingLevel)
+	}
+
+	mux := serverMuxRef.Load()
+	if mux != nil {
+		// Adjust portBindings.
+		mtu := util.DefaultMTU
+		if config.GetMtu() != 0 {
+			mtu = int(config.GetMtu())
+		}
+		endpoints, err := PortBindingsToUnderlayProperties(config.GetPortBindings(), mtu)
+		if err != nil {
+			return &pb.Empty{}, err
+		}
+		mux.SetEndpoints(endpoints)
+
+		// Adjust users.
+		mux.SetServerUsers(UserListToMap(config.GetUsers()))
 	}
 	return &pb.Empty{}, nil
 }
@@ -641,6 +633,36 @@ func ValidateFullServerConfig(config *pb.ServerConfig) error {
 		return fmt.Errorf("server port binding is not set")
 	}
 	return nil
+}
+
+// PortBindingsToUnderlayProperties converts port bindings to underlay properties.
+func PortBindingsToUnderlayProperties(portBindings []*pb.PortBinding, mtu int) ([]protocolv2.UnderlayProperties, error) {
+	endpoints := make([]protocolv2.UnderlayProperties, 0)
+	listenIP := net.ParseIP(util.AllIPAddr())
+	ipVersion := util.GetIPVersion(listenIP.String())
+	if listenIP == nil {
+		return endpoints, fmt.Errorf(stderror.ParseIPFailed)
+	}
+	portBindings, err := FlatPortBindings(portBindings)
+	if err != nil {
+		return endpoints, fmt.Errorf(stderror.InvalidPortBindingsErr, err)
+	}
+	n := len(portBindings)
+	for i := 0; i < n; i++ {
+		protocol := portBindings[i].GetProtocol()
+		port := portBindings[i].GetPort()
+		switch protocol {
+		case pb.TransportProtocol_TCP:
+			endpoint := protocolv2.NewUnderlayProperties(mtu, ipVersion, util.TCPTransport, &net.TCPAddr{IP: listenIP, Port: int(port)}, nil)
+			endpoints = append(endpoints, endpoint)
+		case pb.TransportProtocol_UDP:
+			endpoint := protocolv2.NewUnderlayProperties(mtu, ipVersion, util.UDPTransport, &net.UDPAddr{IP: listenIP, Port: int(port)}, nil)
+			endpoints = append(endpoints, endpoint)
+		default:
+			return []protocolv2.UnderlayProperties{}, fmt.Errorf(stderror.InvalidTransportProtocol)
+		}
+	}
+	return endpoints, nil
 }
 
 // checkServerConfigDir validates if server config directory exists.

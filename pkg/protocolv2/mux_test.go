@@ -21,6 +21,7 @@ import (
 	"io"
 	mrand "math/rand"
 	"net"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -216,5 +217,56 @@ func TestIPv6UDPUnderlay(t *testing.T) {
 	runClient(t, clientProperties, []byte("xiaochitang"), []byte("kuiranbudong"), 4)
 	if err := serverMux.Close(); err != nil {
 		t.Errorf("Server mux close failed: %v", err)
+	}
+}
+
+func TestNewEndpoints(t *testing.T) {
+	cases := []struct {
+		old []UnderlayProperties
+		new []UnderlayProperties
+		res []UnderlayProperties
+	}{
+		{
+			nil,
+			nil,
+			[]UnderlayProperties{},
+		},
+		{
+			nil,
+			[]UnderlayProperties{
+				NewUnderlayProperties(1500, util.IPVersion4, util.TCPTransport, util.NilNetAddr(), util.NilNetAddr()),
+			},
+			[]UnderlayProperties{
+				NewUnderlayProperties(1500, util.IPVersion4, util.TCPTransport, util.NilNetAddr(), util.NilNetAddr()),
+			},
+		},
+		{
+			[]UnderlayProperties{
+				NewUnderlayProperties(1500, util.IPVersion4, util.TCPTransport, util.NilNetAddr(), util.NilNetAddr()),
+			},
+			nil,
+			[]UnderlayProperties{},
+		},
+		{
+			[]UnderlayProperties{
+				NewUnderlayProperties(1500, util.IPVersion4, util.TCPTransport, util.NilNetAddr(), util.NilNetAddr()),
+				NewUnderlayProperties(1500, util.IPVersion6, util.TCPTransport, util.NilNetAddr(), util.NilNetAddr()),
+			},
+			[]UnderlayProperties{
+				NewUnderlayProperties(1500, util.IPVersion6, util.TCPTransport, util.NilNetAddr(), util.NilNetAddr()),
+				NewUnderlayProperties(1500, util.IPVersion6, util.UDPTransport, util.NilNetAddr(), util.NilNetAddr()),
+			},
+			[]UnderlayProperties{
+				NewUnderlayProperties(1500, util.IPVersion6, util.UDPTransport, util.NilNetAddr(), util.NilNetAddr()),
+			},
+		},
+	}
+
+	mux := NewMux(false)
+	for _, tc := range cases {
+		ep := mux.newEndpoints(tc.old, tc.new)
+		if !reflect.DeepEqual(ep, tc.res) {
+			t.Errorf("newEndpoints(): got %v, want %v", ep, tc.res)
+		}
 	}
 }

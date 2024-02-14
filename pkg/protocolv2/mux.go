@@ -22,6 +22,7 @@ import (
 	"io"
 	mrand "math/rand"
 	"net"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -93,6 +94,7 @@ func NewMux(isClinet bool) *Mux {
 	return mux
 }
 
+// SetClientPassword panics if the mux is already started.
 func (m *Mux) SetClientPassword(password []byte) *Mux {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -106,6 +108,7 @@ func (m *Mux) SetClientPassword(password []byte) *Mux {
 	return m
 }
 
+// SetClientMultiplexFactor panics if the mux is already started.
 func (m *Mux) SetClientMultiplexFactor(n int) *Mux {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -120,6 +123,7 @@ func (m *Mux) SetClientMultiplexFactor(n int) *Mux {
 	return m
 }
 
+// SetServerUsers updates the registered users, even if mux is already started.
 func (m *Mux) SetServerUsers(users map[string]*appctlpb.User) *Mux {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -139,13 +143,29 @@ func (m *Mux) SetServerUsers(users map[string]*appctlpb.User) *Mux {
 	return m
 }
 
+// SetEndpoints updates the endpoints that mux is listening to.
+// If mux is started and new endpoints are added, mux also starts
+// to listen to those new endpoints. In that case, old endpoints
+// are not impacted.
 func (m *Mux) SetEndpoints(endpoints []UnderlayProperties) *Mux {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.used {
-		panic("Can't set endpoints after mux is used")
+	new := m.newEndpoints(m.endpoints, endpoints)
+	if len(new) > 0 {
+		if m.used {
+			select {
+			case <-m.done:
+				log.Infof("Unable to add new endpoint after multiplexer is closed")
+			default:
+				for _, p := range new {
+					go m.acceptUnderlayLoop(context.Background(), p)
+				}
+				m.endpoints = endpoints
+			}
+		} else {
+			m.endpoints = new
+		}
 	}
-	m.endpoints = endpoints
 	return m
 }
 
@@ -210,7 +230,7 @@ func (m *Mux) Start() error {
 	defer m.mu.Unlock()
 	m.used = true
 	for _, p := range m.endpoints {
-		go m.acceptUnderlayLoop(p)
+		go m.acceptUnderlayLoop(context.Background(), p)
 	}
 	return nil
 }
@@ -321,7 +341,26 @@ func (m *Mux) ExportSessionInfoTable() []string {
 	return res
 }
 
-func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
+func (m *Mux) newEndpoints(old, new []UnderlayProperties) []UnderlayProperties {
+	newEndpoints := []UnderlayProperties{}
+
+	for _, n := range new {
+		found := false
+		for _, o := range old {
+			if reflect.DeepEqual(n, o) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			newEndpoints = append(newEndpoints, n)
+		}
+	}
+
+	return newEndpoints
+}
+
+func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayProperties) {
 	laddr := properties.LocalAddr().String()
 	if laddr == "" {
 		m.chAcceptErr <- fmt.Errorf("underlay local address is empty")
@@ -332,50 +371,61 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 	switch network {
 	case "tcp", "tcp4", "tcp6":
 		listenConfig := sockopts.ListenConfigWithControls()
-		rawListener, err := listenConfig.Listen(context.Background(), network, laddr)
+		rawListener, err := listenConfig.Listen(ctx, network, laddr)
 		if err != nil {
 			m.chAcceptErr <- fmt.Errorf("Listen() failed: %w", err)
 			return
 		}
 		log.Infof("Mux is listening to endpoint %s %s", network, laddr)
+
+		acceptLoopDone := ctx.Done()
 		for {
-			underlay, err := m.acceptTCPUnderlay(rawListener, properties)
-			if err != nil {
-				m.chAcceptErr <- err
+			select {
+			case <-acceptLoopDone:
 				return
-			}
-			log.Debugf("Created new server underlay %v", underlay)
-			m.mu.Lock()
-			m.underlays = append(m.underlays, underlay)
-			m.cleanUnderlay()
-			m.mu.Unlock()
-			UnderlayPassiveOpens.Add(1)
-			currEst := UnderlayCurrEstablished.Add(1)
-			maxConn := UnderlayMaxConn.Load()
-			if currEst > maxConn {
-				UnderlayMaxConn.Store(currEst)
-			}
-
-			go func() {
-				err := underlay.RunEventLoop(context.Background())
-				if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
-					log.Debugf("%v RunEventLoop(): %v", underlay, err)
+			default:
+				underlay, err := m.acceptTCPUnderlay(rawListener, properties)
+				if err != nil {
+					m.chAcceptErr <- err
+					return
 				}
-				underlay.Close()
-			}()
+				log.Debugf("Created new server underlay %v", underlay)
+				m.mu.Lock()
+				m.underlays = append(m.underlays, underlay)
+				m.cleanUnderlay()
+				m.mu.Unlock()
+				UnderlayPassiveOpens.Add(1)
+				currEst := UnderlayCurrEstablished.Add(1)
+				maxConn := UnderlayMaxConn.Load()
+				if currEst > maxConn {
+					UnderlayMaxConn.Store(currEst)
+				}
 
-			go func() {
-				for {
-					conn, err := underlay.Accept()
-					if err != nil {
-						if !stderror.IsEOF(err) && !stderror.IsClosed(err) {
-							log.Debugf("%v Accept(): %v", underlay, err)
-						}
-						break
+				go func(ctx context.Context, underlay Underlay) {
+					err := underlay.RunEventLoop(ctx)
+					if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
+						log.Debugf("%v RunEventLoop(): %v", underlay, err)
 					}
-					m.chAccept <- conn
-				}
-			}()
+					underlay.Close()
+				}(ctx, underlay)
+
+				go func(ctx context.Context, underlay Underlay) {
+					for {
+						conn, err := underlay.Accept()
+						if err != nil {
+							if !stderror.IsEOF(err) && !stderror.IsClosed(err) {
+								log.Debugf("%v Accept(): %v", underlay, err)
+							}
+							break
+						}
+						select {
+						case m.chAccept <- conn:
+						case <-ctx.Done():
+							return
+						}
+					}
+				}(ctx, underlay)
+			}
 		}
 	case "udp", "udp4", "udp6":
 		conn, err := net.ListenUDP(network, properties.LocalAddr().(*net.UDPAddr))
@@ -406,15 +456,15 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 			UnderlayMaxConn.Store(currEst)
 		}
 
-		go func() {
-			err := underlay.RunEventLoop(context.Background())
+		go func(ctx context.Context, underlay Underlay) {
+			err := underlay.RunEventLoop(ctx)
 			if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
 				log.Debugf("%v RunEventLoop(): %v", underlay, err)
 			}
 			underlay.Close()
-		}()
+		}(ctx, underlay)
 
-		go func() {
+		go func(ctx context.Context, underlay Underlay) {
 			for {
 				conn, err := underlay.Accept()
 				if err != nil {
@@ -423,9 +473,13 @@ func (m *Mux) acceptUnderlayLoop(properties UnderlayProperties) {
 					}
 					break
 				}
-				m.chAccept <- conn
+				select {
+				case m.chAccept <- conn:
+				case <-ctx.Done():
+					return
+				}
 			}
-		}()
+		}(ctx, underlay)
 	default:
 		m.chAcceptErr <- fmt.Errorf("unsupported underlay network type %q", network)
 	}

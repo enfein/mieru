@@ -74,6 +74,13 @@ func RegisterServerCommands() {
 		serverStopFunc,
 	)
 	RegisterCallback(
+		[]string{"", "reload"},
+		func(s []string) error {
+			return unexpectedArgsError(s, 2)
+		},
+		serverReloadFunc,
+	)
+	RegisterCallback(
 		[]string{"", "status"},
 		func(s []string) error {
 			return unexpectedArgsError(s, 2)
@@ -192,6 +199,10 @@ var serverHelpFunc = func(s []string) error {
 			{
 				cmd:  "stop",
 				help: "Stop mita server proxy service.",
+			},
+			{
+				cmd:  "reload",
+				help: "Reload mita server configuration without stopping proxy service.",
 			},
 			{
 				cmd:  "status",
@@ -365,30 +376,9 @@ var serverRunFunc = func(s []string) error {
 		if config.GetMtu() != 0 {
 			mtu = int(config.GetMtu())
 		}
-		endpoints := make([]protocolv2.UnderlayProperties, 0)
-		listenIP := net.ParseIP(util.AllIPAddr())
-		ipVersion := util.GetIPVersion(listenIP.String())
-		if listenIP == nil {
-			return fmt.Errorf(stderror.ParseIPFailedErr, err)
-		}
-		portBindings, err := appctl.FlatPortBindings(config.GetPortBindings())
+		endpoints, err := appctl.PortBindingsToUnderlayProperties(config.GetPortBindings(), mtu)
 		if err != nil {
-			return fmt.Errorf(stderror.InvalidPortBindingsErr, err)
-		}
-		n := len(portBindings)
-		for i := 0; i < n; i++ {
-			protocol := portBindings[i].GetProtocol()
-			port := portBindings[i].GetPort()
-			switch protocol {
-			case appctlpb.TransportProtocol_TCP:
-				endpoint := protocolv2.NewUnderlayProperties(mtu, ipVersion, util.TCPTransport, &net.TCPAddr{IP: listenIP, Port: int(port)}, nil)
-				endpoints = append(endpoints, endpoint)
-			case appctlpb.TransportProtocol_UDP:
-				endpoint := protocolv2.NewUnderlayProperties(mtu, ipVersion, util.UDPTransport, &net.UDPAddr{IP: listenIP, Port: int(port)}, nil)
-				endpoints = append(endpoints, endpoint)
-			default:
-				return fmt.Errorf(stderror.InvalidTransportProtocol)
-			}
+			return err
 		}
 		mux.SetEndpoints(endpoints)
 
@@ -464,6 +454,28 @@ var serverStopFunc = func(s []string) error {
 		return fmt.Errorf(stderror.StopServerProxyFailedErr, err)
 	}
 	log.Infof("mita server proxy is stopped")
+	return nil
+}
+
+var serverReloadFunc = func(s []string) error {
+	appStatus, err := appctl.GetServerStatusWithRPC(context.Background())
+	if err != nil {
+		return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
+	}
+	if err := appctl.IsServerDaemonRunning(appStatus); err != nil {
+		return fmt.Errorf(stderror.ServerNotRunningErr, err)
+	}
+
+	client, err := appctl.NewServerLifecycleRPCClient()
+	if err != nil {
+		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
+	}
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
+	defer cancelFunc()
+	if _, err = client.Reload(timedctx, &appctlpb.Empty{}); err != nil {
+		return fmt.Errorf(stderror.ReloadServerFailedErr, err)
+	}
+	log.Infof("mita server is reloaded")
 	return nil
 }
 
