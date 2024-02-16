@@ -21,12 +21,17 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/socks5client"
 	"github.com/enfein/mieru/pkg/util"
+)
+
+const (
+	clientTimeout time.Duration = 10 * time.Second
 )
 
 var (
@@ -51,6 +56,9 @@ var hopByHopHeaders = []string{
 
 type Proxy struct {
 	ProxyURI string
+
+	client *http.Client // cached HTTP client
+	mu     sync.Mutex
 }
 
 var (
@@ -124,21 +132,27 @@ func (p *Proxy) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		util.BidiCopy(httpConn, socksConn)
 	} else {
 		// HTTP
-		tr := &http.Transport{
-			Dial: dialFunc,
+		p.mu.Lock()
+		if p.client == nil {
+			tr := &http.Transport{
+				Dial: dialFunc,
+			}
+			p.client = &http.Client{
+				Transport: tr,
+				CheckRedirect: func(req *http.Request, via []*http.Request) error {
+					return nil
+				},
+				Timeout: clientTimeout,
+			}
 		}
-		client := &http.Client{
-			Transport: tr,
-			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				return nil
-			},
-		}
+		p.mu.Unlock()
+		defer p.client.CloseIdleConnections()
 
 		outReq := *req
 		outReq.RequestURI = ""
 		deleteHopByHopHeaders(outReq.Header)
 
-		resp, err := client.Do(&outReq)
+		resp, err := p.client.Do(&outReq)
 		if err != nil {
 			HTTPConnErrors.Add(1)
 			log.Debugf("send HTTP proxy request to socks5 server failed: %v", err)

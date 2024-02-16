@@ -76,10 +76,14 @@ type Request struct {
 	Raw []byte
 }
 
-// NewRequest creates a new Request from the tcp connection.
-func NewRequest(conn io.Reader) (*Request, error) {
+// newRequest creates a new Request from the connection.
+func (s *Server) newRequest(conn io.Reader) (*Request, error) {
 	// Read the version byte.
 	header := []byte{0, 0, 0}
+	if netConn, ok := conn.(net.Conn); ok {
+		util.SetReadTimeout(netConn, s.config.HandshakeTimeout)
+		defer util.SetReadTimeout(netConn, 0)
+	}
 	if _, err := io.ReadFull(conn, header); err != nil {
 		return nil, fmt.Errorf("failed to get command version: %w", err)
 	}
@@ -374,6 +378,9 @@ func (s *Server) handleAssociate(ctx context.Context, req *Request, conn io.Read
 // between socks5 client and server.
 func (s *Server) proxySocks5AuthReq(conn, proxyConn net.Conn) error {
 	// Send the version and authtication methods to the server.
+	defer util.SetReadTimeout(conn, 0)
+	defer util.SetReadTimeout(proxyConn, 0)
+	util.SetReadTimeout(conn, s.config.HandshakeTimeout)
 	version := []byte{0}
 	if _, err := io.ReadFull(conn, version); err != nil {
 		return fmt.Errorf("failed to get version byte: %w", err)
@@ -398,6 +405,7 @@ func (s *Server) proxySocks5AuthReq(conn, proxyConn net.Conn) error {
 	}
 
 	// Get server authentication response.
+	util.SetReadTimeout(proxyConn, s.config.HandshakeTimeout)
 	authResp := make([]byte, 2)
 	if _, err := io.ReadFull(proxyConn, authResp); err != nil {
 		return fmt.Errorf("failed to read authentication response from the socks5 server: %w", err)
@@ -414,6 +422,9 @@ func (s *Server) proxySocks5AuthReq(conn, proxyConn net.Conn) error {
 // return the created UDP connection.
 func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, error) {
 	// Send the connection request to the server.
+	defer util.SetReadTimeout(conn, 0)
+	defer util.SetReadTimeout(proxyConn, 0)
+	util.SetReadTimeout(conn, s.config.HandshakeTimeout)
 	connReq := make([]byte, 4)
 	if _, err := io.ReadFull(conn, connReq); err != nil {
 		return nil, fmt.Errorf("failed to get socks5 connection request: %w", err)
@@ -449,6 +460,7 @@ func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, err
 	log.Debugf("Sent socks5 request %v to server", connReq)
 
 	// Get server connection response.
+	util.SetReadTimeout(proxyConn, s.config.HandshakeTimeout)
 	connResp := make([]byte, 4)
 	if _, err := io.ReadFull(proxyConn, connResp); err != nil {
 		return nil, fmt.Errorf("failed to read connection response from the server: %w", err)

@@ -478,6 +478,7 @@ var clientRunFunc = func(s []string) error {
 		UseProxy:                 true,
 		ClientSideAuthentication: true,
 		ProxyMux:                 mux,
+		HandshakeTimeout:         10 * time.Second,
 	}
 	socks5Server, err := socks5.New(socks5Config)
 	if err != nil {

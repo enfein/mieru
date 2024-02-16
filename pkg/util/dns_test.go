@@ -46,11 +46,12 @@ func TestDNSResolver(t *testing.T) {
 	if IsIPDualStack() {
 		// IPv6 only.
 		d.DNSPolicy = DNSPolicyIPv6Only
-		addr, err = d.LookupIP(ctx, "localhost")
-		if err != nil {
-			t.Fatalf("LookupIP() failed: %v", err)
+		addr, err := d.LookupIP(ctx, "localhost")
+		addr2, err2 := d.LookupIP(ctx, "ip6-localhost")
+		if err != nil && err2 != nil {
+			t.Fatalf("LookupIP() failed: %v; %v", err, err2)
 		}
-		if !addr.IsLoopback() {
+		if (addr != nil && !addr.IsLoopback()) || (addr2 != nil && !addr2.IsLoopback()) {
 			t.Errorf("Returned IP address is not loopback address")
 		}
 	}

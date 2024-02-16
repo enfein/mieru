@@ -26,6 +26,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/enfein/mieru/pkg/appctl"
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
@@ -387,6 +388,7 @@ var serverRunFunc = func(s []string) error {
 			AllowLocalDestination:    config.GetAdvancedSettings().GetAllowLocalDestination(),
 			ClientSideAuthentication: true,
 			EgressController:         egress.NewSocks5Controller(config.GetEgress()),
+			HandshakeTimeout:         10 * time.Second,
 		}
 		socks5Server, err := socks5.New(socks5Config)
 		if err != nil {

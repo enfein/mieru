@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"time"
 
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/egress"
@@ -53,6 +54,10 @@ type Config struct {
 
 	// BindIP is used for bind or udp associate
 	BindIP net.IP
+
+	// Handshake timeout to establish socks5 connection.
+	// Use 0 or negative value to disable the timeout.
+	HandshakeTimeout time.Duration
 
 	// Use mieru proxy to carry socks5 traffic.
 	UseProxy bool
@@ -229,7 +234,7 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 		}
 	}
 
-	request, err := NewRequest(conn)
+	request, err := s.newRequest(conn)
 	if err != nil {
 		HandshakeErrors.Add(1)
 		if errors.Is(err, errUnrecognizedAddrType) {
@@ -263,6 +268,8 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 
 func (s *Server) handleAuthentication(conn net.Conn) error {
 	// Read the version byte and ensure we are compatible.
+	util.SetReadTimeout(conn, s.config.HandshakeTimeout)
+	defer util.SetReadTimeout(conn, 0)
 	version := []byte{0}
 	if _, err := io.ReadFull(conn, version); err != nil {
 		HandshakeErrors.Add(1)
@@ -319,6 +326,8 @@ func (s *Server) handleForwarding(req *Request, conn net.Conn, forwardHost strin
 		proxyConn.Close()
 		return fmt.Errorf("failed to write socks5 auth header to egress proxy: %w", err)
 	}
+	util.SetReadTimeout(proxyConn, s.config.HandshakeTimeout)
+	defer util.SetReadTimeout(proxyConn, 0)
 	resp := []byte{0, 0}
 	if _, err := io.ReadFull(proxyConn, resp); err != nil {
 		HandshakeErrors.Add(1)

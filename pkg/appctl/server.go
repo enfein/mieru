@@ -25,6 +25,7 @@ import (
 	"sort"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	pb "github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/egress"
@@ -128,6 +129,7 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 		AllowLocalDestination:    config.GetAdvancedSettings().GetAllowLocalDestination(),
 		ClientSideAuthentication: true,
 		EgressController:         egress.NewSocks5Controller(config.GetEgress()),
+		HandshakeTimeout:         10 * time.Second,
 	}
 	socks5Server, err := socks5.New(socks5Config)
 	if err != nil {

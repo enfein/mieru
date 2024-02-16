@@ -18,6 +18,7 @@ package stderror
 import (
 	"errors"
 	"io"
+	"net"
 	"strings"
 )
 
@@ -41,13 +42,23 @@ func IsEOF(err error) bool {
 	return errors.Is(err, io.EOF)
 }
 
+// IsNotReady returns true if the caller should retry the same operation again.
+func IsNotReady(err error) bool {
+	return errors.Is(err, ErrNotReady)
+}
+
 // IsPermissionDenied returns true if the cause of error is permission denied.
 func IsPermissionDenied(err error) bool {
 	s := strings.ToLower(err.Error())
 	return strings.Contains(s, "permission denied")
 }
 
-// ShouldRetry returns true if the caller should retry the same operation again.
-func ShouldRetry(err error) bool {
-	return errors.Is(err, ErrNotReady)
+// IsTimeout returns true if the cause of error is timeout.
+func IsTimeout(err error) bool {
+	if netErr, ok := err.(net.Error); ok {
+		if netErr.Timeout() {
+			return true
+		}
+	}
+	return errors.Is(err, ErrTimeout)
 }

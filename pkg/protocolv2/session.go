@@ -366,6 +366,7 @@ func (s *Session) Close() error {
 
 	s.forwardStateTo(sessionClosed)
 	close(s.done)
+	log.Debugf("Closed %v", s)
 	metrics.CurrEstablished.Add(-1)
 	return nil
 }
@@ -890,7 +891,7 @@ func (s *Session) output(seg *segment, remoteAddr net.Addr) error {
 	case util.UDPTransport:
 		err := s.conn.(*UDPUnderlay).writeOneSegment(seg, remoteAddr.(*net.UDPAddr))
 		if err != nil {
-			if !stderror.ShouldRetry(err) {
+			if !stderror.IsNotReady(err) {
 				return fmt.Errorf("UDPUnderlay.writeOneSegment() failed: %v", err)
 			}
 			if log.IsLevelEnabled(log.TraceLevel) {

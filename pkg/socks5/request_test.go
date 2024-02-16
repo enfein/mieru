@@ -61,7 +61,7 @@ func TestRequestConnect(t *testing.T) {
 
 	// Socks server handles the request.
 	go func() {
-		req, err := NewRequest(serverConn)
+		req, err := s.newRequest(serverConn)
 		if err != nil {
 			t.Errorf("NewRequest() failed: %v", err)
 		}
@@ -118,7 +118,7 @@ func TestRequestUnsupportedCommand(t *testing.T) {
 		clientConn.Write(tc.req)
 
 		// Socks server handles the request.
-		req, err := NewRequest(serverConn)
+		req, err := s.newRequest(serverConn)
 		if err != nil {
 			t.Fatalf("NewRequest() failed: %v", err)
 		}

@@ -18,7 +18,18 @@ package util
 import (
 	"context"
 	"net"
+	"time"
 )
+
+// SetReadTimeout set read deadline to the connection.
+// It cancels the deadline if the timeout is 0 or negative.
+func SetReadTimeout(conn net.Conn, timeout time.Duration) {
+	if timeout > 0 {
+		conn.SetReadDeadline(time.Now().Add(timeout))
+	} else {
+		conn.SetReadDeadline(ZeroTime())
+	}
+}
 
 // WaitForClose blocks the go routine. It returns when the peer closes the connection.
 // In the meanwhile, everything send by the peer is discarded.

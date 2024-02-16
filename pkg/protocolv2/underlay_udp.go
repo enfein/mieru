@@ -40,6 +40,8 @@ const (
 
 	idleSessionTickerInterval = 5 * time.Second
 	idleSessionTimeout        = time.Minute
+
+	readOneSegmentTimeout = 5 * time.Second
 )
 
 var udpReplayCache = replay.NewCache(4*1024*1024, 2*time.Minute)
@@ -214,6 +216,9 @@ func (u *UDPUnderlay) RunEventLoop(ctx context.Context) error {
 		}
 		seg, addr, err := u.readOneSegment()
 		if err != nil {
+			if stderror.IsTimeout(err) {
+				continue
+			}
 			return fmt.Errorf("readOneSegment() failed: %w", err)
 		}
 		if log.IsLevelEnabled(log.TraceLevel) {
@@ -333,11 +338,16 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 		default:
 		}
 
+		util.SetReadTimeout(u.conn, readOneSegmentTimeout)
+		defer util.SetReadTimeout(u.conn, 0)
 		// Peer may select a different MTU.
 		// Use the largest possible value here to avoid error.
 		b := make([]byte, 1500)
 		n, addr, err = u.conn.ReadFromUDP(b)
 		if err != nil {
+			if stderror.IsTimeout(err) {
+				return nil, nil, stderror.ErrTimeout
+			}
 			return nil, nil, fmt.Errorf("ReadFromUDP() failed: %w", err)
 		}
 		if u.isClient && addr.String() != u.serverAddr.String() {
