@@ -1,5 +1,17 @@
 # 运营维护与故障排查
 
+## 查看当前客户端与服务器之间的连接
+
+可以在客户端运行 `mieru get connections` 指令查看当前客户端与服务器之间的连接。该指令输出的一个示例如下。
+
+```
+Session ID  Protocol  Local       Remote              State        Recv Q+Buf  Send Q+Buf  Last Recv  Last Send
+2187011369  UDP       [::]:59998  1.2.3.4:5678        ESTABLISHED  0+0         0+1         1s         1s
+1466481848  UDP       [::]:59999  1.2.3.4:5678        ESTABLISHED  0+0         0+1         3s         3s
+```
+
+类似的，可以在服务器运行 `mita get connections` 指令查看当前服务器与所有客户端之间的连接。
+
 ## 配置文件存放地址
 
 代理服务器软件 mita 的配置存放在 `/etc/mita/server.conf.pb`。这是一个以 protocol buffer 格式存储的二进制文件。为保护用户信息，mita 不会存储用户密码的明文，只会存储其校验码。
@@ -36,7 +48,7 @@ sudo journalctl -u mita -xe --no-pager
 
 mieru / mita 在默认的日志等级下，打印的信息非常少，不包含 IP 地址、端口号等敏感信息。如果需要诊断单个网络连接，则需要打开调试日志（debug log）。
 
-本项目在 `configs/templates` 目录下提供了快速打开和关闭调试日志的配置文件。请将它们下载到服务器或本地计算机上，并输入以下指令。注意，改变 mieru / mita 的设置后，需要重新启动服务才能生效。
+本项目在 `configs/templates` 目录下提供了快速打开和关闭调试日志的配置文件。请将它们下载到服务器或本地计算机上，并输入以下指令。注意，改变 mieru 的设置后，需要重新启动服务才能生效。
 
 ```sh
 # enable debug logging
@@ -45,9 +57,8 @@ mita apply config server_enable_debug_logging.json
 # OR disable debug logging
 mita apply config server_disable_debug_logging.json
 
-mita stop
-
-mita start
+# This will not interrupt traffic
+mita reload
 ```
 
 ```sh
@@ -64,21 +75,61 @@ mieru start
 
 ## 判断客户端与服务器之间的连接是否正常
 
-判断连接是否正常，只需要查看客户端日志。例如，在下面的日志中
+要确定连接是否正常，可以查看客户端指标。要获取指标，请运行命令 `mieru get metrics`。在下面的例子中，
 
 ```
-INFO [metrics]
-INFO [metrics - cipher - client] DirectDecrypt=9187 FailedDirectDecrypt=0
-INFO [metrics - connections] ActiveOpens=44 CurrEstablished=1 MaxConn=2 PassiveOpens=0
-INFO [metrics - HTTP proxy] ConnErrors=0 Requests=0 SchemeErrors=0
-INFO [metrics - replay] KnownSession=0 NewSession=0
-INFO [metrics - socks5] ConnectionRefusedErrors=0 DNSResolveErrors=0 HandshakeErrors=0 HostUnreachableErrors=0 NetworkUnreachableErrors=0 UDPAssociateErrors=0 UnsupportedCommandErrors=0
-INFO [metrics - socks5 UDP associate] InBytes=3106936 InPkts=4399 OutBytes=3106340 OutPkts=4398
-INFO [metrics - traffic] InBytes=3883129 OutBytes=3867440 OutPaddingBytes=422090
-INFO [metrics - underlay] ActiveOpens=4 CurrEstablished=4 MaxConn=4 PassiveOpens=0 UnderlayMalformedUDP=0 UnsolicitedUDP=0
+{
+    "cipher - client": {
+        "DirectDecrypt": 25683,
+        "FailedDirectDecrypt": 0
+    },
+    "connections": {
+        "ActiveOpens": 2,
+        "CurrEstablished": 2,
+        "MaxConn": 2,
+        "PassiveOpens": 0
+    },
+    "HTTP proxy": {
+        "ConnErrors": 0,
+        "Requests": 2,
+        "SchemeErrors": 0
+    },
+    "replay": {
+        "KnownSession": 0,
+        "NewSession": 0
+    },
+    "socks5": {
+        "ConnectionRefusedErrors": 0,
+        "DNSResolveErrors": 0,
+        "HandshakeErrors": 0,
+        "HostUnreachableErrors": 0,
+        "NetworkUnreachableErrors": 0,
+        "UDPAssociateErrors": 0,
+        "UnsupportedCommandErrors": 0
+    },
+    "socks5 UDP associate": {
+        "InBytes": 0,
+        "InPkts": 0,
+        "OutBytes": 0,
+        "OutPkts": 0
+    },
+    "traffic": {
+        "InBytes": 14680428,
+        "OutBytes": 1853242,
+        "OutPaddingBytes": 271334
+    },
+    "underlay": {
+        "ActiveOpens": 2,
+        "CurrEstablished": 2,
+        "MaxConn": 2,
+        "PassiveOpens": 0,
+        "UnderlayMalformedUDP": 0,
+        "UnsolicitedUDP": 0
+    }
+}
 ```
 
-如果 `CurrEstablished` 的值不为 0，说明此刻客户端与服务器之间有活跃的连接。如果 `DirectDecrypt` 的值不为 0，说明客户端曾经成功解密了服务器返回的数据包。
+如果 `connections` -> `CurrEstablished` 的值不为 0，说明此刻客户端与服务器之间有活跃的连接。如果 `cipher - client` -> `DirectDecrypt` 的值不为 0，说明客户端曾经成功解密了服务器返回的数据包。
 
 ## 故障诊断与排查
 

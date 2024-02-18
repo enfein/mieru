@@ -1,5 +1,17 @@
 # Maintenance & Troubleshooting
 
+## View the current connections between client and server
+
+You can run `mieru get connections` command on the client to view the current connections between client and server. An example of the command output is as follows.
+
+```
+Session ID  Protocol  Local       Remote              State        Recv Q+Buf  Send Q+Buf  Last Recv  Last Send
+2187011369  UDP       [::]:59998  1.2.3.4:5678        ESTABLISHED  0+0         0+1         1s         1s
+1466481848  UDP       [::]:59999  1.2.3.4:5678        ESTABLISHED  0+0         0+1         3s         3s
+```
+
+Similarly, you can run `mita get connections` command on the server to view the current connections between the server and all clients.
+
 ## Configuration file location
 
 The configuration of the mita proxy server is stored in `/etc/mita/server.conf.pb`. This is a binary file in protocol buffer format. To protect user information, mita does not store the user's password in plain text, it only stores the checksum.
@@ -36,7 +48,7 @@ Each log file uses the format `yyyyMMdd_HHmm_PID.log`, where `yyyyMMdd_HHmm` is 
 
 mieru / mita prints very little information at the default log level, which does not contain sensitive information such as IP addresses, port numbers, etc. If you need to diagnose a single network connection, you need to turn on the debug logging.
 
-The project provides configuration files for quickly enable and disable debug logs in the `configs/templates` directory. Please download them to your server or local computer and enter the following commands. Note that changing the settings of mieru / mita requires restarting the service to take effect.
+The project provides configuration files for quickly enable and disable debug logs in the `configs/templates` directory. Please download them to your server or local computer and enter the following commands. Note that changing the settings of mieru requires restarting the service to take effect.
 
 ```sh
 # enable debug logging
@@ -45,9 +57,8 @@ mita apply config server_enable_debug_logging.json
 # OR disable debug logging
 mita apply config server_disable_debug_logging.json
 
-mita stop
-
-mita start
+# This will not interrupt traffic
+mita reload
 ```
 
 ```sh
@@ -64,21 +75,61 @@ mieru start
 
 ## Check connectivity between client and server
 
-To determine if the connectivity is OK, you can look at the client logs. For example, in this log,
+To determine if the connectivity is OK, you can look at the client metrics. To get the metrics, run command `mieru get metrics`. In the following example,
 
 ```
-INFO [metrics]
-INFO [metrics - cipher - client] DirectDecrypt=9187 FailedDirectDecrypt=0
-INFO [metrics - connections] ActiveOpens=44 CurrEstablished=1 MaxConn=2 PassiveOpens=0
-INFO [metrics - HTTP proxy] ConnErrors=0 Requests=0 SchemeErrors=0
-INFO [metrics - replay] KnownSession=0 NewSession=0
-INFO [metrics - socks5] ConnectionRefusedErrors=0 DNSResolveErrors=0 HandshakeErrors=0 HostUnreachableErrors=0 NetworkUnreachableErrors=0 UDPAssociateErrors=0 UnsupportedCommandErrors=0
-INFO [metrics - socks5 UDP associate] InBytes=3106936 InPkts=4399 OutBytes=3106340 OutPkts=4398
-INFO [metrics - traffic] InBytes=3883129 OutBytes=3867440 OutPaddingBytes=422090
-INFO [metrics - underlay] ActiveOpens=4 CurrEstablished=4 MaxConn=4 PassiveOpens=0 UnderlayMalformedUDP=0 UnsolicitedUDP=0
+{
+    "cipher - client": {
+        "DirectDecrypt": 25683,
+        "FailedDirectDecrypt": 0
+    },
+    "connections": {
+        "ActiveOpens": 2,
+        "CurrEstablished": 2,
+        "MaxConn": 2,
+        "PassiveOpens": 0
+    },
+    "HTTP proxy": {
+        "ConnErrors": 0,
+        "Requests": 2,
+        "SchemeErrors": 0
+    },
+    "replay": {
+        "KnownSession": 0,
+        "NewSession": 0
+    },
+    "socks5": {
+        "ConnectionRefusedErrors": 0,
+        "DNSResolveErrors": 0,
+        "HandshakeErrors": 0,
+        "HostUnreachableErrors": 0,
+        "NetworkUnreachableErrors": 0,
+        "UDPAssociateErrors": 0,
+        "UnsupportedCommandErrors": 0
+    },
+    "socks5 UDP associate": {
+        "InBytes": 0,
+        "InPkts": 0,
+        "OutBytes": 0,
+        "OutPkts": 0
+    },
+    "traffic": {
+        "InBytes": 14680428,
+        "OutBytes": 1853242,
+        "OutPaddingBytes": 271334
+    },
+    "underlay": {
+        "ActiveOpens": 2,
+        "CurrEstablished": 2,
+        "MaxConn": 2,
+        "PassiveOpens": 0,
+        "UnderlayMalformedUDP": 0,
+        "UnsolicitedUDP": 0
+    }
+}
 ```
 
-if the value of `CurrEstablished` is not 0, there is an active connection between the client and the server at this moment; if the value of `DirectDecrypt` is not 0, the client has successfully decrypted the response packets sent by the server.
+if the value of `connections` -> `CurrEstablished` is not 0, there is an active connection between the client and the server at this moment; if the value of `cipher - client` -> `DirectDecrypt` is not 0, the client has successfully decrypted the response packets sent by the server.
 
 ## Troubleshooting suggestions
 

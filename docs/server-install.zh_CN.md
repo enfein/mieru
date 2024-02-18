@@ -13,10 +13,10 @@ curl -LSO https://github.com/enfein/mieru/releases/download/v2.4.0/mita_2.4.0_am
 # Debian / Ubuntu - ARM 64
 curl -LSO https://github.com/enfein/mieru/releases/download/v2.4.0/mita_2.4.0_arm64.deb
 
-# Fedora / CentOS / RedHat - X86_64
+# RedHat / CentOS / Rocky Linux - X86_64
 curl -LSO https://github.com/enfein/mieru/releases/download/v2.4.0/mita-2.4.0-1.x86_64.rpm
 
-# Fedora / CentOS / RedHat - ARM 64
+# RedHat / CentOS / Rocky Linux - ARM 64
 curl -LSO https://github.com/enfein/mieru/releases/download/v2.4.0/mita-2.4.0-1.aarch64.rpm
 ```
 
@@ -31,22 +31,23 @@ sudo dpkg -i mita_2.4.0_amd64.deb
 # Debian / Ubuntu - ARM 64
 sudo dpkg -i mita_2.4.0_arm64.deb
 
-# Fedora / CentOS / RedHat - X86_64
+# RedHat / CentOS / Rocky Linux - X86_64
 sudo rpm -Uvh --force mita-2.4.0-1.x86_64.rpm
 
-# Fedora / CentOS / RedHat - ARM 64
+# RedHat / CentOS / Rocky Linux - ARM 64
 sudo rpm -Uvh --force mita-2.4.0-1.aarch64.rpm
 ```
 
-## 赋予当前用户操作 mita 的权限，需要重启服务器使此设置生效
+## 赋予当前用户操作 mita 的权限，重新登录使此设置生效
 
 ```sh
 sudo usermod -a -G mita $USER
 
-sudo reboot
+# logout
+exit
 ```
 
-## 重启后，使用 SSH 重新连接到服务器，检查 mita 守护进程的状态
+## 使用 SSH 重新连接到服务器，检查 mita 守护进程的状态
 
 ```sh
 systemctl status mita
@@ -147,7 +148,7 @@ mita status
 mita stop
 ```
 
-注意，每次使用 `mita apply config <FILE>` 修改设置后，需要用 `mita stop` 和 `mita start` 重启代理服务，才能使新设置生效。
+注意，每次使用 `mita apply config <FILE>` 修改设置后，需要用 `mita stop` 和 `mita start` 重启代理服务，才能使新设置生效。一个例外是，如果只修改了 `users` 或者 `loggingLevel` 设置，你可以使用 `mita reload` 加载新的设置，此时不会影响服务器与客户端的活跃连接。
 
 启动代理服务后，请继续进行[客户端安装与配置](https://github.com/enfein/mieru/blob/main/docs/client-install.zh_CN.md)。
 
@@ -274,9 +275,6 @@ Tor 浏览器 -> mieru 客户端 -> GFW -> mita 服务器 -> Tor 网络 -> 目�
 # Debian / Ubuntu
 sudo apt-get install ntp
 
-# Fedora
+# RedHat / CentOS / Rocky Linux
 sudo dnf install ntp
-
-# CentOS / Red Hat Enterprise Linux
-sudo yum install ntp
 ```

@@ -13,10 +13,10 @@ curl -LSO https://github.com/enfein/mieru/releases/download/v2.4.0/mita_2.4.0_am
 # Debian / Ubuntu - ARM 64
 curl -LSO https://github.com/enfein/mieru/releases/download/v2.4.0/mita_2.4.0_arm64.deb
 
-# Fedora / CentOS / RedHat - X86_64
+# RedHat / CentOS / Rocky Linux - X86_64
 curl -LSO https://github.com/enfein/mieru/releases/download/v2.4.0/mita-2.4.0-1.x86_64.rpm
 
-# Fedora / CentOS / RedHat - ARM 64
+# RedHat / CentOS / Rocky Linux - ARM 64
 curl -LSO https://github.com/enfein/mieru/releases/download/v2.4.0/mita-2.4.0-1.aarch64.rpm
 ```
 
@@ -31,22 +31,23 @@ sudo dpkg -i mita_2.4.0_amd64.deb
 # Debian / Ubuntu - ARM 64
 sudo dpkg -i mita_2.4.0_arm64.deb
 
-# Fedora / CentOS / RedHat - X86_64
+# RedHat / CentOS / Rocky Linux - X86_64
 sudo rpm -Uvh --force mita-2.4.0-1.x86_64.rpm
 
-# Fedora / CentOS / RedHat - ARM 64
+# RedHat / CentOS / Rocky Linux - ARM 64
 sudo rpm -Uvh --force mita-2.4.0-1.aarch64.rpm
 ```
 
-## Grant permissions
+## Grant permissions, logout and login again to make the change effective
 
 ```sh
 sudo usermod -a -G mita $USER
 
-sudo reboot
+# logout
+exit
 ```
 
-## After reboot, reconnect the server via SSH, check mita daemon status
+## Reconnect the server via SSH, check mita daemon status
 
 ```sh
 systemctl status mita
@@ -147,7 +148,7 @@ If you want to stop the proxy service, use command
 mita stop
 ```
 
-Note that each time you change the settings with `mita apply config <FILE>`, you need to restart the service with `mita stop` and `mita start` for the new settings to take effect.
+Note that each time you change the settings with `mita apply config <FILE>`, you need to restart the service with `mita stop` and `mita start` for the new settings to take effect. An exception is, if you only change `users` or `loggingLevel` settings, you may run `mita reload` to load the new settings, which will not disturb active connections between server and client.
 
 After starting the proxy service, proceed to [Client Installation & Configuration](https://github.com/enfein/mieru/blob/main/docs/client-install.md).
 
@@ -274,9 +275,6 @@ To ensure that the server system time is accurate, we recommend that users insta
 # Debian / Ubuntu
 sudo apt-get install ntp
 
-# Fedora
+# RedHat / CentOS / Rocky Linux
 sudo dnf install ntp
-
-# CentOS / Red Hat Enterprise Linux
-sudo yum install ntp
 ```
