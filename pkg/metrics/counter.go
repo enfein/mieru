@@ -23,7 +23,8 @@ import (
 )
 
 const (
-	rollUpInterval       = 100
+	rollUpInterval       = 256
+	rollUpToSecond       = 2 * time.Second
 	rollUpSecondToMinute = 120 * time.Second
 	rollUpMinuteToHour   = 120 * time.Minute
 	rollUpHourToDay      = 48 * time.Hour
@@ -33,6 +34,7 @@ type rollUpLabel uint8
 
 const (
 	noRollUp rollUpLabel = iota
+	toSecond
 	toMinute
 	toHour
 	toDay
@@ -141,10 +143,16 @@ func (c *Counter) rollUp() {
 	if c.op%rollUpInterval != 0 {
 		return
 	}
-	c.doRollUp(noRollUp, toMinute, rollUpSecondToMinute, time.Minute)
+
+	c.doRollUp(noRollUp, toSecond, rollUpToSecond, time.Second)
+	c.doRollUp(toSecond, toSecond, rollUpToSecond, time.Second)
+
+	c.doRollUp(toSecond, toMinute, rollUpSecondToMinute, time.Minute)
 	c.doRollUp(toMinute, toMinute, rollUpSecondToMinute, time.Minute)
+
 	c.doRollUp(toMinute, toHour, rollUpMinuteToHour, time.Hour)
 	c.doRollUp(toHour, toHour, rollUpMinuteToHour, time.Hour)
+
 	c.doRollUp(toHour, toDay, rollUpHourToDay, 24*time.Hour)
 	c.doRollUp(toDay, toDay, rollUpHourToDay, 24*time.Hour)
 }
