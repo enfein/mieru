@@ -1,4 +1,4 @@
-// Copyright (C) 2021  mieru authors
+// Copyright (C) 2024  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package appctl
+package util
 
 import (
 	"google.golang.org/protobuf/encoding/protojson"
@@ -37,7 +37,7 @@ var jsonUnmarshalOption = protojson.UnmarshalOptions{
 }
 
 // Marshal returns a JSON representation of protobuf.
-func Marshal(m protoreflect.ProtoMessage) ([]byte, error) {
+func MarshalJSON(m protoreflect.ProtoMessage) ([]byte, error) {
 	b, err := jsonMarshalOption.Marshal(m)
 	if err != nil {
 		return nil, err
@@ -46,6 +46,6 @@ func Marshal(m protoreflect.ProtoMessage) ([]byte, error) {
 }
 
 // Unmarshal writes protobuf based on JSON data.
-func Unmarshal(b []byte, m protoreflect.ProtoMessage) error {
+func UnmarshalJSON(b []byte, m protoreflect.ProtoMessage) error {
 	return jsonUnmarshalOption.Unmarshal(b, m)
 }

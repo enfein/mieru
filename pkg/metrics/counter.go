@@ -20,24 +20,17 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	pb "github.com/enfein/mieru/pkg/metrics/metricspb"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
-	rollUpInterval       = 256
+	rollUpInterval       = 1024
 	rollUpToSecond       = 2 * time.Second
 	rollUpSecondToMinute = 120 * time.Second
 	rollUpMinuteToHour   = 120 * time.Minute
 	rollUpHourToDay      = 48 * time.Hour
-)
-
-type rollUpLabel uint8
-
-const (
-	noRollUp rollUpLabel = iota
-	toSecond
-	toMinute
-	toHour
-	toDay
 )
 
 // Counter holds a named int64 value that can't decrease.
@@ -49,7 +42,7 @@ type Counter struct {
 	value int64
 
 	timeSeries bool
-	history    []record
+	history    []*pb.History
 
 	mu sync.Mutex
 	op uint64 // number of operations
@@ -104,15 +97,15 @@ func (c *Counter) DeltaBetween(t1, t2 time.Time) int64 {
 
 	t1Idx := sort.Search(
 		len(c.history),
-		func(i int) bool { return c.history[i].time.After(t1) },
+		func(i int) bool { return time.UnixMilli(c.history[i].GetTimeUnixMilli()).After(t1) },
 	)
 	t2Idx := sort.Search(
 		len(c.history),
-		func(i int) bool { return c.history[i].time.After(t2) },
+		func(i int) bool { return time.UnixMilli(c.history[i].GetTimeUnixMilli()).After(t2) },
 	)
 	var sum int64
 	for i := t1Idx; i < t2Idx; i++ {
-		sum += c.history[i].delta
+		sum += c.history[i].GetDelta()
 	}
 	return sum
 }
@@ -128,10 +121,14 @@ func (c *Counter) addWithTime(delta int64, time time.Time) int64 {
 	c.value += delta
 	if c.timeSeries {
 		if c.history == nil {
-			c.history = make([]record, 0)
+			c.history = make([]*pb.History, 0)
 		}
-		r := record{time: time, delta: delta, label: noRollUp}
-		c.history = append(c.history, r)
+		h := &pb.History{
+			TimeUnixMilli: proto.Int64(time.UnixMilli()),
+			Delta:         proto.Int64(delta),
+			RollUp:        pb.RollUpLabel_NO_ROLL_UP.Enum(),
+		}
+		c.history = append(c.history, h)
 		c.rollUp()
 	}
 	return c.value
@@ -144,63 +141,61 @@ func (c *Counter) rollUp() {
 		return
 	}
 
-	c.doRollUp(noRollUp, toSecond, rollUpToSecond, time.Second)
-	c.doRollUp(toSecond, toSecond, rollUpToSecond, time.Second)
+	c.doRollUp(pb.RollUpLabel_NO_ROLL_UP, pb.RollUpLabel_ROLL_UP_TO_SECOND, rollUpToSecond, time.Second)
+	c.doRollUp(pb.RollUpLabel_ROLL_UP_TO_SECOND, pb.RollUpLabel_ROLL_UP_TO_SECOND, rollUpToSecond, time.Second)
 
-	c.doRollUp(toSecond, toMinute, rollUpSecondToMinute, time.Minute)
-	c.doRollUp(toMinute, toMinute, rollUpSecondToMinute, time.Minute)
+	c.doRollUp(pb.RollUpLabel_ROLL_UP_TO_SECOND, pb.RollUpLabel_ROLL_UP_TO_MINUTE, rollUpSecondToMinute, time.Minute)
+	c.doRollUp(pb.RollUpLabel_ROLL_UP_TO_MINUTE, pb.RollUpLabel_ROLL_UP_TO_MINUTE, rollUpSecondToMinute, time.Minute)
 
-	c.doRollUp(toMinute, toHour, rollUpMinuteToHour, time.Hour)
-	c.doRollUp(toHour, toHour, rollUpMinuteToHour, time.Hour)
+	c.doRollUp(pb.RollUpLabel_ROLL_UP_TO_MINUTE, pb.RollUpLabel_ROLL_UP_TO_HOUR, rollUpMinuteToHour, time.Hour)
+	c.doRollUp(pb.RollUpLabel_ROLL_UP_TO_HOUR, pb.RollUpLabel_ROLL_UP_TO_HOUR, rollUpMinuteToHour, time.Hour)
 
-	c.doRollUp(toHour, toDay, rollUpHourToDay, 24*time.Hour)
-	c.doRollUp(toDay, toDay, rollUpHourToDay, 24*time.Hour)
+	c.doRollUp(pb.RollUpLabel_ROLL_UP_TO_HOUR, pb.RollUpLabel_ROLL_UP_TO_DAY, rollUpHourToDay, 24*time.Hour)
+	c.doRollUp(pb.RollUpLabel_ROLL_UP_TO_DAY, pb.RollUpLabel_ROLL_UP_TO_DAY, rollUpHourToDay, 24*time.Hour)
 }
 
-func (c *Counter) doRollUp(fromLabel, toLabel rollUpLabel, rollUpDuration, truncateDuration time.Duration) {
-	newHistory := make([]record, 0)
-	var last *record
-	for _, r := range c.history {
-		if r.label != fromLabel {
-			newHistory = append(newHistory, r)
+func (c *Counter) doRollUp(fromLabel, toLabel pb.RollUpLabel, rollUpDuration, truncateDuration time.Duration) {
+	newHistory := make([]*pb.History, 0)
+	var last *pb.History
+	for _, h := range c.history {
+		// case 1: h should not be rolled up
+		if h.GetRollUp() != fromLabel {
+			newHistory = append(newHistory, h)
 			continue
 		}
-		if time.Since(r.time) <= rollUpDuration {
+		t := time.UnixMilli(h.GetTimeUnixMilli())
+		if time.Since(t) <= rollUpDuration {
 			if last != nil {
-				newHistory = append(newHistory, *last)
+				newHistory = append(newHistory, last)
 				last = nil
 			}
-			newHistory = append(newHistory, r)
+			newHistory = append(newHistory, h)
 			continue
 		}
+
+		// case 2: h should be rolled up
+		t = t.Truncate(truncateDuration)
 		if last == nil {
-			last = &record{
-				time:  r.time.Truncate(truncateDuration),
-				delta: r.delta,
-				label: toLabel,
+			last = &pb.History{
+				TimeUnixMilli: proto.Int64(t.UnixMilli()),
+				Delta:         proto.Int64(h.GetDelta()),
+				RollUp:        toLabel.Enum(),
 			}
 		} else {
-			t := r.time.Truncate(truncateDuration)
-			if last.time.Equal(t) {
-				last.delta += r.delta
+			if last.GetTimeUnixMilli() == t.UnixMilli() {
+				*last.Delta = *last.Delta + h.GetDelta()
 			} else {
-				newHistory = append(newHistory, *last)
-				last = &record{
-					time:  r.time.Truncate(truncateDuration),
-					delta: r.delta,
-					label: toLabel,
+				newHistory = append(newHistory, last)
+				last = &pb.History{
+					TimeUnixMilli: proto.Int64(t.UnixMilli()),
+					Delta:         proto.Int64(h.GetDelta()),
+					RollUp:        toLabel.Enum(),
 				}
 			}
 		}
 	}
 	if last != nil {
-		newHistory = append(newHistory, *last)
+		newHistory = append(newHistory, last)
 	}
 	c.history = newHistory
-}
-
-type record struct {
-	time  time.Time
-	delta int64
-	label rollUpLabel
 }

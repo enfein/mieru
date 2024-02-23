@@ -359,6 +359,20 @@ var serverRunFunc = func(s []string) error {
 		log.SetLevel(loggingLevel)
 	}
 
+	// Load previous metrics if possible.
+	if err := os.MkdirAll("/var/lib/mita", 0775); err == nil {
+		const metricsDumpPath = "/var/lib/mita/metrics.pb"
+		metrics.SetMetricsDumpFilePath(metricsDumpPath)
+		if err := metrics.LoadMetricsFromDump(); err == nil {
+			log.Infof("Loaded previous metrics from %s", metricsDumpPath)
+		} else {
+			log.Infof("Failed to load previous metrics from %s: %v", metricsDumpPath, err)
+		}
+		if err := metrics.EnableMetricsDump(); err != nil {
+			log.Warnf("Failed to enable metrics dump: %v", err)
+		}
+	}
+
 	// Disable client side metrics.
 	if clientDecryptionMetricGroup := metrics.GetMetricGroupByName(cipher.ClientDecryptionMetricGroupName); clientDecryptionMetricGroup != nil {
 		clientDecryptionMetricGroup.DisableLogging()
@@ -524,8 +538,8 @@ var serverApplyConfigFunc = func(s []string) error {
 		return fmt.Errorf("os.ReadFile(%q) failed: %w", path, err)
 	}
 	patch := &appctlpb.ServerConfig{}
-	if err = appctl.Unmarshal(b, patch); err != nil {
-		return fmt.Errorf("protojson.Unmarshal() failed: %w", err)
+	if err = util.UnmarshalJSON(b, patch); err != nil {
+		return fmt.Errorf("util.UnmarshalJSON() failed: %w", err)
 	}
 	if err := appctl.ValidateServerConfigPatch(patch); err != nil {
 		return fmt.Errorf(stderror.ValidateServerConfigPatchFailedErr, err)
@@ -563,9 +577,9 @@ var serverDescribeConfigFunc = func(s []string) error {
 	if err != nil {
 		return fmt.Errorf(stderror.GetServerConfigFailedErr, err)
 	}
-	jsonBytes, err := appctl.Marshal(config)
+	jsonBytes, err := util.MarshalJSON(config)
 	if err != nil {
-		return fmt.Errorf("protojson.Marshal() failed: %w", err)
+		return fmt.Errorf("util.MarshalJSON() failed: %w", err)
 	}
 	log.Infof("%s", string(jsonBytes))
 	return nil

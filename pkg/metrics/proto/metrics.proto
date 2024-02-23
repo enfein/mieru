@@ -1,0 +1,57 @@
+// Copyright (C) 2024  mieru authors
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+syntax = "proto3";
+
+package metrics;
+
+option go_package = "github.com/enfein/mieru/pkg/metrics/metricspb";
+
+message AllMetrics {
+    repeated MetricGroup groups = 1;
+}
+
+message MetricGroup {
+    optional string name = 1;
+    repeated Metric metrics = 2;
+}
+
+message Metric {
+    optional string name = 1;
+    optional MetricType type = 2;
+    optional int64 value = 3;
+    repeated History history = 4;
+}
+
+enum MetricType {
+    UNSPECIFIED = 0;
+    COUNTER = 1;
+    COUNTER_TIME_SERIES = 2; // only this type has history
+    GAUGE = 3;
+}
+
+message History {
+    optional int64 timeUnixMilli = 1;
+    optional int64 delta = 2;
+    optional RollUpLabel rollUp = 3;
+}
+
+enum RollUpLabel {
+    NO_ROLL_UP = 0;
+    ROLL_UP_TO_SECOND = 1;
+    ROLL_UP_TO_MINUTE = 2;
+    ROLL_UP_TO_HOUR = 3;
+    ROLL_UP_TO_DAY = 4;
+}

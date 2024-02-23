@@ -91,7 +91,7 @@ func TestRollUp(t *testing.T) {
 	}
 	var sum int64
 	for _, r := range c.history {
-		sum += r.delta
+		sum += r.GetDelta()
 	}
 	if sum != total {
 		t.Errorf("History sum up to %d, want %d", sum, total)

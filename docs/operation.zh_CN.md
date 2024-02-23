@@ -5,9 +5,9 @@
 可以在客户端运行 `mieru get connections` 指令查看当前客户端与服务器之间的连接。该指令输出的一个示例如下。
 
 ```
-Session ID  Protocol  Local       Remote              State        Recv Q+Buf  Send Q+Buf  Last Recv  Last Send
-2187011369  UDP       [::]:59998  1.2.3.4:5678        ESTABLISHED  0+0         0+1         1s         1s
-1466481848  UDP       [::]:59999  1.2.3.4:5678        ESTABLISHED  0+0         0+1         3s         3s
+Session ID  Protocol  Local       Remote        State        Recv Q+Buf  Send Q+Buf  Last Recv  Last Send
+2187011369  UDP       [::]:59998  1.2.3.4:5678  ESTABLISHED  0+0         0+1         1s         1s
+1466481848  UDP       [::]:59999  1.2.3.4:5678  ESTABLISHED  0+0         0+1         3s         3s
 ```
 
 类似的，可以在服务器运行 `mita get connections` 指令查看当前服务器与所有客户端之间的连接。
@@ -77,7 +77,7 @@ mieru start
 
 要确定连接是否正常，可以查看客户端指标。要获取指标，请运行命令 `mieru get metrics`。在下面的例子中，
 
-```
+```json
 {
     "cipher - client": {
         "DirectDecrypt": 25683,
@@ -142,6 +142,14 @@ mieru 为了防止 GFW 主动探测，增强了服务器端的隐蔽性，但是
 5. 打开客户端和服务器的调试日志，查看具体的网络连接情况。
 
 如果未能解决问题，可以提交 GitHub Issue 联系开发者。
+
+## 重置服务器指标
+
+服务器指标存储在文件 `/var/lib/mita/metrics.pb` 文件中。如果想重置指标，可以运行下面的命令：
+
+```sh
+sudo systemctl stop mita && sudo rm -f /var/lib/mita/metrics.pb && sudo systemctl start mita
+```
 
 ## 环境变量
 

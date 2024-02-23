@@ -32,7 +32,7 @@ PROJECT_NAME=$(shell basename "${ROOT}")
 # - pkg/version/current.go
 #
 # Use `tools/bump_version.sh` script to change all those files at one shot.
-VERSION="2.4.0"
+VERSION="2.5.0"
 
 # Build binaries and installation packages.
 .PHONY: build
@@ -389,17 +389,16 @@ protobuf:
 		--go_out="${ROOT}/pkg/appctl" --go_opt=module="github.com/enfein/mieru/pkg/appctl" \
 		--go-grpc_out="${ROOT}/pkg/appctl" --go-grpc_opt=module="github.com/enfein/mieru/pkg/appctl" \
 		--proto_path="${ROOT}/pkg" \
+		"${ROOT}/pkg/appctl/proto/base.proto" \
 		"${ROOT}/pkg/appctl/proto/clientcfg.proto" \
-		"${ROOT}/pkg/appctl/proto/debug.proto" \
-		"${ROOT}/pkg/appctl/proto/egress.proto" \
-		"${ROOT}/pkg/appctl/proto/empty.proto" \
-		"${ROOT}/pkg/appctl/proto/endpoint.proto" \
-		"${ROOT}/pkg/appctl/proto/lifecycle.proto" \
-		"${ROOT}/pkg/appctl/proto/logging.proto" \
-		"${ROOT}/pkg/appctl/proto/metrics.proto" \
-		"${ROOT}/pkg/appctl/proto/multiplexing.proto" \
-		"${ROOT}/pkg/appctl/proto/servercfg.proto" \
-		"${ROOT}/pkg/appctl/proto/user.proto"
+		"${ROOT}/pkg/appctl/proto/misc.proto" \
+		"${ROOT}/pkg/appctl/proto/rpc.proto" \
+		"${ROOT}/pkg/appctl/proto/servercfg.proto"
+
+	PATH=${PATH}:"${ROOT}/tools/build" ${ROOT}/tools/build/protoc -I="${ROOT}/pkg/metrics/proto" \
+		--go_out="${ROOT}/pkg/metrics" --go_opt=module="github.com/enfein/mieru/pkg/metrics" \
+		--proto_path="${ROOT}/pkg" \
+		"${ROOT}/pkg/metrics/proto/metrics.proto"
 
 # Package source code.
 .PHONY: src

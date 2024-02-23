@@ -17,19 +17,9 @@ syntax = "proto3";
 
 package appctl;
 
-import "egress.proto";
-import "empty.proto";
-import "endpoint.proto";
-import "logging.proto";
-import "user.proto";
+import "base.proto";
 
 option go_package = "github.com/enfein/mieru/pkg/appctl/appctlpb";
-
-message ServerAdvancedSettings {
-    // Allow using socks5 to access resources served in localhost.
-    // This option should be set to false unless required due to testing purpose.
-    optional bool allowLocalDestination = 1;
-}
 
 message ServerConfig {
     // Server's port-protocol bindings.
@@ -52,10 +42,62 @@ message ServerConfig {
     optional Egress egress = 6;
 }
 
-service ServerConfigService {
-    // Fetch the server config.
-    rpc GetConfig(Empty) returns (ServerConfig);
+message ServerAdvancedSettings {
+    // Allow using socks5 to access resources served in localhost.
+    // This option should be set to false unless required due to testing purpose.
+    optional bool allowLocalDestination = 1;
+}
 
-    // Update server config.
-    rpc SetConfig(ServerConfig) returns (ServerConfig);
+message Egress {
+    // A list of proxies.
+    repeated EgressProxy proxies = 1;
+
+    // A list of rules.
+    // If no rule is matched, the default action is DIRECT.
+    repeated EgressRule rules = 2;
+}
+
+message EgressProxy {
+    optional string name = 1;
+
+    optional ProxyProtocol protocol = 2;
+
+    // Proxy IP address or domain name.
+    optional string host = 3;
+
+    // Proxy port number.
+    optional int32 port = 4;
+}
+
+enum ProxyProtocol {
+    UNKNOWN_PROXY_PROTOCOL = 0;
+    SOCKS5_PROXY_PROTOCOL = 1;
+}
+
+message EgressRule {
+    // A list of CIDR to match the rule.
+    // Use "*" to match all IP addresses.
+    repeated string ipRanges = 1;
+
+    // A list of domain names to match the rule.
+    // Use "*" to match all domain names.
+    repeated string domainNames = 2;
+
+    // The action to do when the rule is matched.
+    optional EgressAction action = 3;
+
+    // The name of proxy to connect.
+    // This is required when the action is PROXY.
+    optional string proxyName = 4;
+}
+
+enum EgressAction {
+    // Use proxy to connect to the destination.
+    PROXY = 0;
+
+    // Directly connect to the destination.
+    DIRECT = 1;
+
+    // Do not connect to the destination.
+    REJECT = 2;
 }

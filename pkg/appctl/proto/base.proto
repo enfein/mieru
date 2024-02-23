@@ -1,4 +1,4 @@
-// Copyright (C) 2021  mieru authors
+// Copyright (C) 2024  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -18,6 +18,70 @@ syntax = "proto3";
 package appctl;
 
 option go_package = "github.com/enfein/mieru/pkg/appctl/appctlpb";
+
+message Empty {}
+
+message AppStatusMsg {
+    optional AppStatus status = 1;
+}
+
+enum AppStatus {
+    UNKNOWN = 0;
+
+    // RPC service is available, but proxy is not started.
+    IDLE = 1;
+
+    // Proxy is starting.
+    STARTING = 2;
+
+    // Proxy is running.
+    RUNNING = 3;
+
+    // Proxy is being stopped.
+    STOPPING = 4;
+}
+
+enum LoggingLevel {
+    DEFAULT = 0;
+    FATAL = 1;
+    ERROR = 2;
+    WARN = 3;
+    INFO = 4;
+    DEBUG = 5;
+    TRACE = 6;
+}
+
+message ServerEndpoint {
+    // String representation of IP address.
+    // It can be either IPv4 or IPv6.
+    optional string ipAddress = 1;
+
+    // Server's full qualified domain name.
+    // When this is set, the `ipAddress` field is ignored.
+    optional string domainName = 2;
+
+    // Server's port-protocol bindings.
+    repeated PortBinding portBindings = 3;
+}
+
+message PortBinding {
+    // A single port number.
+    // This field can't be set with portRange at the same time.
+    optional int32 port = 1;
+
+    optional TransportProtocol protocol = 2;
+
+    // A port number range.
+    // For example, "8000-9000" contains 1001 ports from 8000 to 9000.
+    // This field can't be set with port at the same time.
+    optional string portRange = 3;
+}
+
+enum TransportProtocol {
+    UNKNOWN_TRANSPORT_PROTOCOL = 0;
+    UDP = 1;
+    TCP = 2;
+}
 
 message User {
 

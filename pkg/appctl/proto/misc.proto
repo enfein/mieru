@@ -1,4 +1,4 @@
-// Copyright (C) 2023  mieru authors
+// Copyright (C) 2024  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -19,15 +19,22 @@ package appctl;
 
 option go_package = "github.com/enfein/mieru/pkg/appctl/appctlpb";
 
-enum MultiplexingLevel {
-    MULTIPLEXING_DEFAULT = 0;
-    MULTIPLEXING_OFF = 1;
-    MULTIPLEXING_LOW = 2;
-    MULTIPLEXING_MIDDLE = 3;
-    MULTIPLEXING_HIGH = 4;
+message Metrics {
+    // JSON dump of metrics.
+    optional string json = 1;
 }
 
-message MultiplexingConfig {
-    // How frequent a network connection is reused.
-    optional MultiplexingLevel level = 1;
+message ProfileSavePath {
+    // Location to save profile results.
+    optional string filePath = 1;
+}
+
+message SessionInfo {
+    // Table of sessions.
+    repeated string table = 1;
+}
+
+message ThreadDump {
+    // Full thread dump of the application.
+    optional string threadDump = 1;
 }

@@ -33,6 +33,7 @@ import (
 	"github.com/enfein/mieru/pkg/protocolv2"
 	"github.com/enfein/mieru/pkg/socks5"
 	"github.com/enfein/mieru/pkg/stderror"
+	"github.com/enfein/mieru/pkg/util"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 )
@@ -192,9 +193,9 @@ func GetJSONClientConfig() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("LoadClientConfig() failed: %w", err)
 	}
-	b, err := jsonMarshalOption.Marshal(config)
+	b, err := util.MarshalJSON(config)
 	if err != nil {
-		return "", fmt.Errorf("protojson.Marshal() failed: %w", err)
+		return "", fmt.Errorf("util.MarshalJSON() failed: %w", err)
 	}
 	return string(b), nil
 }
@@ -246,8 +247,8 @@ func LoadClientConfig() (*pb.ClientConfig, error) {
 			return nil, fmt.Errorf("proto.Unmarshal() failed: %w", err)
 		}
 	case JSON_CONFIG_FILE_TYPE:
-		if err := Unmarshal(b, c); err != nil {
-			return nil, fmt.Errorf("Unmarshal() failed: %w", err)
+		if err := util.UnmarshalJSON(b, c); err != nil {
+			return nil, fmt.Errorf("util.UnmarshalJSON() failed: %w", err)
 		}
 	default:
 		return nil, fmt.Errorf("config file type is invalid")
@@ -280,8 +281,8 @@ func StoreClientConfig(config *pb.ClientConfig) error {
 			return fmt.Errorf("proto.Marshal() failed: %w", err)
 		}
 	case JSON_CONFIG_FILE_TYPE:
-		if b, err = Marshal(config); err != nil {
-			return fmt.Errorf("Marshal() failed: %w", err)
+		if b, err = util.MarshalJSON(config); err != nil {
+			return fmt.Errorf("util.MarshalJSON() failed: %w", err)
 		}
 	default:
 		return fmt.Errorf("config file type is invalid")
@@ -302,8 +303,8 @@ func ApplyJSONClientConfig(path string) error {
 		return fmt.Errorf("os.ReadFile(%q) failed: %w", path, err)
 	}
 	c := &pb.ClientConfig{}
-	if err = jsonUnmarshalOption.Unmarshal(b, c); err != nil {
-		return fmt.Errorf("protojson.Unmarshal() failed: %w", err)
+	if err = util.UnmarshalJSON(b, c); err != nil {
+		return fmt.Errorf("util.UnmarshalJSON() failed: %w", err)
 	}
 	return applyClientConfig(c)
 }

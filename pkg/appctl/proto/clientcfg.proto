@@ -17,32 +17,9 @@ syntax = "proto3";
 
 package appctl;
 
-import "endpoint.proto";
-import "logging.proto";
-import "multiplexing.proto";
-import "user.proto";
+import "base.proto";
 
 option go_package = "github.com/enfein/mieru/pkg/appctl/appctlpb";
-
-message ClientProfile {
-    // Client profile name.
-    optional string profileName = 1;
-
-    // User information.
-    optional User user = 2;
-
-    // A list of servers to connect.
-    repeated ServerEndpoint servers = 3;
-
-    // Maximum transmission unit of L2 payload.
-    // This setting only applies to UDP protocol egress traffic.
-    optional int32 mtu = 4;
-
-    // Multiplexing behaviors.
-    optional MultiplexingConfig multiplexing = 5;
-}
-
-message ClientAdvancedSettings {}
 
 message ClientConfig {
     // A list of known client profiles.
@@ -72,3 +49,36 @@ message ClientConfig {
     // If set, the HTTP proxy port listens to LAN rather than localhost.
     optional bool httpProxyListenLAN = 9;
 }
+
+message ClientProfile {
+    // Client profile name.
+    optional string profileName = 1;
+
+    // User information.
+    optional User user = 2;
+
+    // A list of servers to connect.
+    repeated ServerEndpoint servers = 3;
+
+    // Maximum transmission unit of L2 payload.
+    // This setting only applies to UDP protocol egress traffic.
+    optional int32 mtu = 4;
+
+    // Multiplexing behaviors.
+    optional MultiplexingConfig multiplexing = 5;
+}
+
+message MultiplexingConfig {
+    // How frequent a network connection is reused.
+    optional MultiplexingLevel level = 1;
+}
+
+enum MultiplexingLevel {
+    MULTIPLEXING_DEFAULT = 0;
+    MULTIPLEXING_OFF = 1;
+    MULTIPLEXING_LOW = 2;
+    MULTIPLEXING_MIDDLE = 3;
+    MULTIPLEXING_HIGH = 4;
+}
+
+message ClientAdvancedSettings {}

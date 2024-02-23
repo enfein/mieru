@@ -19,7 +19,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/enfein/mieru/pkg/appctl/appctlpb"
+	pb "github.com/enfein/mieru/pkg/appctl/appctlpb"
+	"github.com/enfein/mieru/pkg/util"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -44,7 +45,7 @@ func TestApply2ClientConfig(t *testing.T) {
 	if err := deleteClientConfigFile(); err != nil {
 		t.Fatalf("failed to delete client config file")
 	}
-	if err := StoreClientConfig(&appctlpb.ClientConfig{}); err != nil {
+	if err := StoreClientConfig(&pb.ClientConfig{}); err != nil {
 		t.Fatalf("failed to create empty client config file")
 	}
 	if err := ApplyJSONClientConfig(configFile2); err != nil {
@@ -55,8 +56,8 @@ func TestApply2ClientConfig(t *testing.T) {
 		t.Errorf("LoadClientConfig() failed: %v", err)
 	}
 	if !proto.Equal(merged, want) {
-		mergedJSON, _ := jsonMarshalOption.Marshal(merged)
-		wantJSON, _ := jsonMarshalOption.Marshal(want)
+		mergedJSON, _ := util.MarshalJSON(merged)
+		wantJSON, _ := util.MarshalJSON(want)
 		t.Errorf("client config doesn't equal:\ngot = %v\nwant = %v", string(mergedJSON), string(wantJSON))
 	}
 
@@ -139,7 +140,7 @@ func TestClientStoreConfigToJSON(t *testing.T) {
 	defer os.Unsetenv("MIERU_CONFIG_JSON_FILE")
 
 	// Store JSON configuration file.
-	if err := StoreClientConfig(&appctlpb.ClientConfig{}); err != nil {
+	if err := StoreClientConfig(&pb.ClientConfig{}); err != nil {
 		t.Fatalf("StoreClientConfig() failed: %v", err)
 	}
 	if _, err := os.Stat(configFilePath); err != nil {
@@ -172,7 +173,7 @@ func TestClientDeleteProfile(t *testing.T) {
 	if err := deleteClientConfigFile(); err != nil {
 		t.Fatalf("failed to delete client config file")
 	}
-	if err := StoreClientConfig(&appctlpb.ClientConfig{}); err != nil {
+	if err := StoreClientConfig(&pb.ClientConfig{}); err != nil {
 		t.Fatalf("failed to create empty client config file")
 	}
 	if err := ApplyJSONClientConfig(wantFile); err != nil {
@@ -183,8 +184,8 @@ func TestClientDeleteProfile(t *testing.T) {
 		t.Errorf("LoadClientConfig() failed: %v", err)
 	}
 	if !proto.Equal(got, want) {
-		gotJSON, _ := jsonMarshalOption.Marshal(got)
-		wantJSON, _ := jsonMarshalOption.Marshal(want)
+		gotJSON, _ := util.MarshalJSON(got)
+		wantJSON, _ := util.MarshalJSON(want)
 		t.Errorf("client config doesn't equal:\ngot = %v\nwant = %v", string(gotJSON), string(wantJSON))
 	}
 
@@ -214,7 +215,7 @@ func beforeClientTest(t *testing.T) {
 	if err := deleteClientConfigFile(); err != nil {
 		t.Fatalf("failed to clean client config file before the test")
 	}
-	if err := StoreClientConfig(&appctlpb.ClientConfig{}); err != nil {
+	if err := StoreClientConfig(&pb.ClientConfig{}); err != nil {
 		t.Fatalf("failed to create empty client config file before the test")
 	}
 }

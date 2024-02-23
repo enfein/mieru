@@ -5,9 +5,9 @@
 You can run `mieru get connections` command on the client to view the current connections between client and server. An example of the command output is as follows.
 
 ```
-Session ID  Protocol  Local       Remote              State        Recv Q+Buf  Send Q+Buf  Last Recv  Last Send
-2187011369  UDP       [::]:59998  1.2.3.4:5678        ESTABLISHED  0+0         0+1         1s         1s
-1466481848  UDP       [::]:59999  1.2.3.4:5678        ESTABLISHED  0+0         0+1         3s         3s
+Session ID  Protocol  Local       Remote        State        Recv Q+Buf  Send Q+Buf  Last Recv  Last Send
+2187011369  UDP       [::]:59998  1.2.3.4:5678  ESTABLISHED  0+0         0+1         1s         1s
+1466481848  UDP       [::]:59999  1.2.3.4:5678  ESTABLISHED  0+0         0+1         3s         3s
 ```
 
 Similarly, you can run `mita get connections` command on the server to view the current connections between the server and all clients.
@@ -77,7 +77,7 @@ mieru start
 
 To determine if the connectivity is OK, you can look at the client metrics. To get the metrics, run command `mieru get metrics`. In the following example,
 
-```
+```json
 {
     "cipher - client": {
         "DirectDecrypt": 25683,
@@ -142,6 +142,14 @@ mieru enhances server-side stealth in order to prevent GFW active probing, but i
 5. Open the debug logs for both the client and server to see exactly what is happening with your network connection.
 
 If you can't solve the problem, you can submit a GitHub issue to contact the developers.
+
+## Reset Server Metrics
+
+Server metrics are stored in the file `/var/lib/mita/metrics.pb`. If you want to reset the metrics, you can run the following command:
+
+```sh
+sudo systemctl stop mita && sudo rm -f /var/lib/mita/metrics.pb && sudo systemctl start mita
+```
 
 ## Environment Variables
 

@@ -1,4 +1,4 @@
-// Copyright (C) 2021  mieru authors
+// Copyright (C) 2024  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,16 +13,30 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-syntax = "proto3";
+package metrics
 
-package appctl;
+import (
+	"errors"
+	"os"
+	"path/filepath"
+	"testing"
+)
 
-option go_package = "github.com/enfein/mieru/pkg/appctl/appctlpb";
+func TestMetricsDump(t *testing.T) {
+	dumpPath := filepath.Join(t.TempDir(), "metrics.pb")
+	SetMetricsDumpFilePath(dumpPath)
+	if err := EnableMetricsDump(); err != nil {
+		t.Fatalf("EnableMetricsDump(): %v", err)
+	}
+	DisableMetricsDump()
 
-message ThreadDump {
-    optional string threadDump = 1;
-}
-
-message ProfileSavePath {
-    optional string filePath = 1;
+	if err := DumpMetricsNow(); err != nil {
+		t.Fatalf("DumpMetricsNow(): %v", err)
+	}
+	if _, err := os.Stat(dumpPath); errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("Dump file %s doesn't exist.", dumpPath)
+	}
+	if err := LoadMetricsFromDump(); err != nil {
+		t.Fatalf("LoadMetricsFromDump(): %v", err)
+	}
 }

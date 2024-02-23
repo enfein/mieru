@@ -1,4 +1,4 @@
-// Copyright (C) 2021  mieru authors
+// Copyright (C) 2024  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -17,31 +17,11 @@ syntax = "proto3";
 
 package appctl;
 
-import "debug.proto";
-import "empty.proto";
-import "metrics.proto";
+import "base.proto";
+import "misc.proto";
+import "servercfg.proto";
 
 option go_package = "github.com/enfein/mieru/pkg/appctl/appctlpb";
-
-enum AppStatus {
-    UNKNOWN = 0;
-
-    // RPC service is available, but proxy is not started.
-    IDLE = 1;
-
-    // Proxy is starting.
-    STARTING = 2;
-
-    // Proxy is running.
-    RUNNING = 3;
-
-    // Proxy is being stopped.
-    STOPPING = 4;
-}
-
-message AppStatusMsg {
-    optional AppStatus status = 1;
-}
 
 service ClientLifecycleService {
     // Fetch client application status.
@@ -102,4 +82,12 @@ service ServerLifecycleService {
 
     // Generate a heap profile.
     rpc GetHeapProfile(ProfileSavePath) returns (Empty);
+}
+
+service ServerConfigService {
+    // Fetch the server config.
+    rpc GetConfig(Empty) returns (ServerConfig);
+
+    // Update server config.
+    rpc SetConfig(ServerConfig) returns (ServerConfig);
 }
