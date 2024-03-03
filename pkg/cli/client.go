@@ -178,6 +178,13 @@ func RegisterClientCommands() {
 		clientGetHeapProfileFunc,
 	)
 	RegisterCallback(
+		[]string{"", "get", "memory-statistics"},
+		func(s []string) error {
+			return unexpectedArgsError(s, 3)
+		},
+		clientGetMemoryStatisticsFunc,
+	)
+	RegisterCallback(
 		[]string{"", "profile", "cpu", "start"},
 		func(s []string) error {
 			if len(s) < 5 {
@@ -267,6 +274,10 @@ var clientHelpFunc = func(s []string) error {
 			{
 				cmd:  "get heap-profile <GZ_FILE>",
 				help: "Get mieru client heap profile and save results to the file.",
+			},
+			{
+				cmd:  "get memory-statistics",
+				help: "Get mieru client memory statistics.",
 			},
 			{
 				cmd:  "profile cpu start <GZ_FILE>",
@@ -714,6 +725,26 @@ var clientGetHeapProfileFunc = func(s []string) error {
 		return fmt.Errorf(stderror.GetHeapProfileFailedErr, err)
 	}
 	log.Infof("heap profile is saved to %q", s[3])
+	return nil
+}
+
+var clientGetMemoryStatisticsFunc = func(s []string) error {
+	if err := appctl.IsClientDaemonRunning(context.Background()); err != nil {
+		log.Infof(stderror.ClientNotRunning)
+		return nil
+	}
+
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
+	defer cancelFunc()
+	client, err := appctl.NewClientLifecycleRPCClient(timedctx)
+	if err != nil {
+		return fmt.Errorf(stderror.CreateClientLifecycleRPCClientFailedErr, err)
+	}
+	memStats, err := client.GetMemoryStatistics(timedctx, &appctlpb.Empty{})
+	if err != nil {
+		return fmt.Errorf(stderror.GetMemoryStatisticsFailedErr, err)
+	}
+	log.Infof("%s", memStats.GetJson())
 	return nil
 }
 

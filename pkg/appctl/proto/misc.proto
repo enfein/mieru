@@ -38,3 +38,8 @@ message ThreadDump {
     // Full thread dump of the application.
     optional string threadDump = 1;
 }
+
+message MemoryStatistics {
+    // JSON dump of memory statistics.
+    optional string json = 1;
+}

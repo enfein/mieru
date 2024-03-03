@@ -34,14 +34,15 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	ClientLifecycleService_GetStatus_FullMethodName       = "/appctl.ClientLifecycleService/GetStatus"
-	ClientLifecycleService_Exit_FullMethodName            = "/appctl.ClientLifecycleService/Exit"
-	ClientLifecycleService_GetMetrics_FullMethodName      = "/appctl.ClientLifecycleService/GetMetrics"
-	ClientLifecycleService_GetSessionInfo_FullMethodName  = "/appctl.ClientLifecycleService/GetSessionInfo"
-	ClientLifecycleService_GetThreadDump_FullMethodName   = "/appctl.ClientLifecycleService/GetThreadDump"
-	ClientLifecycleService_StartCPUProfile_FullMethodName = "/appctl.ClientLifecycleService/StartCPUProfile"
-	ClientLifecycleService_StopCPUProfile_FullMethodName  = "/appctl.ClientLifecycleService/StopCPUProfile"
-	ClientLifecycleService_GetHeapProfile_FullMethodName  = "/appctl.ClientLifecycleService/GetHeapProfile"
+	ClientLifecycleService_GetStatus_FullMethodName           = "/appctl.ClientLifecycleService/GetStatus"
+	ClientLifecycleService_Exit_FullMethodName                = "/appctl.ClientLifecycleService/Exit"
+	ClientLifecycleService_GetMetrics_FullMethodName          = "/appctl.ClientLifecycleService/GetMetrics"
+	ClientLifecycleService_GetSessionInfo_FullMethodName      = "/appctl.ClientLifecycleService/GetSessionInfo"
+	ClientLifecycleService_GetThreadDump_FullMethodName       = "/appctl.ClientLifecycleService/GetThreadDump"
+	ClientLifecycleService_StartCPUProfile_FullMethodName     = "/appctl.ClientLifecycleService/StartCPUProfile"
+	ClientLifecycleService_StopCPUProfile_FullMethodName      = "/appctl.ClientLifecycleService/StopCPUProfile"
+	ClientLifecycleService_GetHeapProfile_FullMethodName      = "/appctl.ClientLifecycleService/GetHeapProfile"
+	ClientLifecycleService_GetMemoryStatistics_FullMethodName = "/appctl.ClientLifecycleService/GetMemoryStatistics"
 )
 
 // ClientLifecycleServiceClient is the client API for ClientLifecycleService service.
@@ -64,6 +65,8 @@ type ClientLifecycleServiceClient interface {
 	StopCPUProfile(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 	// Generate a heap profile.
 	GetHeapProfile(ctx context.Context, in *ProfileSavePath, opts ...grpc.CallOption) (*Empty, error)
+	// Get memory statistics of client daemon.
+	GetMemoryStatistics(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MemoryStatistics, error)
 }
 
 type clientLifecycleServiceClient struct {
@@ -146,6 +149,15 @@ func (c *clientLifecycleServiceClient) GetHeapProfile(ctx context.Context, in *P
 	return out, nil
 }
 
+func (c *clientLifecycleServiceClient) GetMemoryStatistics(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MemoryStatistics, error) {
+	out := new(MemoryStatistics)
+	err := c.cc.Invoke(ctx, ClientLifecycleService_GetMemoryStatistics_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ClientLifecycleServiceServer is the server API for ClientLifecycleService service.
 // All implementations must embed UnimplementedClientLifecycleServiceServer
 // for forward compatibility
@@ -166,6 +178,8 @@ type ClientLifecycleServiceServer interface {
 	StopCPUProfile(context.Context, *Empty) (*Empty, error)
 	// Generate a heap profile.
 	GetHeapProfile(context.Context, *ProfileSavePath) (*Empty, error)
+	// Get memory statistics of client daemon.
+	GetMemoryStatistics(context.Context, *Empty) (*MemoryStatistics, error)
 	mustEmbedUnimplementedClientLifecycleServiceServer()
 }
 
@@ -196,6 +210,9 @@ func (UnimplementedClientLifecycleServiceServer) StopCPUProfile(context.Context,
 }
 func (UnimplementedClientLifecycleServiceServer) GetHeapProfile(context.Context, *ProfileSavePath) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetHeapProfile not implemented")
+}
+func (UnimplementedClientLifecycleServiceServer) GetMemoryStatistics(context.Context, *Empty) (*MemoryStatistics, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetMemoryStatistics not implemented")
 }
 func (UnimplementedClientLifecycleServiceServer) mustEmbedUnimplementedClientLifecycleServiceServer() {
 }
@@ -355,6 +372,24 @@ func _ClientLifecycleService_GetHeapProfile_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ClientLifecycleService_GetMemoryStatistics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClientLifecycleServiceServer).GetMemoryStatistics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ClientLifecycleService_GetMemoryStatistics_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClientLifecycleServiceServer).GetMemoryStatistics(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ClientLifecycleService_ServiceDesc is the grpc.ServiceDesc for ClientLifecycleService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -394,23 +429,28 @@ var ClientLifecycleService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "GetHeapProfile",
 			Handler:    _ClientLifecycleService_GetHeapProfile_Handler,
 		},
+		{
+			MethodName: "GetMemoryStatistics",
+			Handler:    _ClientLifecycleService_GetMemoryStatistics_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "rpc.proto",
 }
 
 const (
-	ServerLifecycleService_GetStatus_FullMethodName       = "/appctl.ServerLifecycleService/GetStatus"
-	ServerLifecycleService_Start_FullMethodName           = "/appctl.ServerLifecycleService/Start"
-	ServerLifecycleService_Stop_FullMethodName            = "/appctl.ServerLifecycleService/Stop"
-	ServerLifecycleService_Reload_FullMethodName          = "/appctl.ServerLifecycleService/Reload"
-	ServerLifecycleService_Exit_FullMethodName            = "/appctl.ServerLifecycleService/Exit"
-	ServerLifecycleService_GetMetrics_FullMethodName      = "/appctl.ServerLifecycleService/GetMetrics"
-	ServerLifecycleService_GetSessionInfo_FullMethodName  = "/appctl.ServerLifecycleService/GetSessionInfo"
-	ServerLifecycleService_GetThreadDump_FullMethodName   = "/appctl.ServerLifecycleService/GetThreadDump"
-	ServerLifecycleService_StartCPUProfile_FullMethodName = "/appctl.ServerLifecycleService/StartCPUProfile"
-	ServerLifecycleService_StopCPUProfile_FullMethodName  = "/appctl.ServerLifecycleService/StopCPUProfile"
-	ServerLifecycleService_GetHeapProfile_FullMethodName  = "/appctl.ServerLifecycleService/GetHeapProfile"
+	ServerLifecycleService_GetStatus_FullMethodName           = "/appctl.ServerLifecycleService/GetStatus"
+	ServerLifecycleService_Start_FullMethodName               = "/appctl.ServerLifecycleService/Start"
+	ServerLifecycleService_Stop_FullMethodName                = "/appctl.ServerLifecycleService/Stop"
+	ServerLifecycleService_Reload_FullMethodName              = "/appctl.ServerLifecycleService/Reload"
+	ServerLifecycleService_Exit_FullMethodName                = "/appctl.ServerLifecycleService/Exit"
+	ServerLifecycleService_GetMetrics_FullMethodName          = "/appctl.ServerLifecycleService/GetMetrics"
+	ServerLifecycleService_GetSessionInfo_FullMethodName      = "/appctl.ServerLifecycleService/GetSessionInfo"
+	ServerLifecycleService_GetThreadDump_FullMethodName       = "/appctl.ServerLifecycleService/GetThreadDump"
+	ServerLifecycleService_StartCPUProfile_FullMethodName     = "/appctl.ServerLifecycleService/StartCPUProfile"
+	ServerLifecycleService_StopCPUProfile_FullMethodName      = "/appctl.ServerLifecycleService/StopCPUProfile"
+	ServerLifecycleService_GetHeapProfile_FullMethodName      = "/appctl.ServerLifecycleService/GetHeapProfile"
+	ServerLifecycleService_GetMemoryStatistics_FullMethodName = "/appctl.ServerLifecycleService/GetMemoryStatistics"
 )
 
 // ServerLifecycleServiceClient is the client API for ServerLifecycleService service.
@@ -439,6 +479,8 @@ type ServerLifecycleServiceClient interface {
 	StopCPUProfile(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 	// Generate a heap profile.
 	GetHeapProfile(ctx context.Context, in *ProfileSavePath, opts ...grpc.CallOption) (*Empty, error)
+	// Get memory statistics of server daemon.
+	GetMemoryStatistics(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MemoryStatistics, error)
 }
 
 type serverLifecycleServiceClient struct {
@@ -548,6 +590,15 @@ func (c *serverLifecycleServiceClient) GetHeapProfile(ctx context.Context, in *P
 	return out, nil
 }
 
+func (c *serverLifecycleServiceClient) GetMemoryStatistics(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MemoryStatistics, error) {
+	out := new(MemoryStatistics)
+	err := c.cc.Invoke(ctx, ServerLifecycleService_GetMemoryStatistics_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ServerLifecycleServiceServer is the server API for ServerLifecycleService service.
 // All implementations must embed UnimplementedServerLifecycleServiceServer
 // for forward compatibility
@@ -574,6 +625,8 @@ type ServerLifecycleServiceServer interface {
 	StopCPUProfile(context.Context, *Empty) (*Empty, error)
 	// Generate a heap profile.
 	GetHeapProfile(context.Context, *ProfileSavePath) (*Empty, error)
+	// Get memory statistics of server daemon.
+	GetMemoryStatistics(context.Context, *Empty) (*MemoryStatistics, error)
 	mustEmbedUnimplementedServerLifecycleServiceServer()
 }
 
@@ -613,6 +666,9 @@ func (UnimplementedServerLifecycleServiceServer) StopCPUProfile(context.Context,
 }
 func (UnimplementedServerLifecycleServiceServer) GetHeapProfile(context.Context, *ProfileSavePath) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetHeapProfile not implemented")
+}
+func (UnimplementedServerLifecycleServiceServer) GetMemoryStatistics(context.Context, *Empty) (*MemoryStatistics, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetMemoryStatistics not implemented")
 }
 func (UnimplementedServerLifecycleServiceServer) mustEmbedUnimplementedServerLifecycleServiceServer() {
 }
@@ -826,6 +882,24 @@ func _ServerLifecycleService_GetHeapProfile_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ServerLifecycleService_GetMemoryStatistics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerLifecycleServiceServer).GetMemoryStatistics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerLifecycleService_GetMemoryStatistics_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerLifecycleServiceServer).GetMemoryStatistics(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ServerLifecycleService_ServiceDesc is the grpc.ServiceDesc for ServerLifecycleService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -876,6 +950,10 @@ var ServerLifecycleService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetHeapProfile",
 			Handler:    _ServerLifecycleService_GetHeapProfile_Handler,
+		},
+		{
+			MethodName: "GetMemoryStatistics",
+			Handler:    _ServerLifecycleService_GetMemoryStatistics_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

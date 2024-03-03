@@ -31,6 +31,7 @@ const (
 	GetClientConfigFailedErr                = "get mieru client config failed: %w"
 	GetConnectionsFailedErr                 = "get connections failed: %w"
 	GetHeapProfileFailedErr                 = "get heap profile failed: %w"
+	GetMemoryStatisticsFailedErr            = "get memory statistics failed: %w"
 	GetMetricsFailedErr                     = "get metrics failed: %w"
 	GetServerConfigFailedErr                = "get mieru server config failed: %w"
 	GetServerStatusFailedErr                = "get mieru server status failed: %w"

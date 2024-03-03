@@ -273,6 +273,10 @@ func (s *serverLifecycleService) GetHeapProfile(ctx context.Context, req *pb.Pro
 	return &pb.Empty{}, err
 }
 
+func (s *serverLifecycleService) GetMemoryStatistics(ctx context.Context, req *pb.Empty) (*pb.MemoryStatistics, error) {
+	return &pb.MemoryStatistics{Json: proto.String(getMemoryStats())}, nil
+}
+
 // NewServerLifecycleService creates a new ServerLifecycleService RPC server.
 func NewServerLifecycleService() *serverLifecycleService {
 	return &serverLifecycleService{}

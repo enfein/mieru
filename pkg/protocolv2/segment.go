@@ -89,8 +89,9 @@ type segment struct {
 	metadata  metadata
 	payload   []byte                 // also can be a fragment
 	transport util.TransportProtocol // transport protocol
+	ackCount  byte                   // number of acknowledges before the next transmission
 	txCount   byte                   // number of transmission times
-	txTime    time.Time              // most recent tx time
+	txTime    time.Time              // most recent transmission time
 	txTimeout time.Duration          // need to receive ACK within this duration
 	block     cipher.BlockCipher     // cipher block to encrypt or decrypt the payload
 }
@@ -150,7 +151,7 @@ func (s *segment) Less(other *segment) bool {
 
 func (s *segment) String() string {
 	if s.transport == util.UDPTransport && (!util.IsZeroTime(s.txTime) || s.txTimeout != 0) {
-		return fmt.Sprintf("segment{metadata=%v, realPayloadLen=%v, txCount=%v, txTime=%v, txTimeout=%v}", s.metadata, len(s.payload), s.txCount, s.txTime.Format(segmentTimeFormat), s.txTimeout)
+		return fmt.Sprintf("segment{metadata=%v, realPayloadLen=%v, ackCount=%v, txCount=%v, txTime=%v, txTimeout=%v}", s.metadata, len(s.payload), s.ackCount, s.txCount, s.txTime.Format(segmentTimeFormat), s.txTimeout)
 	}
 	return fmt.Sprintf("segment{metadata=%v, realPayloadLen=%v}", s.metadata, len(s.payload))
 }

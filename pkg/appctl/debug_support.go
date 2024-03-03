@@ -1,6 +1,7 @@
 package appctl
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"runtime"
@@ -75,4 +76,31 @@ func getHeapProfile(filePath string) error {
 		return fmt.Errorf("pprof.WriteHeapProfile() failed: %w", err)
 	}
 	return nil
+}
+
+func getMemoryStats() string {
+	mu.Lock()
+	defer mu.Unlock()
+	runtime.GC()
+	ms := &runtime.MemStats{}
+	runtime.ReadMemStats(ms)
+	type stats struct {
+		HeapBytes       uint64 `json:"heapBytes"`
+		HeapObjects     uint64 `json:"heapObjects"`
+		MaxHeapBytes    uint64 `json:"maxHeapBytes"`
+		TargetHeapBytes uint64 `json:"targetHeapBytes"`
+		StackBytes      uint64 `json:"stackBytes"`
+	}
+	s := stats{
+		HeapBytes:       ms.HeapAlloc,
+		HeapObjects:     ms.HeapObjects,
+		MaxHeapBytes:    ms.HeapSys,
+		TargetHeapBytes: ms.NextGC,
+		StackBytes:      ms.StackSys,
+	}
+	b, err := json.MarshalIndent(&s, "", "    ")
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
 }

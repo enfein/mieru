@@ -165,6 +165,13 @@ func RegisterServerCommands() {
 		serverGetHeapProfileFunc,
 	)
 	RegisterCallback(
+		[]string{"", "get", "memory-statistics"},
+		func(s []string) error {
+			return unexpectedArgsError(s, 3)
+		},
+		serverGetMemoryStatisticsFunc,
+	)
+	RegisterCallback(
 		[]string{"", "profile", "cpu", "start"},
 		func(s []string) error {
 			if len(s) < 5 {
@@ -250,6 +257,10 @@ var serverHelpFunc = func(s []string) error {
 			{
 				cmd:  "get heap-profile <GZ_FILE>",
 				help: "Get mita server heap profile and save results to the file.",
+			},
+			{
+				cmd:  "get memory-statistics",
+				help: "Get mita server memory statistics.",
 			},
 			{
 				cmd:  "profile cpu start <GZ_FILE>",
@@ -507,7 +518,7 @@ var serverStatusFunc = func(s []string) error {
 				cmd := strings.Join(s, " ")
 				return fmt.Errorf("unable to determine the OS user which executed command %q", cmd)
 			}
-			return fmt.Errorf("unable to connect to mita server daemon via %q, please retry after running \"sudo usermod -a -G mita %s\" command and reboot the system", appctl.ServerUDS(), currentUser.Username)
+			return fmt.Errorf("unable to connect to mita server daemon via %q, please retry after running \"sudo usermod -a -G mita %s\" command and logout the system, then login again", appctl.ServerUDS(), currentUser.Username)
 		} else {
 			return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
 		}
@@ -716,6 +727,29 @@ var serverGetHeapProfileFunc = func(s []string) error {
 		return fmt.Errorf(stderror.GetHeapProfileFailedErr, err)
 	}
 	log.Infof("heap profile is saved to %q", s[3])
+	return nil
+}
+
+var serverGetMemoryStatisticsFunc = func(s []string) error {
+	appStatus, err := appctl.GetServerStatusWithRPC(context.Background())
+	if err != nil {
+		return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
+	}
+	if err := appctl.IsServerDaemonRunning(appStatus); err != nil {
+		return fmt.Errorf(stderror.ServerNotRunningErr, err)
+	}
+
+	client, err := appctl.NewServerLifecycleRPCClient()
+	if err != nil {
+		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
+	}
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
+	defer cancelFunc()
+	memStats, err := client.GetMemoryStatistics(timedctx, &appctlpb.Empty{})
+	if err != nil {
+		return fmt.Errorf(stderror.GetMemoryStatisticsFailedErr, err)
+	}
+	log.Infof("%s", memStats.GetJson())
 	return nil
 }
 

@@ -17,6 +17,8 @@
 package main
 
 import (
+	"runtime/debug"
+
 	"github.com/enfein/mieru/pkg/appctl"
 	"github.com/enfein/mieru/pkg/cli"
 	"github.com/enfein/mieru/pkg/log"
@@ -24,6 +26,7 @@ import (
 
 func main() {
 	appctl.SetAppType(appctl.SERVER_APP)
+	debug.SetGCPercent(90)
 	cli.RegisterServerCommands()
 	err := cli.ParseAndExecute()
 	if err != nil {

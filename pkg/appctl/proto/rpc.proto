@@ -47,6 +47,9 @@ service ClientLifecycleService {
 
     // Generate a heap profile.
     rpc GetHeapProfile(ProfileSavePath) returns (Empty);
+
+    // Get memory statistics of client daemon.
+    rpc GetMemoryStatistics(Empty) returns (MemoryStatistics);
 }
 
 service ServerLifecycleService {
@@ -82,6 +85,9 @@ service ServerLifecycleService {
 
     // Generate a heap profile.
     rpc GetHeapProfile(ProfileSavePath) returns (Empty);
+
+    // Get memory statistics of server daemon.
+    rpc GetMemoryStatistics(Empty) returns (MemoryStatistics);
 }
 
 service ServerConfigService {

@@ -101,6 +101,14 @@ fi
 ./mieru get heap-profile /test/mieru.udp.heap.gz
 ./mita get heap-profile /test/mita.udp.heap.gz
 
+# Print memory statistics.
+echo "client memory statistics"
+./mieru get memory-statistics
+sleep 1
+echo "server memory statistics"
+./mita get memory-statistics
+sleep 1
+
 # Stop mieru client.
 ./mieru stop
 if [[ "$?" -ne 0 ]]; then

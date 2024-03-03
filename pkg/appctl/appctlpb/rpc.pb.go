@@ -40,7 +40,7 @@ var file_rpc_proto_rawDesc = []byte{
 	0x0a, 0x09, 0x72, 0x70, 0x63, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x06, 0x61, 0x70, 0x70,
 	0x63, 0x74, 0x6c, 0x1a, 0x0a, 0x62, 0x61, 0x73, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a,
 	0x0a, 0x6d, 0x69, 0x73, 0x63, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x0f, 0x73, 0x65, 0x72,
-	0x76, 0x65, 0x72, 0x63, 0x66, 0x67, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x32, 0xad, 0x03, 0x0a,
+	0x76, 0x65, 0x72, 0x63, 0x66, 0x67, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x32, 0xed, 0x03, 0x0a,
 	0x16, 0x43, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x4c, 0x69, 0x66, 0x65, 0x63, 0x79, 0x63, 0x6c, 0x65,
 	0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x30, 0x0a, 0x09, 0x47, 0x65, 0x74, 0x53, 0x74,
 	0x61, 0x74, 0x75, 0x73, 0x12, 0x0d, 0x2e, 0x61, 0x70, 0x70, 0x63, 0x74, 0x6c, 0x2e, 0x45, 0x6d,
@@ -67,7 +67,11 @@ var file_rpc_proto_rawDesc = []byte{
 	0x74, 0x79, 0x12, 0x38, 0x0a, 0x0e, 0x47, 0x65, 0x74, 0x48, 0x65, 0x61, 0x70, 0x50, 0x72, 0x6f,
 	0x66, 0x69, 0x6c, 0x65, 0x12, 0x17, 0x2e, 0x61, 0x70, 0x70, 0x63, 0x74, 0x6c, 0x2e, 0x50, 0x72,
 	0x6f, 0x66, 0x69, 0x6c, 0x65, 0x53, 0x61, 0x76, 0x65, 0x50, 0x61, 0x74, 0x68, 0x1a, 0x0d, 0x2e,
-	0x61, 0x70, 0x70, 0x63, 0x74, 0x6c, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x32, 0xa2, 0x04, 0x0a,
+	0x61, 0x70, 0x70, 0x63, 0x74, 0x6c, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x12, 0x3e, 0x0a, 0x13,
+	0x47, 0x65, 0x74, 0x4d, 0x65, 0x6d, 0x6f, 0x72, 0x79, 0x53, 0x74, 0x61, 0x74, 0x69, 0x73, 0x74,
+	0x69, 0x63, 0x73, 0x12, 0x0d, 0x2e, 0x61, 0x70, 0x70, 0x63, 0x74, 0x6c, 0x2e, 0x45, 0x6d, 0x70,
+	0x74, 0x79, 0x1a, 0x18, 0x2e, 0x61, 0x70, 0x70, 0x63, 0x74, 0x6c, 0x2e, 0x4d, 0x65, 0x6d, 0x6f,
+	0x72, 0x79, 0x53, 0x74, 0x61, 0x74, 0x69, 0x73, 0x74, 0x69, 0x63, 0x73, 0x32, 0xe2, 0x04, 0x0a,
 	0x16, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x4c, 0x69, 0x66, 0x65, 0x63, 0x79, 0x63, 0x6c, 0x65,
 	0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x30, 0x0a, 0x09, 0x47, 0x65, 0x74, 0x53, 0x74,
 	0x61, 0x74, 0x75, 0x73, 0x12, 0x0d, 0x2e, 0x61, 0x70, 0x70, 0x63, 0x74, 0x6c, 0x2e, 0x45, 0x6d,
@@ -102,7 +106,11 @@ var file_rpc_proto_rawDesc = []byte{
 	0x61, 0x70, 0x50, 0x72, 0x6f, 0x66, 0x69, 0x6c, 0x65, 0x12, 0x17, 0x2e, 0x61, 0x70, 0x70, 0x63,
 	0x74, 0x6c, 0x2e, 0x50, 0x72, 0x6f, 0x66, 0x69, 0x6c, 0x65, 0x53, 0x61, 0x76, 0x65, 0x50, 0x61,
 	0x74, 0x68, 0x1a, 0x0d, 0x2e, 0x61, 0x70, 0x70, 0x63, 0x74, 0x6c, 0x2e, 0x45, 0x6d, 0x70, 0x74,
-	0x79, 0x32, 0x80, 0x01, 0x0a, 0x13, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x43, 0x6f, 0x6e, 0x66,
+	0x79, 0x12, 0x3e, 0x0a, 0x13, 0x47, 0x65, 0x74, 0x4d, 0x65, 0x6d, 0x6f, 0x72, 0x79, 0x53, 0x74,
+	0x61, 0x74, 0x69, 0x73, 0x74, 0x69, 0x63, 0x73, 0x12, 0x0d, 0x2e, 0x61, 0x70, 0x70, 0x63, 0x74,
+	0x6c, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x1a, 0x18, 0x2e, 0x61, 0x70, 0x70, 0x63, 0x74, 0x6c,
+	0x2e, 0x4d, 0x65, 0x6d, 0x6f, 0x72, 0x79, 0x53, 0x74, 0x61, 0x74, 0x69, 0x73, 0x74, 0x69, 0x63,
+	0x73, 0x32, 0x80, 0x01, 0x0a, 0x13, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x43, 0x6f, 0x6e, 0x66,
 	0x69, 0x67, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x30, 0x0a, 0x09, 0x47, 0x65, 0x74,
 	0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x12, 0x0d, 0x2e, 0x61, 0x70, 0x70, 0x63, 0x74, 0x6c, 0x2e,
 	0x45, 0x6d, 0x70, 0x74, 0x79, 0x1a, 0x14, 0x2e, 0x61, 0x70, 0x70, 0x63, 0x74, 0x6c, 0x2e, 0x53,
@@ -117,13 +125,14 @@ var file_rpc_proto_rawDesc = []byte{
 }
 
 var file_rpc_proto_goTypes = []interface{}{
-	(*Empty)(nil),           // 0: appctl.Empty
-	(*ProfileSavePath)(nil), // 1: appctl.ProfileSavePath
-	(*ServerConfig)(nil),    // 2: appctl.ServerConfig
-	(*AppStatusMsg)(nil),    // 3: appctl.AppStatusMsg
-	(*Metrics)(nil),         // 4: appctl.Metrics
-	(*SessionInfo)(nil),     // 5: appctl.SessionInfo
-	(*ThreadDump)(nil),      // 6: appctl.ThreadDump
+	(*Empty)(nil),            // 0: appctl.Empty
+	(*ProfileSavePath)(nil),  // 1: appctl.ProfileSavePath
+	(*ServerConfig)(nil),     // 2: appctl.ServerConfig
+	(*AppStatusMsg)(nil),     // 3: appctl.AppStatusMsg
+	(*Metrics)(nil),          // 4: appctl.Metrics
+	(*SessionInfo)(nil),      // 5: appctl.SessionInfo
+	(*ThreadDump)(nil),       // 6: appctl.ThreadDump
+	(*MemoryStatistics)(nil), // 7: appctl.MemoryStatistics
 }
 var file_rpc_proto_depIdxs = []int32{
 	0,  // 0: appctl.ClientLifecycleService.GetStatus:input_type -> appctl.Empty
@@ -134,42 +143,46 @@ var file_rpc_proto_depIdxs = []int32{
 	1,  // 5: appctl.ClientLifecycleService.StartCPUProfile:input_type -> appctl.ProfileSavePath
 	0,  // 6: appctl.ClientLifecycleService.StopCPUProfile:input_type -> appctl.Empty
 	1,  // 7: appctl.ClientLifecycleService.GetHeapProfile:input_type -> appctl.ProfileSavePath
-	0,  // 8: appctl.ServerLifecycleService.GetStatus:input_type -> appctl.Empty
-	0,  // 9: appctl.ServerLifecycleService.Start:input_type -> appctl.Empty
-	0,  // 10: appctl.ServerLifecycleService.Stop:input_type -> appctl.Empty
-	0,  // 11: appctl.ServerLifecycleService.Reload:input_type -> appctl.Empty
-	0,  // 12: appctl.ServerLifecycleService.Exit:input_type -> appctl.Empty
-	0,  // 13: appctl.ServerLifecycleService.GetMetrics:input_type -> appctl.Empty
-	0,  // 14: appctl.ServerLifecycleService.GetSessionInfo:input_type -> appctl.Empty
-	0,  // 15: appctl.ServerLifecycleService.GetThreadDump:input_type -> appctl.Empty
-	1,  // 16: appctl.ServerLifecycleService.StartCPUProfile:input_type -> appctl.ProfileSavePath
-	0,  // 17: appctl.ServerLifecycleService.StopCPUProfile:input_type -> appctl.Empty
-	1,  // 18: appctl.ServerLifecycleService.GetHeapProfile:input_type -> appctl.ProfileSavePath
-	0,  // 19: appctl.ServerConfigService.GetConfig:input_type -> appctl.Empty
-	2,  // 20: appctl.ServerConfigService.SetConfig:input_type -> appctl.ServerConfig
-	3,  // 21: appctl.ClientLifecycleService.GetStatus:output_type -> appctl.AppStatusMsg
-	0,  // 22: appctl.ClientLifecycleService.Exit:output_type -> appctl.Empty
-	4,  // 23: appctl.ClientLifecycleService.GetMetrics:output_type -> appctl.Metrics
-	5,  // 24: appctl.ClientLifecycleService.GetSessionInfo:output_type -> appctl.SessionInfo
-	6,  // 25: appctl.ClientLifecycleService.GetThreadDump:output_type -> appctl.ThreadDump
-	0,  // 26: appctl.ClientLifecycleService.StartCPUProfile:output_type -> appctl.Empty
-	0,  // 27: appctl.ClientLifecycleService.StopCPUProfile:output_type -> appctl.Empty
-	0,  // 28: appctl.ClientLifecycleService.GetHeapProfile:output_type -> appctl.Empty
-	3,  // 29: appctl.ServerLifecycleService.GetStatus:output_type -> appctl.AppStatusMsg
-	0,  // 30: appctl.ServerLifecycleService.Start:output_type -> appctl.Empty
-	0,  // 31: appctl.ServerLifecycleService.Stop:output_type -> appctl.Empty
-	0,  // 32: appctl.ServerLifecycleService.Reload:output_type -> appctl.Empty
-	0,  // 33: appctl.ServerLifecycleService.Exit:output_type -> appctl.Empty
-	4,  // 34: appctl.ServerLifecycleService.GetMetrics:output_type -> appctl.Metrics
-	5,  // 35: appctl.ServerLifecycleService.GetSessionInfo:output_type -> appctl.SessionInfo
-	6,  // 36: appctl.ServerLifecycleService.GetThreadDump:output_type -> appctl.ThreadDump
-	0,  // 37: appctl.ServerLifecycleService.StartCPUProfile:output_type -> appctl.Empty
-	0,  // 38: appctl.ServerLifecycleService.StopCPUProfile:output_type -> appctl.Empty
-	0,  // 39: appctl.ServerLifecycleService.GetHeapProfile:output_type -> appctl.Empty
-	2,  // 40: appctl.ServerConfigService.GetConfig:output_type -> appctl.ServerConfig
-	2,  // 41: appctl.ServerConfigService.SetConfig:output_type -> appctl.ServerConfig
-	21, // [21:42] is the sub-list for method output_type
-	0,  // [0:21] is the sub-list for method input_type
+	0,  // 8: appctl.ClientLifecycleService.GetMemoryStatistics:input_type -> appctl.Empty
+	0,  // 9: appctl.ServerLifecycleService.GetStatus:input_type -> appctl.Empty
+	0,  // 10: appctl.ServerLifecycleService.Start:input_type -> appctl.Empty
+	0,  // 11: appctl.ServerLifecycleService.Stop:input_type -> appctl.Empty
+	0,  // 12: appctl.ServerLifecycleService.Reload:input_type -> appctl.Empty
+	0,  // 13: appctl.ServerLifecycleService.Exit:input_type -> appctl.Empty
+	0,  // 14: appctl.ServerLifecycleService.GetMetrics:input_type -> appctl.Empty
+	0,  // 15: appctl.ServerLifecycleService.GetSessionInfo:input_type -> appctl.Empty
+	0,  // 16: appctl.ServerLifecycleService.GetThreadDump:input_type -> appctl.Empty
+	1,  // 17: appctl.ServerLifecycleService.StartCPUProfile:input_type -> appctl.ProfileSavePath
+	0,  // 18: appctl.ServerLifecycleService.StopCPUProfile:input_type -> appctl.Empty
+	1,  // 19: appctl.ServerLifecycleService.GetHeapProfile:input_type -> appctl.ProfileSavePath
+	0,  // 20: appctl.ServerLifecycleService.GetMemoryStatistics:input_type -> appctl.Empty
+	0,  // 21: appctl.ServerConfigService.GetConfig:input_type -> appctl.Empty
+	2,  // 22: appctl.ServerConfigService.SetConfig:input_type -> appctl.ServerConfig
+	3,  // 23: appctl.ClientLifecycleService.GetStatus:output_type -> appctl.AppStatusMsg
+	0,  // 24: appctl.ClientLifecycleService.Exit:output_type -> appctl.Empty
+	4,  // 25: appctl.ClientLifecycleService.GetMetrics:output_type -> appctl.Metrics
+	5,  // 26: appctl.ClientLifecycleService.GetSessionInfo:output_type -> appctl.SessionInfo
+	6,  // 27: appctl.ClientLifecycleService.GetThreadDump:output_type -> appctl.ThreadDump
+	0,  // 28: appctl.ClientLifecycleService.StartCPUProfile:output_type -> appctl.Empty
+	0,  // 29: appctl.ClientLifecycleService.StopCPUProfile:output_type -> appctl.Empty
+	0,  // 30: appctl.ClientLifecycleService.GetHeapProfile:output_type -> appctl.Empty
+	7,  // 31: appctl.ClientLifecycleService.GetMemoryStatistics:output_type -> appctl.MemoryStatistics
+	3,  // 32: appctl.ServerLifecycleService.GetStatus:output_type -> appctl.AppStatusMsg
+	0,  // 33: appctl.ServerLifecycleService.Start:output_type -> appctl.Empty
+	0,  // 34: appctl.ServerLifecycleService.Stop:output_type -> appctl.Empty
+	0,  // 35: appctl.ServerLifecycleService.Reload:output_type -> appctl.Empty
+	0,  // 36: appctl.ServerLifecycleService.Exit:output_type -> appctl.Empty
+	4,  // 37: appctl.ServerLifecycleService.GetMetrics:output_type -> appctl.Metrics
+	5,  // 38: appctl.ServerLifecycleService.GetSessionInfo:output_type -> appctl.SessionInfo
+	6,  // 39: appctl.ServerLifecycleService.GetThreadDump:output_type -> appctl.ThreadDump
+	0,  // 40: appctl.ServerLifecycleService.StartCPUProfile:output_type -> appctl.Empty
+	0,  // 41: appctl.ServerLifecycleService.StopCPUProfile:output_type -> appctl.Empty
+	0,  // 42: appctl.ServerLifecycleService.GetHeapProfile:output_type -> appctl.Empty
+	7,  // 43: appctl.ServerLifecycleService.GetMemoryStatistics:output_type -> appctl.MemoryStatistics
+	2,  // 44: appctl.ServerConfigService.GetConfig:output_type -> appctl.ServerConfig
+	2,  // 45: appctl.ServerConfigService.SetConfig:output_type -> appctl.ServerConfig
+	23, // [23:46] is the sub-list for method output_type
+	0,  // [0:23] is the sub-list for method input_type
 	0,  // [0:0] is the sub-list for extension type_name
 	0,  // [0:0] is the sub-list for extension extendee
 	0,  // [0:0] is the sub-list for field type_name

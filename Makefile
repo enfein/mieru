@@ -44,7 +44,7 @@ bin: lib client-android client-linux client-mac client-windows-amd64 server-linu
 
 # Compile go libraries and run unit tests.
 .PHONY: lib
-lib: fmt
+lib: fmt vet
 	CGO_ENABLED=0 go build -v ./...
 	CGO_ENABLED=0 go test -timeout=1m0s -coverprofile coverage.out ./...
 	go tool cover -html coverage.out -o coverage.html
