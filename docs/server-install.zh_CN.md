@@ -8,16 +8,16 @@
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v2.5.0/mita_2.5.0_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v2.6.0/mita_2.6.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v2.5.0/mita_2.5.0_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v2.6.0/mita_2.6.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v2.5.0/mita-2.5.0-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v2.6.0/mita-2.6.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v2.5.0/mita-2.5.0-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v2.6.0/mita-2.6.0-1.aarch64.rpm
 ```
 
 如果上述链接被墙，请翻墙后使用浏览器从 GitHub Releases 页面下载安装。
@@ -26,16 +26,16 @@ curl -LSO https://github.com/enfein/mieru/releases/download/v2.5.0/mita-2.5.0-1.
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_2.5.0_amd64.deb
+sudo dpkg -i mita_2.6.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_2.5.0_arm64.deb
+sudo dpkg -i mita_2.6.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-2.5.0-1.x86_64.rpm
+sudo rpm -Uvh --force mita-2.6.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-2.5.0-1.aarch64.rpm
+sudo rpm -Uvh --force mita-2.6.0-1.aarch64.rpm
 ```
 
 ## 赋予当前用户操作 mita 的权限，重新登录使此设置生效

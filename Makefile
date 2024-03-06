@@ -32,7 +32,7 @@ PROJECT_NAME=$(shell basename "${ROOT}")
 # - pkg/version/current.go
 #
 # Use `tools/bump_version.sh` script to change all those files at one shot.
-VERSION="2.5.0"
+VERSION="2.6.0"
 
 # Build binaries and installation packages.
 .PHONY: build
@@ -40,7 +40,7 @@ build: bin deb rpm
 
 # Build binaries.
 .PHONY: bin
-bin: lib client-android client-linux client-mac client-windows-amd64 server-linux
+bin: lib client-android client-linux client-mac client-windows server-linux
 
 # Compile go libraries and run unit tests.
 .PHONY: lib
@@ -163,17 +163,33 @@ client-mac-arm64:
 	mv release/macos/arm64/mieru_${VERSION}_macos_arm64.tar.gz release/
 	mv release/macos/arm64/mieru_${VERSION}_macos_arm64.tar.gz.sha256.txt release/
 
+# Build windows clients.
+.PHONY: client-windows
+client-windows: client-windows-x86 client-windows-amd64
+
+# Build windows x86 client.
+.PHONY: client-windows-x86
+client-windows-x86:
+	mkdir -p release/windows/386
+	env GOOS=windows GOARCH=386 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/windows/386/mieru.exe cmd/mieru/mieru.go
+	cd release/windows/386;\
+		sha256sum mieru.exe > mieru_${VERSION}_windows_x86.exe.sha256.txt;\
+		zip -r mieru_${VERSION}_windows_x86.zip mieru.exe;\
+		sha256sum mieru_${VERSION}_windows_x86.zip > mieru_${VERSION}_windows_x86.zip.sha256.txt
+	mv release/windows/386/mieru_${VERSION}_windows_x86.zip release/
+	mv release/windows/386/mieru_${VERSION}_windows_x86.zip.sha256.txt release/
+
 # Build windows amd64 client.
 .PHONY: client-windows-amd64
 client-windows-amd64:
-	mkdir -p release/windows
-	env GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/windows/mieru.exe cmd/mieru/mieru.go
-	cd release/windows;\
-		sha256sum mieru.exe > mieru_${VERSION}_windows.exe.sha256.txt;\
+	mkdir -p release/windows/amd64
+	env GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o release/windows/amd64/mieru.exe cmd/mieru/mieru.go
+	cd release/windows/amd64;\
+		sha256sum mieru.exe > mieru_${VERSION}_windows_amd64.exe.sha256.txt;\
 		zip -r mieru_${VERSION}_windows_amd64.zip mieru.exe;\
 		sha256sum mieru_${VERSION}_windows_amd64.zip > mieru_${VERSION}_windows_amd64.zip.sha256.txt
-	mv release/windows/mieru_${VERSION}_windows_amd64.zip release/
-	mv release/windows/mieru_${VERSION}_windows_amd64.zip.sha256.txt release/
+	mv release/windows/amd64/mieru_${VERSION}_windows_amd64.zip release/
+	mv release/windows/amd64/mieru_${VERSION}_windows_amd64.zip.sha256.txt release/
 
 # Build linux servers.
 .PHONY: server-linux
