@@ -10,7 +10,7 @@ permissions:
 jobs:
   stale:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 2
     steps:
       - uses: actions/stale@v6
         with:
