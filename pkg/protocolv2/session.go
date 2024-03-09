@@ -42,8 +42,6 @@ const (
 	minWindowSize = 16
 	maxWindowSize = segmentTreeCapacity
 
-	outputInterval = 10 * time.Millisecond
-
 	serverRespTimeout        = 10 * time.Second
 	sessionHeartbeatInterval = 5 * time.Second
 
@@ -128,7 +126,7 @@ var _ net.Conn = &Session{}
 // NewSession creates a new session.
 func NewSession(id uint32, isClient bool, mtu int) *Session {
 	rttStat := congestion.NewRTTStats()
-	rttStat.SetMaxAckDelay(outputInterval)
+	rttStat.SetMaxAckDelay(outputLoopInterval)
 	rttStat.SetRTOMultiplier(txTimeoutBackOff)
 	return &Session{
 		conn:             nil,
@@ -566,7 +564,7 @@ func (s *Session) runInputLoop(ctx context.Context) error {
 }
 
 func (s *Session) runOutputLoop(ctx context.Context) error {
-	ticker := time.NewTicker(outputInterval)
+	ticker := time.NewTicker(outputLoopInterval)
 	defer ticker.Stop()
 	for {
 		select {
