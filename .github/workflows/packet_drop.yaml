@@ -6,9 +6,9 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: 1.21.7
       - name: Build test binaries
