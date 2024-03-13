@@ -1,6 +1,6 @@
 # Client Installation & Configuration - OpenWrt
 
-OpenWrt is a minimal Linux distribution, and additional steps are required to run the mieru client in an OpenWrt environment. Please refer to the [Client Installation & Configuration](https://github.com/enfein/mieru/blob/main/docs/client-install.md) guide, and follow the instructions here to install and configure the mieru client.
+OpenWrt is a minimal Linux distribution, and additional steps are required to run the mieru client in an OpenWrt environment. Please refer to the [Client Installation & Configuration](./client-install.md) guide, and follow the instructions here to install and configure the mieru client.
 
 ## Download mieru client
 

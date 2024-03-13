@@ -1,6 +1,6 @@
 # 客户端安装与配置 - OpenWrt
 
-OpenWrt 是一个极简 Linux 环境，在 OpenWrt 环境运行 mieru 客户端软件需要额外的步骤。请参照[客户端安装与配置](https://github.com/enfein/mieru/blob/main/docs/client-install.zh_CN.md)，同时按照这里的提示安装和配置 mieru 客户端。
+OpenWrt 是一个极简 Linux 环境，在 OpenWrt 环境运行 mieru 客户端软件需要额外的步骤。请参照[客户端安装与配置](./client-install.zh_CN.md)，同时按照这里的提示安装和配置 mieru 客户端。
 
 ## 下载 mieru 客户端
 

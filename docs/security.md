@@ -22,8 +22,8 @@ Considering that it is difficult for domestic users to not use domestic software
 
 Anti-censorship software developers, investigative journalists, human rights lawyers, and people who engage in political discussions on foreign websites are all high-risk users. In addition to the above suggestions, please make sure to use [Tor](https://www.torproject.org/) for sensitive operations. You cannot connect directly to the Tor bridge in China, but mieru can be used as a Tor proxy. To use a proxy in the Tor browser, please follow the pictures below. Make sure to use the port number that mieru is listening to on your computer.
 
-![Configuring Tor browser](https://github.com/enfein/mieru/blob/main/docs/assets/config_tor_browser.png)
+![Configuring Tor browser](./assets/config_tor_browser.png)
 
-![Configuring Tor browser](https://github.com/enfein/mieru/blob/main/docs/assets/config_tor_browser_2.png)
+![Configuring Tor browser](./assets/config_tor_browser_2.png)
 
 When using Tor, the internet speed is slow, and you may not be able to watch videos smoothly.

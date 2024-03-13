@@ -111,7 +111,7 @@ Chrome / Firefox 等浏览器可以通过安装插件，使用 socks5 代理访�
 
 mieru 不使用 socks5 用户名和密码进行身份验证。
 
-关于在 Tor 浏览器中配置 socks5 代理，参见[翻墙安全指南](https://github.com/enfein/mieru/blob/main/docs/security.zh_CN.md)。
+关于在 Tor 浏览器中配置 socks5 代理，参见[翻墙安全指南](./security.zh_CN.md)。
 
 如果需要通过代理转发所有应用程序的流量，或者自定义路由规则，请使用 clash 等代理平台，将 mieru 作为代理平台的后端。下面提供了 clash 配置的例子。
 

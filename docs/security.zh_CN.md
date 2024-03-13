@@ -22,9 +22,9 @@ mieru 本身没有提供基于域名规则或 IP 地址位置来判断是否应�
 
 翻墙软件开发者、调查记者、维权律师、在国外网站上参与政治讨论的人，都是高风险用户。除了上述三点之外，翻墙时请务必使用 [Tor](https://www.torproject.org/) 进行敏感操作。在国内无法直接连接 Tor 网桥，但是 mieru 可以作为 Tor 的前置代理。在 Tor 浏览器中使用前置代理的方法如下图所示（请使用自己电脑上 mieru 监听的端口号）。
 
-![配置 Tor 浏览器](https://github.com/enfein/mieru/blob/main/docs/assets/config_tor_browser.png)
+![配置 Tor 浏览器](./assets/config_tor_browser.png)
 
-![配置 Tor 浏览器](https://github.com/enfein/mieru/blob/main/docs/assets/config_tor_browser_2.png)
+![配置 Tor 浏览器](./assets/config_tor_browser_2.png)
 
 通过这种方式翻墙的网速比较慢，可能无法流畅观看视频。
 

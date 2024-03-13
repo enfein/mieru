@@ -3,9 +3,9 @@
 [![Build Status](https://github.com/enfein/mieru/actions/workflows/ci.yaml/badge.svg)](https://github.com/enfein/mieru/actions/workflows/ci.yaml)
 [![Releases](https://img.shields.io/github/release/enfein/mieru/all.svg?style=flat)](https://github.com/enfein/mieru/releases)
 [![Downloads](https://img.shields.io/github/downloads/enfein/mieru/total.svg?style=flat)](https://github.com/enfein/mieru/releases)
-[![LICENSE](https://img.shields.io/github/license/enfein/mieru.svg?style=flat)](https://github.com/enfein/mieru/blob/main/LICENSE)
+[![LICENSE](https://img.shields.io/github/license/enfein/mieru.svg?style=flat)](./LICENSE)
 
-[中文文档](https://github.com/enfein/mieru/blob/main/README.zh_CN.md)
+[中文文档](./README.zh_CN.md)
 
 mieru is a secure, hard to classify, hard to probe, TCP or UDP protocol-based socks5 / HTTP / HTTPS network proxy software.
 
@@ -15,7 +15,7 @@ The mieru proxy software suite consists of two parts, a client software called m
 
 The principle of mieru is similar to shadowsocks / v2ray etc. It creates an encrypted channel between the client and the proxy server outside the firewall. GFW cannot decrypt the encrypted transmission and cannot determine the destination you end up visiting, so it has no choice but to let you go.
 
-For an explanation of the mieru protocol, see [mieru Proxy Protocol](https://github.com/enfein/mieru/blob/main/docs/protocol.md).
+For an explanation of the mieru protocol, see [mieru Proxy Protocol](./docs/protocol.md).
 
 ## Features
 
@@ -33,11 +33,11 @@ For an explanation of the mieru protocol, see [mieru Proxy Protocol](https://git
 
 ## User Guide
 
-1. [Server Installation & Configuration](https://github.com/enfein/mieru/blob/main/docs/server-install.md)
-2. [Client Installation & Configuration](https://github.com/enfein/mieru/blob/main/docs/client-install.md)
-3. [Client Installation & Configuration - OpenWrt](https://github.com/enfein/mieru/blob/main/docs/client-install-openwrt.md)
-4. [Maintenance & Troubleshooting](https://github.com/enfein/mieru/blob/main/docs/operation.md)
-5. [Security Guide](https://github.com/enfein/mieru/blob/main/docs/security.md)
+1. [Server Installation & Configuration](./docs/server-install.md)
+2. [Client Installation & Configuration](./docs/client-install.md)
+3. [Client Installation & Configuration - OpenWrt](./docs/client-install-openwrt.md)
+4. [Maintenance & Troubleshooting](./docs/operation.md)
+5. [Security Guide](./docs/security.md)
 
 ## Compile
 

@@ -3,7 +3,7 @@
 [![Build Status](https://github.com/enfein/mieru/actions/workflows/ci.yaml/badge.svg)](https://github.com/enfein/mieru/actions/workflows/ci.yaml)
 [![Releases](https://img.shields.io/github/release/enfein/mieru/all.svg?style=flat)](https://github.com/enfein/mieru/releases)
 [![Downloads](https://img.shields.io/github/downloads/enfein/mieru/total.svg?style=flat)](https://github.com/enfein/mieru/releases)
-[![LICENSE](https://img.shields.io/github/license/enfein/mieru.svg?style=flat)](https://github.com/enfein/mieru/blob/main/LICENSE)
+[![LICENSE](https://img.shields.io/github/license/enfein/mieru.svg?style=flat)](./LICENSE)
 
 mieru【見える】是一款安全的、无流量特征、难以主动探测的，基于 TCP 或 UDP 协议的 socks5 / HTTP / HTTPS 网络代理软件。
 
@@ -13,7 +13,7 @@ mieru 代理软件由称为 mieru【見える】的客户端软件和称为 mita
 
 mieru 的翻墙原理与 shadowsocks / v2ray 等软件类似，在客户端和墙外的代理服务器之间建立一个加密的通道。GFW 不能破解加密传输的信息，无法判定你最终访问的网址，因此只能选择放行。
 
-有关 mieru 协议的讲解，请参阅 [mieru 代理协议](https://github.com/enfein/mieru/blob/main/docs/protocol.zh_CN.md)。
+有关 mieru 协议的讲解，请参阅 [mieru 代理协议](./docs/protocol.zh_CN.md)。
 
 ## 特性
 
@@ -31,11 +31,11 @@ mieru 的翻墙原理与 shadowsocks / v2ray 等软件类似，在客户端和�
 
 ## 使用教程
 
-1. [服务器安装与配置](https://github.com/enfein/mieru/blob/main/docs/server-install.zh_CN.md)
-2. [客户端安装与配置](https://github.com/enfein/mieru/blob/main/docs/client-install.zh_CN.md)
-3. [客户端安装与配置 - OpenWrt](https://github.com/enfein/mieru/blob/main/docs/client-install-openwrt.zh_CN.md)
-4. [运营维护与故障排查](https://github.com/enfein/mieru/blob/main/docs/operation.zh_CN.md)
-5. [翻墙安全指南](https://github.com/enfein/mieru/blob/main/docs/security.zh_CN.md)
+1. [服务器安装与配置](./docs/server-install.zh_CN.md)
+2. [客户端安装与配置](./docs/client-install.zh_CN.md)
+3. [客户端安装与配置 - OpenWrt](./docs/client-install-openwrt.zh_CN.md)
+4. [运营维护与故障排查](./docs/operation.zh_CN.md)
+5. [翻墙安全指南](./docs/security.zh_CN.md)
 
 ## 编译
 

@@ -111,7 +111,7 @@ Chrome / Firefox and other browsers can use socks5 proxy to access blocked websi
 
 mieru doesn't use socks5 authentication.
 
-For configuring the socks5 proxy in the Tor browser, see the [Security Guide](https://github.com/enfein/mieru/blob/main/docs/security.md).
+For configuring the socks5 proxy in the Tor browser, see the [Security Guide](./security.md).
 
 If you need to forward all application traffic through a proxy, or customize routing rules, use a proxy platform such as clash, and use mieru as the backend of the proxy platform. An example of clash configuration is provided below.
 

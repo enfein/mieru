@@ -65,7 +65,7 @@ mita status
 
 ## 修改代理服务器设置
 
-mieru 代理支持 TCP 和 UDP 两种不同的传输协议。要了解协议之间的差别，请阅读 [mieru 代理协议](https://github.com/enfein/mieru/blob/main/docs/protocol.zh_CN.md)。
+mieru 代理支持 TCP 和 UDP 两种不同的传输协议。要了解协议之间的差别，请阅读 [mieru 代理协议](./protocol.zh_CN.md)。
 
 用户可以通过
 
@@ -150,7 +150,7 @@ mita stop
 
 注意，每次使用 `mita apply config <FILE>` 修改设置后，需要用 `mita stop` 和 `mita start` 重启代理服务，才能使新设置生效。一个例外是，如果只修改了 `users` 或者 `loggingLevel` 设置，你可以使用 `mita reload` 加载新的设置，此时不会影响服务器与客户端的活跃连接。
 
-启动代理服务后，请继续进行[客户端安装与配置](https://github.com/enfein/mieru/blob/main/docs/client-install.zh_CN.md)。
+启动代理服务后，请继续进行[客户端安装与配置](./client-install.zh_CN.md)。
 
 ## 高级设置
 
@@ -222,7 +222,7 @@ mieru 客户端 -> GFW -> mita 服务器 -> cloudflare 代理客户端 -> cloudf
 Tor 浏览器 -> mieru 客户端 -> GFW -> mita 服务器 -> Tor 网络 -> 目标网址
 ```
 
-关于如何在 Tor 浏览器上配置嵌套代理，请参见[翻墙安全指南](https://github.com/enfein/mieru/blob/main/docs/security.zh_CN.md)。
+关于如何在 Tor 浏览器上配置嵌套代理，请参见[翻墙安全指南](./security.zh_CN.md)。
 
 ### 限制用户流量
 

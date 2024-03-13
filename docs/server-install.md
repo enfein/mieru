@@ -65,7 +65,7 @@ If the installation is just completed, the output will be `mita server status is
 
 ## Modify proxy server settings
 
-The mieru proxy supports two different transport protocols, TCP and UDP. To understand the differences between the protocols, please read [mieru proxy protocols](https://github.com/enfein/mieru/blob/main/docs/protocol.md).
+The mieru proxy supports two different transport protocols, TCP and UDP. To understand the differences between the protocols, please read [mieru proxy protocols](./protocol.md).
 
 Users should call
 
@@ -150,7 +150,7 @@ mita stop
 
 Note that each time you change the settings with `mita apply config <FILE>`, you need to restart the service with `mita stop` and `mita start` for the new settings to take effect. An exception is, if you only change `users` or `loggingLevel` settings, you may run `mita reload` to load the new settings, which will not disturb active connections between server and client.
 
-After starting the proxy service, proceed to [Client Installation & Configuration](https://github.com/enfein/mieru/blob/main/docs/client-install.md).
+After starting the proxy service, proceed to [Client Installation & Configuration](./client-install.md).
 
 ## Advanced Settings
 
@@ -222,7 +222,7 @@ Note that proxy chain is different from nested proxy. An example of the network 
 Tor browser -> mieru client -> GFW -> mita server -> Tor network -> target website
 ```
 
-For information on how to configure nested proxy on a Tor browser, please refer to the [Security Guide](https://github.com/enfein/mieru/blob/main/docs/security.md).
+For information on how to configure nested proxy on a Tor browser, please refer to the [Security Guide](./security.md).
 
 ### Limiting User Traffic
 
