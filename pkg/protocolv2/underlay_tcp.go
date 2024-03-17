@@ -472,7 +472,7 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 		maxPaddingSize := MaxPaddingSize(t.mtu, t.IPVersion(), t.TransportProtocol(), int(ss.payloadLen), 0)
 		padding := newPadding(paddingOpts{
 			maxLen:                 maxPaddingSize,
-			minConsecutiveASCIILen: mathext.Max(maxPaddingSize, recommendedConsecutiveASCIILen),
+			minConsecutiveASCIILen: mathext.Min(maxPaddingSize, recommendedConsecutiveASCIILen),
 		})
 		ss.suffixLen = uint8(len(padding))
 		if log.IsLevelEnabled(log.TraceLevel) {

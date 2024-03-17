@@ -17,10 +17,29 @@ package cipher
 
 import (
 	"bytes"
+	crand "crypto/rand"
 	"fmt"
 	"testing"
 	"time"
 )
+
+func BenchmarkNewKey(b *testing.B) {
+	password := make([]byte, 32)
+	if _, err := crand.Read(password); err != nil {
+		b.Fatalf("Generate password failed.")
+	}
+	t := time.Now()
+	salts := saltFromTime(t)
+	keygen := pbkdf2Gen{
+		Salt: salts[1],
+		Iter: defaultIter,
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		keygen.NewKey(password, DefaultKeyLen)
+	}
+}
 
 func TestSaltFromTimeSize(t *testing.T) {
 	salts := saltFromTime(time.Now())

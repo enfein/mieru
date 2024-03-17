@@ -32,7 +32,7 @@ PROJECT_NAME=$(shell basename "${ROOT}")
 # - pkg/version/current.go
 #
 # Use `tools/bump_version.sh` script to change all those files at one shot.
-VERSION="2.6.0"
+VERSION="2.7.0"
 
 # Build binaries and installation packages.
 .PHONY: build
@@ -47,6 +47,7 @@ bin: lib client-android client-linux client-mac client-windows server-linux
 lib: fmt vet
 	CGO_ENABLED=0 go build -v ./...
 	CGO_ENABLED=0 go test -timeout=1m0s -coverprofile coverage.out ./...
+	CGO_ENABLED=0 go test -bench=. ./pkg/cipher
 	go tool cover -html coverage.out -o coverage.html
 
 # Build Android clients.

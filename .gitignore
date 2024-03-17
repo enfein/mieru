@@ -26,6 +26,7 @@
 *.dylib
 *.deb
 *.rpm
+__pycache__/
 
 .vscode/
 

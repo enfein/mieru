@@ -27,7 +27,7 @@ import random
 import sys
 
 
-def gen() -> None:
+def gen_port_bindings() -> None:
     random.seed()
     args = parse_args()
     bindings = []
@@ -135,4 +135,4 @@ def print_exit(*values: object) -> None:
 
 
 if __name__ == '__main__':
-    gen()
+    gen_port_bindings()

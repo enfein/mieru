@@ -25,7 +25,7 @@ import (
 )
 
 var (
-	recommendedConsecutiveASCIILen = 32 + rng.FixedInt(33)
+	recommendedConsecutiveASCIILen = 32 + rng.FixedInt(17)
 )
 
 type paddingOpts struct {

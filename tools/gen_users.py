@@ -16,25 +16,34 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 '''
-This program generate secure strings that can be used as username or password.
+This program generates users that can be used in mieru server configurations.
 '''
 
 
+import sys
+sys.dont_write_bytecode = True
+
+
+from gen_username_passwd import gen_token
 import argparse
-import secrets
+import json
 
 
-def gen_username_passwd() -> None:
-    parser = argparse.ArgumentParser(description='Parse string length.')
-    parser.add_argument('--length', type=int, default=12, required=False, help='Length of string to generate.')
+def gen_users() -> None:
+    parser = argparse.ArgumentParser(description='Parse number of users.')
+    parser.add_argument('-n', type=int, default=1, required=False, help='Number of users.')
     args = parser.parse_args()
-    print(gen_token(args.length))
-
-
-def gen_token(length: int) -> str:
-    s = secrets.token_urlsafe(length)
-    return s[:length]
+    user_list = []
+    for i in range(args.n):
+        user_list.append({
+            "name": gen_token(8),
+            "password": gen_token(8),
+        })
+    users = {
+        "users": user_list
+    }
+    print(json.dumps(users, indent=4))
 
 
 if __name__ == '__main__':
-    gen_username_passwd()
+    gen_users()

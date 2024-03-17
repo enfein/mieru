@@ -21,7 +21,7 @@ import (
 	"time"
 )
 
-const cacheValidInterval = 1 * time.Minute
+const cacheValidInterval = 30 * time.Second
 
 type cachedCiphers struct {
 	cipherList []BlockCipher
@@ -30,40 +30,54 @@ type cachedCiphers struct {
 
 var blockCipherCache = sync.Map{}
 
-// getBlockCipherList returns three BlockCipher. If stateless is true,
-// we will try to use cached BlockCipher. Otherwise, new BlockCipher is created.
+// getBlockCipherList returns three BlockCipher.
+// It uses cache so it doesn't need to generate BlockCipher each time.
 func getBlockCipherList(password []byte, stateless bool) ([]BlockCipher, error) {
 	pw := string(password)
 
-	// Try to find []BlockCipher from cache if it is stateless.
-	if stateless {
-		c, ok := blockCipherCache.Load(pw)
-		if ok {
-			// Check if the cached entry is expired.
-			if c.(cachedCiphers).createTime.Add(cacheValidInterval).Before(time.Now()) {
-				ok = false
-			}
+	// Try to find []BlockCipher from cache.
+	c, ok := blockCipherCache.Load(pw)
+	if ok {
+		// Check if the cached entry is expired.
+		if c.(cachedCiphers).createTime.Add(cacheValidInterval).Before(time.Now()) {
+			ok = false
 		}
-		if ok {
+	}
+	if ok {
+		if stateless {
 			return c.(cachedCiphers).cipherList, nil
+		} else {
+			blocks := CloneBlockCiphers(c.(cachedCiphers).cipherList)
+			for i := 0; i < len(blocks); i++ {
+				blocks[i].SetImplicitNonceMode(true)
+			}
+			return blocks, nil
 		}
 	}
 
-	// If not stateless or not found, generate the []BlockCipher.
-	blockCiphers, t, err := newBlockCipherList(password, stateless)
+	// If not found, generate the stateless []BlockCipher.
+	blockCiphers, t, err := newBlockCipherList(password, true)
 	if err != nil {
 		return nil, fmt.Errorf("newBlockCipherList() failed: %v", err)
 	}
 
-	// Insert back to cache if it is stateless.
-	if stateless {
-		entry := cachedCiphers{
-			cipherList: blockCiphers,
-			createTime: t,
-		}
-		blockCipherCache.Store(pw, entry)
+	// Insert to cache.
+	entry := cachedCiphers{
+		cipherList: blockCiphers,
+		createTime: t,
 	}
-	return blockCiphers, nil
+	blockCipherCache.Store(pw, entry)
+
+	if stateless {
+		return blockCiphers, nil
+	}
+
+	// Set cipher to stateful if needed.
+	blocks := CloneBlockCiphers(blockCiphers)
+	for i := 0; i < len(blocks); i++ {
+		blocks[i].SetImplicitNonceMode(true)
+	}
+	return blocks, nil
 }
 
 func newBlockCipherList(password []byte, stateless bool) ([]BlockCipher, time.Time, error) {

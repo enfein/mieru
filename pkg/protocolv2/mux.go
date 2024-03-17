@@ -23,6 +23,7 @@ import (
 	mrand "math/rand"
 	"net"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -36,20 +37,24 @@ import (
 	"github.com/enfein/mieru/pkg/util/sockopts"
 )
 
-const idleUnderlayTickerInterval = 5 * time.Second
+const (
+	idleUnderlayTickerInterval  = 5 * time.Second
+	userCipherCacheWarmInterval = 15 * time.Second
+)
 
 // Mux manages the sessions and underlays.
 type Mux struct {
 	// ---- common fields ----
-	isClient    bool
-	endpoints   []UnderlayProperties
-	underlays   []Underlay
-	chAccept    chan net.Conn
-	chAcceptErr chan error
-	used        bool
-	done        chan struct{}
-	mu          sync.Mutex
-	cleaner     *time.Ticker
+	isClient              bool
+	endpoints             []UnderlayProperties
+	underlays             []Underlay
+	chAccept              chan net.Conn
+	chAcceptErr           chan error
+	used                  bool
+	done                  chan struct{}
+	mu                    sync.Mutex
+	cleaner               *time.Ticker
+	userCipherCacheWarmer *time.Ticker
 
 	// ---- client fields ----
 	password        []byte
@@ -69,15 +74,16 @@ func NewMux(isClinet bool) *Mux {
 		log.Infof("Initializing server multiplexer")
 	}
 	mux := &Mux{
-		isClient:    isClinet,
-		underlays:   make([]Underlay, 0),
-		chAccept:    make(chan net.Conn, sessionChanCapacity),
-		chAcceptErr: make(chan error, 1), // non-blocking
-		done:        make(chan struct{}),
-		cleaner:     time.NewTicker(idleUnderlayTickerInterval),
+		isClient:              isClinet,
+		underlays:             make([]Underlay, 0),
+		chAccept:              make(chan net.Conn, sessionChanCapacity),
+		chAcceptErr:           make(chan error, 1), // non-blocking
+		done:                  make(chan struct{}),
+		cleaner:               time.NewTicker(idleUnderlayTickerInterval),
+		userCipherCacheWarmer: time.NewTicker(userCipherCacheWarmInterval),
 	}
 
-	// Run idle underlay cleaner in the background.
+	// Run maintenance tasks in the background.
 	go func() {
 		for {
 			select {
@@ -85,8 +91,11 @@ func NewMux(isClinet bool) *Mux {
 				mux.mu.Lock()
 				mux.cleanUnderlay()
 				mux.mu.Unlock()
+			case <-mux.userCipherCacheWarmer.C:
+				mux.warmUserCipherCache()
 			case <-mux.done:
 				mux.cleaner.Stop()
+				mux.userCipherCacheWarmer.Stop()
 				return
 			}
 		}
@@ -617,5 +626,49 @@ func (m *Mux) cleanUnderlay() {
 	m.underlays = remaining
 	if cnt > 0 {
 		log.Debugf("Mux cleaned %d underlays", cnt)
+	}
+}
+
+func (m *Mux) warmUserCipherCache() {
+	if m.isClient {
+		return
+	}
+
+	m.mu.Lock()
+	userList := make([]*appctlpb.User, len(m.users))
+	i := 0
+	for _, user := range m.users {
+		userList[i] = user
+		i++
+	}
+	m.mu.Unlock()
+
+	warmSingleUser := func(user *appctlpb.User) {
+		password, err := hex.DecodeString(user.GetHashedPassword())
+		if err != nil {
+			return
+		}
+		if len(password) == 0 {
+			password = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
+		}
+		cipher.BlockCipherListFromPassword(password, true)
+	}
+
+	cpus := runtime.NumCPU()
+	if len(userList) <= cpus {
+		for _, user := range userList {
+			warmSingleUser(user)
+		}
+	} else {
+		// Do parallel.
+		for i := 0; i < cpus; i++ {
+			go func(userList []*appctlpb.User, workerID int, nWorker int) {
+				for j := 0; j < len(userList); j++ {
+					if j%nWorker == workerID {
+						warmSingleUser(userList[j])
+					}
+				}
+			}(userList, i, cpus)
+		}
 	}
 }

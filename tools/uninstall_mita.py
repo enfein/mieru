@@ -28,7 +28,7 @@ import subprocess
 import sys
 
 
-def uninstall() -> None:
+def uninstall_mita() -> None:
     print('[check permission]')
     uid = os.getuid()
     if uid != 0:
@@ -111,4 +111,4 @@ def print_exit(*values: object) -> None:
 
 
 if __name__ == '__main__':
-    uninstall()
+    uninstall_mita()
