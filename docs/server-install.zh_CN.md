@@ -20,8 +20,6 @@ curl -LSO https://github.com/enfein/mieru/releases/download/v2.7.0/mita-2.7.0-1.
 curl -LSO https://github.com/enfein/mieru/releases/download/v2.7.0/mita-2.7.0-1.aarch64.rpm
 ```
 
-如果上述链接被墙，请翻墙后使用浏览器从 GitHub Releases 页面下载安装。
-
 ## 安装 mita 软件包
 
 ```sh
@@ -37,6 +35,8 @@ sudo rpm -Uvh --force mita-2.7.0-1.x86_64.rpm
 # RedHat / CentOS / Rocky Linux - ARM 64
 sudo rpm -Uvh --force mita-2.7.0-1.aarch64.rpm
 ```
+
+上述指令也可以用来升级 mita 软件包的版本。
 
 ## 赋予当前用户操作 mita 的权限，重新登录使此设置生效
 

@@ -20,8 +20,6 @@ curl -LSO https://github.com/enfein/mieru/releases/download/v2.7.0/mita-2.7.0-1.
 curl -LSO https://github.com/enfein/mieru/releases/download/v2.7.0/mita-2.7.0-1.aarch64.rpm
 ```
 
-If the above link is blocked, please use your browser to download and install from the GitHub Releases page.
-
 ## Install mita package
 
 ```sh
@@ -37,6 +35,8 @@ sudo rpm -Uvh --force mita-2.7.0-1.x86_64.rpm
 # RedHat / CentOS / Rocky Linux - ARM 64
 sudo rpm -Uvh --force mita-2.7.0-1.aarch64.rpm
 ```
+
+Those instructions can also be used to upgrade the version of mita software package.
 
 ## Grant permissions, logout and login again to make the change effective
 
