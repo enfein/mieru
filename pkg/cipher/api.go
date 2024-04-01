@@ -67,8 +67,12 @@ type BlockCipher interface {
 	// This method is not supported by stateful BlockCipher.
 	DecryptWithNonce(ciphertext, nonce []byte) ([]byte, error)
 
+	// NonceSize returns the size of the nonce that must be passed to Seal
+	// and Open.
 	NonceSize() int
 
+	// Overhead returns the maximum difference between the lengths of a
+	// plaintext and its ciphertext.
 	Overhead() int
 
 	// Clone method creates a deep copy of block cipher itself.

@@ -23,19 +23,29 @@ import (
 	"sync"
 
 	"github.com/enfein/mieru/pkg/util"
+
+	"golang.org/x/crypto/chacha20poly1305"
 )
 
 const (
 	noncePrintablePrefixLen = 8
 )
 
-var (
-	_ BlockCipher = &AESGCMBlockCipher{}
+type AEADType uint8
+
+const (
+	AES256GCM AEADType = iota
+	ChaCha20Poly1305
 )
 
-// AESGCMBlockCipher implements BlockCipher interface with AES-GCM algorithm.
-type AESGCMBlockCipher struct {
+var (
+	_ BlockCipher = &AEADBlockCipher{}
+)
+
+// AEADBlockCipher implements BlockCipher interface with one AEAD algorithm.
+type AEADBlockCipher struct {
 	aead                cipher.AEAD
+	aeadType            AEADType
 	enableImplicitNonce bool
 	key                 []byte
 	implicitNonce       []byte
@@ -43,10 +53,11 @@ type AESGCMBlockCipher struct {
 	ctx                 BlockContext
 }
 
-// newAESGCMBlockCipher creates a new cipher with the supplied key.
-func newAESGCMBlockCipher(key []byte) (*AESGCMBlockCipher, error) {
-	if err := validateKeySize(key); err != nil {
-		return nil, err
+// newAESGCMBlockCipher creates a new AES-GCM cipher with the supplied key.
+func newAESGCMBlockCipher(key []byte) (*AEADBlockCipher, error) {
+	keyLen := len(key)
+	if keyLen != 16 && keyLen != 24 && keyLen != 32 {
+		return nil, fmt.Errorf("AES key length is %d, want 16 or 24 or 32", keyLen)
 	}
 
 	block, err := aes.NewCipher(key)
@@ -59,31 +70,51 @@ func newAESGCMBlockCipher(key []byte) (*AESGCMBlockCipher, error) {
 		return nil, fmt.Errorf("cipher.NewGCM() failed: %w", err)
 	}
 
-	c := &AESGCMBlockCipher{
+	return &AEADBlockCipher{
 		aead:                aead,
+		aeadType:            AES256GCM,
 		enableImplicitNonce: false,
 		key:                 key,
 		implicitNonce:       nil,
+	}, nil
+}
+
+// newChaCha20Poly1305BlockCipher creates a new AES-GCM cipher with the supplied key.
+func newChaCha20Poly1305BlockCipher(key []byte) (*AEADBlockCipher, error) {
+	keyLen := len(key)
+	if keyLen != 32 {
+		return nil, fmt.Errorf("ChaCha20-Poly1305 key length is %d, want 32", keyLen)
 	}
 
-	return c, nil
+	aead, err := chacha20poly1305.New(key)
+	if err != nil {
+		return nil, fmt.Errorf("chacha20poly1305.New() failed: %w", err)
+	}
+
+	return &AEADBlockCipher{
+		aead:                aead,
+		aeadType:            ChaCha20Poly1305,
+		enableImplicitNonce: false,
+		key:                 key,
+		implicitNonce:       nil,
+	}, nil
 }
 
 // BlockSize returns the block size of cipher.
-func (*AESGCMBlockCipher) BlockSize() int {
+func (*AEADBlockCipher) BlockSize() int {
 	return aes.BlockSize
 }
 
 // NonceSize returns the number of bytes used by nonce.
-func (c *AESGCMBlockCipher) NonceSize() int {
+func (c *AEADBlockCipher) NonceSize() int {
 	return c.aead.NonceSize()
 }
 
-func (c *AESGCMBlockCipher) Overhead() int {
+func (c *AEADBlockCipher) Overhead() int {
 	return c.aead.Overhead()
 }
 
-func (c *AESGCMBlockCipher) Encrypt(plaintext []byte) ([]byte, error) {
+func (c *AEADBlockCipher) Encrypt(plaintext []byte) ([]byte, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var nonce []byte
@@ -117,7 +148,7 @@ func (c *AESGCMBlockCipher) Encrypt(plaintext []byte) ([]byte, error) {
 	return dst, nil
 }
 
-func (c *AESGCMBlockCipher) EncryptWithNonce(plaintext, nonce []byte) ([]byte, error) {
+func (c *AEADBlockCipher) EncryptWithNonce(plaintext, nonce []byte) ([]byte, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.enableImplicitNonce {
@@ -129,7 +160,7 @@ func (c *AESGCMBlockCipher) EncryptWithNonce(plaintext, nonce []byte) ([]byte, e
 	return c.aead.Seal(nil, nonce, plaintext, nil), nil
 }
 
-func (c *AESGCMBlockCipher) Decrypt(ciphertext []byte) ([]byte, error) {
+func (c *AEADBlockCipher) Decrypt(ciphertext []byte) ([]byte, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var nonce []byte
@@ -160,7 +191,7 @@ func (c *AESGCMBlockCipher) Decrypt(ciphertext []byte) ([]byte, error) {
 	return plaintext, nil
 }
 
-func (c *AESGCMBlockCipher) DecryptWithNonce(ciphertext, nonce []byte) ([]byte, error) {
+func (c *AEADBlockCipher) DecryptWithNonce(ciphertext, nonce []byte) ([]byte, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.enableImplicitNonce {
@@ -176,13 +207,23 @@ func (c *AESGCMBlockCipher) DecryptWithNonce(ciphertext, nonce []byte) ([]byte, 
 	return plaintext, nil
 }
 
-func (c *AESGCMBlockCipher) Clone() BlockCipher {
+func (c *AEADBlockCipher) Clone() BlockCipher {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	newCipher, err := newAESGCMBlockCipher(c.key)
+
+	var newCipher *AEADBlockCipher
+	var err error
+	if c.aeadType == AES256GCM {
+		newCipher, err = newAESGCMBlockCipher(c.key)
+	} else if c.aeadType == ChaCha20Poly1305 {
+		newCipher, err = newChaCha20Poly1305BlockCipher(c.key)
+	} else {
+		panic("invalid AEAD type")
+	}
 	if err != nil {
 		panic(err)
 	}
+
 	newCipher.enableImplicitNonce = c.enableImplicitNonce
 	if len(c.implicitNonce) != 0 {
 		newCipher.implicitNonce = make([]byte, len(c.implicitNonce))
@@ -192,7 +233,7 @@ func (c *AESGCMBlockCipher) Clone() BlockCipher {
 	return newCipher
 }
 
-func (c *AESGCMBlockCipher) SetImplicitNonceMode(enable bool) {
+func (c *AEADBlockCipher) SetImplicitNonceMode(enable bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.enableImplicitNonce = enable
@@ -201,22 +242,22 @@ func (c *AESGCMBlockCipher) SetImplicitNonceMode(enable bool) {
 	}
 }
 
-func (c *AESGCMBlockCipher) IsStateless() bool {
+func (c *AEADBlockCipher) IsStateless() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return !c.enableImplicitNonce
 }
 
-func (c *AESGCMBlockCipher) BlockContext() BlockContext {
+func (c *AEADBlockCipher) BlockContext() BlockContext {
 	return c.ctx
 }
 
-func (c *AESGCMBlockCipher) SetBlockContext(bc BlockContext) {
+func (c *AEADBlockCipher) SetBlockContext(bc BlockContext) {
 	c.ctx = bc
 }
 
 // newNonce generates a new nonce.
-func (c *AESGCMBlockCipher) newNonce() ([]byte, error) {
+func (c *AEADBlockCipher) newNonce() ([]byte, error) {
 	nonce := make([]byte, c.NonceSize())
 	if _, err := crand.Read(nonce); err != nil {
 		return nil, err
@@ -231,7 +272,7 @@ func (c *AESGCMBlockCipher) newNonce() ([]byte, error) {
 	return nonce, nil
 }
 
-func (c *AESGCMBlockCipher) increaseNonce() {
+func (c *AEADBlockCipher) increaseNonce() {
 	if !c.enableImplicitNonce || len(c.implicitNonce) == 0 {
 		panic("implicit nonce mode is not enabled")
 	}
@@ -242,13 +283,4 @@ func (c *AESGCMBlockCipher) increaseNonce() {
 			break
 		}
 	}
-}
-
-// validateKeySize validates if key size is acceptable.
-func validateKeySize(key []byte) error {
-	keyLen := len(key)
-	if keyLen != 16 && keyLen != 24 && keyLen != 32 {
-		return fmt.Errorf("AES key length is %d, want 16 or 24 or 32", keyLen)
-	}
-	return nil
 }
