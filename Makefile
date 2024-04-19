@@ -47,7 +47,7 @@ bin: lib client-android client-linux client-mac client-windows server-linux
 lib: fmt vet
 	CGO_ENABLED=0 go build -v ./...
 	CGO_ENABLED=0 go test -timeout=1m0s -coverprofile coverage.out ./...
-	CGO_ENABLED=0 go test -bench=. ./pkg/cipher
+	CGO_ENABLED=0 go test -bench=. -benchtime=5s ./pkg/cipher
 	go tool cover -html coverage.out -o coverage.html
 
 # Build Android clients.

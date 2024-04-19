@@ -300,6 +300,27 @@ func BenchmarkChaCha20Poly1305Stateful(b *testing.B) {
 	benchmarkEncryptDecryptStateful(b, block, block2, data)
 }
 
+func BenchmarkXChaCha20Poly1305Stateless(b *testing.B) {
+	key, data := benchmarkGenKeyAndData(b)
+	block, err := newXChaCha20Poly1305BlockCipher(key)
+	if err != nil {
+		b.Fatalf("newXChaCha20Poly1305BlockCipher() failed: %v", err)
+	}
+	block.SetImplicitNonceMode(false)
+	benchmarkEncryptDecryptStateless(b, block, data)
+}
+
+func BenchmarkXChaCha20Poly1305Stateful(b *testing.B) {
+	key, data := benchmarkGenKeyAndData(b)
+	block, err := newXChaCha20Poly1305BlockCipher(key)
+	if err != nil {
+		b.Fatalf("newXChaCha20Poly1305BlockCipher() failed: %v", err)
+	}
+	block.SetImplicitNonceMode(true)
+	block2 := block.Clone().(*AEADBlockCipher)
+	benchmarkEncryptDecryptStateful(b, block, block2, data)
+}
+
 func benchmarkEncryptDecryptStateless(b *testing.B, block BlockCipher, data []byte) {
 	b.Helper()
 	b.ResetTimer()

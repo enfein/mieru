@@ -36,6 +36,7 @@ type AEADType uint8
 const (
 	AES256GCM AEADType = iota
 	ChaCha20Poly1305
+	XChaCha20Poly1305
 )
 
 var (
@@ -79,7 +80,7 @@ func newAESGCMBlockCipher(key []byte) (*AEADBlockCipher, error) {
 	}, nil
 }
 
-// newChaCha20Poly1305BlockCipher creates a new AES-GCM cipher with the supplied key.
+// newChaCha20Poly1305BlockCipher creates a new ChaCha20-Poly1305 cipher with the supplied key.
 func newChaCha20Poly1305BlockCipher(key []byte) (*AEADBlockCipher, error) {
 	keyLen := len(key)
 	if keyLen != 32 {
@@ -94,6 +95,27 @@ func newChaCha20Poly1305BlockCipher(key []byte) (*AEADBlockCipher, error) {
 	return &AEADBlockCipher{
 		aead:                aead,
 		aeadType:            ChaCha20Poly1305,
+		enableImplicitNonce: false,
+		key:                 key,
+		implicitNonce:       nil,
+	}, nil
+}
+
+// newXChaCha20Poly1305BlockCipher creates a new XChaCha20-Poly1305 cipher with the supplied key.
+func newXChaCha20Poly1305BlockCipher(key []byte) (*AEADBlockCipher, error) {
+	keyLen := len(key)
+	if keyLen != 32 {
+		return nil, fmt.Errorf("XChaCha20-Poly1305 key length is %d, want 32", keyLen)
+	}
+
+	aead, err := chacha20poly1305.NewX(key)
+	if err != nil {
+		return nil, fmt.Errorf("chacha20poly1305.NewX() failed: %w", err)
+	}
+
+	return &AEADBlockCipher{
+		aead:                aead,
+		aeadType:            XChaCha20Poly1305,
 		enableImplicitNonce: false,
 		key:                 key,
 		implicitNonce:       nil,
@@ -217,6 +239,8 @@ func (c *AEADBlockCipher) Clone() BlockCipher {
 		newCipher, err = newAESGCMBlockCipher(c.key)
 	} else if c.aeadType == ChaCha20Poly1305 {
 		newCipher, err = newChaCha20Poly1305BlockCipher(c.key)
+	} else if c.aeadType == XChaCha20Poly1305 {
+		newCipher, err = newXChaCha20Poly1305BlockCipher(c.key)
 	} else {
 		panic("invalid AEAD type")
 	}
