@@ -21,7 +21,7 @@ import (
 	"time"
 )
 
-const cacheValidInterval = 30 * time.Second
+const cacheValidInterval = KeyRefreshInterval / 2
 
 type cachedCiphers struct {
 	cipherList []BlockCipher
@@ -87,7 +87,7 @@ func newBlockCipherList(password []byte, stateless bool) ([]BlockCipher, time.Ti
 	for i := 0; i < 3; i++ {
 		keygen := pbkdf2Gen{
 			Salt: salts[i],
-			Iter: defaultIter,
+			Iter: KeyIter,
 		}
 		cipherKey, err := keygen.NewKey(password, DefaultKeyLen)
 		if err != nil {

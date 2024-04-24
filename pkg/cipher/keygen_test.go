@@ -32,7 +32,7 @@ func BenchmarkNewKey(b *testing.B) {
 	salts := saltFromTime(t)
 	keygen := pbkdf2Gen{
 		Salt: salts[1],
-		Iter: defaultIter,
+		Iter: KeyIter,
 	}
 
 	b.ResetTimer()
@@ -61,7 +61,7 @@ func hasOverlap(a, b [][]byte) bool {
 
 func TestSaltFromTimeCoverage(t *testing.T) {
 	noOverlap := 0
-	nTest := 30
+	nTest := 10
 
 	for i := 1; i <= nTest; i++ {
 		forward, err := time.ParseDuration(fmt.Sprintf("%dm", i))

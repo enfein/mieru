@@ -25,13 +25,17 @@ import (
 )
 
 const (
-	// defaultIter is the default number of iterations to generate the key.
+	// KeyIter is the number of iterations to generate a key.
 	// This is part of mieru protocol. This value should not be changed.
-	defaultIter = 4096
+	//
+	// In mieru v2, the value was 4096.
+	KeyIter = 64
 
-	// refreshInterval is the amount of time when the salt used to generate cipher block is changed.
+	// KeyRefreshInterval is the amount of time when the salt used to generate cipher block is changed.
 	// This is part of mieru protocol. This value should not be changed.
-	refreshInterval = 1 * time.Minute
+	//
+	// In mieru v2, the value was 1 * time.Minute.
+	KeyRefreshInterval = 2 * time.Minute
 )
 
 // pbkdf2Gen implements KeyGenerator with PBKDF2 algorithm.
@@ -51,10 +55,10 @@ func (g *pbkdf2Gen) NewKey(password []byte, keyLen int) ([]byte, error) {
 // saltFromTime generate three salts (each 32 bytes) based on the time.
 func saltFromTime(t time.Time) [][]byte {
 	var times []time.Time
-	rounded := t.Round(refreshInterval)
-	times = append(times, rounded.Add(-refreshInterval))
+	rounded := t.Round(KeyRefreshInterval)
+	times = append(times, rounded.Add(-KeyRefreshInterval))
 	times = append(times, rounded)
-	times = append(times, rounded.Add(refreshInterval))
+	times = append(times, rounded.Add(KeyRefreshInterval))
 
 	b := make([]byte, 8) // 64 bits
 	var salts [][]byte

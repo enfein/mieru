@@ -51,7 +51,7 @@ type TCPUnderlay struct {
 
 var _ Underlay = &TCPUnderlay{}
 
-var tcpReplayCache = replay.NewCache(4*1024*1024, 2*time.Minute)
+var tcpReplayCache = replay.NewCache(4*1024*1024, cipher.KeyRefreshInterval*3)
 
 // NewTCPUnderlay connects to the remote address "raddr" on the network "tcp"
 // with packet encryption. If "laddr" is empty, an automatic address is used.

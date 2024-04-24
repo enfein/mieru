@@ -44,7 +44,7 @@ const (
 	readOneSegmentTimeout = 5 * time.Second
 )
 
-var udpReplayCache = replay.NewCache(4*1024*1024, 2*time.Minute)
+var udpReplayCache = replay.NewCache(4*1024*1024, cipher.KeyRefreshInterval*3)
 
 type UDPUnderlay struct {
 	// ---- common fields ----

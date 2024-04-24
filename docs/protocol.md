@@ -14,9 +14,9 @@ The first step is to generate a hashed password `hashedPassword`, whose value is
 
 The second step is to get the current time of the system `unixTime`, whose value is equal to the number of seconds elapsed between January 1, 1970 and now. Round the time of `unixTime` to the nearest 1 minute, and store it as an 8-byte string from uint64. Get the SHA-256 checksum of the string as `timeSalt`.
 
-In the third step, the key is generated using the [pbkdf2](https://en.wikipedia.org/wiki/PBKDF2) algorithm. In this case, `hashedPassword` is used as the password, `timeSalt` is used as the salt, the number of iterations is 4096, the length of the key is 32 bytes, and the hash algorithm is SHA-256.
+In the third step, the key is generated using the [pbkdf2](https://en.wikipedia.org/wiki/PBKDF2) algorithm. In this case, `hashedPassword` is used as the password, `timeSalt` is used as the salt, the number of iterations is 64, the length of the key is 32 bytes, and the hash algorithm is SHA-256.
 
-Since the key depends on the system time, the time difference between the client and the server must not be larger than 2 minutes. The server may need to try several different `timeSalt` to decrypt it successfully.
+Since the key depends on the system time, the time difference between the client and the server must not be larger than 4 minutes. The server may need to try several different `timeSalt` to decrypt it successfully.
 
 The mieru protocol allows the use of any [AEAD](https://en.wikipedia.org/wiki/Authenticated_encryption) algorithm for encryption. The current version of mieru only implements the AES-256-GCM algorithm.
 
