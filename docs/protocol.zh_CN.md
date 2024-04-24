@@ -12,11 +12,11 @@ TCP 和 UDP 协议共用同一套密钥生成方法。
 
 第一步，生成一个哈希密码 `hashedPassword`，其值等于 `password` 附加一个 `0x00` 字节再附加 `username` 得到的字符串的 SHA-256 校验码。
 
-第二步，获取系统当前的时间 `unixTime`，其值等于 1970 年 1 月 1 日到现在经历的秒数。将 `unixTime` 的时刻四舍五入到最接近的 1 分钟，以 uint64 存储为一个 8 字节的字符串，取得该字符串的 SHA-256 校验码，记为 `timeSalt`。
+第二步，获取系统当前的时间 `unixTime`，其值等于 1970 年 1 月 1 日到现在经历的秒数。将 `unixTime` 的时刻四舍五入到最接近的 2 分钟，以 uint64 存储为一个 8 字节的字符串，取得该字符串的 SHA-256 校验码，记为 `timeSalt`。
 
 第三步，使用 [pbkdf2](https://en.wikipedia.org/wiki/PBKDF2) 算法生成密钥。其中，使用 `hashedPassword` 作为密码，使用 `timeSalt` 作为盐，迭代次数为 64，密钥长度为 32 字节，哈希算法为 SHA-256。
 
-由于密钥依赖于系统时间，客户端和服务器之间的时间差不能超过四分钟。服务器可能需要尝试几组不同的时刻才能顺利解密。
+由于密钥依赖于系统时间，客户端和服务器之间的时间差不能超过 4 分钟。服务器最多需要尝试 3 组不同的时刻才能顺利解密。
 
 mieru 协议允许使用任何 [AEAD](https://en.wikipedia.org/wiki/Authenticated_encryption) 算法进行加密。当前 mieru 版本只实现了 AES-256-GCM 算法。
 
