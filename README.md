@@ -19,7 +19,7 @@ For an explanation of the mieru protocol, see [mieru Proxy Protocol](./docs/prot
 
 ## Features
 
-1. mieru uses a high-strength AES-256-GCM encryption algorithm that generates encryption keys based on username, password and system time.
+1. mieru uses a high-strength XChaCha20-Poly1305 encryption algorithm that generates encryption keys based on username, password and system time.
 2. mieru implements complete encryption of all transmitted content between the client and the proxy server, without transmitting any plaintext information.
 3. When mieru sends a packet, it is padded with random bytes at the end. Even when the same content is transmitted, the packet size varies.
 4. When using the UDP transport protocol, mieru does not require a handshake between client and server.

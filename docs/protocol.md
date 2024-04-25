@@ -18,7 +18,7 @@ In the third step, the key is generated using the [pbkdf2](https://en.wikipedia.
 
 Since the key depends on the system time, the time difference between the client and the server must not be larger than 4 minutes. The server needs to try maximum 3 different `timeSalt` to decrypt it successfully.
 
-The mieru protocol allows the use of any [AEAD](https://en.wikipedia.org/wiki/Authenticated_encryption) algorithm for encryption. The current version of mieru only implements the AES-256-GCM algorithm.
+The mieru protocol allows the use of any [AEAD](https://en.wikipedia.org/wiki/Authenticated_encryption) algorithm for encryption. The current version of mieru only implements the XChaCha20-Poly1305 algorithm.
 
 ## Segment Format
 
@@ -26,7 +26,7 @@ When mieru receives a network access request from a user, it divides the origina
 
 | padding 0 | nonce | encrypted metadata | auth tag of encrypted metadata | padding 1 | encrypted payload | auth tag of encrypted payload | padding 2 |
 | :----: | :----: | :----: | :----: | :----: | :----: | :----: | :----: |
-| ? | 0 or 12 | 32 | 16 | ? | size of original fragment | 16 | ? |
+| ? | 0 or 12 or 24 | 32 | 16 | ? | size of original fragment | 16 | ? |
 
 Among these, `encrypted metadata` and `auth tag of encrypted metadata` will appear in every segment, while the other fields are not mandatory. `padding 0`, `padding 1`, and `padding 2` are randomly generated non-encrypted content used by mieru to adjust the information entropy of the segment, and the length of consecutive printable characters, among other factors.
 

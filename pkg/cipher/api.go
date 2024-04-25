@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	DefaultNonceSize = 12 // 12 bytes
+	DefaultNonceSize = 24 // 24 bytes. In mieru v2, the value was 12.
 	DefaultOverhead  = 16 // 16 bytes
 	DefaultKeyLen    = 32 // 256 bits
 

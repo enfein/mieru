@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	noncePrintablePrefixLen = 8
+	noncePrintablePrefixLen = 12
 )
 
 type AEADType uint8

@@ -93,9 +93,9 @@ func newBlockCipherList(password []byte, stateless bool) ([]BlockCipher, time.Ti
 		if err != nil {
 			return nil, t, fmt.Errorf("NewKey() failed: %w", err)
 		}
-		blockCipher, err := newAESGCMBlockCipher(cipherKey)
+		blockCipher, err := newXChaCha20Poly1305BlockCipher(cipherKey)
 		if err != nil {
-			return nil, t, fmt.Errorf("NewAESGCMBlockCipher() failed: %w", err)
+			return nil, t, fmt.Errorf("newXChaCha20Poly1305BlockCipher() failed: %w", err)
 		}
 		if !stateless {
 			blockCipher.SetImplicitNonceMode(true)

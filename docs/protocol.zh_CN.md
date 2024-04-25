@@ -18,7 +18,7 @@ TCP 和 UDP 协议共用同一套密钥生成方法。
 
 由于密钥依赖于系统时间，客户端和服务器之间的时间差不能超过 4 分钟。服务器最多需要尝试 3 组不同的时刻才能顺利解密。
 
-mieru 协议允许使用任何 [AEAD](https://en.wikipedia.org/wiki/Authenticated_encryption) 算法进行加密。当前 mieru 版本只实现了 AES-256-GCM 算法。
+mieru 协议允许使用任何 [AEAD](https://en.wikipedia.org/wiki/Authenticated_encryption) 算法进行加密。当前 mieru 版本只实现了 XChaCha20-Poly1305 算法。
 
 ## 数据段的格式
 
@@ -26,7 +26,7 @@ mieru 收到用户的网络访问请求后，会将原始数据流量切分成�
 
 | padding 0 | nonce | encrypted metadata | auth tag of encrypted metadata | padding 1 | encrypted payload | auth tag of encrypted payload | padding 2 |
 | :----: | :----: | :----: | :----: | :----: | :----: | :----: | :----: |
-| ? | 0 or 12 | 32 | 16 | ? | size of original fragment | 16 | ? |
+| ? | 0 or 12 or 24 | 32 | 16 | ? | size of original fragment | 16 | ? |
 
 这其中，`encrypted metadata` 和 `auth tag of encrypted metadata` 会出现在每一个数据段中，其它的数据项则不是必须的。`padding 0`, `padding 1` 和 `padding 2` 是随机生成的非加密内容，mieru 使用这些填充数据调节数据段的信息熵，以及连续可打印字符的长度等信息。
 
