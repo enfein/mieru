@@ -8,32 +8,32 @@
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v2.7.0/mita_2.7.0_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.0.0/mita_3.0.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v2.7.0/mita_2.7.0_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.0.0/mita_3.0.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v2.7.0/mita-2.7.0-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.0.0/mita-3.0.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v2.7.0/mita-2.7.0-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.0.0/mita-3.0.0-1.aarch64.rpm
 ```
 
 ## 安装 mita 软件包
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_2.7.0_amd64.deb
+sudo dpkg -i mita_3.0.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_2.7.0_arm64.deb
+sudo dpkg -i mita_3.0.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-2.7.0-1.x86_64.rpm
+sudo rpm -Uvh --force mita-3.0.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-2.7.0-1.aarch64.rpm
+sudo rpm -Uvh --force mita-3.0.0-1.aarch64.rpm
 ```
 
 上述指令也可以用来升级 mita 软件包的版本。
