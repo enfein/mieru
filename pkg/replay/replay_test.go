@@ -170,7 +170,7 @@ func TestExpireInterval(t *testing.T) {
 		t.Errorf("cache sizes are %d %d, want 1 0.", curr, prev)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(75 * time.Millisecond)
 
 	if res := cache.IsDuplicate(a, replay.EmptyTag); res == false {
 		t.Errorf("IsDuplicate() = false, want true")
@@ -179,12 +179,12 @@ func TestExpireInterval(t *testing.T) {
 		t.Errorf("cache sizes are %d %d, want 1 1.", curr, prev)
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(150 * time.Millisecond)
 
 	if res := cache.IsDuplicate(b, replay.EmptyTag); res == true {
 		t.Errorf("IsDuplicate() = true, want false")
 	}
-	if curr, prev := cache.Sizes(); curr != 1 || prev != 1 {
-		t.Errorf("cache sizes are %d %d, want 1 1.", curr, prev)
+	if curr, prev := cache.Sizes(); curr != 1 || prev != 0 {
+		t.Errorf("cache sizes are %d %d, want 1 0.", curr, prev)
 	}
 }

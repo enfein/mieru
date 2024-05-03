@@ -90,7 +90,14 @@ func (c *ReplayCache) IsDuplicate(data []byte, tag string) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	if time.Since(c.expireTime) > c.expireInterval {
+		// Both current and previous are expired.
+		c.current = make(map[uint64]string)
+		c.previous = make(map[uint64]string)
+		c.expireTime = time.Now().Add(c.expireInterval)
+	}
 	if len(c.current) >= c.capacity || time.Now().After(c.expireTime) {
+		// Move current to previous.
 		c.previous = c.current
 		c.current = make(map[uint64]string)
 		c.expireTime = time.Now().Add(c.expireInterval)
