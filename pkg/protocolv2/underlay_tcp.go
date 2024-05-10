@@ -303,7 +303,11 @@ func (t *TCPUnderlay) readOneSegment() (*segment, error, stderror.ErrorType) {
 	if _, err := io.ReadFull(t.conn, encryptedMeta); err != nil {
 		return nil, fmt.Errorf("metadata: read %d bytes from TCPUnderlay failed: %w", readLen, err), stderror.NETWORK_ERROR
 	}
-	metrics.InBytes.Add(int64(len(encryptedMeta)))
+	if t.isClient {
+		metrics.DownloadBytes.Add(int64(len(encryptedMeta)))
+	} else {
+		metrics.UploadBytes.Add(int64(len(encryptedMeta)))
+	}
 	if tcpReplayCache.IsDuplicate(encryptedMeta[:cipher.DefaultOverhead], replay.EmptyTag) {
 		if firstRead {
 			replay.NewSession.Add(1)
@@ -374,7 +378,11 @@ func (t *TCPUnderlay) readSessionSegment(ss *sessionStruct) (*segment, error, st
 		if _, err := io.ReadFull(t.conn, encryptedPayload); err != nil {
 			return nil, fmt.Errorf("payload: read %d bytes from TCPUnderlay failed: %w", ss.payloadLen+cipher.DefaultOverhead, err), stderror.NETWORK_ERROR
 		}
-		metrics.InBytes.Add(int64(len(encryptedPayload)))
+		if t.isClient {
+			metrics.DownloadBytes.Add(int64(len(encryptedPayload)))
+		} else {
+			metrics.UploadBytes.Add(int64(len(encryptedPayload)))
+		}
 		if tcpReplayCache.IsDuplicate(encryptedPayload[:cipher.DefaultOverhead], replay.EmptyTag) {
 			replay.KnownSession.Add(1)
 		}
@@ -398,7 +406,11 @@ func (t *TCPUnderlay) readSessionSegment(ss *sessionStruct) (*segment, error, st
 		if _, err := io.ReadFull(t.conn, padding); err != nil {
 			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", ss.suffixLen, err), stderror.NETWORK_ERROR
 		}
-		metrics.InBytes.Add(int64(len(padding)))
+		if t.isClient {
+			metrics.DownloadBytes.Add(int64(len(padding)))
+		} else {
+			metrics.UploadBytes.Add(int64(len(padding)))
+		}
 	}
 
 	return &segment{
@@ -418,14 +430,22 @@ func (t *TCPUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error, s
 		if _, err := io.ReadFull(t.conn, padding1); err != nil {
 			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", das.prefixLen, err), stderror.NETWORK_ERROR
 		}
-		metrics.InBytes.Add(int64(len(padding1)))
+		if t.isClient {
+			metrics.DownloadBytes.Add(int64(len(padding1)))
+		} else {
+			metrics.UploadBytes.Add(int64(len(padding1)))
+		}
 	}
 	if das.payloadLen > 0 {
 		encryptedPayload := make([]byte, das.payloadLen+cipher.DefaultOverhead)
 		if _, err := io.ReadFull(t.conn, encryptedPayload); err != nil {
 			return nil, fmt.Errorf("payload: read %d bytes from TCPUnderlay failed: %w", das.payloadLen+cipher.DefaultOverhead, err), stderror.NETWORK_ERROR
 		}
-		metrics.InBytes.Add(int64(len(encryptedPayload)))
+		if t.isClient {
+			metrics.DownloadBytes.Add(int64(len(encryptedPayload)))
+		} else {
+			metrics.UploadBytes.Add(int64(len(encryptedPayload)))
+		}
 		if tcpReplayCache.IsDuplicate(encryptedPayload[:cipher.DefaultOverhead], replay.EmptyTag) {
 			replay.KnownSession.Add(1)
 		}
@@ -449,7 +469,11 @@ func (t *TCPUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error, s
 		if _, err := io.ReadFull(t.conn, padding2); err != nil {
 			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", das.suffixLen, err), stderror.NETWORK_ERROR
 		}
-		metrics.InBytes.Add(int64(len(padding2)))
+		if t.isClient {
+			metrics.DownloadBytes.Add(int64(len(padding2)))
+		} else {
+			metrics.UploadBytes.Add(int64(len(padding2)))
+		}
 	}
 
 	return &segment{
@@ -499,8 +523,12 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 		if _, err := t.conn.Write(dataToSend); err != nil {
 			return fmt.Errorf("Write() failed: %w", err)
 		}
-		metrics.OutBytes.Add(int64(len(dataToSend)))
-		metrics.OutPaddingBytes.Add(int64(len(padding)))
+		if t.isClient {
+			metrics.UploadBytes.Add(int64(len(dataToSend)))
+		} else {
+			metrics.DownloadBytes.Add(int64(len(dataToSend)))
+		}
+		metrics.OutputPaddingBytes.Add(int64(len(padding)))
 	} else if das, ok := toDataAckStruct(seg.metadata); ok {
 		padding1 := newPadding(paddingOpts{
 			maxLen: MaxPaddingSize(t.mtu, t.IPVersion(), t.TransportProtocol(), int(das.payloadLen), 0),
@@ -534,9 +562,13 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 		if _, err := t.conn.Write(dataToSend); err != nil {
 			return fmt.Errorf("Write() failed: %w", err)
 		}
-		metrics.OutBytes.Add(int64(len(dataToSend)))
-		metrics.OutPaddingBytes.Add(int64(len(padding1)))
-		metrics.OutPaddingBytes.Add(int64(len(padding2)))
+		if t.isClient {
+			metrics.UploadBytes.Add(int64(len(dataToSend)))
+		} else {
+			metrics.DownloadBytes.Add(int64(len(dataToSend)))
+		}
+		metrics.OutputPaddingBytes.Add(int64(len(padding1)))
+		metrics.OutputPaddingBytes.Add(int64(len(padding2)))
 	} else {
 		return stderror.ErrInvalidArgument
 	}

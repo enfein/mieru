@@ -106,8 +106,8 @@ type Session struct {
 	ackOnDataRecv atomic.Bool // whether ack should be sent due to receive of new data
 	unreadBuf     []byte      // payload removed from the recvQueue that haven't been read by application
 
-	readBytes  metrics.Metric // number of bytes delivered to the application
-	writeBytes metrics.Metric // number of bytes sent from the application
+	uploadBytes   metrics.Metric // number of bytes from client to server, only used by server
+	downloadBytes metrics.Metric // number of bytes from server to client, only used by server
 
 	rttStat          *congestion.RTTStats
 	sendAlgorithm    *congestion.CubicSendAlgorithm
@@ -190,8 +190,8 @@ func (s *Session) Read(b []byte) (n int, err error) {
 		if log.IsLevelEnabled(log.TraceLevel) {
 			log.Tracef("%v read %d bytes", s, n)
 		}
-		if s.readBytes != nil {
-			s.readBytes.Add(int64(n))
+		if !s.isClient && s.uploadBytes != nil {
+			s.uploadBytes.Add(int64(n))
 		}
 		return n, nil
 	}
@@ -245,8 +245,8 @@ func (s *Session) Read(b []byte) (n int, err error) {
 	if log.IsLevelEnabled(log.TraceLevel) {
 		log.Tracef("%v read %d bytes", s, n)
 	}
-	if s.readBytes != nil {
-		s.readBytes.Add(int64(n))
+	if !s.isClient && s.uploadBytes != nil {
+		s.uploadBytes.Add(int64(n))
 	}
 	return n, nil
 }
@@ -307,8 +307,8 @@ func (s *Session) Write(b []byte) (n int, err error) {
 	if log.IsLevelEnabled(log.TraceLevel) {
 		log.Tracef("%v wrote %d bytes", s, n)
 	}
-	if s.writeBytes != nil {
-		s.writeBytes.Add(int64(n))
+	if !s.isClient && s.downloadBytes != nil {
+		s.downloadBytes.Add(int64(n))
 	}
 	return n, nil
 }
@@ -724,11 +724,13 @@ func (s *Session) input(seg *segment) error {
 	}
 	if seg.block != nil {
 		s.block = seg.block
-		if s.readBytes == nil && s.block.BlockContext().UserName != "" {
-			s.readBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, s.block.BlockContext().UserName), metrics.UserMetricReadBytes, metrics.COUNTER_TIME_SERIES)
-		}
-		if s.writeBytes == nil && s.block.BlockContext().UserName != "" {
-			s.writeBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, s.block.BlockContext().UserName), metrics.UserMetricWriteBytes, metrics.COUNTER_TIME_SERIES)
+		if !s.isClient {
+			if s.uploadBytes == nil && s.block.BlockContext().UserName != "" {
+				s.uploadBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, s.block.BlockContext().UserName), metrics.UserMetricUploadBytes, metrics.COUNTER_TIME_SERIES)
+			}
+			if s.downloadBytes == nil && s.block.BlockContext().UserName != "" {
+				s.downloadBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, s.block.BlockContext().UserName), metrics.UserMetricDownloadBytes, metrics.COUNTER_TIME_SERIES)
+			}
 		}
 	}
 	s.lastRXTime = time.Now()
@@ -958,19 +960,19 @@ func (s *Session) checkQuota(userName string) (ok bool, err error) {
 	if metricGroup == nil {
 		return true, fmt.Errorf("metric group %s is not found", metricGroupName)
 	}
-	readBytes, found := metricGroup.GetMetric(metrics.UserMetricReadBytes)
+	uploadBytes, found := metricGroup.GetMetric(metrics.UserMetricUploadBytes)
 	if !found {
-		return true, fmt.Errorf("metric %s in group %s is not found", metrics.UserMetricReadBytes, metricGroupName)
+		return true, fmt.Errorf("metric %s in group %s is not found", metrics.UserMetricUploadBytes, metricGroupName)
 	}
-	writeBytes, found := metricGroup.GetMetric(metrics.UserMetricWriteBytes)
+	downloadBytes, found := metricGroup.GetMetric(metrics.UserMetricDownloadBytes)
 	if !found {
-		return true, fmt.Errorf("metric %s in group %s is not found", metrics.UserMetricWriteBytes, metricGroupName)
+		return true, fmt.Errorf("metric %s in group %s is not found", metrics.UserMetricDownloadBytes, metricGroupName)
 	}
 	for _, quota := range user.GetQuotas() {
 		now := time.Now()
 		then := now.Add(-time.Duration(quota.GetDays()) * 24 * time.Hour)
-		totalBytes := readBytes.(*metrics.Counter).DeltaBetween(then, now)
-		totalBytes += writeBytes.(*metrics.Counter).DeltaBetween(then, now)
+		totalBytes := uploadBytes.(*metrics.Counter).DeltaBetween(then, now)
+		totalBytes += downloadBytes.(*metrics.Counter).DeltaBetween(then, now)
 		if totalBytes/1048576 > int64(quota.GetMegabytes()) {
 			return false, nil
 		}

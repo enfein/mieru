@@ -365,7 +365,11 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 			continue
 		}
 		b = b[:n]
-		metrics.InBytes.Add(int64(n))
+		if u.isClient {
+			metrics.DownloadBytes.Add(int64(n))
+		} else {
+			metrics.UploadBytes.Add(int64(n))
+		}
 
 		// Read encrypted metadata.
 		encryptedMeta := b[:udpNonHeaderPosition]
@@ -662,8 +666,12 @@ func (u *UDPUnderlay) writeOneSegment(seg *segment, addr *net.UDPAddr) error {
 		if _, err := u.conn.WriteToUDP(dataToSend, addr); err != nil {
 			return fmt.Errorf("WriteToUDP() failed: %w", err)
 		}
-		metrics.OutBytes.Add(int64(len(dataToSend)))
-		metrics.OutPaddingBytes.Add(int64(len(padding)))
+		if u.isClient {
+			metrics.UploadBytes.Add(int64(len(dataToSend)))
+		} else {
+			metrics.DownloadBytes.Add(int64(len(dataToSend)))
+		}
+		metrics.OutputPaddingBytes.Add(int64(len(padding)))
 	} else if das, ok := toDataAckStruct(seg.metadata); ok {
 		padding1 := newPadding(paddingOpts{
 			maxLen: MaxPaddingSize(u.mtu, u.IPVersion(), u.TransportProtocol(), int(das.payloadLen), 0),
@@ -695,9 +703,13 @@ func (u *UDPUnderlay) writeOneSegment(seg *segment, addr *net.UDPAddr) error {
 		if _, err := u.conn.WriteToUDP(dataToSend, addr); err != nil {
 			return fmt.Errorf("WriteToUDP() failed: %w", err)
 		}
-		metrics.OutBytes.Add(int64(len(dataToSend)))
-		metrics.OutPaddingBytes.Add(int64(len(padding1)))
-		metrics.OutPaddingBytes.Add(int64(len(padding2)))
+		if u.isClient {
+			metrics.UploadBytes.Add(int64(len(dataToSend)))
+		} else {
+			metrics.DownloadBytes.Add(int64(len(dataToSend)))
+		}
+		metrics.OutputPaddingBytes.Add(int64(len(padding1)))
+		metrics.OutputPaddingBytes.Add(int64(len(padding2)))
 	} else {
 		return stderror.ErrInvalidArgument
 	}

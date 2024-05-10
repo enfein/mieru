@@ -35,10 +35,10 @@ var (
 	ConnectionRefusedErrors  = metrics.RegisterMetric("socks5", "ConnectionRefusedErrors", metrics.COUNTER)
 	UDPAssociateErrors       = metrics.RegisterMetric("socks5", "UDPAssociateErrors", metrics.COUNTER)
 
-	UDPAssociateInBytes  = metrics.RegisterMetric("socks5 UDP associate", "InBytes", metrics.COUNTER)
-	UDPAssociateOutBytes = metrics.RegisterMetric("socks5 UDP associate", "OutBytes", metrics.COUNTER)
-	UDPAssociateInPkts   = metrics.RegisterMetric("socks5 UDP associate", "InPkts", metrics.COUNTER)
-	UDPAssociateOutPkts  = metrics.RegisterMetric("socks5 UDP associate", "OutPkts", metrics.COUNTER)
+	UDPAssociateUploadBytes     = metrics.RegisterMetric("socks5 UDP associate", "UploadBytes", metrics.COUNTER)
+	UDPAssociateDownloadBytes   = metrics.RegisterMetric("socks5 UDP associate", "DownloadBytes", metrics.COUNTER)
+	UDPAssociateUploadPackets   = metrics.RegisterMetric("socks5 UDP associate", "UploadPackets", metrics.COUNTER)
+	UDPAssociateDownloadPackets = metrics.RegisterMetric("socks5 UDP associate", "DownloadPackets", metrics.COUNTER)
 )
 
 // Config is used to setup and configure a socks5 server.

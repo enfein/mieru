@@ -109,8 +109,8 @@ func TestSocks5Connect(t *testing.T) {
 }
 
 func TestSocks5UDPAssociation(t *testing.T) {
-	udpInPktsCnt := UDPAssociateInPkts.Load()
-	udpOutPktsCnt := UDPAssociateOutPkts.Load()
+	udpUploadPktsCnt := UDPAssociateUploadPackets.Load()
+	udpDownloadPktsCnt := UDPAssociateDownloadPackets.Load()
 
 	// Create a local listener as the destination target.
 	udpListenerAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
@@ -235,10 +235,10 @@ func TestSocks5UDPAssociation(t *testing.T) {
 	}
 
 	// Verify metrics are updated.
-	if UDPAssociateInPkts.Load() <= udpInPktsCnt {
-		t.Errorf("UDPAssociateInPkts value %d is not increased", UDPAssociateInPkts.Load())
+	if UDPAssociateUploadPackets.Load() <= udpUploadPktsCnt {
+		t.Errorf("UDPAssociateUploadPackets value %d is not increased", UDPAssociateUploadPackets.Load())
 	}
-	if UDPAssociateOutPkts.Load() <= udpOutPktsCnt {
-		t.Errorf("UDPAssociateOutPkts value %d is not increased", UDPAssociateOutPkts.Load())
+	if UDPAssociateDownloadPackets.Load() <= udpDownloadPktsCnt {
+		t.Errorf("UDPAssociateDownloadPackets value %d is not increased", UDPAssociateDownloadPackets.Load())
 	}
 }
