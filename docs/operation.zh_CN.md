@@ -80,18 +80,18 @@ mieru start
 ```json
 {
     "cipher - client": {
-        "DirectDecrypt": 25683,
+        "DirectDecrypt": 64540,
         "FailedDirectDecrypt": 0
     },
     "connections": {
-        "ActiveOpens": 2,
+        "ActiveOpens": 130,
         "CurrEstablished": 2,
-        "MaxConn": 2,
+        "MaxConn": 35,
         "PassiveOpens": 0
     },
     "HTTP proxy": {
-        "ConnErrors": 0,
-        "Requests": 2,
+        "ConnErrors": 2,
+        "Requests": 130,
         "SchemeErrors": 0
     },
     "replay": {
@@ -101,27 +101,27 @@ mieru start
     "socks5": {
         "ConnectionRefusedErrors": 0,
         "DNSResolveErrors": 0,
-        "HandshakeErrors": 0,
+        "HandshakeErrors": 1,
         "HostUnreachableErrors": 0,
         "NetworkUnreachableErrors": 0,
         "UDPAssociateErrors": 0,
         "UnsupportedCommandErrors": 0
     },
     "socks5 UDP associate": {
-        "InBytes": 0,
-        "InPkts": 0,
-        "OutBytes": 0,
-        "OutPkts": 0
+        "DownloadBytes": 0,
+        "DownloadPackets": 0,
+        "UploadBytes": 0,
+        "UploadPackets": 0
     },
     "traffic": {
-        "InBytes": 14680428,
-        "OutBytes": 1853242,
-        "OutPaddingBytes": 271334
+        "DownloadBytes": 257341785,
+        "OutputPaddingBytes": 511223,
+        "UploadBytes": 1254325
     },
     "underlay": {
-        "ActiveOpens": 2,
-        "CurrEstablished": 2,
-        "MaxConn": 2,
+        "ActiveOpens": 16,
+        "CurrEstablished": 7,
+        "MaxConn": 11,
         "PassiveOpens": 0,
         "UnderlayMalformedUDP": 0,
         "UnsolicitedUDP": 0
