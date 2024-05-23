@@ -31,6 +31,9 @@ var (
 	// Number of replay packets sent from a new session.
 	NewSession = metrics.RegisterMetric("replay", "NewSession", metrics.COUNTER)
 
+	// Number of replay packets sent from a new session that can be decrypted.
+	NewSessionDecrypted = metrics.RegisterMetric("replay", "NewSessionDecrypted", metrics.COUNTER)
+
 	// Number of replay packets sent from a known session.
 	KnownSession = metrics.RegisterMetric("replay", "KnownSession", metrics.COUNTER)
 )

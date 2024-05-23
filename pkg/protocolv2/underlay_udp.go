@@ -373,10 +373,10 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 
 		// Read encrypted metadata.
 		encryptedMeta := b[:udpNonHeaderPosition]
+		isNewSessionReplay := false
 		if udpReplayCache.IsDuplicate(encryptedMeta[:cipher.DefaultOverhead], addr.String()) {
 			replay.NewSession.Add(1)
-			log.Debugf("found possible replay attack in %v from %v", u, addr)
-			continue
+			isNewSessionReplay = true
 		}
 		nonce := encryptedMeta[:cipher.DefaultNonceSize]
 
@@ -434,13 +434,20 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 			}
 			if !decrypted {
 				cipher.ServerFailedIterateDecrypt.Add(1)
-				if log.IsLevelEnabled(log.TraceLevel) {
+				if isNewSessionReplay {
+					log.Debugf("found possible replay attack in %v from %v", u, addr)
+				} else if log.IsLevelEnabled(log.TraceLevel) {
 					log.Tracef("%v TryDecrypt() failed with UDP packet from %v", u, addr)
 				}
 				continue
 			} else {
 				if blockCipher == nil {
 					panic("UDPUnderlay readOneSegment(): block cipher is nil after decryption is successful")
+				}
+				if isNewSessionReplay {
+					replay.NewSessionDecrypted.Add(1)
+					log.Debugf("found possible replay attack with payload decrypted in %v from %v", u, addr)
+					continue
 				}
 			}
 		}

@@ -308,10 +308,11 @@ func (t *TCPUnderlay) readOneSegment() (*segment, error, stderror.ErrorType) {
 	} else {
 		metrics.UploadBytes.Add(int64(len(encryptedMeta)))
 	}
+	isNewSessionReplay := false
 	if tcpReplayCache.IsDuplicate(encryptedMeta[:cipher.DefaultOverhead], replay.EmptyTag) {
 		if firstRead {
 			replay.NewSession.Add(1)
-			return nil, fmt.Errorf("found possible replay attack in %v", t), stderror.REPLAY_ERROR
+			isNewSessionReplay = true
 		} else {
 			replay.KnownSession.Add(1)
 		}
@@ -328,7 +329,14 @@ func (t *TCPUnderlay) readOneSegment() (*segment, error, stderror.ErrorType) {
 		cipher.ServerIterateDecrypt.Add(1)
 		if err != nil {
 			cipher.ServerFailedIterateDecrypt.Add(1)
-			return nil, fmt.Errorf("cipher.SelectDecrypt() failed: %w", err), stderror.CRYPTO_ERROR
+			if isNewSessionReplay {
+				return nil, fmt.Errorf("found possible replay attack in %v", t), stderror.REPLAY_ERROR
+			} else {
+				return nil, fmt.Errorf("cipher.SelectDecrypt() failed: %w", err), stderror.CRYPTO_ERROR
+			}
+		} else if isNewSessionReplay {
+			replay.NewSessionDecrypted.Add(1)
+			return nil, fmt.Errorf("found possible replay attack with payload decrypted in %v", t), stderror.REPLAY_ERROR
 		}
 		t.recv = peerBlock.Clone()
 	} else {
