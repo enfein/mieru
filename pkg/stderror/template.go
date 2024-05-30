@@ -38,8 +38,6 @@ const (
 	GetThreadDumpFailedErr                  = "get thread dump failed: %w"
 	InvalidPortBindingsErr                  = "invalid port bindings: %w"
 	InvalidTransportProtocol                = "invalid transport protocol"
-	LoadClientConfigFailedErr               = "load mieru client config failed: %w"
-	LoadServerConfigFailedErr               = "load mieru server config failed: %w"
 	LookupIPFailedErr                       = "look up IP address failed: %w"
 	ParseIPFailed                           = "parse IP address failed"
 	ReloadServerFailedErr                   = "reload mieru server failed: %w"

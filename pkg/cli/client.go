@@ -20,8 +20,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os/exec"
 	"runtime/pprof"
 	"strconv"
@@ -39,6 +41,7 @@ import (
 	"github.com/enfein/mieru/pkg/stderror"
 	"github.com/enfein/mieru/pkg/util"
 	"github.com/enfein/mieru/pkg/util/sockopts"
+	"golang.org/x/net/proxy"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 )
@@ -79,6 +82,13 @@ func RegisterClientCommands() {
 			return unexpectedArgsError(s, 2)
 		},
 		clientStatusFunc,
+	)
+	RegisterCallback(
+		[]string{"", "test"},
+		func(s []string) error {
+			return unexpectedArgsError(s, 2)
+		},
+		clientTestFunc,
 	)
 	RegisterCallback(
 		[]string{"", "apply", "config"},
@@ -226,6 +236,10 @@ var clientHelpFunc = func(s []string) error {
 				help: "Check mieru client status.",
 			},
 			{
+				cmd:  "test",
+				help: "Test mieru client connection to the Internet via proxy server.",
+			},
+			{
 				cmd:  "apply config <FILE>",
 				help: "Apply client configuration from JSON file.",
 			},
@@ -300,7 +314,7 @@ var clientStartFunc = func(s []string) error {
 		if err == stderror.ErrFileNotExist {
 			return fmt.Errorf(stderror.ClientConfigNotExist)
 		} else {
-			return fmt.Errorf(stderror.LoadClientConfigFailedErr, err)
+			return fmt.Errorf(stderror.GetClientConfigFailedErr, err)
 		}
 	}
 	if err = appctl.ValidateFullClientConfig(config); err != nil {
@@ -309,9 +323,9 @@ var clientStartFunc = func(s []string) error {
 
 	if err = appctl.IsClientDaemonRunning(context.Background()); err == nil {
 		if config.GetSocks5ListenLAN() {
-			log.Infof("mieru client is running, listening to 0.0.0.0:%d", config.GetSocks5Port())
+			log.Infof("mieru client is running, listening to socks5://0.0.0.0:%d", config.GetSocks5Port())
 		} else {
-			log.Infof("mieru client is running, listening to 127.0.0.1:%d", config.GetSocks5Port())
+			log.Infof("mieru client is running, listening to socks5://127.0.0.1:%d", config.GetSocks5Port())
 		}
 		return nil
 	}
@@ -331,9 +345,9 @@ var clientStartFunc = func(s []string) error {
 		lastErr = appctl.IsClientDaemonRunning(context.Background())
 		if lastErr == nil {
 			if config.GetSocks5ListenLAN() {
-				log.Infof("mieru client is started, listening to 0.0.0.0:%d", config.GetSocks5Port())
+				log.Infof("mieru client is started, listening to socks5://0.0.0.0:%d", config.GetSocks5Port())
 			} else {
-				log.Infof("mieru client is started, listening to 127.0.0.1:%d", config.GetSocks5Port())
+				log.Infof("mieru client is started, listening to socks5://127.0.0.1:%d", config.GetSocks5Port())
 			}
 			return nil
 		}
@@ -362,7 +376,7 @@ var clientRunFunc = func(s []string) error {
 		if err == stderror.ErrFileNotExist {
 			return fmt.Errorf(stderror.ClientConfigNotExist)
 		} else {
-			return fmt.Errorf(stderror.LoadClientConfigFailedErr, err)
+			return fmt.Errorf(stderror.GetClientConfigFailedErr, err)
 		}
 	}
 	if proto.Equal(config, &appctlpb.ClientConfig{}) {
@@ -555,18 +569,18 @@ var clientRunFunc = func(s []string) error {
 }
 
 var clientStopFunc = func(s []string) error {
-	if err := appctl.IsClientDaemonRunning(context.Background()); err != nil {
+	ctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
+	defer cancelFunc()
+	client, running, err := newClientLifecycleRPCClient(ctx)
+	if !running {
 		log.Infof(stderror.ClientNotRunning)
 		return nil
 	}
-
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
-	defer cancelFunc()
-	client, err := appctl.NewClientLifecycleRPCClient(timedctx)
 	if err != nil {
-		return fmt.Errorf(stderror.CreateClientLifecycleRPCClientFailedErr, err)
+		return err
 	}
-	if _, err = client.Exit(timedctx, &appctlpb.Empty{}); err != nil {
+
+	if _, err = client.Exit(ctx, &appctlpb.Empty{}); err != nil {
 		return fmt.Errorf(stderror.ExitFailedErr, err)
 	}
 	log.Infof("mieru client is stopped")
@@ -586,6 +600,50 @@ var clientStatusFunc = func(s []string) error {
 		}
 	}
 	log.Infof("mieru client is running")
+	return nil
+}
+
+var clientTestFunc = func(s []string) error {
+	if err := appctl.IsClientDaemonRunning(context.Background()); err != nil {
+		return fmt.Errorf(stderror.ClientNotRunning)
+	}
+	config, err := appctl.LoadClientConfig()
+	if err != nil {
+		return fmt.Errorf(stderror.GetClientConfigFailedErr, err)
+	}
+
+	proxyURL, err := url.Parse(fmt.Sprintf("socks5://127.0.0.1:%d", config.GetSocks5Port()))
+	if err != nil {
+		return fmt.Errorf("failed to parse proxy URL: %w", err)
+	}
+	dialer, err := proxy.FromURL(proxyURL, proxy.Direct)
+	if err != nil {
+		return fmt.Errorf("failed to create proxy dialer: %w", err)
+	}
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			Dial: dialer.Dial,
+		},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return nil
+		},
+		Timeout: appctl.RPCTimeout,
+	}
+
+	beginTime := time.Now()
+	resp, err := httpClient.Get("https://google.com/generate_204")
+	if err != nil {
+		return err
+	}
+	endTime := time.Now()
+	d := endTime.Sub(beginTime).Round(time.Millisecond)
+	defer resp.Body.Close()
+	io.ReadAll(resp.Body)
+
+	if resp.StatusCode != 204 {
+		return fmt.Errorf("received unexpected status code %d after %v", resp.StatusCode, d)
+	}
+	log.Infof("Connected to https://google.com after %v", d)
 	return nil
 }
 
@@ -642,24 +700,23 @@ var clientExportConfigFunc = func(s []string) error {
 var clientDeleteProfileFunc = func(s []string) error {
 	_, err := appctl.LoadClientConfig()
 	if err != nil {
-		return fmt.Errorf(stderror.LoadClientConfigFailedErr, err)
+		return fmt.Errorf(stderror.GetClientConfigFailedErr, err)
 	}
 	return appctl.DeleteClientConfigProfile(s[3])
 }
 
 var clientGetMetricsFunc = func(s []string) error {
-	if err := appctl.IsClientDaemonRunning(context.Background()); err != nil {
-		log.Infof(stderror.ClientNotRunning)
-		return nil
+	ctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
+	defer cancelFunc()
+	client, running, err := newClientLifecycleRPCClient(ctx)
+	if !running {
+		return fmt.Errorf(stderror.ClientNotRunning)
+	}
+	if err != nil {
+		return err
 	}
 
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
-	defer cancelFunc()
-	client, err := appctl.NewClientLifecycleRPCClient(timedctx)
-	if err != nil {
-		return fmt.Errorf(stderror.CreateClientLifecycleRPCClientFailedErr, err)
-	}
-	metrics, err := client.GetMetrics(timedctx, &appctlpb.Empty{})
+	metrics, err := client.GetMetrics(ctx, &appctlpb.Empty{})
 	if err != nil {
 		return fmt.Errorf(stderror.GetMetricsFailedErr, err)
 	}
@@ -668,18 +725,17 @@ var clientGetMetricsFunc = func(s []string) error {
 }
 
 var clientGetConnectionsFunc = func(s []string) error {
-	if err := appctl.IsClientDaemonRunning(context.Background()); err != nil {
-		log.Infof(stderror.ClientNotRunning)
-		return nil
+	ctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
+	defer cancelFunc()
+	client, running, err := newClientLifecycleRPCClient(ctx)
+	if !running {
+		return fmt.Errorf(stderror.ClientNotRunning)
+	}
+	if err != nil {
+		return err
 	}
 
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
-	defer cancelFunc()
-	client, err := appctl.NewClientLifecycleRPCClient(timedctx)
-	if err != nil {
-		return fmt.Errorf(stderror.CreateClientLifecycleRPCClientFailedErr, err)
-	}
-	info, err := client.GetSessionInfo(timedctx, &appctlpb.Empty{})
+	info, err := client.GetSessionInfo(ctx, &appctlpb.Empty{})
 	if err != nil {
 		return fmt.Errorf(stderror.GetConnectionsFailedErr, err)
 	}
@@ -690,18 +746,17 @@ var clientGetConnectionsFunc = func(s []string) error {
 }
 
 var clientGetThreadDumpFunc = func(s []string) error {
-	if err := appctl.IsClientDaemonRunning(context.Background()); err != nil {
-		log.Infof(stderror.ClientNotRunning)
-		return nil
+	ctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
+	defer cancelFunc()
+	client, running, err := newClientLifecycleRPCClient(ctx)
+	if !running {
+		return fmt.Errorf(stderror.ClientNotRunning)
+	}
+	if err != nil {
+		return err
 	}
 
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
-	defer cancelFunc()
-	client, err := appctl.NewClientLifecycleRPCClient(timedctx)
-	if err != nil {
-		return fmt.Errorf(stderror.CreateClientLifecycleRPCClientFailedErr, err)
-	}
-	dump, err := client.GetThreadDump(timedctx, &appctlpb.Empty{})
+	dump, err := client.GetThreadDump(ctx, &appctlpb.Empty{})
 	if err != nil {
 		return fmt.Errorf(stderror.GetThreadDumpFailedErr, err)
 	}
@@ -710,18 +765,17 @@ var clientGetThreadDumpFunc = func(s []string) error {
 }
 
 var clientGetHeapProfileFunc = func(s []string) error {
-	if err := appctl.IsClientDaemonRunning(context.Background()); err != nil {
-		log.Infof(stderror.ClientNotRunning)
-		return nil
+	ctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
+	defer cancelFunc()
+	client, running, err := newClientLifecycleRPCClient(ctx)
+	if !running {
+		return fmt.Errorf(stderror.ClientNotRunning)
+	}
+	if err != nil {
+		return err
 	}
 
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
-	defer cancelFunc()
-	client, err := appctl.NewClientLifecycleRPCClient(timedctx)
-	if err != nil {
-		return fmt.Errorf(stderror.CreateClientLifecycleRPCClientFailedErr, err)
-	}
-	if _, err := client.GetHeapProfile(timedctx, &appctlpb.ProfileSavePath{FilePath: proto.String(s[3])}); err != nil {
+	if _, err := client.GetHeapProfile(ctx, &appctlpb.ProfileSavePath{FilePath: proto.String(s[3])}); err != nil {
 		return fmt.Errorf(stderror.GetHeapProfileFailedErr, err)
 	}
 	log.Infof("heap profile is saved to %q", s[3])
@@ -729,18 +783,17 @@ var clientGetHeapProfileFunc = func(s []string) error {
 }
 
 var clientGetMemoryStatisticsFunc = func(s []string) error {
-	if err := appctl.IsClientDaemonRunning(context.Background()); err != nil {
-		log.Infof(stderror.ClientNotRunning)
-		return nil
+	ctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
+	defer cancelFunc()
+	client, running, err := newClientLifecycleRPCClient(ctx)
+	if !running {
+		return fmt.Errorf(stderror.ClientNotRunning)
+	}
+	if err != nil {
+		return err
 	}
 
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
-	defer cancelFunc()
-	client, err := appctl.NewClientLifecycleRPCClient(timedctx)
-	if err != nil {
-		return fmt.Errorf(stderror.CreateClientLifecycleRPCClientFailedErr, err)
-	}
-	memStats, err := client.GetMemoryStatistics(timedctx, &appctlpb.Empty{})
+	memStats, err := client.GetMemoryStatistics(ctx, &appctlpb.Empty{})
 	if err != nil {
 		return fmt.Errorf(stderror.GetMemoryStatisticsFailedErr, err)
 	}
@@ -749,18 +802,17 @@ var clientGetMemoryStatisticsFunc = func(s []string) error {
 }
 
 var clientStartCPUProfileFunc = func(s []string) error {
-	if err := appctl.IsClientDaemonRunning(context.Background()); err != nil {
-		log.Infof(stderror.ClientNotRunning)
-		return nil
+	ctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
+	defer cancelFunc()
+	client, running, err := newClientLifecycleRPCClient(ctx)
+	if !running {
+		return fmt.Errorf(stderror.ClientNotRunning)
+	}
+	if err != nil {
+		return err
 	}
 
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
-	defer cancelFunc()
-	client, err := appctl.NewClientLifecycleRPCClient(timedctx)
-	if err != nil {
-		return fmt.Errorf(stderror.CreateClientLifecycleRPCClientFailedErr, err)
-	}
-	if _, err := client.StartCPUProfile(timedctx, &appctlpb.ProfileSavePath{FilePath: proto.String(s[4])}); err != nil {
+	if _, err := client.StartCPUProfile(ctx, &appctlpb.ProfileSavePath{FilePath: proto.String(s[4])}); err != nil {
 		return fmt.Errorf(stderror.StartCPUProfileFailedErr, err)
 	}
 	log.Infof("CPU profile will be saved to %q", s[4])
@@ -768,17 +820,30 @@ var clientStartCPUProfileFunc = func(s []string) error {
 }
 
 var clientStopCPUProfileFunc = func(s []string) error {
-	if err := appctl.IsClientDaemonRunning(context.Background()); err != nil {
-		log.Infof(stderror.ClientNotRunning)
-		return nil
+	ctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
+	defer cancelFunc()
+	client, running, err := newClientLifecycleRPCClient(ctx)
+	if !running {
+		return fmt.Errorf(stderror.ClientNotRunning)
+	}
+	if err != nil {
+		return err
 	}
 
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
-	defer cancelFunc()
-	client, err := appctl.NewClientLifecycleRPCClient(timedctx)
-	if err != nil {
-		return fmt.Errorf(stderror.CreateClientLifecycleRPCClientFailedErr, err)
-	}
-	client.StopCPUProfile(timedctx, &appctlpb.Empty{})
+	client.StopCPUProfile(ctx, &appctlpb.Empty{})
 	return nil
+}
+
+// newClientLifecycleRPCClient returns a new client lifecycle RPC client.
+// No RPC client is returned if mieru is not running.
+func newClientLifecycleRPCClient(ctx context.Context) (client appctlpb.ClientLifecycleServiceClient, running bool, err error) {
+	if err := appctl.IsClientDaemonRunning(ctx); err != nil {
+		return nil, false, nil
+	}
+	running = true
+	client, err = appctl.NewClientLifecycleRPCClient(ctx)
+	if err != nil {
+		return nil, true, fmt.Errorf(stderror.CreateClientLifecycleRPCClientFailedErr, err)
+	}
+	return
 }

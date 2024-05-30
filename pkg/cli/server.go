@@ -360,7 +360,7 @@ var serverRunFunc = func(s []string) error {
 	if config == nil {
 		config, err = appctl.LoadServerConfig()
 		if err != nil {
-			return fmt.Errorf(stderror.LoadServerConfigFailedErr, err)
+			return fmt.Errorf(stderror.GetServerConfigFailedErr, err)
 		}
 	}
 
