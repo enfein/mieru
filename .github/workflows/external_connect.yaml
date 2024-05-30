@@ -14,4 +14,4 @@ jobs:
       - name: Build test binaries
         run: make test-binary
       - name: Run packet drop test
-        run: ./test/deploy/externalconnect/test.sh
+        run: sudo ./test/deploy/externalconnect/test.sh
