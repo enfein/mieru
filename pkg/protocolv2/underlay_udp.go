@@ -102,7 +102,6 @@ func NewUDPUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, 
 		serverAddr:        remoteAddr,
 		block:             block,
 	}
-	log.Debugf("Created new client UDP underlay %v", u)
 	return u, nil
 }
 
@@ -317,7 +316,9 @@ func (u *UDPUnderlay) onCloseSession(seg *segment) error {
 	sessionID := ss.sessionID
 	session, found := u.sessionMap.Load(sessionID)
 	if !found {
-		log.Debugf("%v received close session request or response, but session ID %d is not found", u, sessionID)
+		if log.IsLevelEnabled(log.TraceLevel) {
+			log.Tracef("%v received close session request or response, but session ID %d is not found", u, sessionID)
+		}
 		return nil
 	}
 	s := session.(*Session)

@@ -85,7 +85,6 @@ func NewTCPUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, 
 		conn:         conn.(*net.TCPConn),
 		candidates:   []cipher.BlockCipher{block},
 	}
-	log.Debugf("Created new client TCP underlay %v", t)
 	return t, nil
 }
 
@@ -278,7 +277,9 @@ func (t *TCPUnderlay) onCloseSession(seg *segment) error {
 	sessionID := ss.sessionID
 	session, found := t.sessionMap.Load(sessionID)
 	if !found {
-		log.Debugf("%v received close session request or response, but session ID %d is not found", t, sessionID)
+		if log.IsLevelEnabled(log.TraceLevel) {
+			log.Tracef("%v received close session request or response, but session ID %d is not found", t, sessionID)
+		}
 		return nil
 	}
 	s := session.(*Session)

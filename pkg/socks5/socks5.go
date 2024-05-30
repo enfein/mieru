@@ -154,9 +154,7 @@ func (s *Server) Serve(l net.Listener) error {
 func (s *Server) ServeConn(conn net.Conn) error {
 	conn = util.WrapHierarchyConn(conn)
 	defer conn.Close()
-	if log.IsLevelEnabled(log.TraceLevel) {
-		log.Tracef("socks5 server starts to serve connection [%v - %v]", conn.LocalAddr(), conn.RemoteAddr())
-	}
+	log.Debugf("socks5 server starts to serve connection [%v - %v]", conn.LocalAddr(), conn.RemoteAddr())
 
 	if s.config.UseProxy {
 		return s.clientServeConn(conn)
