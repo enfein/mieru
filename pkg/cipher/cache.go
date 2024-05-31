@@ -21,7 +21,7 @@ import (
 	"time"
 )
 
-const cacheValidInterval = KeyRefreshInterval / 2
+const cacheValidInterval = KeyRefreshInterval / 8
 
 type cachedCiphers struct {
 	cipherList []BlockCipher
