@@ -101,12 +101,10 @@ fi
 ./mieru get heap-profile /test/mieru.tcp.heap.gz
 ./mita get heap-profile /test/mita.tcp.heap.gz
 
-# Print memory statistics.
-echo "client memory statistics"
-./mieru get memory-statistics
+# Print metrics and memory statistics.
+print_mieru_client_metrics
 sleep 1
-echo "server memory statistics"
-./mita get memory-statistics
+print_mieru_server_metrics
 sleep 1
 
 # Stop mieru client.

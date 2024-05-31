@@ -58,6 +58,14 @@ fi
 # Start testing.
 sleep 2
 run_external_connect_test
+if [[ "$?" -ne 0 ]]; then
+    print_mieru_client_log
+    sleep 1
+    print_mieru_client_metrics
+    sleep 1
+    print_mieru_server_metrics
+    exit 1
+fi
 
 # Stop mieru client.
 ./mieru stop

@@ -26,13 +26,15 @@ function run_external_connect_test() {
             echo "Failed $failure_count times with $i runs."
             if [[ "$failure_count" -ge 2 ]]; then
                 echo "Test failed: too many runs have a non-zero exit code."
-                exit 1
+                return 1
             fi
         else
             ((success_count++))
         fi
         sleep 1
     done
+
+    return 0
 }
 
 function print_mieru_client_log() {
@@ -45,14 +47,16 @@ function delete_mieru_client_log() {
     rm -rf $HOME/.cache/mieru/*.log
 }
 
-function print_mieru_server_thread_dump() {
-    echo "========== BEGIN OF MIERU SERVER THREAD DUMP =========="
-    ./mita get thread-dump
-    echo "==========  END OF MIERU SERVER THREAD DUMP  =========="
+function print_mieru_client_metrics() {
+    echo "========== BEGIN OF MIERU CLIENT METRICS =========="
+    ./mieru get metrics
+    ./mieru get memory-statistics
+    echo "==========  END OF MIERU CLIENT METRICS  =========="
 }
 
-function print_mieru_client_thread_dump() {
-    echo "========== BEGIN OF MIERU CLIENT THREAD DUMP =========="
-    ./mieru get thread-dump
-    echo "==========  END OF MIERU CLIENT THREAD DUMP  =========="
+function print_mieru_server_metrics() {
+    echo "========== BEGIN OF MIERU SERVER METRICS =========="
+    ./mita get metrics
+    ./mita get memory-statistics
+    echo "==========  END OF MIERU SERVER METRICS  =========="
 }

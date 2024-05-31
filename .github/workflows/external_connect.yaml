@@ -13,5 +13,5 @@ jobs:
           go-version-file: go.mod
       - name: Build test binaries
         run: make test-binary
-      - name: Run packet drop test
+      - name: Run external connection test
         run: sudo ./test/deploy/externalconnect/test.sh

@@ -77,17 +77,9 @@ fi
 ./mita get heap-profile /test/mita.associate.heap.gz
 
 # Print metrics and memory statistics.
-echo "client metrics"
-./mieru get metrics
+print_mieru_client_metrics
 sleep 1
-echo "server metrics"
-./mita get metrics
-sleep 1
-echo "client memory statistics"
-./mieru get memory-statistics
-sleep 1
-echo "server memory statistics"
-./mita get memory-statistics
+print_mieru_server_metrics
 sleep 1
 
 # Stop mieru client.
