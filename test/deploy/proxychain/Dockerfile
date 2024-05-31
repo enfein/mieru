@@ -15,7 +15,7 @@
 
 # Assume this file is executed with `docker build -f` from the root dir of mieru project.
 
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 WORKDIR /test
 

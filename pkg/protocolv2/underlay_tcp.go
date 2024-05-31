@@ -114,6 +114,8 @@ func (t *TCPUnderlay) Addr() net.Addr {
 }
 
 func (t *TCPUnderlay) IPVersion() util.IPVersion {
+	t.ipVersionMutex.Lock()
+	defer t.ipVersionMutex.Unlock()
 	if t.conn == nil {
 		return util.IPVersionUnknown
 	}

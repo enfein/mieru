@@ -24,7 +24,7 @@ function run_external_connect_test() {
         if [[ "$?" -ne 0 ]]; then
             ((failure_count++))
             echo "Failed $failure_count times with $i runs."
-            if [[ "$failure_count" -gt 2 ]]; then
+            if [[ "$failure_count" -ge 2 ]]; then
                 echo "Test failed: too many runs have a non-zero exit code."
                 exit 1
             fi

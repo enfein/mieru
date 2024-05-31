@@ -132,6 +132,8 @@ func (u *UDPUnderlay) Close() error {
 }
 
 func (u *UDPUnderlay) IPVersion() util.IPVersion {
+	u.ipVersionMutex.Lock()
+	defer u.ipVersionMutex.Unlock()
 	if u.conn == nil {
 		return util.IPVersionUnknown
 	}

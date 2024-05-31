@@ -24,6 +24,7 @@ package congestion
 
 import (
 	"math"
+	"sync"
 	"time"
 
 	"github.com/enfein/mieru/pkg/mathext"
@@ -49,6 +50,8 @@ type RTTStats struct {
 
 	maxAckDelay   time.Duration
 	rtoMultiplier float64
+
+	mu sync.Mutex
 }
 
 // NewRTTStats makes a properly initialized RTTStats object
@@ -78,6 +81,9 @@ func (r *RTTStats) MaxAckDelay() time.Duration { return r.maxAckDelay }
 
 // RTO gets the retransmission timeout.
 func (r *RTTStats) RTO() time.Duration {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	if r.SmoothedRTT() == 0 {
 		return 2 * defaultInitialRTT
 	}
@@ -88,6 +94,9 @@ func (r *RTTStats) RTO() time.Duration {
 
 // UpdateRTT updates the RTT based on a new sample.
 func (r *RTTStats) UpdateRTT(sample time.Duration) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	if sample == infDuration || sample <= 0 {
 		return
 	}
@@ -109,6 +118,8 @@ func (r *RTTStats) UpdateRTT(sample time.Duration) {
 
 // SetMaxAckDelay sets the max_ack_delay
 func (r *RTTStats) SetMaxAckDelay(mad time.Duration) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.maxAckDelay = mad
 }
 
@@ -117,12 +128,17 @@ func (r *RTTStats) SetRTOMultiplier(n float64) {
 	if n <= 0 {
 		panic("retransmission timeout multiplier must be greater than 0")
 	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.rtoMultiplier = n
 }
 
 // SetInitialRTT sets the initial RTT.
 // It is used during the 0-RTT handshake when restoring the RTT stats from the session state.
 func (r *RTTStats) SetInitialRTT(t time.Duration) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	if r.hasMeasurement {
 		panic("initial RTT set after first measurement")
 	}
@@ -132,6 +148,9 @@ func (r *RTTStats) SetInitialRTT(t time.Duration) {
 
 // Reset is called when connection migrates and rtt measurement needs to be reset.
 func (r *RTTStats) Reset() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	r.latestRTT = 0
 	r.minRTT = 0
 	r.smoothedRTT = 0
@@ -142,6 +161,9 @@ func (r *RTTStats) Reset() {
 // is larger. The mean deviation is increased to the most recent deviation if
 // it's larger.
 func (r *RTTStats) ExpireSmoothedMetrics() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	r.meanDeviation = mathext.Max(r.meanDeviation, mathext.Abs(r.smoothedRTT-r.latestRTT))
 	r.smoothedRTT = mathext.Max(r.smoothedRTT, r.latestRTT)
 }

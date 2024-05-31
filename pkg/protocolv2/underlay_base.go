@@ -39,8 +39,9 @@ type baseUnderlay struct {
 	sessionMap    sync.Map      // Map<sessionID, *Session>
 	readySessions chan *Session // sessions that completed handshake and ready for consume
 
-	sendMutex  sync.Mutex // protect writing data to the connection
-	closeMutex sync.Mutex // protect closing the connection
+	sendMutex      sync.Mutex // protect writing data to the connection
+	closeMutex     sync.Mutex // protect closing the connection
+	ipVersionMutex sync.Mutex // protect getting and setting IPVersion
 
 	// ---- client fields ----
 	scheduler *ScheduleController

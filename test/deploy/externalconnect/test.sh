@@ -20,21 +20,28 @@
 
 set -e
 
+# Make sure the current user has root privilege.
+uid=$(id -u "$USER")
+if [ $uid -ne 0 ]; then
+    echo "Error: need root to run this test"
+    exit 1
+fi
+
 # Start mieru server daemon.
 mkdir -p /etc/mita
 export MITA_INSECURE_UDS=1
 ./mita run &
 sleep 1
 
-# Run TCP test.
-echo "========== BEGIN OF TCP TEST =========="
-./test/deploy/externalconnect/test_tcp.sh
-echo "==========  END OF TCP TEST  =========="
-
 # Run UDP test.
 echo "========== BEGIN OF UDP TEST =========="
 ./test/deploy/externalconnect/test_udp.sh
 echo "==========  END OF UDP TEST  =========="
+
+# Run TCP test.
+echo "========== BEGIN OF TCP TEST =========="
+./test/deploy/externalconnect/test_tcp.sh
+echo "==========  END OF TCP TEST  =========="
 
 echo "Test is successful."
 exit 0
