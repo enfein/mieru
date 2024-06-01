@@ -30,7 +30,7 @@
                 }
             ],
             "multiplexing": {
-                "level": "MULTIPLEXING_OFF"
+                "level": "MULTIPLEXING_HIGH"
             }
         }
     ],

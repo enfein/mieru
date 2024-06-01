@@ -67,7 +67,10 @@ type Underlay interface {
 	// The session is destroyed when this returns.
 	RemoveSession(*Session) error
 
-	// Returns information of all the sessions.
+	// Returns the number of sessions.
+	NSessions() int
+
+	// Returns detailed information of all the sessions.
 	Sessions() []SessionInfo
 
 	// Run event loop.

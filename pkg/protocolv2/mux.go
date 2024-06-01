@@ -85,7 +85,11 @@ func NewMux(isClinet bool) *Mux {
 			select {
 			case <-mux.cleaner.C:
 				mux.mu.Lock()
-				mux.cleanUnderlay()
+				if isClinet {
+					mux.cleanUnderlay(true)
+				} else {
+					mux.cleanUnderlay(false)
+				}
 				mux.mu.Unlock()
 			case <-mux.done:
 				mux.cleaner.Stop()
@@ -261,7 +265,7 @@ func (m *Mux) DialContext(ctx context.Context) (net.Conn, error) {
 	var err error
 
 	// Try to find a underlay for the session.
-	m.cleanUnderlay()
+	m.cleanUnderlay(true)
 	underlay := m.maybePickExistingUnderlay()
 	if underlay == nil {
 		underlay, err = m.newUnderlay(ctx)
@@ -394,7 +398,7 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 				log.Debugf("Created new server underlay %v", underlay)
 				m.mu.Lock()
 				m.underlays = append(m.underlays, underlay)
-				m.cleanUnderlay()
+				m.cleanUnderlay(false)
 				m.mu.Unlock()
 				UnderlayPassiveOpens.Add(1)
 				currEst := UnderlayCurrEstablished.Add(1)
@@ -449,7 +453,7 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 		log.Infof("Created new server underlay %v", underlay)
 		m.mu.Lock()
 		m.underlays = append(m.underlays, underlay)
-		m.cleanUnderlay()
+		m.cleanUnderlay(false)
 		m.mu.Unlock()
 		UnderlayPassiveOpens.Add(1)
 		currEst := UnderlayCurrEstablished.Add(1)
@@ -601,23 +605,32 @@ func (m *Mux) maybePickExistingUnderlay() Underlay {
 
 // cleanUnderlay removes closed underlays.
 // This method MUST be called only when holding the mu lock.
-func (m *Mux) cleanUnderlay() {
+func (m *Mux) cleanUnderlay(alsoDisableIdleUnderlay bool) {
 	remaining := make([]Underlay, 0)
-	cnt := 0
+	disable := 0
+	close := 0
 	for _, underlay := range m.underlays {
 		select {
 		case <-underlay.Done():
 		default:
+			if alsoDisableIdleUnderlay && underlay.NSessions() == 0 {
+				if underlay.Scheduler().TryDisable() {
+					disable++
+				}
+			}
 			if underlay.Scheduler().Idle() {
 				underlay.Close()
-				cnt++
+				close++
 			} else {
 				remaining = append(remaining, underlay)
 			}
 		}
 	}
 	m.underlays = remaining
-	if cnt > 0 {
-		log.Debugf("Mux cleaned %d underlays", cnt)
+	if disable > 0 {
+		log.Debugf("Mux disabled scheduling from %d underlays", disable)
+	}
+	if close > 0 {
+		log.Debugf("Mux cleaned %d underlays", close)
 	}
 }

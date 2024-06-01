@@ -168,20 +168,16 @@ func (b *baseUnderlay) RemoveSession(s *Session) error {
 	s.wg.Wait()
 	s.conn = nil
 	s = nil
-
-	if b.isClient {
-		// May disable scheduling if the underlay has no session.
-		sessions := 0
-		b.sessionMap.Range(func(k, v any) bool {
-			sessions += 1
-			return false
-		})
-		if sessions == 0 {
-			b.scheduler.TryDisable()
-		}
-	}
-
 	return nil
+}
+
+func (b *baseUnderlay) NSessions() int {
+	n := 0
+	b.sessionMap.Range(func(k, v any) bool {
+		n++
+		return true
+	})
+	return n
 }
 
 func (b *baseUnderlay) Sessions() []SessionInfo {

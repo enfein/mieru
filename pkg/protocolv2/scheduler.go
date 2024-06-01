@@ -24,25 +24,25 @@ import (
 )
 
 var (
-	// scheduleIdleTime determines when an idle underlay should be closed.
-	// It may take 5 seconds to 15 seconds in different machines.
-	scheduleIdleTime = time.Duration(5+rng.FixedInt(11)) * time.Second
+	// scheduleIdleTime determines when a underlay is considered idle.
+	// It takes 60 seconds to 120 seconds in different machines.
+	scheduleIdleTime = time.Duration(60+rng.FixedInt(61)) * time.Second
 )
 
 // ScheduleController controls scheduling a new client session to a underlay.
 type ScheduleController struct {
 	pending          int // number of pending sessions going to be scheduled
 	lastScheduleTime time.Time
-	disable          bool // if scheduling to the underlay is disabled
-	disableTime      time.Time
+	disableTime      time.Time // if set, scheduling to the underlay is disabled after this time
 	mu               sync.Mutex
 }
 
 // IncPending increases the number of pending sessions by 1.
+// The number of pending sessions can't increase if the scheduler is disabled.
 func (c *ScheduleController) IncPending() (ok bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.disable {
+	if !util.IsZeroTime(c.disableTime) && time.Since(c.disableTime) > 0 {
 		return false
 	}
 	c.pending++
@@ -51,48 +51,51 @@ func (c *ScheduleController) IncPending() (ok bool) {
 }
 
 // DecPending decreases the number of pending sessions by 1.
-func (c *ScheduleController) DecPending() (ok bool) {
+func (c *ScheduleController) DecPending() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.disable {
-		return false
-	}
 	c.pending--
 	c.lastScheduleTime = time.Now()
-	return true
 }
 
 // IsDisabled returns true if scheduling new sessions to the underlay is disabled.
 func (c *ScheduleController) IsDisabled() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.disable
+	return !util.IsZeroTime(c.disableTime) && time.Since(c.disableTime) > 0
 }
 
-// Idle returns true if the scheduling has been disabled for the given interval time.
+// Idle returns true if the scheduling has been disabled for the given interval.
 func (c *ScheduleController) Idle() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.disable && time.Since(c.disableTime) > scheduleIdleTime
+	return !util.IsZeroTime(c.disableTime) && time.Since(c.lastScheduleTime) > scheduleIdleTime && time.Since(c.disableTime) > scheduleIdleTime
 }
 
 // TryDisable tries to disable scheduling new sessions.
-func (c *ScheduleController) TryDisable() (ok bool) {
+func (c *ScheduleController) TryDisable() (successful bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if !util.IsZeroTime(c.disableTime) {
+		return false // already disabled
+	}
 	if c.pending > 0 {
 		return false
 	}
-	if util.IsZeroTime(c.lastScheduleTime) {
-		c.lastScheduleTime = time.Now()
-	}
-	if time.Since(c.lastScheduleTime) < scheduleIdleTime {
+	if !util.IsZeroTime(c.lastScheduleTime) && time.Since(c.lastScheduleTime) < scheduleIdleTime {
 		return false
 	}
-	if c.disable {
-		return true
-	}
-	c.disable = true
 	c.disableTime = time.Now()
 	return true
+}
+
+// SetRemainingTime disables the scheduler after the given duration.
+// Do nothing if the scheduler has already been disabled.
+func (c *ScheduleController) SetRemainingTime(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if d <= 0 || !util.IsZeroTime(c.disableTime) {
+		return
+	}
+	c.disableTime = time.Now().Add(d)
 }

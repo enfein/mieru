@@ -102,6 +102,8 @@ func NewUDPUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, 
 		serverAddr:        remoteAddr,
 		block:             block,
 	}
+	// The block cipher expires after this time.
+	u.scheduler.SetRemainingTime(cipher.KeyRefreshInterval / 2)
 	return u, nil
 }
 
