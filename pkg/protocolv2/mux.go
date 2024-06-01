@@ -618,7 +618,7 @@ func (m *Mux) cleanUnderlay(alsoDisableIdleUnderlay bool) {
 					disable++
 				}
 			}
-			if underlay.Scheduler().Idle() {
+			if underlay.NSessions() == 0 && underlay.Scheduler().Idle() {
 				underlay.Close()
 				close++
 			} else {
