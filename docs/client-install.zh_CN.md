@@ -105,6 +105,14 @@ mieru stop
 
 注意，每次使用 `mieru apply config <FILE>` 修改设置后，需要用 `mieru stop` 和 `mieru start` 重启客户端，才能使新设置生效。
 
+## 测试客户端与服务器的连接
+
+```sh
+mieru test
+```
+
+如果输出显示 `Connected to https://google.com`，表示 mieru 客户端成功连接了代理服务器。
+
 ## 配置浏览器
 
 Chrome / Firefox 等浏览器可以通过安装插件，使用 socks5 代理访问墙外的网站。关于 socks5 代理的地址，请填写 `127.0.0.1:xxxx`，其中 `xxxx` 是客户端设置中 `socks5Port` 的值。这个地址在调用 `mieru start` 指令时也会打印出来。

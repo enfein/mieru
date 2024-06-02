@@ -105,6 +105,14 @@ mieru stop
 
 Note that every time you change the settings with `mieru apply config <FILE>`, you need to restart the client with `mieru stop` and `mieru start` for the new settings to take effect.
 
+## Test the Connection Between Client and Server
+
+```sh
+mieru test
+```
+
+If the output shows `Connected to https://google.com`, it indicates that the mieru client has successfully connected to the proxy server.
+
 ## Configuring the browser
 
 Chrome / Firefox and other browsers can use socks5 proxy to access blocked websites by installing browser plugins. For the address of the socks5 proxy, please fill in `127.0.0.1:xxxx`, where `xxxx` is the value of `socks5Port` in the client settings. This address will also be printed when the `mieru start` command is called.
