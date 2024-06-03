@@ -96,7 +96,8 @@ To determine if the connectivity is OK, you can look at the client metrics. To g
     },
     "replay": {
         "KnownSession": 0,
-        "NewSession": 0
+        "NewSession": 0,
+        "NewSessionDecrypted": 0
     },
     "socks5": {
         "ConnectionRefusedErrors": 0,

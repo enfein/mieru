@@ -96,7 +96,8 @@ mieru start
     },
     "replay": {
         "KnownSession": 0,
-        "NewSession": 0
+        "NewSession": 0,
+        "NewSessionDecrypted": 0
     },
     "socks5": {
         "ConnectionRefusedErrors": 0,

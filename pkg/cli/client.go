@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"os/exec"
 	"runtime/pprof"
 	"strconv"
@@ -334,6 +335,8 @@ var clientStartFunc = func(s []string) error {
 	if errors.Is(cmd.Err, exec.ErrDot) {
 		cmd.Err = nil
 	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf(stderror.StartClientFailedErr, err)
 	}

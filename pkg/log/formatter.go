@@ -3,6 +3,7 @@ package log
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -55,6 +56,7 @@ func (f *CliFormatter) Format(entry *Entry) ([]byte, error) {
 }
 
 // DaemonFormatter is the a log formatter that is suitable for daemon.
+// FATAL log is also printed to stderr.
 type DaemonFormatter struct {
 	NoTimestamp bool
 }
@@ -118,6 +120,11 @@ func (f *DaemonFormatter) Format(entry *Entry) ([]byte, error) {
 		buf.WriteString(value)
 	}
 	buf.WriteString("\n")
+
+	if entry.Level == FatalLevel {
+		fmt.Fprint(os.Stderr, buf.String())
+	}
+
 	return buf.Bytes(), nil
 }
 
