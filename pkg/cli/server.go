@@ -279,6 +279,9 @@ var serverHelpFunc = func(s []string) error {
 var serverStartFunc = func(s []string) error {
 	appStatus, err := appctl.GetServerStatusWithRPC(context.Background())
 	if err != nil {
+		if stderror.IsConnRefused(err) {
+			return fmt.Errorf(stderror.ServerNotRunningWithCommand)
+		}
 		return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
 	}
 	if err := appctl.IsServerDaemonRunning(appStatus); err != nil {
@@ -461,6 +464,9 @@ var serverRunFunc = func(s []string) error {
 var serverStopFunc = func(s []string) error {
 	appStatus, err := appctl.GetServerStatusWithRPC(context.Background())
 	if err != nil {
+		if stderror.IsConnRefused(err) {
+			return fmt.Errorf(stderror.ServerNotRunningWithCommand)
+		}
 		return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
 	}
 	if err := appctl.IsServerDaemonRunning(appStatus); err != nil {
@@ -487,6 +493,9 @@ var serverStopFunc = func(s []string) error {
 var serverReloadFunc = func(s []string) error {
 	appStatus, err := appctl.GetServerStatusWithRPC(context.Background())
 	if err != nil {
+		if stderror.IsConnRefused(err) {
+			return fmt.Errorf(stderror.ServerNotRunningWithCommand)
+		}
 		return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
 	}
 	if err := appctl.IsServerDaemonRunning(appStatus); err != nil {
@@ -510,15 +519,14 @@ var serverStatusFunc = func(s []string) error {
 	appStatus, err := appctl.GetServerStatusWithRPC(context.Background())
 	if err != nil {
 		if stderror.IsConnRefused(err) {
-			// This is the most common reason, no need to show more details.
-			return fmt.Errorf(stderror.ServerNotRunning)
+			return fmt.Errorf(stderror.ServerNotRunningWithCommand)
 		} else if stderror.IsPermissionDenied(err) {
 			currentUser, err := user.Current()
 			if err != nil {
 				cmd := strings.Join(s, " ")
 				return fmt.Errorf("unable to determine the OS user which executed command %q", cmd)
 			}
-			return fmt.Errorf("unable to connect to mita server daemon via %q, please retry after running \"sudo usermod -a -G mita %s\" command and logout the system, then login again", appctl.ServerUDS(), currentUser.Username)
+			return fmt.Errorf("unable to connect to mita server daemon via %q; please retry after running \"sudo usermod -a -G mita %s\" command and logout the system, then login again", appctl.ServerUDS(), currentUser.Username)
 		} else {
 			return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
 		}
@@ -537,6 +545,9 @@ var serverStatusFunc = func(s []string) error {
 var serverApplyConfigFunc = func(s []string) error {
 	appStatus, err := appctl.GetServerStatusWithRPC(context.Background())
 	if err != nil {
+		if stderror.IsConnRefused(err) {
+			return fmt.Errorf(stderror.ServerNotRunningWithCommand)
+		}
 		return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
 	}
 	if err := appctl.IsServerDaemonRunning(appStatus); err != nil {
@@ -572,6 +583,9 @@ var serverApplyConfigFunc = func(s []string) error {
 var serverDescribeConfigFunc = func(s []string) error {
 	appStatus, err := appctl.GetServerStatusWithRPC(context.Background())
 	if err != nil {
+		if stderror.IsConnRefused(err) {
+			return fmt.Errorf(stderror.ServerNotRunningWithCommand)
+		}
 		return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
 	}
 	if err := appctl.IsServerDaemonRunning(appStatus); err != nil {
@@ -599,6 +613,9 @@ var serverDescribeConfigFunc = func(s []string) error {
 var serverDeleteUserFunc = func(s []string) error {
 	appStatus, err := appctl.GetServerStatusWithRPC(context.Background())
 	if err != nil {
+		if stderror.IsConnRefused(err) {
+			return fmt.Errorf(stderror.ServerNotRunningWithCommand)
+		}
 		return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
 	}
 	if err := appctl.IsServerDaemonRunning(appStatus); err != nil {
@@ -640,6 +657,9 @@ var serverDeleteUserFunc = func(s []string) error {
 var serverGetMetricsFunc = func(s []string) error {
 	appStatus, err := appctl.GetServerStatusWithRPC(context.Background())
 	if err != nil {
+		if stderror.IsConnRefused(err) {
+			return fmt.Errorf(stderror.ServerNotRunningWithCommand)
+		}
 		return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
 	}
 	if err := appctl.IsServerDaemonRunning(appStatus); err != nil {
@@ -663,6 +683,9 @@ var serverGetMetricsFunc = func(s []string) error {
 var serverGetConnectionsFunc = func(s []string) error {
 	appStatus, err := appctl.GetServerStatusWithRPC(context.Background())
 	if err != nil {
+		if stderror.IsConnRefused(err) {
+			return fmt.Errorf(stderror.ServerNotRunningWithCommand)
+		}
 		return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
 	}
 	if err := appctl.IsServerDaemonRunning(appStatus); err != nil {

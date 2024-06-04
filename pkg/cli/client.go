@@ -23,7 +23,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"runtime/pprof"
@@ -39,10 +38,10 @@ import (
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/protocolv2"
 	"github.com/enfein/mieru/pkg/socks5"
+	"github.com/enfein/mieru/pkg/socks5client"
 	"github.com/enfein/mieru/pkg/stderror"
 	"github.com/enfein/mieru/pkg/util"
 	"github.com/enfein/mieru/pkg/util/sockopts"
-	"golang.org/x/net/proxy"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 )
@@ -615,17 +614,9 @@ var clientTestFunc = func(s []string) error {
 		return fmt.Errorf(stderror.GetClientConfigFailedErr, err)
 	}
 
-	proxyURL, err := url.Parse(fmt.Sprintf("socks5://127.0.0.1:%d", config.GetSocks5Port()))
-	if err != nil {
-		return fmt.Errorf("failed to parse proxy URL: %w", err)
-	}
-	dialer, err := proxy.FromURL(proxyURL, proxy.Direct)
-	if err != nil {
-		return fmt.Errorf("failed to create proxy dialer: %w", err)
-	}
 	httpClient := &http.Client{
 		Transport: &http.Transport{
-			Dial: dialer.Dial,
+			Dial: socks5client.Dial(fmt.Sprintf("socks5://127.0.0.1:%d", config.GetSocks5Port()), socks5client.ConnectCmd),
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return nil
