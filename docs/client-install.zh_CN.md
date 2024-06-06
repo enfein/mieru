@@ -109,9 +109,13 @@ mieru stop
 
 ```sh
 mieru test
+
+或者
+
+mieru test https://<website.you.want.to.connect>
 ```
 
-如果输出显示 `Connected to https://google.com`，表示 mieru 客户端成功连接了代理服务器。
+如果输出显示 `Connected to ...`，表示 mieru 客户端成功连接了代理服务器。
 
 ## 配置浏览器
 

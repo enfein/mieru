@@ -27,6 +27,7 @@ import (
 	"os/exec"
 	"runtime/pprof"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -86,7 +87,15 @@ func RegisterClientCommands() {
 	RegisterCallback(
 		[]string{"", "test"},
 		func(s []string) error {
-			return unexpectedArgsError(s, 2)
+			if len(s) > 3 {
+				return fmt.Errorf("usage: mieru test [URL]. More than 1 URL is provided")
+			}
+			if len(s) == 3 {
+				if !strings.HasPrefix(s[2], "http://") && !strings.HasPrefix(s[2], "https://") {
+					return fmt.Errorf("provided URL is invalid, it must start with %q or %q", "http://", "https://")
+				}
+			}
+			return nil
 		},
 		clientTestFunc,
 	)
@@ -236,7 +245,7 @@ var clientHelpFunc = func(s []string) error {
 				help: "Check mieru client status.",
 			},
 			{
-				cmd:  "test",
+				cmd:  "test [URL]",
 				help: "Test mieru client connection to the Internet via proxy server.",
 			},
 			{
@@ -624,8 +633,12 @@ var clientTestFunc = func(s []string) error {
 		Timeout: appctl.RPCTimeout,
 	}
 
+	destination := "https://google.com/generate_204"
+	if len(s) == 3 {
+		destination = s[2]
+	}
 	beginTime := time.Now()
-	resp, err := httpClient.Get("https://google.com/generate_204")
+	resp, err := httpClient.Get(destination)
 	if err != nil {
 		return err
 	}
@@ -634,10 +647,10 @@ var clientTestFunc = func(s []string) error {
 	defer resp.Body.Close()
 	io.ReadAll(resp.Body)
 
-	if resp.StatusCode != 204 {
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("received unexpected status code %d after %v", resp.StatusCode, d)
 	}
-	log.Infof("Connected to https://google.com after %v", d)
+	log.Infof("Connected to %q after %v", destination, d)
 	return nil
 }
 

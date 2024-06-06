@@ -109,9 +109,13 @@ Note that every time you change the settings with `mieru apply config <FILE>`, y
 
 ```sh
 mieru test
+
+OR
+
+mieru test https://<website.you.want.to.connect>
 ```
 
-If the output shows `Connected to https://google.com`, it indicates that the mieru client has successfully connected to the proxy server.
+If the output shows `Connected to ...`, it indicates that the mieru client has successfully connected to the proxy server.
 
 ## Configuring the browser
 
