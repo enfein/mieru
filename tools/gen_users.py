@@ -16,7 +16,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 '''
-This program generates users that can be used in mieru server configurations.
+This program generates users that can be used in mita server configurations.
 '''
 
 

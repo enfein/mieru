@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//go:build !(android || linux)
+//go:build !(android || darwin || linux)
 
 package sockopts
 
@@ -21,7 +21,7 @@ import (
 	"syscall"
 )
 
-// ReuseAddrPort does nothing outside Android and Linux platform.
+// ReuseAddrPort does nothing in unsupported platforms.
 func ReuseAddrPort() Control {
 	return func(network, address string, conn syscall.RawConn) error {
 		return nil
