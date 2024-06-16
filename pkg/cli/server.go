@@ -380,7 +380,7 @@ var serverRunFunc = func(s []string) error {
 		if err := metrics.LoadMetricsFromDump(); err == nil {
 			log.Infof("Loaded previous metrics from %s", metricsDumpPath)
 		} else {
-			log.Infof("Failed to load previous metrics from %s: %v", metricsDumpPath, err)
+			log.Infof("Failed to load previous metrics: %v", err)
 		}
 		if err := metrics.EnableMetricsDump(); err != nil {
 			log.Warnf("Failed to enable metrics dump: %v", err)
@@ -393,6 +393,11 @@ var serverRunFunc = func(s []string) error {
 	}
 	if httpMetricGroup := metrics.GetMetricGroupByName(http2socks.HTTPMetricGroupName); httpMetricGroup != nil {
 		httpMetricGroup.DisableLogging()
+	}
+
+	// Detect and log TCP congestion control algorithm.
+	if algo := util.TCPCongestionControlAlgorithm(); algo != "" {
+		log.Infof("TCP congestion control algorithm is %q", algo)
 	}
 
 	// Start proxy if server config is valid.

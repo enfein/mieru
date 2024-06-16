@@ -56,7 +56,7 @@ func IsIPDualStack() bool {
 			return false
 		}
 		s := string(v)
-		s = strings.Trim(s, "\n")
+		s = strings.TrimSpace(s)
 		i, err := strconv.Atoi(s)
 		if err != nil {
 			return false
