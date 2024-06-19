@@ -26,6 +26,10 @@ import sys
 
 
 def enable_tcp_bbr() -> None:
+    if not sys.platform.startswith('linux'):
+        print_exit('You can only run this program on Linux.')
+        return
+
     if is_bbr_enabled():
         print('BBR is already enabled.')
         return
@@ -44,7 +48,7 @@ def enable_tcp_bbr() -> None:
     if is_bbr_enabled():
         print('BBR is enabled.')
     else:
-        print_exit('BBR is not enabled.')
+        print_exit('BBR is not enabled. This program doesn\'t support your operating system.')
 
 
 def is_bbr_enabled() -> bool:

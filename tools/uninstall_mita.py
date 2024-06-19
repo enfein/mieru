@@ -29,6 +29,12 @@ import sys
 
 
 def uninstall_mita() -> None:
+    print('[check operating system]')
+    if not sys.platform.startswith('linux'):
+        print_exit('You can only run this program on Linux.')
+    else:
+        print('OK')
+
     print('[check permission]')
     uid = os.getuid()
     if uid != 0:
@@ -101,6 +107,7 @@ def rpm_uninstall() -> None:
     run_command('[remove mita metrics]', ['rm', '-rf', '/var/lib/mita'])
     run_command('[remove mita runtime]', ['rm', '-rf', '/var/run/mita'])
     run_command('[remove mita systemd unit]', ['rm', '-f', '/lib/systemd/system/mita.service'])
+    run_command('[remove TCP BBR sysctl patch]', ['rm', '-f', '/etc/sysctl.d/mieru_tcp_bbr.conf'])
     run_command('[reload systemd]', ['systemctl', 'daemon-reload'])
     run_command('[delete mita user]', ['userdel', 'mita'])
     run_command('[delete mita group]', ['groupdel', 'mita'])
