@@ -20,13 +20,9 @@ This program generates users that can be used in mita server configurations.
 '''
 
 
-import sys
-sys.dont_write_bytecode = True
-
-
-from gen_username_passwd import gen_token
 import argparse
 import json
+import secrets
 
 
 def gen_users() -> None:
@@ -43,6 +39,11 @@ def gen_users() -> None:
         "users": user_list
     }
     print(json.dumps(users, indent=4))
+
+
+def gen_token(length: int) -> str:
+    s = secrets.token_urlsafe(length)
+    return s[:length]
 
 
 if __name__ == '__main__':

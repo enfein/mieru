@@ -32,7 +32,7 @@ def uninstall_mita() -> None:
     print('[check permission]')
     uid = os.getuid()
     if uid != 0:
-        print_exit('ERROR: only root user can run this program.')
+        print_exit('Only root user can run this program.')
     else:
         print('OK')
 
@@ -44,7 +44,7 @@ def uninstall_mita() -> None:
         print('Package manager is rpm.')
         rpm_uninstall()
     else:
-        print_exit('ERROR: unable to determine package manager.')
+        print_exit('Unable to determine package manager.')
 
 
 def is_deb() -> bool:
@@ -87,6 +87,7 @@ def deb_uninstall() -> None:
     run_command('[remove mita metrics]', ['rm', '-rf', '/var/lib/mita'])
     run_command('[remove mita runtime]', ['rm', '-rf', '/var/run/mita'])
     run_command('[remove mita systemd unit]', ['rm', '-f', '/lib/systemd/system/mita.service'])
+    run_command('[remove TCP BBR sysctl patch]', ['rm', '-f', '/etc/sysctl.d/mieru_tcp_bbr.conf'])
     run_command('[reload systemd]', ['systemctl', 'daemon-reload'])
     run_command('[delete mita user]', ['userdel', 'mita'])
     run_command('[delete mita group]', ['groupdel', 'mita'])
