@@ -23,13 +23,16 @@ import (
 const (
 	PrintableCharSub = 0x20 // 0x20, i.e. ' ', is the first printable ASCII character
 	PrintableCharSup = 0x7E // 0x7E, i.e. '~', is the last printable ASCII character
+
+	// Common64Set contains 64 selected common characters.
+	Common64Set = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-"
 )
 
 var (
 	printableCharRange = big.NewInt(PrintableCharSup - PrintableCharSub + 1)
 )
 
-// ToPrintableChar rewrite [beginIdx, endIdx) of the byte slice with printable
+// ToPrintableChar rewrites [beginIdx, endIdx) of the byte slice with printable
 // ASCII characters.
 func ToPrintableChar(b []byte, beginIdx, endIdx int) {
 	if beginIdx > endIdx {
@@ -57,5 +60,20 @@ func ToPrintableChar(b []byte, beginIdx, endIdx int) {
 			}
 			b[i] = byte(randBigInt.Int64() + PrintableCharSub)
 		}
+	}
+}
+
+// ToCommon64Set rewrites [beginIdx, endIdx) of the byte slice with characters
+// from Common64Set.
+func ToCommon64Set(b []byte, beginIdx, endIdx int) {
+	if beginIdx > endIdx {
+		panic("begin index > end index")
+	}
+	if endIdx > len(b) {
+		panic("index out of range")
+	}
+	for i := beginIdx; i < endIdx; i++ {
+		setIdx := b[i] & 0x3f
+		b[i] = Common64Set[setIdx]
 	}
 }

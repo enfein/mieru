@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	noncePrintablePrefixLen = 12
+	nonceRewritePrefixLen = 8
 )
 
 type AEADType uint8
@@ -288,11 +288,11 @@ func (c *AEADBlockCipher) newNonce() ([]byte, error) {
 	}
 
 	// Adjust the nonce such that the first a few bytes are printable ASCII characters.
-	rewriteLen := noncePrintablePrefixLen
+	rewriteLen := nonceRewritePrefixLen
 	if rewriteLen > c.NonceSize() {
 		rewriteLen = c.NonceSize()
 	}
-	util.ToPrintableChar(nonce, 0, rewriteLen)
+	util.ToCommon64Set(nonce, 0, rewriteLen)
 	return nonce, nil
 }
 

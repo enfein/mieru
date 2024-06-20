@@ -27,10 +27,34 @@ func TestToPrintableChar(t *testing.T) {
 			break
 		}
 	}
+
 	ToPrintableChar(b, 0, 1024)
 	for i := 0; i < 1024; i++ {
 		if b[i] < PrintableCharSub || b[i] > PrintableCharSup {
-			t.Fatalf("Found non printable character")
+			t.Errorf("Found non printable character")
+		}
+	}
+}
+
+func TestToCommon64Set(t *testing.T) {
+	if len(Common64Set) != 64 {
+		t.Fatalf("Common64Set has %d characters, want 64", len(Common64Set))
+	}
+	s := make(map[byte]struct{})
+	for _, c := range []byte(Common64Set) {
+		s[c] = struct{}{}
+	}
+	b := make([]byte, 1024)
+	for {
+		if _, err := crand.Read(b); err == nil {
+			break
+		}
+	}
+
+	ToCommon64Set(b, 0, 1024)
+	for i := 0; i < 1024; i++ {
+		if _, ok := s[b[i]]; !ok {
+			t.Errorf("Found character not in Common64Set")
 		}
 	}
 }

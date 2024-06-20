@@ -216,6 +216,10 @@ func TestAEADBlockCipherNewNonce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newXChaCha20Poly1305BlockCipher() failed: %v", err)
 	}
+	s := make(map[byte]struct{})
+	for _, c := range []byte(util.Common64Set) {
+		s[c] = struct{}{}
+	}
 	distribution := make(map[byte]int32)
 	for i := 0; i < 100000; i++ {
 		nonce, err := c.newNonce()
@@ -223,11 +227,11 @@ func TestAEADBlockCipherNewNonce(t *testing.T) {
 			t.Fatalf("newNonce() failed: %v", err)
 		}
 		for j, b := range nonce {
-			if j >= noncePrintablePrefixLen {
+			if j >= nonceRewritePrefixLen {
 				break
 			}
-			if b < util.PrintableCharSub || b > util.PrintableCharSup {
-				t.Fatalf("Byte %v in position %d is not a printable ASCII character", b, j)
+			if _, ok := s[b]; !ok {
+				t.Fatalf("Byte %v in position %d is not allowed", b, j)
 			}
 			distribution[b]++
 		}
