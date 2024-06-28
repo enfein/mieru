@@ -150,7 +150,7 @@ func (s *segment) Less(other *segment) bool {
 }
 
 func (s *segment) String() string {
-	if s.transport == util.UDPTransport && (!util.IsZeroTime(s.txTime) || s.txTimeout != 0) {
+	if s.transport == util.UDPTransport && (!s.txTime.IsZero() || s.txTimeout != 0) {
 		return fmt.Sprintf("segment{metadata=%v, realPayloadLen=%v, ackCount=%v, txCount=%v, txTime=%v, txTimeout=%v}", s.metadata, len(s.payload), s.ackCount, s.txCount, s.txTime.Format(segmentTimeFormat), s.txTimeout)
 	}
 	return fmt.Sprintf("segment{metadata=%v, realPayloadLen=%v}", s.metadata, len(s.payload))

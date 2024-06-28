@@ -27,7 +27,7 @@ func SetReadTimeout(conn net.Conn, timeout time.Duration) {
 	if timeout > 0 {
 		conn.SetReadDeadline(time.Now().Add(timeout))
 	} else {
-		conn.SetReadDeadline(ZeroTime())
+		conn.SetReadDeadline(time.Time{})
 	}
 }
 

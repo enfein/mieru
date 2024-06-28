@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/enfein/mieru/pkg/rng"
-	"github.com/enfein/mieru/pkg/util"
 )
 
 var (
@@ -42,7 +41,7 @@ type ScheduleController struct {
 func (c *ScheduleController) IncPending() (ok bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if !util.IsZeroTime(c.disableTime) && time.Since(c.disableTime) > 0 {
+	if !c.disableTime.IsZero() && time.Since(c.disableTime) > 0 {
 		return false
 	}
 	c.pending++
@@ -62,27 +61,27 @@ func (c *ScheduleController) DecPending() {
 func (c *ScheduleController) IsDisabled() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return !util.IsZeroTime(c.disableTime) && time.Since(c.disableTime) > 0
+	return !c.disableTime.IsZero() && time.Since(c.disableTime) > 0
 }
 
 // Idle returns true if the scheduling has been disabled for the given interval.
 func (c *ScheduleController) Idle() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return !util.IsZeroTime(c.disableTime) && time.Since(c.lastScheduleTime) > scheduleIdleTime && time.Since(c.disableTime) > scheduleIdleTime
+	return !c.disableTime.IsZero() && time.Since(c.lastScheduleTime) > scheduleIdleTime && time.Since(c.disableTime) > scheduleIdleTime
 }
 
 // TryDisable tries to disable scheduling new sessions.
 func (c *ScheduleController) TryDisable() (successful bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if !util.IsZeroTime(c.disableTime) {
+	if !c.disableTime.IsZero() {
 		return false // already disabled
 	}
 	if c.pending > 0 {
 		return false
 	}
-	if !util.IsZeroTime(c.lastScheduleTime) && time.Since(c.lastScheduleTime) < scheduleIdleTime {
+	if !c.lastScheduleTime.IsZero() && time.Since(c.lastScheduleTime) < scheduleIdleTime {
 		return false
 	}
 	c.disableTime = time.Now()
@@ -94,7 +93,7 @@ func (c *ScheduleController) TryDisable() (successful bool) {
 func (c *ScheduleController) SetRemainingTime(d time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if d <= 0 || !util.IsZeroTime(c.disableTime) {
+	if d <= 0 || !c.disableTime.IsZero() {
 		return
 	}
 	c.disableTime = time.Now().Add(d)

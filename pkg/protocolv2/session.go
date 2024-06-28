@@ -138,8 +138,8 @@ func NewSession(id uint32, isClient bool, mtu int) *Session {
 		status:           statusOK,
 		ready:            make(chan struct{}),
 		done:             make(chan struct{}),
-		readDeadline:     util.ZeroTime(),
-		writeDeadline:    util.ZeroTime(),
+		readDeadline:     time.Time{},
+		writeDeadline:    time.Time{},
 		inputErr:         make(chan error, 2), // allow nested
 		outputErr:        make(chan error, 2), // allow nested
 		sendQueue:        newSegmentTree(segmentTreeCapacity),
@@ -173,7 +173,7 @@ func (s *Session) Read(b []byte) (n int, err error) {
 		return 0, io.ErrClosedPipe
 	}
 	defer func() {
-		s.readDeadline = util.ZeroTime()
+		s.readDeadline = time.Time{}
 	}()
 	if log.IsLevelEnabled(log.TraceLevel) {
 		log.Tracef("%v trying to read %d bytes", s, len(b))
@@ -198,7 +198,7 @@ func (s *Session) Read(b []byte) (n int, err error) {
 
 	// Stop reading when deadline is reached.
 	var timeC <-chan time.Time
-	if !util.IsZeroTime(s.readDeadline) {
+	if !s.readDeadline.IsZero() {
 		timeC = time.After(time.Until(s.readDeadline))
 	}
 
@@ -263,7 +263,7 @@ func (s *Session) Write(b []byte) (n int, err error) {
 		return 0, io.ErrClosedPipe
 	}
 	defer func() {
-		s.writeDeadline = util.ZeroTime()
+		s.writeDeadline = time.Time{}
 	}()
 
 	if s.isClient && s.isState(sessionAttached) {
@@ -468,7 +468,7 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 
 	// Stop writing when deadline is reached.
 	var timeC <-chan time.Time
-	if !util.IsZeroTime(s.writeDeadline) {
+	if !s.writeDeadline.IsZero() {
 		timeC = time.After(time.Until(s.writeDeadline))
 	}
 

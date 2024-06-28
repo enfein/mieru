@@ -26,5 +26,5 @@
     "advancedSettings": {
         "allowLocalDestination": true
     },
-    "loggingLevel": "TRACE"
+    "loggingLevel": "INFO"
 }
