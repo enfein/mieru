@@ -1,5 +1,5 @@
 name: 'integration test'
-on: [workflow_dispatch]
+on: [push, pull_request, workflow_dispatch]
 jobs:
   run-test:
     runs-on: ubuntu-latest
