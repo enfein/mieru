@@ -52,6 +52,19 @@ const (
 	stateGrowth
 )
 
+const maxDatagramSize = 1280
+
+type AckedPacketInfo struct {
+	packetNumber     int64
+	bytesAcked       int64
+	receiveTimestamp time.Time
+}
+
+type LostPacketInfo struct {
+	packetNumber int64
+	bytesLost    int64
+}
+
 type BBRSender struct {
 	rttStats *RTTStats
 
@@ -65,7 +78,7 @@ type BBRSender struct {
 	sampler BandwidthSamplerInterface
 
 	// The number of the round trips that have occurred during the connection.
-	roundTripCount uint64
+	roundTripCount int64
 
 	// The packet number of the most recently sent packet.
 	lastSentPacket int64
@@ -128,7 +141,7 @@ type BBRSender struct {
 	rttVarianceWeight float64
 
 	// The number of RTTs to stay in STARTUP mode. Defaults to 3.
-	numStartupRTTs uint64
+	numStartupRTTs int64
 
 	// If true, exit startup if 1 RTT has passed with no bandwidth increase and
 	// the connection is in recovery.
@@ -207,4 +220,163 @@ type BBRSender struct {
 
 	appLimitedSinceLastProbeRTT bool
 	minRTTSinceLastProbeRTT     time.Duration
+}
+
+func (b *BBRSender) InSlowStart() bool {
+	return b.mode == modeStartUp
+}
+
+func (b *BBRSender) InRecovery() bool {
+	return b.recoveryState != stateNotInRecovery
+}
+
+func (b *BBRSender) IsProbingForMoreBandwidth() bool {
+	return b.mode == modeProbeBW
+}
+
+func (b *BBRSender) AdjustNetworkParameters(bandwidth uint64, rtt time.Duration) {
+	if bandwidth > 0 {
+		b.maxBandwidth.Update(bandwidth, b.roundTripCount)
+	}
+	if rtt > 0 && (b.minRTT > rtt || b.minRTT == 0) {
+		b.minRTT = rtt
+	}
+}
+
+func (b *BBRSender) SetInitialCongestionWindowInPackets(congestionWindow int64) {
+	if b.mode == modeStartUp {
+		b.initialCongestionWindow = congestionWindow * maxDatagramSize
+		b.congestionWindow = congestionWindow * maxDatagramSize
+	}
+}
+
+func (b *BBRSender) OnCongestionEvent(rttUpdated bool, priorInFlight int64, eventTime time.Time, ackedPackets []AckedPacketInfo, lostPackets []LostPacketInfo) {
+	// Implementation here
+}
+
+func (b *BBRSender) OnPacketSent(sentTime time.Time, bytesInFlight int64, packetNumber int64, bytes int64, isRetransmittable bool) {
+	// Implementation here
+}
+
+func (b *BBRSender) OnRetransmissionTimeout(packetsRetransmitted bool) {
+	// Implementation here
+}
+
+func (b *BBRSender) OnConnectionMigration() {
+	// Implementation here
+}
+
+func (b *BBRSender) CanSend(bytesInFlight int64) bool {
+	return bytesInFlight < b.GetCongestionWindow()
+}
+
+func (b *BBRSender) PacingRate(bytesInFlight int64) int64 {
+	// Implementation here
+	return 0
+}
+
+func (b *BBRSender) BandwidthEstimate() int64 {
+	// Implementation here
+	return 0
+}
+
+func (b *BBRSender) GetCongestionWindow() int64 {
+	// Implementation here
+	return 0
+}
+
+func (b *BBRSender) GetSlowStartThreshold() int64 {
+	// Implementation here
+	return 0
+}
+
+func (b *BBRSender) OnApplicationLimited(bytesInFlight int64) {
+	// Implementation here
+}
+
+func (b *BBRSender) NumStartupRTTs() int64 {
+	return b.numStartupRTTs
+}
+
+func (b *BBRSender) GetMinRTT() time.Duration {
+	// Implementation here
+	return 0
+}
+
+func (b *BBRSender) IsAtFullBandwidth() bool {
+	// Implementation here
+	return false
+}
+
+func (b *BBRSender) GetTargetCongestionWindow(gain float64) int64 {
+	// Implementation here
+	return 0
+}
+
+func (b *BBRSender) ProbeRTTCongestionWindow() int64 {
+	// Implementation here
+	return 0
+}
+
+func (b *BBRSender) ShouldExtendMinRTTExpiry() bool {
+	// Implementation here
+	return false
+}
+
+func (b *BBRSender) EnterStartupMode() {
+	// Implementation here
+}
+
+func (b *BBRSender) EnterProbeBandwidthMode(now time.Time) {
+	// Implementation here
+}
+
+func (b *BBRSender) DiscardLostPackets(lostPackets []LostPacketInfo) {
+	// Implementation here
+}
+
+func (b *BBRSender) UpdateRoundTripCounter(lastAckedPacket int64) bool {
+	// Implementation here
+	return false
+}
+
+func (b *BBRSender) UpdateBandwidthAndMinRTT(now time.Time, ackedPackets []AckedPacketInfo) bool {
+	// Implementation here
+	return false
+}
+
+func (b *BBRSender) UpdateGainCyclePhase(now time.Time, priorInFlight int64, hasLosses bool) {
+	// Implementation here
+}
+
+func (b *BBRSender) CheckIfFullBandwidthReached() {
+	// Implementation here
+}
+
+func (b *BBRSender) MaybeExitStartupOrDrain(now time.Time) {
+	// Implementation here
+}
+
+func (b *BBRSender) MaybeEnterOrExitProbeRTT(now time.Time, isRoundStart bool, minRTTExpired bool) {
+	// Implementation here
+}
+
+func (b *BBRSender) UpdateRecoveryState(lastAckedPacket int64, hasLosses bool, isRoundStart bool) {
+	// Implementation here
+}
+
+func (b *BBRSender) UpdateAckAggregationBytes(ackTime time.Time, newlyAckedBytes int64) {
+	// Implementation here
+}
+
+func (b *BBRSender) CalculatePacingRate() {
+	// Implementation here
+}
+
+func (b *BBRSender) CalculateCongestionWindow(bytesAcked int64) {
+	// Implementation here
+}
+
+func (b *BBRSender) CalculateRecoveryWindow(bytesAcked int64, bytesLost int64) {
+	// Implementation here
 }
