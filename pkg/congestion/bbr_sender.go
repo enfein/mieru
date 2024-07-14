@@ -88,10 +88,10 @@ type BBRSender struct {
 	currentRoundTripEnd int64
 
 	// Tracks the maximum bandwidth over the multiple recent round-trips.
-	maxBandwidth WindowedFilter[uint64]
+	maxBandwidth WindowedFilter[int64]
 
 	// Tracks the maximum number of bytes acked faster than the sending rate.
-	maxAckHeight WindowedFilter[uint64]
+	maxAckHeight WindowedFilter[int64]
 
 	// The time this aggregation started and the number of bytes acked during it.
 	aggregationEpochStartTime time.Time
@@ -158,7 +158,7 @@ type BBRSender struct {
 	isAtFullBandwidth bool
 
 	// Number of rounds during which there was no significant bandwidth increase.
-	roundsWithoutBandwidthGain uint64
+	roundsWithoutBandwidthGain int64
 
 	// The bandwidth compared to which the increase is measured.
 	bandwidthAtLastRound int64
@@ -234,7 +234,7 @@ func (b *BBRSender) IsProbingForMoreBandwidth() bool {
 	return b.mode == modeProbeBW
 }
 
-func (b *BBRSender) AdjustNetworkParameters(bandwidth uint64, rtt time.Duration) {
+func (b *BBRSender) AdjustNetworkParameters(bandwidth int64, rtt time.Duration) {
 	if bandwidth > 0 {
 		b.maxBandwidth.Update(bandwidth, b.roundTripCount)
 	}
@@ -276,8 +276,7 @@ func (b *BBRSender) PacingRate(bytesInFlight int64) int64 {
 }
 
 func (b *BBRSender) BandwidthEstimate() int64 {
-	// Implementation here
-	return 0
+	return b.maxBandwidth.GetBest()
 }
 
 func (b *BBRSender) GetCongestionWindow() int64 {
@@ -286,7 +285,6 @@ func (b *BBRSender) GetCongestionWindow() int64 {
 }
 
 func (b *BBRSender) GetSlowStartThreshold() int64 {
-	// Implementation here
 	return 0
 }
 
@@ -299,8 +297,10 @@ func (b *BBRSender) NumStartupRTTs() int64 {
 }
 
 func (b *BBRSender) GetMinRTT() time.Duration {
-	// Implementation here
-	return 0
+	if b.minRTT != 0 {
+		return b.minRTT
+	}
+	return b.rttStats.SmoothedRTT()
 }
 
 func (b *BBRSender) IsAtFullBandwidth() bool {
