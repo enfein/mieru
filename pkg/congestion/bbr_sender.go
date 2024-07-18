@@ -15,7 +15,11 @@
 
 package congestion
 
-import "time"
+import (
+	"time"
+
+	"github.com/enfein/mieru/pkg/mathext"
+)
 
 type bbrMode int
 
@@ -52,7 +56,55 @@ const (
 	stateGrowth
 )
 
-const maxDatagramSize = 1280
+const (
+	maxDatagramSize = 1280
+
+	// The minimum CWND to ensure delayed acks don't reduce bandwidth measurements.
+	// Does not inflate the pacing rate.
+	defaultMinimumCongestionWindow = 16 * maxDatagramSize
+
+	// The gain used for the slow start, equal to 2/ln(2).
+	highGain = 2.885
+
+	// The gain used in STARTUP after loss has been detected.
+	// 1.5 is enough to allow for 25% exogenous loss and still observe a 25% growth
+	// in measured bandwidth.
+	StartupAfterLossGain = 1.5
+
+	// The gain used to drain the queue after the slow start.
+	drainGain = 1.0 / highGain
+
+	// The length of the gain cycle.
+	gainCycleLength = 8
+
+	// The size of the bandwidth filter window, in round-trips.
+	bandwidthFilterWindowSize = gainCycleLength + 2
+
+	// The time after which the current min_rtt value expires.
+	minRTTExpiry = 10 * time.Second
+
+	// The minimum time the connection can spend in PROBE RTT mode.
+	probeRTTTime = 200 * time.Millisecond
+
+	// If the bandwidth does not increase by the factor of startUpGrowthTarget
+	// within roundTripsWithoutGrowthBeforeExitingStartup rounds, the connection
+	// will exit the STARTUP mode.
+	startUpGrowthTarget = 1.25
+
+	roundTripsWithoutGrowthBeforeExitingStartup = 3
+
+	// Coefficient of target congestion window to use when basing PROBE RTT on BDP.
+	moderateProbeRttMultiplier = 0.75
+
+	// Coefficient to determine if a new RTT is sufficiently similar to min RTT that
+	// we don't need to enter PROBE RTT.
+	similarMinRttThreshold = 1.125
+)
+
+var (
+	// The cycle of gains used during the PROBE BW stage.
+	pacingGainList = [8]float64{1.25, 0.75, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0}
+)
 
 type AckedPacketInfo struct {
 	packetNumber     int64
@@ -280,8 +332,15 @@ func (b *BBRSender) BandwidthEstimate() int64 {
 }
 
 func (b *BBRSender) GetCongestionWindow() int64 {
-	// Implementation here
-	return 0
+	if b.mode == modeProbeRTT {
+		return b.ProbeRTTCongestionWindow()
+	}
+
+	if b.InRecovery() && !b.rateBasedRecovery && !(b.rateBasedStartup && b.mode == modeStartUp) {
+		return mathext.Min(b.congestionWindow, b.recoveryWindow)
+	}
+
+	return b.congestionWindow
 }
 
 func (b *BBRSender) GetSlowStartThreshold() int64 {
@@ -289,7 +348,13 @@ func (b *BBRSender) GetSlowStartThreshold() int64 {
 }
 
 func (b *BBRSender) OnApplicationLimited(bytesInFlight int64) {
-	// Implementation here
+	if bytesInFlight >= b.GetCongestionWindow() {
+		// Not application limited.
+		return
+	}
+
+	b.appLimitedSinceLastProbeRTT = true
+	b.sampler.OnAppLimited()
 }
 
 func (b *BBRSender) NumStartupRTTs() int64 {
@@ -304,27 +369,47 @@ func (b *BBRSender) GetMinRTT() time.Duration {
 }
 
 func (b *BBRSender) IsAtFullBandwidth() bool {
-	// Implementation here
-	return false
+	return b.isAtFullBandwidth
 }
 
 func (b *BBRSender) GetTargetCongestionWindow(gain float64) int64 {
-	// Implementation here
-	return 0
+	bdp := (b.GetMinRTT().Nanoseconds() * b.BandwidthEstimate()) / int64(time.Second)
+	congestionWindow := int64(gain * float64(bdp))
+
+	// BDP estimate will be zero if no bandwidth samples are available yet.
+	if congestionWindow <= 0 {
+		congestionWindow = int64(gain * float64(b.initialCongestionWindow))
+	}
+
+	return mathext.Max(congestionWindow, b.minCongestionWindow)
 }
 
 func (b *BBRSender) ProbeRTTCongestionWindow() int64 {
-	// Implementation here
-	return 0
+	if b.probeRTTBasedOnBDP {
+		return b.GetTargetCongestionWindow(moderateProbeRttMultiplier)
+	}
+	return b.minCongestionWindow
 }
 
 func (b *BBRSender) ShouldExtendMinRTTExpiry() bool {
-	// Implementation here
+	if b.probeRTTDisabledIfAppLimited && b.appLimitedSinceLastProbeRTT {
+		// Extend the current min RTT if we've been app limited recently.
+		return true
+	}
+	minRTTIncreasedSinceLastProbe := b.minRTTSinceLastProbeRTT > time.Duration(float64(b.minRTT)*similarMinRttThreshold)
+	if b.probeRTTSkippedIfSimilarRTT && b.appLimitedSinceLastProbeRTT && !minRTTIncreasedSinceLastProbe {
+		// Extend the current min RTT if we've been app limited recently and an RTT
+		// has been measured in that time that's less than 12.5% more than the
+		// current min RTT.
+		return true
+	}
 	return false
 }
 
 func (b *BBRSender) EnterStartupMode() {
-	// Implementation here
+	b.mode = modeStartUp
+	b.pacingGain = highGain
+	b.congestionWindowGain = highGain
 }
 
 func (b *BBRSender) EnterProbeBandwidthMode(now time.Time) {
