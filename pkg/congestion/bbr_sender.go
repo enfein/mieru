@@ -62,7 +62,13 @@ const (
 
 	// The minimum CWND to ensure delayed acks don't reduce bandwidth measurements.
 	// Does not inflate the pacing rate.
-	defaultMinimumCongestionWindow = 16 * maxDatagramSize
+	//
+	// We use TCP initial CWND specified in RFC 6928.
+	defaultMinimumCongestionWindow = 10 * maxDatagramSize
+
+	defaultInitialCongestionWindow = 32 * maxDatagramSize
+
+	defaultMaximumCongestionWindow = 4096 * maxDatagramSize
 
 	// The gain used for the slow start, equal to 2/ln(2).
 	highGain = 2.885
@@ -142,10 +148,10 @@ type BBRSender struct {
 	currentRoundTripEnd int64
 
 	// Tracks the maximum bandwidth over the multiple recent round-trips.
-	maxBandwidth WindowedFilter[int64]
+	maxBandwidth *WindowedFilter[int64]
 
 	// Tracks the maximum number of bytes acked faster than the sending rate.
-	maxAckHeight WindowedFilter[int64]
+	maxAckHeight *WindowedFilter[int64]
 
 	// The time this aggregation started and the number of bytes acked during it.
 	aggregationEpochStartTime time.Time
@@ -160,7 +166,7 @@ type BBRSender struct {
 	maxAggregationBytesMultiplier float64
 
 	// Minimum RTT estimate. Automatically expires within 10 seconds
-	// (and triggers PROBE_RTT mode) if no new value is sampled
+	// and triggers PROBE RTT mode if no new value is sampled
 	// during that period.
 	minRTT time.Duration
 
@@ -188,20 +194,20 @@ type BBRSender struct {
 	// The gain currently applied to the congestion window.
 	congestionWindowGain float64
 
-	// The gain used for the congestion window during PROBE_BW.
+	// The gain used for the congestion window during PROBE BW.
 	congestionWindowGainConstant float64
 
 	// The coefficient by which mean RTT variance is added to the congestion window.
 	rttVarianceWeight float64
 
-	// The number of RTTs to stay in STARTUP mode. Defaults to 3.
+	// The number of RTTs to stay in STARTUP mode.
 	numStartupRTTs int64
 
 	// If true, exit startup if 1 RTT has passed with no bandwidth increase and
 	// the connection is in recovery.
 	exitStartupOnLoss bool
 
-	// Number of round-trips in PROBE_BW mode, used for determining the current
+	// Number of round-trips in PROBE BW mode, used for determining the current
 	// pacing gain cycle.
 	cycleCurrentOffset int
 
@@ -217,15 +223,16 @@ type BBRSender struct {
 	// The bandwidth compared to which the increase is measured.
 	bandwidthAtLastRound int64
 
-	// Set to true upon exiting quiescence.
+	// Set to true upon exiting quiescence. Quiescence means bytesInFlight is
+	// zero and app is not sending data.
 	exitingQuiescence bool
 
-	// Time at which PROBE_RTT has to be exited. Setting it to zero indicates
+	// Time at which PROBE RTT has to be exited. Setting it to zero indicates
 	// that the time is yet unknown as the number of packets in flight has not
 	// reached the required value.
 	exitProbeRTTAt time.Time
 
-	// Indicates whether a round-trip has passed since PROBE_RTT became active.
+	// Indicates whether a round-trip has passed since PROBE RTT became active.
 	probeRTTRoundPassed bool
 
 	// Indicates whether the most recent bandwidth sample was marked as
@@ -259,16 +266,16 @@ type BBRSender struct {
 	// or it's time for high gain mode.
 	fullyDrainQueue bool
 
-	// If true, use a CWND of 0.75*BDP during probe_rtt instead of 4 packets.
+	// If true, use a CWND of 0.75*BDP during PROBE RTT instead of minCongestionWindow.
 	probeRTTBasedOnBDP bool
 
-	// If true, skip PROBE_RTT and update the timestamp of the existing minRTT to
+	// If true, skip PROBE RTT and update the timestamp of the existing minRTT to
 	// now if minRTT over the last cycle is within 12.5% of the current minRTT.
 	// Even if the minRTT is 12.5% too low, the 25% gain cycling and 2x CWND gain
 	// should overcome an overly small minRTT.
 	probeRTTSkippedIfSimilarRTT bool
 
-	// If true, disable PROBE_RTT entirely as long as the connection was recently
+	// If true, disable PROBE RTT entirely as long as the connection was recently
 	// app limited.
 	probeRTTDisabledIfAppLimited bool
 
@@ -276,24 +283,26 @@ type BBRSender struct {
 	minRTTSinceLastProbeRTT     time.Duration
 }
 
-func (b *BBRSender) InSlowStart() bool {
-	return b.mode == modeStartUp
-}
-
-func (b *BBRSender) InRecovery() bool {
-	return b.recoveryState != stateNotInRecovery
-}
-
-func (b *BBRSender) IsProbingForMoreBandwidth() bool {
-	return b.mode == modeProbeBW
-}
-
-func (b *BBRSender) AdjustNetworkParameters(bandwidth int64, rtt time.Duration) {
-	if bandwidth > 0 {
-		b.maxBandwidth.Update(bandwidth, b.roundTripCount)
-	}
-	if rtt > 0 && (b.minRTT > rtt || b.minRTT == 0) {
-		b.minRTT = rtt
+func NewBBRSender() *BBRSender {
+	return &BBRSender{
+		rttStats:                     NewRTTStats(),
+		mode:                         modeStartUp,
+		sampler:                      NewBandwidthSampler(),
+		maxBandwidth:                 NewWindowedFilter(bandwidthFilterWindowSize, 0, MaxFilter[int64]),
+		maxAckHeight:                 NewWindowedFilter(bandwidthFilterWindowSize, 0, MaxFilter[int64]),
+		congestionWindow:             defaultInitialCongestionWindow,
+		initialCongestionWindow:      defaultInitialCongestionWindow,
+		maxCongestionWindow:          defaultMaximumCongestionWindow,
+		minCongestionWindow:          defaultMinimumCongestionWindow,
+		pacingGain:                   1.0,
+		congestionWindowGain:         1.0,
+		congestionWindowGainConstant: 2.0,
+		rttVarianceWeight:            0.0,
+		numStartupRTTs:               roundTripsWithoutGrowthBeforeExitingStartup,
+		recoveryState:                stateNotInRecovery,
+		recoveryWindow:               defaultMaximumCongestionWindow,
+		initialConservationInStartup: stateConservation,
+		minRTTSinceLastProbeRTT:      infDuration,
 	}
 }
 
@@ -304,10 +313,86 @@ func (b *BBRSender) SetInitialCongestionWindowInPackets(congestionWindow int64) 
 	}
 }
 
-func (b *BBRSender) OnCongestionEvent(rttUpdated bool, priorInFlight int64, eventTime time.Time, ackedPackets []AckedPacketInfo, lostPackets []LostPacketInfo) {
+func (b *BBRSender) InSlowStart() bool {
+	return b.mode == modeStartUp
+}
+
+func (b *BBRSender) OnPacketSent(sentTime time.Time, bytesInFlight int64, packetNumber int64, bytes int64, hasRetransmittableData bool) {
+	b.lastSentPacket = packetNumber
+	b.bytesInFlight = bytesInFlight
+
+	if bytesInFlight <= 0 && b.sampler.IsAppLimited() {
+		b.exitingQuiescence = true
+	}
+
+	if b.aggregationEpochStartTime.IsZero() {
+		b.aggregationEpochStartTime = sentTime
+	}
+
+	b.sampler.OnPacketSent(sentTime, packetNumber, bytes, bytesInFlight, hasRetransmittableData)
+}
+
+func (b *BBRSender) CanSend(bytesInFlight int64) bool {
+	return bytesInFlight < b.GetCongestionWindow()
+}
+
+func (b *BBRSender) PacingRate(bytesInFlight int64) int64 {
+	if b.pacingRate <= 0 {
+		return int64(highGain * float64(bandwidthFromBytesAndTimeDelta(b.initialCongestionWindow, b.GetMinRTT())))
+	}
+	return b.pacingRate
+}
+
+func (b *BBRSender) BandwidthEstimate() int64 {
+	return b.maxBandwidth.GetBest()
+}
+
+func (b *BBRSender) GetCongestionWindow() int64 {
+	if b.mode == modeProbeRTT {
+		return b.ProbeRTTCongestionWindow()
+	}
+
+	if b.InRecovery() && !b.rateBasedRecovery && !(b.mode == modeStartUp && b.rateBasedStartup) {
+		return mathext.Min(b.congestionWindow, b.recoveryWindow)
+	}
+
+	return b.congestionWindow
+}
+
+func (b *BBRSender) GetSlowStartThreshold() int64 {
+	return 0
+}
+
+func (b *BBRSender) InRecovery() bool {
+	return b.recoveryState != stateNotInRecovery
+}
+
+func (b *BBRSender) IsProbingForMoreBandwidth() bool {
+	return (b.mode == modeProbeBW && b.pacingGain > 1) || b.mode == modeStartUp
+}
+
+func (b *BBRSender) AdjustNetworkParameters(bandwidth int64, rtt time.Duration) {
+	if bandwidth > 0 {
+		b.maxBandwidth.Update(bandwidth, b.roundTripCount)
+	}
+	if rtt > 0 && (b.minRTT <= 0 || rtt < b.minRTT) {
+		b.minRTT = rtt
+	}
+}
+
+func (b *BBRSender) OnCongestionEvent(priorInFlight int64, eventTime time.Time, ackedPackets []AckedPacketInfo, lostPackets []LostPacketInfo) {
 	totalBytesAckedBefore := b.sampler.TotalBytesAcked()
 	isRoundStart := false
 	isMinRTTExpired := false
+
+	b.bytesInFlight = priorInFlight
+	for _, p := range ackedPackets {
+		b.bytesInFlight -= p.bytesAcked
+	}
+	for _, p := range lostPackets {
+		b.bytesInFlight -= p.bytesLost
+	}
+	b.bytesInFlight = mathext.Max(b.bytesInFlight, 0)
 
 	b.DiscardLostPackets(lostPackets)
 
@@ -359,8 +444,8 @@ func (b *BBRSender) OnCongestionEvent(rttUpdated bool, priorInFlight int64, even
 
 	// Cleanup internal state.
 	// This is where we clean up obsolete (acked or lost) packets from the bandwidth sampler.
-	// The "least unacked" should actually be FirstOutstanding, but we will only do an estimate
-	// using acked/lost packets for now. Because of fast retransmission, they should differ by
+	// The "least unacked" should actually be first outstanding, but we will only do an estimate
+	// using acked / lost packets for now. Because of fast retransmission, they should differ by
 	// no more than 2 packets.
 	var leastUnacked int64
 	if len(ackedPackets) > 0 {
@@ -371,68 +456,11 @@ func (b *BBRSender) OnCongestionEvent(rttUpdated bool, priorInFlight int64, even
 	b.sampler.RemoveObsoletePackets(leastUnacked)
 }
 
-func (b *BBRSender) OnPacketSent(sentTime time.Time, bytesInFlight int64, packetNumber int64, bytes int64, hasRetransmittableData bool) {
-	b.lastSentPacket = packetNumber
-
-	if bytesInFlight <= 0 && b.sampler.IsAppLimited() {
-		b.exitingQuiescence = true
-	}
-
-	if b.aggregationEpochStartTime.IsZero() {
-		b.aggregationEpochStartTime = sentTime
-	}
-
-	b.sampler.OnPacketSent(sentTime, packetNumber, bytes, bytesInFlight, hasRetransmittableData)
-}
-
-func (b *BBRSender) OnRetransmissionTimeout(packetsRetransmitted bool) {}
-
-func (b *BBRSender) OnConnectionMigration() {}
-
-func (b *BBRSender) CanSend(bytesInFlight int64) bool {
-	return bytesInFlight < b.GetCongestionWindow()
-}
-
-func (b *BBRSender) PacingRate(bytesInFlight int64) int64 {
-	if b.pacingRate == 0 {
-		return int64(highGain * float64(bandwidthFromBytesAndTimeDelta(b.initialCongestionWindow, b.GetMinRTT())))
-	}
-	return b.pacingRate
-}
-
-func (b *BBRSender) BandwidthEstimate() int64 {
-	return b.maxBandwidth.GetBest()
-}
-
-func (b *BBRSender) GetCongestionWindow() int64 {
-	if b.mode == modeProbeRTT {
-		return b.ProbeRTTCongestionWindow()
-	}
-
-	if b.InRecovery() && !b.rateBasedRecovery && !(b.rateBasedStartup && b.mode == modeStartUp) {
-		return mathext.Min(b.congestionWindow, b.recoveryWindow)
-	}
-
-	return b.congestionWindow
-}
-
-func (b *BBRSender) GetSlowStartThreshold() int64 {
-	return 0
-}
-
-func (b *BBRSender) NumStartupRTTs() int64 {
-	return b.numStartupRTTs
-}
-
 func (b *BBRSender) GetMinRTT() time.Duration {
-	if b.minRTT != 0 {
+	if b.minRTT > 0 {
 		return b.minRTT
 	}
-	return b.rttStats.SmoothedRTT()
-}
-
-func (b *BBRSender) IsAtFullBandwidth() bool {
-	return b.isAtFullBandwidth
+	return defaultInitialRTT
 }
 
 func (b *BBRSender) GetTargetCongestionWindow(gain float64) int64 {
@@ -495,10 +523,10 @@ func (b *BBRSender) UpdateBandwidthAndMinRTT(now time.Time, ackedPackets []Acked
 	for _, acked := range ackedPackets {
 		bandwidthSample := b.sampler.OnPacketAcknowledged(now, acked.packetNumber)
 		b.lastSampleIsAppLimited = bandwidthSample.isAppLimited
-		if bandwidthSample.rtt != 0 {
+		if bandwidthSample.rtt > 0 {
 			sampleMinRTT = mathext.Min(sampleMinRTT, bandwidthSample.rtt)
 		}
-		if !bandwidthSample.isAppLimited && bandwidthSample.bandwidth > b.BandwidthEstimate() {
+		if !bandwidthSample.isAppLimited || bandwidthSample.bandwidth > b.BandwidthEstimate() {
 			b.maxBandwidth.Update(bandwidthSample.bandwidth, b.roundTripCount)
 		}
 	}
@@ -509,7 +537,7 @@ func (b *BBRSender) UpdateBandwidthAndMinRTT(now time.Time, ackedPackets []Acked
 	}
 
 	b.minRTTSinceLastProbeRTT = mathext.Min(b.minRTTSinceLastProbeRTT, sampleMinRTT)
-	minRTTExpired := b.minRTT != 0 && now.After(b.minRTTTimestamp.Add(minRTTExpiry))
+	minRTTExpired := b.minRTT > 0 && now.After(b.minRTTTimestamp.Add(minRTTExpiry))
 	if b.minRTT <= 0 || minRTTExpired || sampleMinRTT < b.minRTT {
 		if b.ShouldExtendMinRTTExpiry() {
 			minRTTExpired = false
@@ -547,7 +575,7 @@ func (b *BBRSender) UpdateGainCyclePhase(now time.Time, priorInFlight int64, has
 	// pacing gain * BDP. Make sure that it actually reaches the target, as long
 	// as there are no losses suggesting that the buffers are not able to hold
 	// that much.
-	if b.pacingGain > 1.0 && (!hasLosses) && priorInFlight < b.GetTargetCongestionWindow(b.pacingGain) {
+	if b.pacingGain > 1.0 && !hasLosses && priorInFlight < b.GetTargetCongestionWindow(b.pacingGain) {
 		shouldAdvanceGainCycling = false
 	}
 
@@ -627,11 +655,11 @@ func (b *BBRSender) MaybeEnterOrExitProbeRTT(now time.Time, isRoundStart bool, m
 			}
 			if now.After(b.exitProbeRTTAt) && b.probeRTTRoundPassed {
 				b.minRTTTimestamp = now
-			}
-			if !b.isAtFullBandwidth {
-				b.EnterStartupMode()
-			} else {
-				b.EnterProbeBandwidthMode(now)
+				if !b.isAtFullBandwidth {
+					b.EnterStartupMode()
+				} else {
+					b.EnterProbeBandwidthMode(now)
+				}
 			}
 		}
 	}
@@ -799,7 +827,6 @@ func (b *BBRSender) CalculateRecoveryWindow(bytesAcked int64, bytesLost int64) {
 
 func (b *BBRSender) OnApplicationLimited(bytesInFlight int64) {
 	if bytesInFlight >= b.GetCongestionWindow() {
-		// Not application limited.
 		return
 	}
 

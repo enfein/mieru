@@ -205,10 +205,16 @@ type BandwidthSampler struct {
 	lastSentPacket                  int64
 	isAppLimited                    bool
 	endOfAppLimitedPhase            int64
-	connectionStateMap              PacketNumberIndexedQueue[ConnectionStateOnSentPacket]
+	connectionStateMap              *PacketNumberIndexedQueue[ConnectionStateOnSentPacket]
 }
 
 var _ BandwidthSamplerInterface = &BandwidthSampler{}
+
+func NewBandwidthSampler() BandwidthSamplerInterface {
+	return &BandwidthSampler{
+		connectionStateMap: NewPacketNumberIndexedQueue[ConnectionStateOnSentPacket](),
+	}
+}
 
 func (bs *BandwidthSampler) OnPacketSent(sentTime time.Time, packetNumber int64, bytes int64, bytesInFlight int64, hasRetransmittableData bool) {
 	bs.lastSentPacket = packetNumber
