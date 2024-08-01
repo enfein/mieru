@@ -29,7 +29,7 @@ func TestPacketNumberIndexedQueue(t *testing.T) {
 	for i := 0; i < total; i++ {
 		clockTime := time.Now().UnixMilli()
 		packets[i] = clockTime
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(5 * time.Millisecond)
 	}
 
 	for i := 0; i < total; i++ {
@@ -58,14 +58,17 @@ func TestPacketNumberIndexedQueue(t *testing.T) {
 	if queue.LastPacket() != packets[total-1] {
 		t.Errorf("Got unexpected last packet %v, want %v", queue.LastPacket(), packets[total-1])
 	}
-	if queue.EntrySlotsUsed() <= total {
-		t.Errorf("Queue has %d slots, want more than %d", queue.EntrySlotsUsed(), total)
+	if queue.entrySlotsUsed() <= total {
+		t.Errorf("Queue has %d slots, want more than %d", queue.entrySlotsUsed(), total)
 	}
 
-	for i := total - 1; i >= 0; i-- {
+	for i := 0; i < total; i++ {
 		if ok := queue.Remove(packets[i]); !ok {
 			t.Fatalf("Remove() failed on packet %d", i)
 		}
+	}
+	if ok := queue.Remove(packets[0]); ok {
+		t.Errorf("Remove() is successful with removed packet")
 	}
 	if !queue.IsEmpty() {
 		t.Errorf("Queue is not empty after removing all the packets")

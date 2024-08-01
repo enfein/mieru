@@ -15,7 +15,11 @@
 
 package congestion
 
-import "github.com/enfein/mieru/pkg/deque"
+import (
+	"sync"
+
+	"github.com/enfein/mieru/pkg/deque"
+)
 
 // PacketNumberIndexedQueue is a queue of mostly continuous numbered entries
 // which supports the following operations:
@@ -39,6 +43,7 @@ import "github.com/enfein/mieru/pkg/deque"
 // Because of that, it is not a general-purpose container and should not be used
 // as one.
 type PacketNumberIndexedQueue[T any] struct {
+	mu                     sync.Mutex
 	entries                *deque.Deque[EntryWrapper[T]]
 	numberOfPresentEntries int
 	firstPacket            int64
@@ -48,7 +53,7 @@ func NewPacketNumberIndexedQueue[T any]() *PacketNumberIndexedQueue[T] {
 	return &PacketNumberIndexedQueue[T]{
 		entries:                deque.New[EntryWrapper[T]](0),
 		numberOfPresentEntries: 0,
-		firstPacket:            0,
+		firstPacket:            -1,
 	}
 }
 
@@ -62,8 +67,11 @@ type EntryWrapper[T any] struct {
 // Returns the pointer to the entry in case of success, or nil if the entry
 // does not exist.
 func (p *PacketNumberIndexedQueue[T]) GetEntry(packetNumber int64) *T {
-	entry := p.getEntryWrapper(packetNumber)
-	if entry == nil {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	entry, idx := p.getEntryWrapper(packetNumber)
+	if idx < 0 {
 		return nil
 	}
 	return &entry.data
@@ -74,7 +82,10 @@ func (p *PacketNumberIndexedQueue[T]) GetEntry(packetNumber int64) *T {
 // true if the element has been inserted successfully, false if it was already
 // in the queue or inserted out of order.
 func (p *PacketNumberIndexedQueue[T]) Emplace(packetNumber int64, args T) bool {
-	if p.IsEmpty() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.numberOfPresentEntries == 0 {
 		p.entries.PushBack(EntryWrapper[T]{data: args, present: true})
 		p.numberOfPresentEntries = 1
 		p.firstPacket = packetNumber
@@ -100,11 +111,15 @@ func (p *PacketNumberIndexedQueue[T]) Emplace(packetNumber int64, args T) bool {
 // Remove removes data associated with packetNumber and frees the slots in the
 // queue as necessary.
 func (p *PacketNumberIndexedQueue[T]) Remove(packetNumber int64) bool {
-	entry := p.getEntryWrapper(packetNumber)
-	if entry == nil {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	entry, idx := p.getEntryWrapper(packetNumber)
+	if idx < 0 {
 		return false
 	}
 	entry.present = false
+	p.entries.Set(idx, entry)
 	p.numberOfPresentEntries--
 
 	if packetNumber == p.firstPacket {
@@ -113,50 +128,54 @@ func (p *PacketNumberIndexedQueue[T]) Remove(packetNumber int64) bool {
 	return true
 }
 
+func (p *PacketNumberIndexedQueue[T]) IsEmpty() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.numberOfPresentEntries == 0
+}
+
 func (p *PacketNumberIndexedQueue[T]) FirstPacket() int64 {
 	return p.firstPacket
 }
 
 func (p *PacketNumberIndexedQueue[T]) LastPacket() int64 {
-	if p.IsEmpty() {
-		return 0
+	if p.numberOfPresentEntries == 0 {
+		return -1
 	}
 	return p.firstPacket + int64(p.entries.Len()) - 1
 }
 
-func (p *PacketNumberIndexedQueue[T]) EntrySlotsUsed() int {
+func (p *PacketNumberIndexedQueue[T]) entrySlotsUsed() int {
 	return p.entries.Len()
 }
 
-func (p *PacketNumberIndexedQueue[T]) IsEmpty() bool {
-	return p.numberOfPresentEntries == 0
-}
-
-// cleanup cleans up unused slots in the front after removing an element.
+// cleanup cleans up unused slots in the front.
 func (p *PacketNumberIndexedQueue[T]) cleanup() {
 	for p.entries.Len() > 0 && !p.entries.Front().present {
 		p.entries.PopFront()
 		p.firstPacket++
 	}
 	if p.entries.Len() == 0 {
-		p.firstPacket = 0
+		p.firstPacket = -1
 	}
 }
 
-func (p *PacketNumberIndexedQueue[T]) getEntryWrapper(packetNumber int64) *EntryWrapper[T] {
+// getEntryWrapper returns a copy of the wrapper and the index in the deque.
+// If not found, index -1 is returned.
+func (p *PacketNumberIndexedQueue[T]) getEntryWrapper(packetNumber int64) (EntryWrapper[T], int) {
 	if packetNumber < p.firstPacket {
-		return nil
+		return EntryWrapper[T]{}, -1
 	}
 
 	offset := packetNumber - p.firstPacket
 	if offset >= int64(p.entries.Len()) {
-		return nil
+		return EntryWrapper[T]{}, -1
 	}
 
 	entry := p.entries.At(int(offset))
 	if !entry.present {
-		return nil
+		return EntryWrapper[T]{}, -1
 	}
 
-	return &entry
+	return entry, int(offset)
 }

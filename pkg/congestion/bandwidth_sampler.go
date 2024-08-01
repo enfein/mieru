@@ -16,14 +16,16 @@
 package congestion
 
 import (
+	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/enfein/mieru/pkg/mathext"
 )
 
 const (
-	InfiniteBandwidth int64 = math.MaxInt64
+	infiniteBandwidth int64 = math.MaxInt64
 )
 
 // BandwidthSample contains a single data point of network bandwidth.
@@ -39,6 +41,10 @@ type BandwidthSample struct {
 	// Indicates whether the sample might be artificially low because the sender
 	// did not have enough data to send in order to saturate the link.
 	isAppLimited bool
+}
+
+func (bs BandwidthSample) String() string {
+	return fmt.Sprintf("BandwidthSample{bandwidth=%v, rtt=%v, isAppLimited=%v}", bs.bandwidth, bs.rtt.Truncate(time.Microsecond), bs.isAppLimited)
 }
 
 // BandwidthSamplerInterface is an interface common to any class that can
@@ -109,7 +115,7 @@ func NewConnectionStateOnSentPacketFromSampler(sendTime time.Time, size int64, s
 		totalBytesSentAtLastAckedPacket:     sampler.totalBytesSentAtLastAckedPacket,
 		lastAckedPacketSentTime:             sampler.lastAckedPacketSentTime,
 		lastAckedPacketAckTime:              sampler.lastAckedPacketAckTime,
-		totalBytesAckedAtTheLastAckedPacket: sampler.totalBytesSentAtLastAckedPacket,
+		totalBytesAckedAtTheLastAckedPacket: sampler.totalBytesAcked,
 		isAppLimited:                        sampler.isAppLimited,
 	}
 }
@@ -197,6 +203,7 @@ func NewConnectionStateOnSentPacketFromSampler(sendTime time.Time, size int64, s
 // Note that while the scenario above is not the only scenario when the
 // connection is app-limited, the approach works in other cases too.
 type BandwidthSampler struct {
+	mu                              sync.Mutex
 	totalBytesSent                  int64
 	totalBytesAcked                 int64
 	totalBytesSentAtLastAckedPacket int64
@@ -217,6 +224,9 @@ func NewBandwidthSampler() BandwidthSamplerInterface {
 }
 
 func (bs *BandwidthSampler) OnPacketSent(sentTime time.Time, packetNumber int64, bytes int64, bytesInFlight int64, hasRetransmittableData bool) {
+	bs.mu.Lock()
+	defer bs.mu.Unlock()
+
 	bs.lastSentPacket = packetNumber
 	if !hasRetransmittableData {
 		return
@@ -242,6 +252,9 @@ func (bs *BandwidthSampler) OnPacketSent(sentTime time.Time, packetNumber int64,
 }
 
 func (bs *BandwidthSampler) OnPacketAcknowledged(ackTime time.Time, packetNumber int64) BandwidthSample {
+	bs.mu.Lock()
+	defer bs.mu.Unlock()
+
 	sentPacket := bs.connectionStateMap.GetEntry(packetNumber)
 	if sentPacket == nil {
 		return BandwidthSample{}
@@ -253,29 +266,44 @@ func (bs *BandwidthSampler) OnPacketAcknowledged(ackTime time.Time, packetNumber
 }
 
 func (bs *BandwidthSampler) OnPacketLost(packetNumber int64) {
+	bs.mu.Lock()
+	defer bs.mu.Unlock()
+
 	bs.connectionStateMap.Remove(packetNumber)
 }
 
 func (bs *BandwidthSampler) OnAppLimited() {
+	bs.mu.Lock()
+	defer bs.mu.Unlock()
+
 	bs.isAppLimited = true
 	bs.endOfAppLimitedPhase = bs.lastSentPacket
 }
 
 func (bs *BandwidthSampler) RemoveObsoletePackets(leastUnacked int64) {
+	bs.mu.Lock()
+	defer bs.mu.Unlock()
+
 	for !bs.connectionStateMap.IsEmpty() && bs.connectionStateMap.FirstPacket() < leastUnacked {
 		bs.connectionStateMap.Remove(bs.connectionStateMap.FirstPacket())
 	}
 }
 
 func (bs *BandwidthSampler) TotalBytesAcked() int64 {
+	bs.mu.Lock()
+	defer bs.mu.Unlock()
 	return bs.totalBytesAcked
 }
 
 func (bs *BandwidthSampler) IsAppLimited() bool {
+	bs.mu.Lock()
+	defer bs.mu.Unlock()
 	return bs.isAppLimited
 }
 
 func (bs *BandwidthSampler) EndOfAppLimitedPhase() int64 {
+	bs.mu.Lock()
+	defer bs.mu.Unlock()
 	return bs.endOfAppLimitedPhase
 }
 
@@ -300,9 +328,9 @@ func (bs *BandwidthSampler) onPacketAcknowledgedInner(ackTime time.Time, packetN
 
 	// Infinite rate indicates that the sampler is supposed to discard the
 	// current send rate sample and use only the ack rate.
-	sendRate := InfiniteBandwidth
+	sendRate := infiniteBandwidth
 	if sentPacket.sentTime.After(sentPacket.lastAckedPacketSentTime) {
-		sendRate = bandwidthFromBytesAndTimeDelta(sentPacket.totalBytesSent-sentPacket.totalBytesSentAtLastAckedPacket, sentPacket.sentTime.Sub(sentPacket.lastAckedPacketSentTime))
+		sendRate = BandwidthFromBytesAndTimeDelta(sentPacket.totalBytesSent-sentPacket.totalBytesSentAtLastAckedPacket, sentPacket.sentTime.Sub(sentPacket.lastAckedPacketSentTime))
 	}
 
 	// During the slope calculation, ensure that ack time of the current packet is
@@ -311,7 +339,7 @@ func (bs *BandwidthSampler) onPacketAcknowledgedInner(ackTime time.Time, packetN
 	if !ackTime.After(sentPacket.lastAckedPacketAckTime) {
 		return BandwidthSample{}
 	}
-	ackRate := bandwidthFromBytesAndTimeDelta(bs.totalBytesAcked-sentPacket.totalBytesAckedAtTheLastAckedPacket, ackTime.Sub(sentPacket.lastAckedPacketAckTime))
+	ackRate := BandwidthFromBytesAndTimeDelta(bs.totalBytesAcked-sentPacket.totalBytesAckedAtTheLastAckedPacket, ackTime.Sub(sentPacket.lastAckedPacketAckTime))
 
 	sample := BandwidthSample{
 		bandwidth:    mathext.Min(sendRate, ackRate),
@@ -321,7 +349,7 @@ func (bs *BandwidthSampler) onPacketAcknowledgedInner(ackTime time.Time, packetN
 	return sample
 }
 
-func bandwidthFromBytesAndTimeDelta(bytes int64, duration time.Duration) int64 {
+func BandwidthFromBytesAndTimeDelta(bytes int64, duration time.Duration) int64 {
 	if duration <= 0 {
 		return 0
 	}

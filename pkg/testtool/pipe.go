@@ -19,20 +19,26 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"sync"
 )
 
 // BufPipe is like net.Pipe() but with an internal buffer.
 func BufPipe() (io.ReadWriteCloser, io.ReadWriteCloser) {
 	var buf1, buf2 bytes.Buffer
+	var lock1, lock2 sync.Mutex
 	ep1 := &ioEndpoint{
 		direction: forward,
 		buf1:      &buf1,
 		buf2:      &buf2,
+		lock1:     &lock1,
+		lock2:     &lock2,
 	}
 	ep2 := &ioEndpoint{
 		direction: backward,
 		buf1:      &buf1,
 		buf2:      &buf2,
+		lock1:     &lock1,
+		lock2:     &lock2,
 	}
 	return ep1, ep2
 }
@@ -48,6 +54,8 @@ type ioEndpoint struct {
 	direction ioDirection
 	buf1      *bytes.Buffer // forward writes to here
 	buf2      *bytes.Buffer // backward writes to here
+	lock1     *sync.Mutex   // lock of buf1
+	lock2     *sync.Mutex   // lock of buf2
 	closed    bool
 }
 
@@ -56,9 +64,13 @@ func (e *ioEndpoint) Read(b []byte) (n int, err error) {
 		return 0, io.EOF
 	}
 	if e.direction == forward {
+		e.lock2.Lock()
 		n, err = e.buf2.Read(b)
+		e.lock2.Unlock()
 	} else {
+		e.lock1.Lock()
 		n, err = e.buf1.Read(b)
+		e.lock1.Unlock()
 	}
 	if errors.Is(err, io.EOF) {
 		err = nil
@@ -66,14 +78,20 @@ func (e *ioEndpoint) Read(b []byte) (n int, err error) {
 	return
 }
 
-func (e *ioEndpoint) Write(b []byte) (int, error) {
+func (e *ioEndpoint) Write(b []byte) (n int, err error) {
 	if e.closed {
 		return 0, io.ErrClosedPipe
 	}
 	if e.direction == forward {
-		return e.buf1.Write(b)
+		e.lock1.Lock()
+		n, err = e.buf1.Write(b)
+		e.lock1.Unlock()
+	} else {
+		e.lock2.Lock()
+		n, err = e.buf2.Write(b)
+		e.lock2.Unlock()
 	}
-	return e.buf2.Write(b)
+	return
 }
 
 func (e *ioEndpoint) Close() error {

@@ -17,8 +17,10 @@ package congestion
 
 import (
 	mrand "math/rand"
+	"sync"
 	"time"
 
+	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/mathext"
 )
 
@@ -114,17 +116,22 @@ var (
 )
 
 type AckedPacketInfo struct {
-	packetNumber     int64
-	bytesAcked       int64
-	receiveTimestamp time.Time
+	PacketNumber     int64
+	BytesAcked       int64
+	ReceiveTimestamp time.Time
 }
 
 type LostPacketInfo struct {
-	packetNumber int64
-	bytesLost    int64
+	PacketNumber int64
+	BytesLost    int64
 }
 
 type BBRSender struct {
+	mu sync.Mutex
+
+	// Additional context of this BBRSender. Used in the log.
+	logContext string
+
 	rttStats *RTTStats
 
 	// Replaces unacked_packets_->bytes_in_flight().
@@ -283,8 +290,9 @@ type BBRSender struct {
 	minRTTSinceLastProbeRTT     time.Duration
 }
 
-func NewBBRSender() *BBRSender {
+func NewBBRSender(logContext string) *BBRSender {
 	return &BBRSender{
+		logContext:                   logContext,
 		rttStats:                     NewRTTStats(),
 		mode:                         modeStartUp,
 		sampler:                      NewBandwidthSampler(),
@@ -318,6 +326,9 @@ func (b *BBRSender) InSlowStart() bool {
 }
 
 func (b *BBRSender) OnPacketSent(sentTime time.Time, bytesInFlight int64, packetNumber int64, bytes int64, hasRetransmittableData bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	b.lastSentPacket = packetNumber
 	b.bytesInFlight = bytesInFlight
 
@@ -333,12 +344,14 @@ func (b *BBRSender) OnPacketSent(sentTime time.Time, bytesInFlight int64, packet
 }
 
 func (b *BBRSender) CanSend(bytesInFlight int64) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	return bytesInFlight < b.GetCongestionWindow()
 }
 
 func (b *BBRSender) PacingRate(bytesInFlight int64) int64 {
 	if b.pacingRate <= 0 {
-		return int64(highGain * float64(bandwidthFromBytesAndTimeDelta(b.initialCongestionWindow, b.GetMinRTT())))
+		return int64(highGain * float64(BandwidthFromBytesAndTimeDelta(b.initialCongestionWindow, b.GetMinRTT())))
 	}
 	return b.pacingRate
 }
@@ -359,10 +372,6 @@ func (b *BBRSender) GetCongestionWindow() int64 {
 	return b.congestionWindow
 }
 
-func (b *BBRSender) GetSlowStartThreshold() int64 {
-	return 0
-}
-
 func (b *BBRSender) InRecovery() bool {
 	return b.recoveryState != stateNotInRecovery
 }
@@ -381,16 +390,19 @@ func (b *BBRSender) AdjustNetworkParameters(bandwidth int64, rtt time.Duration) 
 }
 
 func (b *BBRSender) OnCongestionEvent(priorInFlight int64, eventTime time.Time, ackedPackets []AckedPacketInfo, lostPackets []LostPacketInfo) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	totalBytesAckedBefore := b.sampler.TotalBytesAcked()
 	isRoundStart := false
 	isMinRTTExpired := false
 
 	b.bytesInFlight = priorInFlight
 	for _, p := range ackedPackets {
-		b.bytesInFlight -= p.bytesAcked
+		b.bytesInFlight -= p.BytesAcked
 	}
 	for _, p := range lostPackets {
-		b.bytesInFlight -= p.bytesLost
+		b.bytesInFlight -= p.BytesLost
 	}
 	b.bytesInFlight = mathext.Max(b.bytesInFlight, 0)
 
@@ -398,7 +410,7 @@ func (b *BBRSender) OnCongestionEvent(priorInFlight int64, eventTime time.Time, 
 
 	// Input the new data into the BBR model of the connection.
 	if len(ackedPackets) > 0 {
-		lastAckedPacket := ackedPackets[len(ackedPackets)-1].packetNumber
+		lastAckedPacket := ackedPackets[len(ackedPackets)-1].PacketNumber
 		isRoundStart = b.UpdateRoundTripCounter(lastAckedPacket)
 		isMinRTTExpired = b.UpdateBandwidthAndMinRTT(eventTime, ackedPackets)
 		b.UpdateRecoveryState(lastAckedPacket, len(lostPackets) > 0, isRoundStart)
@@ -433,7 +445,7 @@ func (b *BBRSender) OnCongestionEvent(priorInFlight int64, eventTime time.Time, 
 	bytesAcked := b.sampler.TotalBytesAcked() - totalBytesAckedBefore
 	var bytesLost int64
 	for _, lost := range lostPackets {
-		bytesLost += lost.bytesLost
+		bytesLost += lost.BytesLost
 	}
 
 	// After the model is updated, recalculate the pacing rate and congestion
@@ -449,9 +461,9 @@ func (b *BBRSender) OnCongestionEvent(priorInFlight int64, eventTime time.Time, 
 	// no more than 2 packets.
 	var leastUnacked int64
 	if len(ackedPackets) > 0 {
-		leastUnacked = ackedPackets[len(ackedPackets)-1].packetNumber - 2
+		leastUnacked = ackedPackets[len(ackedPackets)-1].PacketNumber - 2
 	} else if len(lostPackets) > 0 {
-		leastUnacked = lostPackets[len(lostPackets)-1].packetNumber + 1
+		leastUnacked = lostPackets[len(lostPackets)-1].PacketNumber + 1
 	}
 	b.sampler.RemoveObsoletePackets(leastUnacked)
 }
@@ -505,7 +517,7 @@ func (b *BBRSender) EnterProbeBandwidthMode(now time.Time) {
 
 func (b *BBRSender) DiscardLostPackets(lostPackets []LostPacketInfo) {
 	for _, lost := range lostPackets {
-		b.sampler.OnPacketLost(lost.packetNumber)
+		b.sampler.OnPacketLost(lost.PacketNumber)
 	}
 }
 
@@ -521,7 +533,14 @@ func (b *BBRSender) UpdateRoundTripCounter(lastAckedPacket int64) bool {
 func (b *BBRSender) UpdateBandwidthAndMinRTT(now time.Time, ackedPackets []AckedPacketInfo) bool {
 	sampleMinRTT := infDuration
 	for _, acked := range ackedPackets {
-		bandwidthSample := b.sampler.OnPacketAcknowledged(now, acked.packetNumber)
+		bandwidthSample := b.sampler.OnPacketAcknowledged(now, acked.PacketNumber)
+		if log.IsLevelEnabled(log.TraceLevel) {
+			log.Tracef("[BBRSender %s] Acknowledged packet %d produced %v", b.logContext, acked.PacketNumber, bandwidthSample)
+		}
+		if bandwidthSample.bandwidth < 0 {
+			log.Debugf("[BBRSender %s] Acknowledged packet %d produced negative bandwidth %d B/s. Sample is dropped.", b.logContext, acked.PacketNumber, bandwidthSample.bandwidth)
+			continue
+		}
 		b.lastSampleIsAppLimited = bandwidthSample.isAppLimited
 		if bandwidthSample.rtt > 0 {
 			sampleMinRTT = mathext.Min(sampleMinRTT, bandwidthSample.rtt)
@@ -739,7 +758,7 @@ func (b *BBRSender) CalculatePacingRate() {
 	// Pace at the rate of initial window / RTT as soon as RTT measurements are
 	// available.
 	if b.pacingRate <= 0 && b.rttStats.MinRTT() > 0 {
-		b.pacingRate = bandwidthFromBytesAndTimeDelta(b.initialCongestionWindow, b.rttStats.MinRTT())
+		b.pacingRate = BandwidthFromBytesAndTimeDelta(b.initialCongestionWindow, b.rttStats.MinRTT())
 	}
 
 	// Slow the pacing rate in STARTUP once loss has ever been detected.
