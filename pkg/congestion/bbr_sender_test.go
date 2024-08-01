@@ -53,7 +53,6 @@ func (s *sender) Run(t *testing.T) {
 			select {
 			case <-s.ctx.Done():
 				wg.Done()
-				t.Logf("nextSend: %v", s.nextSend)
 				break loop
 			default:
 				b := make([]byte, 8)
@@ -76,7 +75,6 @@ func (s *sender) Run(t *testing.T) {
 			select {
 			case <-s.ctx.Done():
 				wg.Done()
-				t.Logf("nextAck: %v", s.nextAck)
 				break loop
 			default:
 				b := make([]byte, 8)
@@ -106,7 +104,6 @@ func (r *receiver) Start(t *testing.T) {
 		for {
 			select {
 			case <-r.ctx.Done():
-				t.Logf("ackSend: %v", r.ackSend)
 				return
 			default:
 				b := make([]byte, 8)
@@ -144,5 +141,8 @@ func TestBBRSender(t *testing.T) {
 	}
 	r.Start(t)
 	s.Run(t)
+	t.Logf("nextSend: %v", s.nextSend)
+	t.Logf("nextAck: %v", s.nextAck)
+	t.Logf("ackSend: %v", r.ackSend)
 	t.Logf("Estimated bandwidth: %d B/s", s.bbr.BandwidthEstimate())
 }
