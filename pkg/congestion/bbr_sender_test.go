@@ -59,7 +59,7 @@ func (s *sender) Run(t *testing.T) {
 				b := make([]byte, 8)
 				inFlight := (s.nextSend - s.nextAck) * 8
 				if s.bbr.CanSend(inFlight) {
-					binary.NativeEndian.PutUint64(b, uint64(s.nextSend))
+					binary.BigEndian.PutUint64(b, uint64(s.nextSend))
 					s.rwc.Write(b)
 					s.bbr.OnPacketSent(time.Now(), inFlight, s.nextSend, 8, true)
 					s.nextSend++
@@ -87,7 +87,7 @@ func (s *sender) Run(t *testing.T) {
 					continue
 				}
 				now := time.Now()
-				s.nextAck = int64(binary.NativeEndian.Uint64(b))
+				s.nextAck = int64(binary.BigEndian.Uint64(b))
 				s.bbr.OnCongestionEvent(inFlight, now, []congestion.AckedPacketInfo{{
 					PacketNumber:     s.nextAck - 1,
 					BytesAcked:       8,
@@ -115,8 +115,8 @@ func (r *receiver) Start(t *testing.T) {
 					time.Sleep(time.Millisecond)
 					continue
 				}
-				r.ackSend = binary.NativeEndian.Uint64(b)
-				binary.NativeEndian.PutUint64(b, r.ackSend+1)
+				r.ackSend = binary.BigEndian.Uint64(b)
+				binary.BigEndian.PutUint64(b, r.ackSend+1)
 				if _, err := r.rwc.Write(b); err != nil {
 					t.Logf("error write ack: %v", err)
 					return
