@@ -45,9 +45,10 @@ const (
 	serverRespTimeout        = 10 * time.Second
 	sessionHeartbeatInterval = 5 * time.Second
 
-	earlyRetransmission  = 3
-	txTimeoutBackOff     = 1.25
-	maxBackOffMultiplier = 20.0
+	earlyRetransmission      = 3 // number of ack to trigger early retransmission
+	earlyRetransmissionLimit = 5 // maximum number of early retransmission attempt
+	txTimeoutBackOff         = 1.25
+	maxBackOffMultiplier     = 20.0
 )
 
 type sessionState byte
@@ -610,7 +611,7 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 					closeSession = true
 					return false
 				}
-				if iter.ackCount >= earlyRetransmission || time.Since(iter.txTime) > iter.txTimeout {
+				if (iter.ackCount >= earlyRetransmission && iter.txCount <= earlyRetransmissionLimit) || time.Since(iter.txTime) > iter.txTimeout {
 					if iter.ackCount >= earlyRetransmission {
 						hasLoss = true
 					} else {
