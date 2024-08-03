@@ -133,7 +133,7 @@ func TestBBRSender(t *testing.T) {
 	s := &sender{
 		ctx: ctx,
 		rwc: e1,
-		bbr: congestion.NewBBRSender("Test"),
+		bbr: congestion.NewBBRSender("Test", nil),
 	}
 	r := &receiver{
 		ctx: ctx,
