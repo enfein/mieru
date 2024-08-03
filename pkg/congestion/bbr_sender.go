@@ -16,6 +16,7 @@
 package congestion
 
 import (
+	"fmt"
 	mrand "math/rand"
 	"sync"
 	"time"
@@ -60,6 +61,8 @@ const (
 )
 
 const (
+	timeFormat = "15:04:05.999"
+
 	maxDatagramSize = 1500
 
 	// The minimum CWND to ensure delayed acks don't reduce bandwidth measurements.
@@ -119,9 +122,17 @@ type AckedPacketInfo struct {
 	ReceiveTimestamp time.Time
 }
 
+func (i AckedPacketInfo) String() string {
+	return fmt.Sprintf("AckedPacketInfo{PacketNumber=%d, BytesAcked=%d, ReceiveTimestamp=%s}", i.PacketNumber, i.BytesAcked, i.ReceiveTimestamp.Format(timeFormat))
+}
+
 type LostPacketInfo struct {
 	PacketNumber int64
 	BytesLost    int64
+}
+
+func (i LostPacketInfo) String() string {
+	return fmt.Sprintf("LostPacketInfo{PacketNumber=%d, BytesLost=%d}", i.PacketNumber, i.BytesLost)
 }
 
 type BBRSender struct {
@@ -329,6 +340,10 @@ func (b *BBRSender) InSlowStart() bool {
 }
 
 func (b *BBRSender) OnPacketSent(sentTime time.Time, bytesInFlight int64, packetNumber int64, bytes int64, hasRetransmittableData bool) {
+	if log.IsLevelEnabled(log.TraceLevel) {
+		log.Tracef("[BBRSender %s] OnPacketSent(bytesInFlight=%d, packetNumber=%d, bytes=%d)", b.loggingContext, bytesInFlight, packetNumber, bytes)
+	}
+
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -393,6 +408,17 @@ func (b *BBRSender) AdjustNetworkParameters(bandwidth int64, rtt time.Duration) 
 }
 
 func (b *BBRSender) OnCongestionEvent(priorInFlight int64, eventTime time.Time, ackedPackets []AckedPacketInfo, lostPackets []LostPacketInfo) {
+	for _, ack := range ackedPackets {
+		if log.IsLevelEnabled(log.TraceLevel) {
+			log.Tracef("[BBRSender %s] OnCongestionEvent(priorInFlight=%d, ackedPacket=%v)", b.loggingContext, priorInFlight, ack)
+		}
+	}
+	for _, lost := range lostPackets {
+		if log.IsLevelEnabled(log.TraceLevel) {
+			log.Tracef("[BBRSender %s] OnCongestionEvent(priorInFlight=%d, lostPacket=%v)", b.loggingContext, priorInFlight, lost)
+		}
+	}
+
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
