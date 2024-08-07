@@ -27,7 +27,7 @@ mieru 的翻墙原理与 shadowsocks / v2ray 等软件类似，在客户端和�
 8. mieru 提供 socks5, HTTP 和 HTTPS 代理。
 9. 客户端软件支持 Windows, Mac OS, Linux 和 Android 系统。Android 用户请使用 [NekoBox](https://github.com/MatsuriDayo/NekoBoxForAndroid) 1.3.1 及以上版本，并安装 [mieru 插件](https://github.com/enfein/NekoBoxPlugins)。
 10. 服务器软件支持 socks5 出站（链式代理）。
-11. 如果需要全局代理或自定义路由规则等高级功能，可以将 mieru 作为 clash 等代理平台的后端。
+11. 如果需要全局代理或自定义路由规则等高级功能，可以将 mieru 作为 [Xray](https://github.com/XTLS/Xray-core) 和 [sing-box](https://github.com/SagerNet/sing-box) 等代理平台的后端。
 
 ## 使用教程
 

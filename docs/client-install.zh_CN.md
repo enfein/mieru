@@ -124,39 +124,3 @@ Chrome / Firefox 等浏览器可以通过安装插件，使用 socks5 代理访�
 mieru 不使用 socks5 用户名和密码进行身份验证。
 
 关于在 Tor 浏览器中配置 socks5 代理，参见[翻墙安全指南](./security.zh_CN.md)。
-
-如果需要通过代理转发所有应用程序的流量，或者自定义路由规则，请使用 clash 等代理平台，将 mieru 作为代理平台的后端。下面提供了 clash 配置的例子。
-
-## 配置 clash
-
-在下面的例子中，clash 监听 7890 端口。如果流量访问 LAN 或者目标地址在中国，则不使用代理。其他情况下使用 mieru 代理。
-
-```yaml
-mixed-port: 7890
-
-proxies:
-  - name: mieru
-    type: socks5
-    server: 127.0.0.1
-    port: 1080
-    udp: true
-
-dns:
-  enable: true
-  ipv6: true
-  enhanced-mode: fake-ip
-  fake-ip-range: 198.18.0.1/16
-  nameserver:
-    - https://1.1.1.1/dns-query
-    - 8.8.8.8
-
-rules:
-  - DOMAIN-KEYWORD,google,mieru
-  - DOMAIN-KEYWORD,gmail,mieru
-  - DOMAIN-KEYWORD,youtube,mieru
-  - IP-CIDR,127.0.0.0/8,DIRECT
-  - IP-CIDR,172.16.0.0/12,DIRECT
-  - IP-CIDR,192.168.0.0/16,DIRECT
-  - GEOIP,CN,DIRECT
-  - MATCH,mieru
-```

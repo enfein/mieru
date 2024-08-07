@@ -29,7 +29,7 @@ For an explanation of the mieru protocol, see [mieru Proxy Protocol](./docs/prot
 8. mieru provides socks5, HTTP and HTTPS proxy.
 9. The client software supports Windows, Mac OS, Linux and Android. For Android users, please use [NekoBox](https://github.com/MatsuriDayo/NekoBoxForAndroid) version 1.3.1 or above, and install [mieru plugin](https://github.com/enfein/NekoBoxPlugins).
 10. The server software supports socks5 outbound (proxy chain).
-11. If you need advanced features like global proxy or customized routing rules, you can use mieru as the backend of a proxy platform such as clash.
+11. If you need advanced features like global proxy or customized routing rules, you can use mieru as the backend of a proxy platform such as [Xray](https://github.com/XTLS/Xray-core) and [sing-box](https://github.com/SagerNet/sing-box).
 
 ## User Guide
 
