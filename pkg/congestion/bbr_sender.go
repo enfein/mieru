@@ -364,6 +364,9 @@ func (b *BBRSender) OnPacketSent(sentTime time.Time, bytesInFlight int64, packet
 func (b *BBRSender) CanSend(bytesInFlight int64) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if log.IsLevelEnabled(log.TraceLevel) {
+		log.Tracef("[BBRSender %s] bytesInFlight=%d, congestionWindow=%d", b.loggingContext, bytesInFlight, b.GetCongestionWindow())
+	}
 	return bytesInFlight < b.GetCongestionWindow()
 }
 
@@ -396,15 +399,6 @@ func (b *BBRSender) InRecovery() bool {
 
 func (b *BBRSender) IsProbingForMoreBandwidth() bool {
 	return (b.mode == modeProbeBW && b.pacingGain > 1) || b.mode == modeStartUp
-}
-
-func (b *BBRSender) AdjustNetworkParameters(bandwidth int64, rtt time.Duration) {
-	if bandwidth > 0 {
-		b.maxBandwidth.Update(bandwidth, b.roundTripCount)
-	}
-	if rtt > 0 && (b.minRTT <= 0 || rtt < b.minRTT) {
-		b.minRTT = rtt
-	}
 }
 
 func (b *BBRSender) OnCongestionEvent(priorInFlight int64, eventTime time.Time, ackedPackets []AckedPacketInfo, lostPackets []LostPacketInfo) {

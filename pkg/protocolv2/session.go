@@ -632,6 +632,7 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 						closeSession = true
 						return false
 					}
+					bytesInFlight += int64(udpOverhead + len(iter.payload))
 					return true
 				}
 				return true
