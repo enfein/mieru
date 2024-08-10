@@ -648,7 +648,7 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 			if s.sendQueue.Len() > 0 {
 				for {
 					seg, deleted := s.sendQueue.DeleteMinIf(func(iter *segment) bool {
-						return s.sendAlgorithm.CanSend(bytesInFlight)
+						return s.sendAlgorithm.CanSend(bytesInFlight, int64(udpOverhead+len(iter.payload)))
 					})
 					if !deleted {
 						break

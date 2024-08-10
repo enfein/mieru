@@ -77,9 +77,10 @@ func (p *PacketNumberIndexedQueue[T]) GetEntry(packetNumber int64) *T {
 	return &entry.data
 }
 
-// Emplace inserts data associated packetNumber into the queue,
-// filling up the missing intermediate entries as necessary.
-// Returns true if the element has been inserted successfully.
+// Emplace inserts data associated packetNumber into (or past) the end of the
+// queue, filling up the missing intermediate entries as necessary. Returns
+// true if the element has been inserted successfully, false if it was already
+// in the queue or inserted out of order.
 func (p *PacketNumberIndexedQueue[T]) Emplace(packetNumber int64, args T) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -91,35 +92,20 @@ func (p *PacketNumberIndexedQueue[T]) Emplace(packetNumber int64, args T) bool {
 		return true
 	}
 
-	if packetNumber < p.firstPacket {
+	// Do not allow insertion out-of-order.
+	if packetNumber <= p.LastPacket() {
 		return false
 	}
 
-	if packetNumber > p.LastPacket() {
-		// Handle potentially missing elements.
-		offset := packetNumber - p.firstPacket
-		for int64(p.entries.Len()) < offset {
-			p.entries.PushBack(EntryWrapper[T]{})
-		}
-
-		p.numberOfPresentEntries++
-		p.entries.PushBack(EntryWrapper[T]{data: args, present: true})
-		return packetNumber == p.LastPacket()
-	} else {
-		entry, idx := p.getEntryWrapper(packetNumber)
-		if idx < 0 {
-			return false
-		}
-		if entry.present {
-			// Don't rewrite existing element.
-			return false
-		}
-		entry.present = true
-		p.numberOfPresentEntries++
-		entry.data = args
-		p.entries.Set(idx, entry)
-		return true
+	// Handle potentially missing elements.
+	offset := packetNumber - p.firstPacket
+	for int64(p.entries.Len()) < offset {
+		p.entries.PushBack(EntryWrapper[T]{})
 	}
+
+	p.numberOfPresentEntries++
+	p.entries.PushBack(EntryWrapper[T]{data: args, present: true})
+	return packetNumber == p.LastPacket()
 }
 
 // Remove removes data associated with packetNumber and frees the slots in the

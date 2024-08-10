@@ -57,7 +57,7 @@ func (s *sender) Run(t *testing.T) {
 			default:
 				b := make([]byte, 8)
 				inFlight := (s.nextSend - s.nextAck) * 8
-				if s.bbr.CanSend(inFlight) {
+				if s.bbr.CanSend(inFlight, 8) {
 					binary.BigEndian.PutUint64(b, uint64(s.nextSend))
 					s.rwc.Write(b)
 					s.bbr.OnPacketSent(time.Now(), inFlight, s.nextSend, 8, true)
