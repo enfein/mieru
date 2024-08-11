@@ -32,7 +32,7 @@ PROJECT_NAME=$(shell basename "${ROOT}")
 # - pkg/version/current.go
 #
 # Use `tools/bump_version.sh` script to change all those files at one shot.
-VERSION="3.3.0"
+VERSION="3.3.1"
 
 # Build binaries and installation packages.
 .PHONY: build
@@ -224,7 +224,7 @@ deb-client-amd64: client-linux-amd64
 		mkdir -p build/package/mieru/amd64/debian/usr/bin;\
 		cp release/linux/amd64/mieru build/package/mieru/amd64/debian/usr/bin/;\
 		cd build/package/mieru/amd64;\
-		fakeroot dpkg-deb --build debian .;\
+		fakeroot dpkg-deb -Zxz --build debian .;\
 		cd "${ROOT}";\
 		mv build/package/mieru/amd64/mieru_${VERSION}_amd64.deb release/;\
 		cd release;\
@@ -239,7 +239,7 @@ deb-client-arm64: client-linux-arm64
 		mkdir -p build/package/mieru/arm64/debian/usr/bin;\
 		cp release/linux/arm64/mieru build/package/mieru/arm64/debian/usr/bin/;\
 		cd build/package/mieru/arm64;\
-		fakeroot dpkg-deb --build debian .;\
+		fakeroot dpkg-deb -Zxz --build debian .;\
 		cd "${ROOT}";\
 		mv build/package/mieru/arm64/mieru_${VERSION}_arm64.deb release/;\
 		cd release;\
@@ -254,7 +254,7 @@ deb-server-amd64: server-linux-amd64
 		mkdir -p build/package/mita/amd64/debian/usr/bin;\
 		cp release/linux/amd64/mita build/package/mita/amd64/debian/usr/bin/;\
 		cd build/package/mita/amd64;\
-		fakeroot dpkg-deb --build debian .;\
+		fakeroot dpkg-deb -Zxz --build debian .;\
 		cd "${ROOT}";\
 		mv build/package/mita/amd64/mita_${VERSION}_amd64.deb release/;\
 		cd release;\
@@ -269,7 +269,7 @@ deb-server-arm64: server-linux-arm64
 		mkdir -p build/package/mita/arm64/debian/usr/bin;\
 		cp release/linux/arm64/mita build/package/mita/arm64/debian/usr/bin/;\
 		cd build/package/mita/arm64;\
-		fakeroot dpkg-deb --build debian .;\
+		fakeroot dpkg-deb -Zxz --build debian .;\
 		cd "${ROOT}";\
 		mv build/package/mita/arm64/mita_${VERSION}_arm64.deb release/;\
 		cd release;\
