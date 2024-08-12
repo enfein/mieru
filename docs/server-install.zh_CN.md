@@ -154,6 +154,20 @@ mita stop
 
 ## 高级设置
 
+### BBR 拥塞控制算法
+
+[BBR](https://en.wikipedia.org/wiki/TCP_congestion_control#TCP_BBR) 是一种不依赖于丢包的拥塞控制算法。在恶劣的网络情况下，使用 BBR 的网络传输速度比传统算法更快。
+
+mieru 的 UDP 传输协议已经使用了 BBR 算法。
+
+在项目根目录下，我们提供了脚本 `tools/enable_tcp_bbr.py`，允许用户在 Linux 系统中让 TCP 传输协议使用 BBR 算法。
+
+```sh
+sudo ./tools/enable_tcp_bbr.py
+```
+
+上述脚本可以在服务器和客户端中使用。
+
 ### 配置出站代理
 
 出站代理功能允许 mieru 与其他代理工具结合构成链式代理。链式代理的网络拓扑结构的一个例子如下图所示：

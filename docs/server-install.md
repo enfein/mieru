@@ -154,6 +154,20 @@ After starting the proxy service, proceed to [Client Installation & Configuratio
 
 ## Advanced Settings
 
+### BBR Congestion Control Algorithm
+
+[BBR](https://en.wikipedia.org/wiki/TCP_congestion_control#TCP_BBR) is a congestion control algorithm that does not rely on packet loss. Under poor network conditions, network transmission using BBR is faster than traditional algorithms.
+
+mieru's UDP transmission protocol already uses the BBR algorithm.
+
+Under the project root directory, we provide a script `tools/enable_tcp_bbr.py`, which allows users to enable BBR algorithm on TCP transmission protocol on Linux.
+
+```sh
+sudo ./tools/enable_tcp_bbr.py
+```
+
+That script can be used on both server side and client side.
+
 ### Configuring Outbound Proxy
 
 The outbound proxy feature allows mieru to work with other proxy tools to form a proxy chain. An example of the network topology of a proxy chain is shown in the diagram below:
