@@ -23,14 +23,28 @@ import (
 
 type Pacer struct {
 	budgetAtLastSent int64
-	maxBudget        int64
+	maxBudget        int64 // determine the max burst
+	minPacingRate    int64
 	lastSentTime     time.Time
 }
 
-func NewPacer(initialBudget, maxBudget int64) *Pacer {
+func NewPacer(initialBudget, maxBudget, minPacingRate int64) *Pacer {
+	if initialBudget <= 0 {
+		panic("initial budget must be a positive number")
+	}
+	if maxBudget <= 0 {
+		panic("max budget must be a positive number")
+	}
+	if maxBudget < initialBudget {
+		panic("max budget is smaller than initial budget")
+	}
+	if minPacingRate <= 0 {
+		panic("min pacing rate must be a positive number")
+	}
 	return &Pacer{
 		budgetAtLastSent: initialBudget,
 		maxBudget:        maxBudget,
+		minPacingRate:    minPacingRate,
 	}
 }
 
@@ -45,6 +59,7 @@ func (p *Pacer) CanSend(now time.Time, bytes, pacingRate int64) bool {
 }
 
 func (p *Pacer) Budget(now time.Time, pacingRate int64) int64 {
+	pacingRate = mathext.Max(pacingRate, p.minPacingRate)
 	if p.lastSentTime.IsZero() {
 		return p.budgetAtLastSent
 	}

@@ -65,6 +65,8 @@ const (
 
 	maxDatagramSize = 1500
 
+	defaultMinimumPacingRate = 64 * 1024 // 64 KBps
+
 	// The minimum CWND to ensure delayed acks don't reduce bandwidth measurements.
 	// Does not inflate the pacing rate.
 	defaultMinimumCongestionWindow = 16 * maxDatagramSize
@@ -304,7 +306,7 @@ type BBRSender struct {
 func NewBBRSender(loggingContext string, rttStats *RTTStats) *BBRSender {
 	s := &BBRSender{
 		loggingContext:               loggingContext,
-		pacer:                        NewPacer(defaultInitialCongestionWindow, defaultMaximumCongestionWindow),
+		pacer:                        NewPacer(defaultInitialCongestionWindow, defaultMaximumCongestionWindow, defaultMinimumPacingRate),
 		mode:                         modeStartUp,
 		sampler:                      NewBandwidthSampler(),
 		maxBandwidth:                 NewWindowedFilter(bandwidthFilterWindowSize, 0, MaxFilter[int64]),

@@ -413,8 +413,8 @@ func (s *Session) ToSessionInfo() SessionInfo {
 		State:      s.state.String(),
 		RecvQBuf:   fmt.Sprintf("%d+%d", s.recvQueue.Len(), s.recvBuf.Len()),
 		SendQBuf:   fmt.Sprintf("%d+%d", s.sendQueue.Len(), s.sendBuf.Len()),
-		LastRecv:   fmt.Sprintf("%v", time.Since(s.lastRXTime).Truncate(time.Second)),
-		LastSend:   fmt.Sprintf("%v", time.Since(s.lastTXTime).Truncate(time.Second)),
+		LastRecv:   fmt.Sprintf("%v (%d)", time.Since(s.lastRXTime).Truncate(time.Second), s.nextRecv-1),
+		LastSend:   fmt.Sprintf("%v (%d)", time.Since(s.lastTXTime).Truncate(time.Second), s.nextSend-1),
 	}
 	if _, ok := s.conn.(*TCPUnderlay); ok {
 		info.Protocol = "TCP"
