@@ -38,36 +38,7 @@ For an explanation of the mieru protocol, see [mieru Proxy Protocol](./docs/prot
 3. [Client Installation & Configuration - OpenWrt](./docs/client-install-openwrt.md)
 4. [Maintenance & Troubleshooting](./docs/operation.md)
 5. [Security Guide](./docs/security.md)
-
-## Compile
-
-Compiling should be done in Linux. The compilation process requires downloading dependent packages, which may be blocked by the firewall.
-
-The following softwares are required for compilation.
-
-- curl
-- env
-- git
-- go (version >= 1.20)
-- make
-- sha256sum
-- tar
-- zip
-
-To build Android executable files:
-
-- gcc
-
-To build debian packages:
-
-- dpkg-deb
-- fakeroot
-
-To build RPM packages:
-
-- rpmbuild
-
-To compile, go to the root directory of the project and invoke `make`. The compilation result will be stored in the `release` directory.
+6. [Compilation](./docs/compile.md)
 
 ## Share
 

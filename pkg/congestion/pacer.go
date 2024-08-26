@@ -21,6 +21,9 @@ import (
 	"github.com/enfein/mieru/pkg/mathext"
 )
 
+// Pacer limits the speed of sending packets.
+// Pacer is not thread safe. The caller should provide synchronization
+// to avoid race condition.
 type Pacer struct {
 	budgetAtLastSent int64
 	maxBudget        int64 // determine the max burst
@@ -28,6 +31,7 @@ type Pacer struct {
 	lastSentTime     time.Time
 }
 
+// NewPacer returns a new Pacer object.
 func NewPacer(initialBudget, maxBudget, minPacingRate int64) *Pacer {
 	if initialBudget <= 0 {
 		panic("initial budget must be a positive number")
@@ -48,16 +52,19 @@ func NewPacer(initialBudget, maxBudget, minPacingRate int64) *Pacer {
 	}
 }
 
+// OnPacketSent updates the budget and time when a packet is sent.
 func (p *Pacer) OnPacketSent(sentTime time.Time, bytes, pacingRate int64) {
 	budget := p.Budget(sentTime, pacingRate)
 	p.budgetAtLastSent = mathext.Max(budget-bytes, 0)
 	p.lastSentTime = sentTime
 }
 
+// CanSend returns true if a packet can be sent based on the given pacing rate.
 func (p *Pacer) CanSend(now time.Time, bytes, pacingRate int64) bool {
 	return p.Budget(now, pacingRate) >= bytes
 }
 
+// Budget returns the maximum number of bytes can be sent right now.
 func (p *Pacer) Budget(now time.Time, pacingRate int64) int64 {
 	pacingRate = mathext.Max(pacingRate, p.minPacingRate)
 	if p.lastSentTime.IsZero() {

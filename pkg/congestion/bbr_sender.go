@@ -92,7 +92,7 @@ const (
 	// The size of the bandwidth filter window, in round-trips.
 	bandwidthFilterWindowSize = gainCycleLength + 2
 
-	// The time after which the current min_rtt value expires.
+	// The time after which the current min RTT value expires.
 	minRTTExpiry = 10 * time.Second
 
 	// The minimum time the connection can spend in PROBE RTT mode.
@@ -104,13 +104,6 @@ const (
 	startUpGrowthTarget = 1.25
 
 	roundTripsWithoutGrowthBeforeExitingStartup = 3
-
-	// Coefficient of target congestion window to use when basing PROBE RTT on BDP.
-	moderateProbeRttMultiplier = 0.75
-
-	// Coefficient to determine if a new RTT is sufficiently similar to min RTT that
-	// we don't need to enter PROBE RTT.
-	similarMinRttThreshold = 1.125
 )
 
 var (
@@ -281,23 +274,6 @@ type BBRSender struct {
 
 	// Used as the initial packet conservation mode when first entering recovery.
 	initialConservationInStartup bbrRecoveryState
-
-	// If true, will not exit low gain mode until bytesInFlight drops below BDP
-	// or it's time for high gain mode.
-	fullyDrainQueue bool
-
-	// If true, use a CWND of 0.75*BDP during PROBE RTT instead of minCongestionWindow.
-	probeRTTBasedOnBDP bool
-
-	// If true, skip PROBE RTT and update the timestamp of the existing minRTT to
-	// now if minRTT over the last cycle is within 12.5% of the current minRTT.
-	// Even if the minRTT is 12.5% too low, the 25% gain cycling and 2x CWND gain
-	// should overcome an overly small minRTT.
-	probeRTTSkippedIfSimilarRTT bool
-
-	// If true, disable PROBE RTT entirely as long as the connection was recently
-	// app limited.
-	probeRTTDisabledIfAppLimited bool
 
 	appLimitedSinceLastProbeRTT bool
 	minRTTSinceLastProbeRTT     time.Duration
@@ -492,9 +468,6 @@ func (b *BBRSender) GetTargetCongestionWindow(gain float64) int64 {
 }
 
 func (b *BBRSender) ProbeRTTCongestionWindow() int64 {
-	if b.probeRTTBasedOnBDP {
-		return b.GetTargetCongestionWindow(moderateProbeRttMultiplier)
-	}
 	return b.minCongestionWindow
 }
 
@@ -564,31 +537,12 @@ func (b *BBRSender) UpdateBandwidthAndMinRTT(now time.Time, ackedPackets []Acked
 	b.minRTTSinceLastProbeRTT = mathext.Min(b.minRTTSinceLastProbeRTT, sampleMinRTT)
 	minRTTExpired := b.minRTT > 0 && now.After(b.minRTTTimestamp.Add(minRTTExpiry))
 	if b.minRTT <= 0 || minRTTExpired || sampleMinRTT < b.minRTT {
-		if b.ShouldExtendMinRTTExpiry() {
-			minRTTExpired = false
-		} else {
-			b.minRTT = sampleMinRTT
-		}
+		b.minRTT = sampleMinRTT
 		b.minRTTTimestamp = now
 		b.minRTTSinceLastProbeRTT = infDuration
 		b.appLimitedSinceLastProbeRTT = false
 	}
 	return minRTTExpired
-}
-
-func (b *BBRSender) ShouldExtendMinRTTExpiry() bool {
-	if b.probeRTTDisabledIfAppLimited && b.appLimitedSinceLastProbeRTT {
-		// Extend the current min RTT if we've been app limited recently.
-		return true
-	}
-	minRTTIncreasedSinceLastProbe := b.minRTTSinceLastProbeRTT > time.Duration(float64(b.minRTT)*similarMinRttThreshold)
-	if b.probeRTTSkippedIfSimilarRTT && b.appLimitedSinceLastProbeRTT && !minRTTIncreasedSinceLastProbe {
-		// Extend the current min RTT if we've been app limited recently and an RTT
-		// has been measured in that time that's less than 12.5% more than the
-		// current min RTT.
-		return true
-	}
-	return false
 }
 
 func (b *BBRSender) UpdateGainCyclePhase(now time.Time, priorInFlight int64, hasLosses bool) {
@@ -615,13 +569,6 @@ func (b *BBRSender) UpdateGainCyclePhase(now time.Time, priorInFlight int64, has
 	if shouldAdvanceGainCycling {
 		b.cycleCurrentOffset = (b.cycleCurrentOffset + 1) % gainCycleLength
 		b.lastCycleStart = now
-
-		// Stay in low gain mode until the target BDP is hit.
-		// Low gain mode will be exited immediately when the target BDP is achieved.
-		if b.pacingGain < 1.0 && pacingGainList[b.cycleCurrentOffset] == 1.0 && b.fullyDrainQueue && priorInFlight > b.GetTargetCongestionWindow(1.0) {
-			return
-		}
-
 		b.pacingGain = pacingGainList[b.cycleCurrentOffset]
 	}
 }

@@ -681,6 +681,8 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 						bytesInFlight += newBytesInFlight
 					}
 				}
+			} else {
+				s.sendAlgorithm.OnApplicationLimited(bytesInFlight)
 			}
 
 			// Send ACK or heartbeat if needed.
