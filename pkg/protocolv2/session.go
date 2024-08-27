@@ -413,13 +413,14 @@ func (s *Session) ToSessionInfo() SessionInfo {
 		State:      s.state.String(),
 		RecvQBuf:   fmt.Sprintf("%d+%d", s.recvQueue.Len(), s.recvBuf.Len()),
 		SendQBuf:   fmt.Sprintf("%d+%d", s.sendQueue.Len(), s.sendBuf.Len()),
-		LastRecv:   fmt.Sprintf("%v (%d)", time.Since(s.lastRXTime).Truncate(time.Second), s.nextRecv-1),
 		LastSend:   fmt.Sprintf("%v (%d)", time.Since(s.lastTXTime).Truncate(time.Second), s.nextSend-1),
 	}
 	if _, ok := s.conn.(*TCPUnderlay); ok {
 		info.Protocol = "TCP"
+		info.LastRecv = fmt.Sprintf("%v", time.Since(s.lastRXTime).Truncate(time.Second)) // TCP nextRecv is not used
 	} else if _, ok := s.conn.(*UDPUnderlay); ok {
 		info.Protocol = "UDP"
+		info.LastRecv = fmt.Sprintf("%v (%d)", time.Since(s.lastRXTime).Truncate(time.Second), s.nextRecv-1)
 	} else {
 		info.Protocol = "UNKNOWN"
 	}
