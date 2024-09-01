@@ -361,6 +361,7 @@ func DeleteClientConfigProfile(profileName string) error {
 // 2.5.2. if set, server's IP address is parsable
 // 2.5.3. the server has at least 1 port binding, and all port bindings are valid
 // 2.6. if set, MTU is valid
+// 3. for each socks5 authentication, the user and password are not empty
 func ValidateClientConfigPatch(patch *pb.ClientConfig) error {
 	for _, profile := range patch.GetProfiles() {
 		name := profile.GetProfileName()
@@ -398,6 +399,14 @@ func ValidateClientConfigPatch(patch *pb.ClientConfig) error {
 		}
 		if profile.GetMtu() != 0 && (profile.GetMtu() < 1280 || profile.GetMtu() > 1500) {
 			return fmt.Errorf("MTU value %d is out of range, valid range is [1280, 1500]", profile.GetMtu())
+		}
+	}
+	for _, auth := range patch.GetSocks5Authentication() {
+		if auth.GetUser() == "" {
+			return fmt.Errorf("socks5 authentication user is not set")
+		}
+		if auth.GetPassword() == "" {
+			return fmt.Errorf("socks5 authentication password is not set")
 		}
 	}
 	return nil
@@ -606,6 +615,10 @@ func mergeClientConfigByProfile(dst, src *pb.ClientConfig) {
 	if src.HttpProxyListenLAN != nil {
 		httpProxyListenLAN = src.HttpProxyListenLAN
 	}
+	var socks5Authentication []*pb.Auth = dst.Socks5Authentication
+	if src.Socks5Authentication != nil {
+		socks5Authentication = src.Socks5Authentication
+	}
 
 	proto.Reset(dst)
 
@@ -619,6 +632,7 @@ func mergeClientConfigByProfile(dst, src *pb.ClientConfig) {
 	dst.Socks5ListenLAN = socks5ListenLAN
 	dst.HttpProxyPort = httpProxyPort
 	dst.HttpProxyListenLAN = httpProxyListenLAN
+	dst.Socks5Authentication = socks5Authentication
 }
 
 // deleteClientConfigFile deletes the client config file.

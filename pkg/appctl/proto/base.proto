@@ -111,3 +111,12 @@ message Quota {
     // Number of megabytes the user allowed to send and receive.
     optional int32 megabytes = 2;
 }
+
+message Auth {
+
+    // Username used for authentication.
+    optional string user = 1;
+
+    // Password used for authentication.
+    optional string password = 2;
+}

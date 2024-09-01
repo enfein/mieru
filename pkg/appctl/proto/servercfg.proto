@@ -67,6 +67,10 @@ message EgressProxy {
 
     // Proxy port number.
     optional int32 port = 4;
+
+    // Credential to authenticate egress socks5 proxy.
+    // If the proxy protocol is not socks5, this is ignored.
+    optional Auth socks5Authentication = 5;
 }
 
 enum ProxyProtocol {

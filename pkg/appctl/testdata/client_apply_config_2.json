@@ -68,5 +68,11 @@
     "loggingLevel": "INFO",
     "socks5ListenLAN": false,
     "httpProxyPort": 8080,
-    "httpProxyListenLAN": true
+    "httpProxyListenLAN": true,
+    "socks5Authentication": [
+        {
+            "user": "shilishanlu",
+            "password": "buhuanjian"
+        }
+    ]
 }

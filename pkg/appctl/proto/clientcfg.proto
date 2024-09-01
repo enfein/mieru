@@ -48,6 +48,10 @@ message ClientConfig {
 
     // If set, the HTTP proxy port listens to LAN rather than localhost.
     optional bool httpProxyListenLAN = 9;
+
+    // A list of accounts that can authenticate mieru socks5 proxy service.
+    // If the list is empty, authentication is not required.
+    repeated Auth socks5Authentication = 10;
 }
 
 message ClientProfile {

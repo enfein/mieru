@@ -544,6 +544,7 @@ func DeleteServerUsers(names []string) error {
 // 4.3. protocol is valid
 // 4.4. host is not empty
 // 4.5. port is valid
+// 4.6. if socks5 authentication is used, the user and password are not empty
 // 5. there is maximum 1 egress rule
 // 5.1. the IP ranges must be "*"
 // 5.2. the domain names must be "*"
@@ -589,6 +590,14 @@ func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 		}
 		if proxy.GetPort() < 1 || proxy.GetPort() > 65535 {
 			return fmt.Errorf("egress proxy port number %d is invalid", proxy.GetPort())
+		}
+		hasSocks5AuthenticationUser := proxy.GetSocks5Authentication().GetUser() != ""
+		hasSocks5AuthenticationPassword := proxy.GetSocks5Authentication().GetPassword() != ""
+		if !hasSocks5AuthenticationUser && hasSocks5AuthenticationPassword {
+			return fmt.Errorf("egress proxy socks5 authentication user is not set")
+		}
+		if hasSocks5AuthenticationUser && !hasSocks5AuthenticationPassword {
+			return fmt.Errorf("egress proxy socks5 authentication password is not set")
 		}
 	}
 	if len(patch.GetEgress().GetRules()) > 1 {

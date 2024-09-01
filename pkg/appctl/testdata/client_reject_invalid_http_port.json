@@ -16,17 +16,11 @@
                         }
                     ]
                 }
-            ],
-            "mtu": 1300,
-            "multiplexing": {
-                "level": "MULTIPLEXING_LOW"
-            }
+            ]
         }
     ],
     "activeProfile": "default",
     "rpcPort": 1989,
     "socks5Port": 1080,
-    "loggingLevel": "DEBUG",
-    "socks5ListenLAN": true,
-    "socks5Authentication": []
+    "httpProxyPort": 1000000
 }
