@@ -20,25 +20,27 @@ For an explanation of the mieru protocol, see [mieru Proxy Protocol](./docs/prot
 ## Features
 
 1. mieru uses a high-strength XChaCha20-Poly1305 encryption algorithm that generates encryption keys based on username, password and system time.
-2. mieru implements complete encryption of all transmitted content between the client and the proxy server, without transmitting any plaintext information.
-3. When mieru sends a packet, it is padded with random bytes at the end. Even when the same content is transmitted, the packet size varies.
-4. When using the UDP transport protocol, mieru does not require a handshake between client and server.
-5. When the server can not decrypt the data sent by the client, no content is returned. it is difficult for GFW to discover the mieru service through active probing.
-6. mieru supports multiple users sharing a single proxy server.
-7. mieru supports IPv4 and IPv6.
-8. mieru provides socks5, HTTP and HTTPS proxy.
-9. The client software supports Windows, Mac OS, Linux and Android. For Android users, please use [NekoBox](https://github.com/MatsuriDayo/NekoBoxForAndroid) version 1.3.1 or above, and install [mieru plugin](https://github.com/enfein/NekoBoxPlugins).
-10. The server software supports socks5 outbound (proxy chain).
-11. If you need advanced features like global proxy or customized routing rules, you can use mieru as the backend of a proxy platform such as [Xray](https://github.com/XTLS/Xray-core) and [sing-box](https://github.com/SagerNet/sing-box).
+1. mieru implements complete encryption of all transmitted content between the client and the proxy server, without transmitting any plaintext information.
+1. When mieru sends a packet, it is padded with random bytes at the end. Even when the same content is transmitted, the packet size varies.
+1. When using the UDP transport protocol, mieru does not require a handshake between client and server.
+1. When the server can not decrypt the data sent by the client, no content is returned. it is difficult for GFW to discover the mieru service through active probing.
+1. mieru supports multiple users sharing a single proxy server.
+1. mieru supports IPv4 and IPv6.
+1. mieru provides socks5, HTTP and HTTPS proxy.
+1. The server software supports socks5 outbound (proxy chain).
+1. The client software supports Windows, Mac OS, Linux and Android. Android clients include
+   - [NekoBox](https://github.com/MatsuriDayo/NekoBoxForAndroid) version 1.3.1 or above, with [mieru plugin](https://github.com/enfein/NekoBoxPlugins).
+   - [Exclave](https://github.com/dyhkwong/Exclave), with mieru plugin.
+1. If you need advanced features like global proxy or customized routing rules, you can use mieru as the backend of a proxy platform such as [Xray](https://github.com/XTLS/Xray-core) and [sing-box](https://github.com/SagerNet/sing-box).
 
 ## User Guide
 
 1. [Server Installation & Configuration](./docs/server-install.md)
-2. [Client Installation & Configuration](./docs/client-install.md)
-3. [Client Installation & Configuration - OpenWrt](./docs/client-install-openwrt.md)
-4. [Maintenance & Troubleshooting](./docs/operation.md)
-5. [Security Guide](./docs/security.md)
-6. [Compilation](./docs/compile.md)
+1. [Client Installation & Configuration](./docs/client-install.md)
+1. [Client Installation & Configuration - OpenWrt](./docs/client-install-openwrt.md)
+1. [Maintenance & Troubleshooting](./docs/operation.md)
+1. [Security Guide](./docs/security.md)
+1. [Compilation](./docs/compile.md)
 
 ## Share
 
