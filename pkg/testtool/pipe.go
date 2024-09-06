@@ -19,11 +19,16 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"net"
+	"runtime"
 	"sync"
+	"time"
+
+	"github.com/enfein/mieru/pkg/util"
 )
 
 // BufPipe is like net.Pipe() but with an internal buffer.
-func BufPipe() (io.ReadWriteCloser, io.ReadWriteCloser) {
+func BufPipe() (net.Conn, net.Conn) {
 	var buf1, buf2 bytes.Buffer
 	var lock1, lock2 sync.Mutex
 	ep1 := &ioEndpoint{
@@ -59,6 +64,8 @@ type ioEndpoint struct {
 	closed    bool
 }
 
+var _ net.Conn = &ioEndpoint{}
+
 func (e *ioEndpoint) Read(b []byte) (n int, err error) {
 	if e.closed {
 		return 0, io.EOF
@@ -73,7 +80,10 @@ func (e *ioEndpoint) Read(b []byte) (n int, err error) {
 		e.lock1.Unlock()
 	}
 	if errors.Is(err, io.EOF) {
+		// io.ReadFull() with partial result will not fail.
 		err = nil
+		// Allow the writer to catch up.
+		runtime.Gosched()
 	}
 	return
 }
@@ -96,5 +106,25 @@ func (e *ioEndpoint) Write(b []byte) (n int, err error) {
 
 func (e *ioEndpoint) Close() error {
 	e.closed = true
+	return nil
+}
+
+func (e *ioEndpoint) LocalAddr() net.Addr {
+	return util.NilNetAddr()
+}
+
+func (e *ioEndpoint) RemoteAddr() net.Addr {
+	return util.NilNetAddr()
+}
+
+func (e *ioEndpoint) SetDeadline(t time.Time) error {
+	return nil
+}
+
+func (e *ioEndpoint) SetReadDeadline(t time.Time) error {
+	return nil
+}
+
+func (e *ioEndpoint) SetWriteDeadline(t time.Time) error {
 	return nil
 }

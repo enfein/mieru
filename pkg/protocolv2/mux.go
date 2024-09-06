@@ -172,6 +172,7 @@ func (m *Mux) SetEndpoints(endpoints []UnderlayProperties) *Mux {
 			m.endpoints = new
 		}
 	}
+	log.Infof("Mux now has %d endpoints", len(m.endpoints))
 	return m
 }
 

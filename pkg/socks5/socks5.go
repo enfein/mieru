@@ -21,9 +21,6 @@ import (
 const (
 	// socks5 version number.
 	socks5Version byte = 5
-
-	// No authentication required.
-	noAuth byte = 0
 )
 
 var (
@@ -55,6 +52,9 @@ type Config struct {
 	// BindIP is used for bind or udp associate
 	BindIP net.IP
 
+	// Authentication options.
+	AuthOpts Auth
+
 	// Handshake timeout to establish socks5 connection.
 	// Use 0 or negative value to disable the timeout.
 	HandshakeTimeout time.Duration
@@ -64,9 +64,6 @@ type Config struct {
 
 	// Allow using socks5 to access resources served in localhost.
 	AllowLocalDestination bool
-
-	// Do socks5 authentication at proxy client side.
-	ClientSideAuthentication bool
 }
 
 // Server is responsible for accepting connections and handling
@@ -184,7 +181,7 @@ func (s *Server) acceptLoop() {
 }
 
 func (s *Server) clientServeConn(conn net.Conn) error {
-	if s.config.ClientSideAuthentication {
+	if s.config.AuthOpts.ClientSideAuthentication {
 		if err := s.handleAuthentication(conn); err != nil {
 			return err
 		}
@@ -199,7 +196,7 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 		return fmt.Errorf("mux DialContext() failed: %w", err)
 	}
 
-	if !s.config.ClientSideAuthentication {
+	if !s.config.AuthOpts.ClientSideAuthentication {
 		if err := s.proxySocks5AuthReq(conn, proxyConn); err != nil {
 			HandshakeErrors.Add(1)
 			proxyConn.Close()
@@ -226,7 +223,7 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 }
 
 func (s *Server) serverServeConn(conn net.Conn) error {
-	if !s.config.ClientSideAuthentication {
+	if !s.config.AuthOpts.ClientSideAuthentication {
 		if err := s.handleAuthentication(conn); err != nil {
 			return err
 		}

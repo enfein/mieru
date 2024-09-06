@@ -506,15 +506,17 @@ var clientRunFunc = func(s []string) error {
 				return fmt.Errorf(stderror.InvalidTransportProtocol)
 			}
 		}
-		mux.SetEndpoints(endpoints)
 	}
+	mux.SetEndpoints(endpoints)
 
 	// Create the local socks5 server.
 	socks5Config := &socks5.Config{
-		UseProxy:                 true,
-		ClientSideAuthentication: true,
-		ProxyMux:                 mux,
-		HandshakeTimeout:         10 * time.Second,
+		UseProxy: true,
+		AuthOpts: socks5.Auth{
+			ClientSideAuthentication: true,
+		},
+		ProxyMux:         mux,
+		HandshakeTimeout: 10 * time.Second,
 	}
 	socks5Server, err := socks5.New(socks5Config)
 	if err != nil {

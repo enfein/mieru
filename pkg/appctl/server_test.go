@@ -74,6 +74,7 @@ func TestServerApplyReject(t *testing.T) {
 		"testdata/server_reject_mtu_too_big.json",
 		"testdata/server_reject_mtu_too_small.json",
 		"testdata/server_reject_no_password.json",
+		"testdata/server_reject_no_port_bindings.json",
 		"testdata/server_reject_no_port.json",
 		"testdata/server_reject_no_protocol.json",
 		"testdata/server_reject_no_user_name.json",

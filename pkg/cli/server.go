@@ -418,10 +418,12 @@ var serverRunFunc = func(s []string) error {
 
 		// Create the egress socks5 server.
 		socks5Config := &socks5.Config{
-			AllowLocalDestination:    config.GetAdvancedSettings().GetAllowLocalDestination(),
-			ClientSideAuthentication: true,
-			EgressController:         egress.NewSocks5Controller(config.GetEgress()),
-			HandshakeTimeout:         10 * time.Second,
+			AllowLocalDestination: config.GetAdvancedSettings().GetAllowLocalDestination(),
+			AuthOpts: socks5.Auth{
+				ClientSideAuthentication: true,
+			},
+			EgressController: egress.NewSocks5Controller(config.GetEgress()),
+			HandshakeTimeout: 10 * time.Second,
 		}
 		socks5Server, err := socks5.New(socks5Config)
 		if err != nil {
