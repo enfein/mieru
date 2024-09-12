@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"strconv"
 	"time"
@@ -244,7 +243,16 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 		Protocol: appctlpb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL,
 		Data:     request.Raw,
 	})
-	log.Debugf("Egress decision of socks5 request %v is %s", request.Raw, action.Action.String())
+	if action.Action == appctlpb.EgressAction_PROXY {
+		proxy := action.Proxy
+		if proxy.GetSocks5Authentication().GetUser() != "" && proxy.GetSocks5Authentication().GetPassword() != "" {
+			log.Debugf("Egress decision of socks5 request %v is %s to %v with user password authentication", request.Raw, action.Action.String(), util.MaybeDecorateIPv6(proxy.GetHost())+":"+strconv.Itoa(int(proxy.GetPort())))
+		} else {
+			log.Debugf("Egress decision of socks5 request %v is %s to %v with no authentication", request.Raw, action.Action.String(), util.MaybeDecorateIPv6(proxy.GetHost())+":"+strconv.Itoa(int(proxy.GetPort())))
+		}
+	} else {
+		log.Debugf("Egress decision of socks5 request %v is %s", request.Raw, action.Action.String())
+	}
 	switch action.Action {
 	case appctlpb.EgressAction_DIRECT:
 		if err := s.handleRequest(context.Background(), request, conn); err != nil {
@@ -254,86 +262,26 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 		if action.Proxy == nil {
 			return fmt.Errorf("egress action is PROXY but proxy info is unavailable")
 		}
-		return s.handleForwarding(request, conn, action.Proxy.GetHost(), action.Proxy.GetPort())
+		return s.handleForwarding(request, conn, action.Proxy)
 	case appctlpb.EgressAction_REJECT:
 		return fmt.Errorf("connection is rejected by egress rules")
 	}
 	return nil
 }
 
-func (s *Server) handleAuthentication(conn net.Conn) error {
-	// Read the version byte and ensure we are compatible.
-	util.SetReadTimeout(conn, s.config.HandshakeTimeout)
-	defer util.SetReadTimeout(conn, 0)
-	version := []byte{0}
-	if _, err := io.ReadFull(conn, version); err != nil {
-		HandshakeErrors.Add(1)
-		return fmt.Errorf("get socks version failed: %w", err)
-	}
-	if version[0] != socks5Version {
-		HandshakeErrors.Add(1)
-		return fmt.Errorf("unsupported socks version: %v", version)
-	}
-
-	// Authenticate the connection.
-	nAuthMethods := []byte{0}
-	if _, err := io.ReadFull(conn, nAuthMethods); err != nil {
-		HandshakeErrors.Add(1)
-		return fmt.Errorf("get number of authentication method failed: %w", err)
-	}
-	if nAuthMethods[0] == 0 {
-		HandshakeErrors.Add(1)
-		return fmt.Errorf("number of authentication method is 0")
-	}
-	allowNoAuth := false
-	authMethods := make([]byte, nAuthMethods[0])
-	if _, err := io.ReadFull(conn, authMethods); err != nil {
-		HandshakeErrors.Add(1)
-		return fmt.Errorf("get authentication method failed: %w", err)
-	}
-	for _, method := range authMethods {
-		if method == noAuth {
-			allowNoAuth = true
-			break
-		}
-	}
-	if !allowNoAuth {
-		HandshakeErrors.Add(1)
-		return fmt.Errorf("no authentication is not supported by socks5 client")
-	}
-	if _, err := conn.Write([]byte{socks5Version, noAuth}); err != nil {
-		HandshakeErrors.Add(1)
-		return fmt.Errorf("write authentication response failed: %w", err)
-	}
-	return nil
-}
-
-func (s *Server) handleForwarding(req *Request, conn net.Conn, forwardHost string, forwardPort int32) error {
+func (s *Server) handleForwarding(req *Request, conn net.Conn, proxy *appctlpb.EgressProxy) error {
+	forwardHost := proxy.GetHost()
+	forwardPort := proxy.GetPort()
 	proxyConn, err := net.Dial("tcp", util.MaybeDecorateIPv6(forwardHost)+":"+strconv.Itoa(int(forwardPort)))
 	if err != nil {
 		HandshakeErrors.Add(1)
 		return fmt.Errorf("dial to egress proxy failed: %w", err)
 	}
 
-	// Authenticate with the egress proxy.
-	if _, err := proxyConn.Write([]byte{socks5Version, 1, noAuth}); err != nil {
-		HandshakeErrors.Add(1)
-		proxyConn.Close()
-		return fmt.Errorf("failed to write socks5 auth header to egress proxy: %w", err)
+	if err := s.dialWithAuthentication(proxyConn, proxy.GetSocks5Authentication()); err != nil {
+		return err
 	}
-	util.SetReadTimeout(proxyConn, s.config.HandshakeTimeout)
-	defer util.SetReadTimeout(proxyConn, 0)
-	resp := []byte{0, 0}
-	if _, err := io.ReadFull(proxyConn, resp); err != nil {
-		HandshakeErrors.Add(1)
-		proxyConn.Close()
-		return fmt.Errorf("failed to read socks5 auth response from egress proxy: %w", err)
-	}
-	if resp[0] != socks5Version || resp[1] != noAuth {
-		HandshakeErrors.Add(1)
-		proxyConn.Close()
-		return fmt.Errorf("got unexpected socks5 auth response from egress proxy: %v", resp)
-	}
+
 	if _, err := proxyConn.Write(req.Raw); err != nil {
 		HandshakeErrors.Add(1)
 		proxyConn.Close()

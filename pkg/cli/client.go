@@ -150,6 +150,13 @@ func RegisterClientCommands() {
 		clientDeleteProfileFunc,
 	)
 	RegisterCallback(
+		[]string{"", "delete", "http", "proxy"},
+		func(s []string) error {
+			return unexpectedArgsError(s, 4)
+		},
+		clientDeleteHTTPProxyFunc,
+	)
+	RegisterCallback(
 		[]string{"", "version"},
 		func(s []string) error {
 			return unexpectedArgsError(s, 2)
@@ -267,6 +274,10 @@ var clientHelpFunc = func(s []string) error {
 			{
 				cmd:  "delete profile <PROFILE_NAME>",
 				help: "Delete an inactive client configuration profile.",
+			},
+			{
+				cmd:  "delete http proxy",
+				help: "Delete HTTP(S) proxy. Only run socks5 proxy.",
 			},
 			{
 				cmd:  "get metrics",
@@ -510,10 +521,18 @@ var clientRunFunc = func(s []string) error {
 	mux.SetEndpoints(endpoints)
 
 	// Create the local socks5 server.
+	var socks5IngressCredentials []socks5.Credential
+	for _, auth := range config.GetSocks5Authentication() {
+		socks5IngressCredentials = append(socks5IngressCredentials, socks5.Credential{
+			User:     auth.GetUser(),
+			Password: auth.GetPassword(),
+		})
+	}
 	socks5Config := &socks5.Config{
 		UseProxy: true,
 		AuthOpts: socks5.Auth{
 			ClientSideAuthentication: true,
+			IngressCredentials:       socks5IngressCredentials,
 		},
 		ProxyMux:         mux,
 		HandshakeTimeout: 10 * time.Second,
@@ -712,6 +731,24 @@ var clientDeleteProfileFunc = func(s []string) error {
 		return fmt.Errorf(stderror.GetClientConfigFailedErr, err)
 	}
 	return appctl.DeleteClientConfigProfile(s[3])
+}
+
+var clientDeleteHTTPProxyFunc = func(_ []string) error {
+	config, err := appctl.LoadClientConfig()
+	if err != nil {
+		return fmt.Errorf(stderror.GetClientConfigFailedErr, err)
+	}
+	if config.HttpProxyPort == nil && config.HttpProxyListenLAN == nil {
+		log.Infof("HTTP proxy is already deleted from client config.")
+		return nil
+	}
+	config.HttpProxyPort = nil
+	config.HttpProxyListenLAN = nil
+	if err := appctl.StoreClientConfig(config); err != nil {
+		return fmt.Errorf(stderror.StoreClientConfigFailedErr, err)
+	}
+	log.Infof("HTTP proxy is deleted from client config.")
+	return nil
 }
 
 var clientGetMetricsFunc = func(s []string) error {

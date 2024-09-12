@@ -30,5 +30,15 @@
     "rpcPort": 4001,
     "socks5Port": 4000,
     "loggingLevel": "INFO",
-    "socks5ListenLAN": false
+    "socks5ListenLAN": false,
+    "socks5Authentication": [
+        {
+            "user": "yitukai",
+            "password": "manlianpenfen"
+        },
+        {
+            "user": "shilishanlu",
+            "password": "buhuanjian"
+        }
+    ]
 }
