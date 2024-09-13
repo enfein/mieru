@@ -157,6 +157,13 @@ func RegisterClientCommands() {
 		clientDeleteHTTPProxyFunc,
 	)
 	RegisterCallback(
+		[]string{"", "delete", "socks5", "authentication"},
+		func(s []string) error {
+			return unexpectedArgsError(s, 4)
+		},
+		clientDeleteSocks5AuthenticationFunc,
+	)
+	RegisterCallback(
 		[]string{"", "version"},
 		func(s []string) error {
 			return unexpectedArgsError(s, 2)
@@ -277,7 +284,11 @@ var clientHelpFunc = func(s []string) error {
 			},
 			{
 				cmd:  "delete http proxy",
-				help: "Delete HTTP(S) proxy. Only run socks5 proxy.",
+				help: "Delete HTTP(S) proxy. Allow socks5 user password authentication to be used.",
+			},
+			{
+				cmd:  "delete socks5 authentication",
+				help: "Delete socks5 user password authentication. Allow HTTP(S) proxy to be used.",
 			},
 			{
 				cmd:  "get metrics",
@@ -568,6 +579,10 @@ var clientRunFunc = func(s []string) error {
 
 	// If HTTP proxy is enabled, run the local HTTP server in the background.
 	if config.GetHttpProxyPort() != 0 {
+		// HTTP proxy is not compatible with socks5 user password authentication.
+		if len(config.GetSocks5Authentication()) > 0 {
+			log.Fatalf(`HTTP(S) proxy is not compatible with socks5 user password authentication. Please run "mieru delete socks5 authentication" to stop using user password authentication, or run "mieru delete http proxy" command to stop using HTTP(S) proxy.`)
+		}
 		wg.Add(1)
 		go func(socks5Addr string) {
 			var httpServerAddr string
@@ -748,6 +763,23 @@ var clientDeleteHTTPProxyFunc = func(_ []string) error {
 		return fmt.Errorf(stderror.StoreClientConfigFailedErr, err)
 	}
 	log.Infof("HTTP proxy is deleted from client config.")
+	return nil
+}
+
+var clientDeleteSocks5AuthenticationFunc = func(_ []string) error {
+	config, err := appctl.LoadClientConfig()
+	if err != nil {
+		return fmt.Errorf(stderror.GetClientConfigFailedErr, err)
+	}
+	if len(config.GetSocks5Authentication()) == 0 {
+		log.Infof("socks5 user password authentication is already deleted from client config.")
+		return nil
+	}
+	config.Socks5Authentication = nil
+	if err := appctl.StoreClientConfig(config); err != nil {
+		return fmt.Errorf(stderror.StoreClientConfigFailedErr, err)
+	}
+	log.Infof("socks5 user password authentication is deleted from client config.")
 	return nil
 }
 

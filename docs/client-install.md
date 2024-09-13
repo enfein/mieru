@@ -124,3 +124,28 @@ Chrome / Firefox and other browsers can use socks5 proxy to access blocked websi
 mieru doesn't use socks5 authentication.
 
 For configuring the socks5 proxy in the Tor browser, see the [Security Guide](./security.md).
+
+## Advanced Settings
+
+### socks5 Username and Password Authentication
+
+If you want to require applications to authenticate the socks5 proxy using a username and password, you can add the `socks5Authentication` property to the client configuration. An example is as follows:
+
+```js
+{
+    "socks5Authentication": [
+        {
+            "user": "yitukai",
+            "password": "manlianpenfen"
+        },
+        {
+            "user": "shilishanlu",
+            "password": "buhuanjian"
+        }
+    ]
+}
+```
+
+**socks5 username and password authentication is not compatible with HTTP / HTTPS proxy.** Since HTTP / HTTPS proxy does not require username and password authentication, based on threat model, mieru prohibits the use of HTTP / HTTPS proxy in conjunction with socks5 username and password authentication.
+
+If you need to delete an existing HTTP / HTTPS proxy configuration, please run the `mieru delete http proxy` command. If you want to delete the socks5 username and password authentication settings, please run the `mieru delete socks5 authentication` command.

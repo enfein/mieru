@@ -124,3 +124,28 @@ Chrome / Firefox 等浏览器可以通过安装插件，使用 socks5 代理访�
 mieru 不使用 socks5 用户名和密码进行身份验证。
 
 关于在 Tor 浏览器中配置 socks5 代理，参见[翻墙安全指南](./security.zh_CN.md)。
+
+## 高级设置
+
+### socks5 用户名和密码验证
+
+如果你想要让应用程序必须通过用户名和密码验证才能访问 socks5 代理，可以在客户端设置中添加 `socks5Authentication` 属性。一个示例如下：
+
+```js
+{
+    "socks5Authentication": [
+        {
+            "user": "yitukai",
+            "password": "manlianpenfen"
+        },
+        {
+            "user": "shilishanlu",
+            "password": "buhuanjian"
+        }
+    ]
+}
+```
+
+**socks5 用户名和密码验证与 HTTP / HTTPS 代理不兼容。**因为 HTTP / HTTPS 代理不需要用户名和密码验证，根据威胁模型，mieru 禁止在使用 socks5 用户名和密码验证的同时使用 HTTP / HTTPS 代理。
+
+如果需要删除已有的 HTTP / HTTPS 代理配置，请运行 `mieru delete http proxy` 指令。如果想要删除 socks5 用户名和密码验证的设置，请运行 `mieru delete socks5 authentication` 指令。

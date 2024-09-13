@@ -1,0 +1,46 @@
+{
+    "profiles": [
+        {
+            "profileName": "default",
+            "user": {
+                "name": "ducaiguozei",
+                "password": "xijinping"
+            },
+            "servers": [
+                {
+                    "ipAddress": "12.34.56.78",
+                    "domainName": "",
+                    "portBindings": [
+                        {
+                            "portRange": "2012-2022",
+                            "protocol": "TCP"
+                        },
+                        {
+                            "port": 2027,
+                            "protocol": "TCP"
+                        }
+                    ]
+                }
+            ],
+            "mtu": 1400,
+            "multiplexing": {
+                "level": "MULTIPLEXING_HIGH"
+            }
+        }
+    ],
+    "activeProfile": "default",
+    "rpcPort": 8964,
+    "socks5Port": 1080,
+    "loggingLevel": "INFO",
+    "socks5ListenLAN": false,
+    "socks5Authentication": [
+        {
+            "user": "yitukai",
+            "password": "manlianpenfen"
+        },
+        {
+            "user": "shilishanlu",
+            "password": "buhuanjian"
+        }
+    ]
+}
