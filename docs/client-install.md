@@ -146,6 +146,8 @@ If you want to require applications to authenticate the socks5 proxy using a use
 }
 ```
 
+Applications can choose any user and password in the `socks5Authentication` list to authenticate the socks5 proxy.
+
 **socks5 username and password authentication is not compatible with HTTP / HTTPS proxy.** Since HTTP / HTTPS proxy does not require username and password authentication, based on threat model, mieru prohibits the use of HTTP / HTTPS proxy in conjunction with socks5 username and password authentication.
 
 If you need to delete an existing HTTP / HTTPS proxy configuration, please run the `mieru delete http proxy` command. If you want to delete the socks5 username and password authentication settings, please run the `mieru delete socks5 authentication` command.
