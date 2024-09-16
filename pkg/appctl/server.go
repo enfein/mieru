@@ -31,7 +31,7 @@ import (
 	"github.com/enfein/mieru/pkg/egress"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
-	"github.com/enfein/mieru/pkg/protocolv2"
+	"github.com/enfein/mieru/pkg/protocol"
 	"github.com/enfein/mieru/pkg/socks5"
 	"github.com/enfein/mieru/pkg/stderror"
 	"github.com/enfein/mieru/pkg/util"
@@ -57,7 +57,7 @@ var (
 	socks5ServerRef atomic.Pointer[socks5.Server]
 
 	// serverMuxRef holds a pointer to server multiplexier.
-	serverMuxRef atomic.Pointer[protocolv2.Mux]
+	serverMuxRef atomic.Pointer[protocol.Mux]
 )
 
 func SetServerRPCServerRef(server *grpc.Server) {
@@ -68,7 +68,7 @@ func SetSocks5Server(server *socks5.Server) {
 	socks5ServerRef.Store(server)
 }
 
-func SetServerMuxRef(mux *protocolv2.Mux) {
+func SetServerMuxRef(mux *protocol.Mux) {
 	serverMuxRef.Store(mux)
 }
 
@@ -112,7 +112,7 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 
 	SetAppStatus(pb.AppStatus_STARTING)
 
-	mux := protocolv2.NewMux(false).SetServerUsers(UserListToMap(config.GetUsers()))
+	mux := protocol.NewMux(false).SetServerUsers(UserListToMap(config.GetUsers()))
 	SetServerMuxRef(mux)
 	mtu := util.DefaultMTU
 	if config.GetMtu() != 0 {
@@ -653,8 +653,8 @@ func ValidateFullServerConfig(config *pb.ServerConfig) error {
 }
 
 // PortBindingsToUnderlayProperties converts port bindings to underlay properties.
-func PortBindingsToUnderlayProperties(portBindings []*pb.PortBinding, mtu int) ([]protocolv2.UnderlayProperties, error) {
-	endpoints := make([]protocolv2.UnderlayProperties, 0)
+func PortBindingsToUnderlayProperties(portBindings []*pb.PortBinding, mtu int) ([]protocol.UnderlayProperties, error) {
+	endpoints := make([]protocol.UnderlayProperties, 0)
 	listenIP := net.ParseIP(util.AllIPAddr())
 	ipVersion := util.GetIPVersion(listenIP.String())
 	if listenIP == nil {
@@ -666,17 +666,17 @@ func PortBindingsToUnderlayProperties(portBindings []*pb.PortBinding, mtu int) (
 	}
 	n := len(portBindings)
 	for i := 0; i < n; i++ {
-		protocol := portBindings[i].GetProtocol()
+		proto := portBindings[i].GetProtocol()
 		port := portBindings[i].GetPort()
-		switch protocol {
+		switch proto {
 		case pb.TransportProtocol_TCP:
-			endpoint := protocolv2.NewUnderlayProperties(mtu, ipVersion, util.TCPTransport, &net.TCPAddr{IP: listenIP, Port: int(port)}, nil)
+			endpoint := protocol.NewUnderlayProperties(mtu, ipVersion, util.TCPTransport, &net.TCPAddr{IP: listenIP, Port: int(port)}, nil)
 			endpoints = append(endpoints, endpoint)
 		case pb.TransportProtocol_UDP:
-			endpoint := protocolv2.NewUnderlayProperties(mtu, ipVersion, util.UDPTransport, &net.UDPAddr{IP: listenIP, Port: int(port)}, nil)
+			endpoint := protocol.NewUnderlayProperties(mtu, ipVersion, util.UDPTransport, &net.UDPAddr{IP: listenIP, Port: int(port)}, nil)
 			endpoints = append(endpoints, endpoint)
 		default:
-			return []protocolv2.UnderlayProperties{}, fmt.Errorf(stderror.InvalidTransportProtocol)
+			return []protocol.UnderlayProperties{}, fmt.Errorf(stderror.InvalidTransportProtocol)
 		}
 	}
 	return endpoints, nil

@@ -30,7 +30,7 @@ import (
 	pb "github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
-	"github.com/enfein/mieru/pkg/protocolv2"
+	"github.com/enfein/mieru/pkg/protocol"
 	"github.com/enfein/mieru/pkg/socks5"
 	"github.com/enfein/mieru/pkg/stderror"
 	"github.com/enfein/mieru/pkg/util"
@@ -67,7 +67,7 @@ var (
 	clientSocks5ServerRef atomic.Pointer[socks5.Server]
 
 	// clientMuxRef holds a pointer to client multiplexier.
-	clientMuxRef atomic.Pointer[protocolv2.Mux]
+	clientMuxRef atomic.Pointer[protocol.Mux]
 )
 
 func SetClientRPCServerRef(server *grpc.Server) {
@@ -78,7 +78,7 @@ func SetClientSocks5ServerRef(server *socks5.Server) {
 	clientSocks5ServerRef.Store(server)
 }
 
-func SetClientMuxRef(mux *protocolv2.Mux) {
+func SetClientMuxRef(mux *protocol.Mux) {
 	clientMuxRef.Store(mux)
 }
 

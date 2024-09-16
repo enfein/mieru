@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//go:build !android
+//go:build android
 
-package protocolv2
+package protocol
 
 import "time"
 
 const (
-	outputLoopInterval = 1 * time.Millisecond
+	outputLoopInterval = 10 * time.Millisecond
 )

@@ -35,7 +35,7 @@ import (
 	"github.com/enfein/mieru/pkg/http2socks"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
-	"github.com/enfein/mieru/pkg/protocolv2"
+	"github.com/enfein/mieru/pkg/protocol"
 	"github.com/enfein/mieru/pkg/socks5"
 	"github.com/enfein/mieru/pkg/stderror"
 	"github.com/enfein/mieru/pkg/util"
@@ -404,7 +404,7 @@ var serverRunFunc = func(s []string) error {
 	if err = appctl.ValidateFullServerConfig(config); err == nil {
 		appctl.SetAppStatus(appctlpb.AppStatus_STARTING)
 
-		mux := protocolv2.NewMux(false).SetServerUsers(appctl.UserListToMap(config.GetUsers()))
+		mux := protocol.NewMux(false).SetServerUsers(appctl.UserListToMap(config.GetUsers()))
 		appctl.SetServerMuxRef(mux)
 		mtu := util.DefaultMTU
 		if config.GetMtu() != 0 {

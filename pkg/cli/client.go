@@ -37,7 +37,7 @@ import (
 	"github.com/enfein/mieru/pkg/http2socks"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
-	"github.com/enfein/mieru/pkg/protocolv2"
+	"github.com/enfein/mieru/pkg/protocol"
 	"github.com/enfein/mieru/pkg/socks5"
 	"github.com/enfein/mieru/pkg/socks5client"
 	"github.com/enfein/mieru/pkg/stderror"
@@ -459,7 +459,7 @@ var clientRunFunc = func(s []string) error {
 	}
 
 	// Collect remote proxy addresses and password.
-	mux := protocolv2.NewMux(true)
+	mux := protocol.NewMux(true)
 	appctl.SetClientMuxRef(mux)
 	var hashedPassword []byte
 	activeProfile, err := appctl.GetActiveProfileFromConfig(config, config.GetActiveProfile())
@@ -492,7 +492,7 @@ var clientRunFunc = func(s []string) error {
 		multiplexFactor = 3
 	}
 	mux = mux.SetClientMultiplexFactor(multiplexFactor)
-	endpoints := make([]protocolv2.UnderlayProperties, 0)
+	endpoints := make([]protocol.UnderlayProperties, 0)
 	resolver := &util.DNSResolver{}
 	for _, serverInfo := range activeProfile.GetServers() {
 		var proxyHost string
@@ -519,10 +519,10 @@ var clientRunFunc = func(s []string) error {
 			proxyPort := bindingInfo.GetPort()
 			switch bindingInfo.GetProtocol() {
 			case appctlpb.TransportProtocol_TCP:
-				endpoint := protocolv2.NewUnderlayProperties(mtu, ipVersion, util.TCPTransport, nil, &net.TCPAddr{IP: proxyIP, Port: int(proxyPort)})
+				endpoint := protocol.NewUnderlayProperties(mtu, ipVersion, util.TCPTransport, nil, &net.TCPAddr{IP: proxyIP, Port: int(proxyPort)})
 				endpoints = append(endpoints, endpoint)
 			case appctlpb.TransportProtocol_UDP:
-				endpoint := protocolv2.NewUnderlayProperties(mtu, ipVersion, util.UDPTransport, nil, &net.UDPAddr{IP: proxyIP, Port: int(proxyPort)})
+				endpoint := protocol.NewUnderlayProperties(mtu, ipVersion, util.UDPTransport, nil, &net.UDPAddr{IP: proxyIP, Port: int(proxyPort)})
 				endpoints = append(endpoints, endpoint)
 			default:
 				return fmt.Errorf(stderror.InvalidTransportProtocol)

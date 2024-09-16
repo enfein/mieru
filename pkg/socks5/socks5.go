@@ -12,7 +12,7 @@ import (
 	"github.com/enfein/mieru/pkg/egress"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
-	"github.com/enfein/mieru/pkg/protocolv2"
+	"github.com/enfein/mieru/pkg/protocol"
 	"github.com/enfein/mieru/pkg/stderror"
 	"github.com/enfein/mieru/pkg/util"
 )
@@ -40,7 +40,7 @@ var (
 // Config is used to setup and configure a socks5 server.
 type Config struct {
 	// Mieru proxy multiplexer.
-	ProxyMux *protocolv2.Mux
+	ProxyMux *protocol.Mux
 
 	// Egress controller.
 	EgressController egress.Controller
