@@ -1,4 +1,4 @@
-package socks5client
+package socks5
 
 import (
 	"reflect"
@@ -11,14 +11,14 @@ func TestParse(t *testing.T) {
 	testcases := []struct {
 		name string
 		uri  string
-		cfg  Config
+		c    Client
 	}{
 		{
 			name: "full config",
 			uri:  "socks5://u1:p1@127.0.0.1:8080?timeout=2s",
-			cfg: Config{
-				Auth: &Auth{
-					Username: "u1",
+			c: Client{
+				Credential: &Credential{
+					User:     "u1",
 					Password: "p1",
 				},
 				Host:    "127.0.0.1:8080",
@@ -28,7 +28,7 @@ func TestParse(t *testing.T) {
 		{
 			name: "simple socks5",
 			uri:  "socks5://127.0.0.1:8080",
-			cfg: Config{
+			c: Client{
 				Host: "127.0.0.1:8080",
 			},
 		},
@@ -37,12 +37,12 @@ func TestParse(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			cfg, err := parse(tc.uri)
+			c, err := parse(tc.uri)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(cfg, &tc.cfg) {
-				t.Fatalf("expect %v got %v", tc.cfg, cfg)
+			if !reflect.DeepEqual(c, &tc.c) {
+				t.Fatalf("expect %v got %v", tc.c, c)
 			}
 		})
 	}

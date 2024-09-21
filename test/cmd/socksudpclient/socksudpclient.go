@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/enfein/mieru/pkg/log"
-	"github.com/enfein/mieru/pkg/socks5client"
+	"github.com/enfein/mieru/pkg/socks5"
 	"github.com/enfein/mieru/pkg/testtool"
 )
 
@@ -78,9 +78,9 @@ func main() {
 }
 
 func CreateNewConnAndDoRequest(nRequest int, dstAddr *net.UDPAddr) {
-	socksDialer := socks5client.DialSocks5Proxy(&socks5client.Config{
+	socksDialer := socks5.DialSocks5Proxy(&socks5.Client{
 		Host:    *localProxyHost + ":" + strconv.Itoa(*localProxyPort),
-		CmdType: socks5client.UDPAssociateCmd,
+		CmdType: socks5.UDPAssociateCmd,
 	})
 	ctrlConn, udpConn, proxyAddr, err := socksDialer("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
 	if err != nil {
@@ -101,9 +101,9 @@ func DoRequestWithExistingConn(conn *net.UDPConn, proxyAddr, dstAddr *net.UDPAdd
 
 	conn.SetReadDeadline(time.Now().Add(1 * time.Second))
 	defer conn.SetReadDeadline(time.Time{})
-	resp, err := socks5client.SendUDP(conn, proxyAddr, dstAddr, payload)
+	resp, err := socks5.TransceiveUDPPacket(conn, proxyAddr, dstAddr, payload)
 	if err != nil {
-		log.Fatalf("socks5client.SendUDP() failed: %v", err)
+		log.Fatalf("socks5.TransceiveUDPPacket() failed: %v", err)
 	}
 
 	rot13, err := testtool.TestHelperRot13(resp)

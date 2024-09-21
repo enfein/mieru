@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package http2socks
+package socks5
 
 import (
 	"fmt"
@@ -26,7 +26,6 @@ import (
 
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
-	"github.com/enfein/mieru/pkg/socks5client"
 	"github.com/enfein/mieru/pkg/util"
 )
 
@@ -54,19 +53,18 @@ var hopByHopHeaders = []string{
 	"Upgrade",
 }
 
-type Proxy struct {
+type HTTPProxy struct {
 	ProxyURI string
-
-	client *http.Client // cached HTTP client
-	mu     sync.Mutex
+	client   *http.Client // cached HTTP client
+	mu       sync.Mutex
 }
 
 var (
-	_ http.Handler = &Proxy{}
+	_ http.Handler = &HTTPProxy{}
 )
 
-// NewHTTPServer returns a new HTTP proxy server.
-func NewHTTPServer(listenAddr string, proxy *Proxy) *http.Server {
+// NewHTTPProxyServer returns a new HTTP proxy server.
+func NewHTTPProxyServer(listenAddr string, proxy *HTTPProxy) *http.Server {
 	if proxy == nil {
 		return nil
 	}
@@ -80,14 +78,14 @@ func NewHTTPServer(listenAddr string, proxy *Proxy) *http.Server {
 }
 
 // ServeHTTP implements http.Handler interface with a socks5 backend.
-func (p *Proxy) ServeHTTP(res http.ResponseWriter, req *http.Request) {
+func (p *HTTPProxy) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	HTTPRequests.Add(1)
 	if log.IsLevelEnabled(log.TraceLevel) {
 		log.Tracef("received HTTP proxy request %s %s", req.Method, req.URL.String())
 	}
 
 	// Dialer to socks5 server.
-	dialFunc := socks5client.Dial(p.ProxyURI, socks5client.ConnectCmd)
+	dialFunc := Dial(p.ProxyURI, ConnectCmd)
 
 	if req.Method == http.MethodConnect {
 		// HTTPS
@@ -167,8 +165,8 @@ func (p *Proxy) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// TransportProxyFunc returns the Proxy function used by http.Transport.
-func TransportProxyFunc(proxy string) func(*http.Request) (*url.URL, error) {
+// HTTPTransportProxyFunc returns the Proxy function used by http.Transport.
+func HTTPTransportProxyFunc(proxy string) func(*http.Request) (*url.URL, error) {
 	if !strings.HasPrefix(proxy, "http://") && !strings.HasPrefix(proxy, "https://") && !strings.HasPrefix(proxy, "socks5://") {
 		return func(r *http.Request) (*url.URL, error) {
 			return nil, fmt.Errorf("unsupport proxy URL %s", proxy)

@@ -1,4 +1,4 @@
-package socks5client
+package socks5
 
 import (
 	"fmt"
@@ -10,50 +10,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/enfein/mieru/pkg/socks5"
+	"github.com/enfein/mieru/pkg/testtool"
 	"github.com/enfein/mieru/pkg/util"
 )
 
-var httpTestServer = func() *http.Server {
-	httpTestPort, err := util.UnusedTCPPort()
-	if err != nil {
-		panic(err)
-	}
-	s := &http.Server{
-		Addr: ":" + strconv.Itoa(httpTestPort),
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			w.Write([]byte("hello"))
-		}),
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
-		MaxHeaderBytes: 1 << 20,
-	}
-
-	started := make(chan struct{})
-	go func() {
-		l, err := net.Listen("tcp", s.Addr)
-		if err != nil {
-			panic(err)
-		}
-		close(started)
-		if err = http.Serve(l, s.Handler); err != nil {
-			panic(err)
-		}
-	}()
-	runtime.Gosched()
-	<-started
-	tcpReady(httpTestPort, 2*time.Second)
-	return s
-}()
-
 func newTestSocksServer(port int) {
-	conf := &socks5.Config{
+	conf := &Config{
 		AllowLocalDestination: true,
 	}
-	srv, err := socks5.New(conf)
+	srv, err := New(conf)
 	if err != nil {
 		panic(err)
 	}
+
 	started := make(chan struct{})
 	go func() {
 		l, err := net.Listen("tcp", "0.0.0.0:"+strconv.Itoa(port))
@@ -65,25 +34,22 @@ func newTestSocksServer(port int) {
 			panic(err)
 		}
 	}()
+
 	runtime.Gosched()
 	<-started
-	tcpReady(port, 2*time.Second)
-}
-
-func tcpReady(port int, timeout time.Duration) {
-	conn, err := net.DialTimeout("tcp", "127.0.0.1:"+strconv.Itoa(port), timeout)
-	if err != nil {
-		panic(err)
-	}
-	conn.Close()
+	runtime.Gosched()
+	testtool.WaitForTCPReady(port, 5*time.Second)
 }
 
 func TestSocks5Anonymous(t *testing.T) {
+	httpTestServer := testtool.NewTestHTTPServer([]byte("hello"))
+
 	port, err := util.UnusedTCPPort()
 	if err != nil {
 		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
 	}
 	newTestSocksServer(port)
+
 	dialSocksProxy := Dial(fmt.Sprintf("socks5://127.0.0.1:%d?timeout=5s", port), ConnectCmd)
 	tr := &http.Transport{Dial: dialSocksProxy}
 	httpClient := &http.Client{Transport: tr}

@@ -50,6 +50,12 @@ lib: fmt vet
 	CGO_ENABLED=0 go test -bench=. -benchtime=5s ./pkg/cipher
 	go tool cover -html coverage.out -o coverage.html
 
+# Generate vendor directory.
+.PHONY: vendor
+vendor:
+	go mod tidy
+	go mod vendor
+
 # Build Android clients.
 .PHONY: client-android
 client-android: client-android-amd64 client-android-arm64

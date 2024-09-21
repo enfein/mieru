@@ -15,15 +15,22 @@ import (
 	"github.com/enfein/mieru/pkg/util"
 )
 
+// socks5 command types.
 const (
-	connectCommand   byte = 1
-	bindCommand      byte = 2
-	associateCommand byte = 3
+	ConnectCmd      byte = 1
+	BindCmd         byte = 2
+	UDPAssociateCmd byte = 3
+)
 
+// socks5 address types.
+const (
 	ipv4Address byte = 1
 	fqdnAddress byte = 3
 	ipv6Address byte = 4
+)
 
+// socks5 error types.
+const (
 	successReply         byte = 0
 	serverFailure        byte = 1
 	ruleFailure          byte = 2
@@ -130,11 +137,11 @@ func (s *Server) handleRequest(ctx context.Context, req *Request, conn io.ReadWr
 
 	// Switch on the command.
 	switch req.Command {
-	case connectCommand:
+	case ConnectCmd:
 		return s.handleConnect(ctx, req, conn)
-	case bindCommand:
+	case BindCmd:
 		return s.handleBind(ctx, req, conn)
-	case associateCommand:
+	case UDPAssociateCmd:
 		return s.handleAssociate(ctx, req, conn)
 	default:
 		UnsupportedCommandErrors.Add(1)
@@ -491,7 +498,7 @@ func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, err
 	connResp = append(connResp, bindAddr...)
 
 	var udpConn *net.UDPConn
-	if cmd == associateCommand {
+	if cmd == UDPAssociateCmd {
 		// Create a UDP listener on a random port in IPv4 network.
 		var err error
 		udpAddr := &net.UDPAddr{IP: net.IP{0, 0, 0, 0}, Port: 0}

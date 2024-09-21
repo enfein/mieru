@@ -32,7 +32,6 @@ import (
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/egress"
-	"github.com/enfein/mieru/pkg/http2socks"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/protocol"
@@ -391,7 +390,7 @@ var serverRunFunc = func(s []string) error {
 	if clientDecryptionMetricGroup := metrics.GetMetricGroupByName(cipher.ClientDecryptionMetricGroupName); clientDecryptionMetricGroup != nil {
 		clientDecryptionMetricGroup.DisableLogging()
 	}
-	if httpMetricGroup := metrics.GetMetricGroupByName(http2socks.HTTPMetricGroupName); httpMetricGroup != nil {
+	if httpMetricGroup := metrics.GetMetricGroupByName(socks5.HTTPMetricGroupName); httpMetricGroup != nil {
 		httpMetricGroup.DisableLogging()
 	}
 

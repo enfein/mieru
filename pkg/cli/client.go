@@ -34,12 +34,10 @@ import (
 	"github.com/enfein/mieru/pkg/appctl"
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
-	"github.com/enfein/mieru/pkg/http2socks"
 	"github.com/enfein/mieru/pkg/log"
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/protocol"
 	"github.com/enfein/mieru/pkg/socks5"
-	"github.com/enfein/mieru/pkg/socks5client"
 	"github.com/enfein/mieru/pkg/stderror"
 	"github.com/enfein/mieru/pkg/util"
 	"github.com/enfein/mieru/pkg/util/sockopts"
@@ -591,7 +589,7 @@ var clientRunFunc = func(s []string) error {
 			} else {
 				httpServerAddr = util.MaybeDecorateIPv6(util.LocalIPAddr()) + ":" + strconv.Itoa(int(config.GetHttpProxyPort()))
 			}
-			httpServer := http2socks.NewHTTPServer(httpServerAddr, &http2socks.Proxy{
+			httpServer := socks5.NewHTTPProxyServer(httpServerAddr, &socks5.HTTPProxy{
 				ProxyURI: "socks5://" + socks5Addr + "?timeout=10s",
 			})
 			log.Infof("mieru client HTTP proxy server is running")
@@ -661,7 +659,7 @@ var clientTestFunc = func(s []string) error {
 
 	httpClient := &http.Client{
 		Transport: &http.Transport{
-			Dial: socks5client.Dial(fmt.Sprintf("socks5://127.0.0.1:%d", config.GetSocks5Port()), socks5client.ConnectCmd),
+			Dial: socks5.Dial(fmt.Sprintf("socks5://127.0.0.1:%d", config.GetSocks5Port()), socks5.ConnectCmd),
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return nil

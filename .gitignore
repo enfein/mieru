@@ -19,6 +19,7 @@
 /release
 /tools/build/**
 !/tools/build/README.md
+/vendor
 
 *.exe
 *.dll

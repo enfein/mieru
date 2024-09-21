@@ -1,4 +1,4 @@
-package socks5client
+package socks5
 
 import (
 	"fmt"
@@ -6,27 +6,25 @@ import (
 	"time"
 )
 
-func parse(proxyURI string) (*Config, error) {
+func parse(proxyURI string) (*Client, error) {
 	uri, err := url.Parse(proxyURI)
 	if err != nil {
 		return nil, err
 	}
-	cfg := &Config{}
-	switch uri.Scheme {
-	case "socks5":
-		// This is the only supported scheme.
-	default:
-		return nil, fmt.Errorf("unsupported SOCKS protocol %s", uri.Scheme)
+
+	c := &Client{}
+	if uri.Scheme != "socks5" {
+		return nil, fmt.Errorf("unsupported protocol %s", uri.Scheme)
 	}
-	cfg.Host = uri.Host
+	c.Host = uri.Host
 	user := uri.User.Username()
 	password, _ := uri.User.Password()
 	if user != "" || password != "" {
 		if user == "" || password == "" || len(user) > 255 || len(password) > 255 {
 			return nil, fmt.Errorf("invalid user name or password")
 		}
-		cfg.Auth = &Auth{
-			Username: user,
+		c.Credential = &Credential{
+			User:     user,
 			Password: password,
 		}
 	}
@@ -34,10 +32,10 @@ func parse(proxyURI string) (*Config, error) {
 	timeout := query.Get("timeout")
 	if timeout != "" {
 		var err error
-		cfg.Timeout, err = time.ParseDuration(timeout)
+		c.Timeout, err = time.ParseDuration(timeout)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return cfg, nil
+	return c, nil
 }

@@ -98,7 +98,7 @@ func TestRequestUnsupportedCommand(t *testing.T) {
 		resp []byte
 	}{
 		{
-			[]byte{5, bindCommand, 0, 1, 127, 0, 0, 1, 0, 1},
+			[]byte{5, BindCmd, 0, 1, 127, 0, 0, 1, 0, 1},
 			[]byte{5, commandNotSupported, 0, 1, 0, 0, 0, 0, 0, 0},
 		},
 	}
