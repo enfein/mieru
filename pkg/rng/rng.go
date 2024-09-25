@@ -21,13 +21,13 @@ import (
 	"math"
 	mrand "math/rand"
 	"os"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/enfein/mieru/pkg/version"
 )
 
-var fixedValue atomic.Value
+var fixedValues sync.Map
 
 // Intn returns a random int from [0, n) with scale down distribution.
 func Intn(n int) int {
@@ -59,25 +59,32 @@ func RandTime(begin, end time.Time) time.Time {
 	return time.Unix(randSec, randNano)
 }
 
-// FixedInt returns an integer in [0, n) that stays the same within one machine.
-// This value may change in different mieru versions.
-func FixedInt(n int) int {
+// FixedInt returns an integer in [0, n) that stays the same
+// if the same hint is provided.
+//
+// This fixed integer may change in different mieru versions.
+//
+// This function uses an internal hint cache to accelerate look up.
+func FixedInt(n int, hint string) int {
 	if n <= 0 {
 		return 0
 	}
-	v, ok := fixedValue.Load().(int)
+	v, ok := fixedValues.Load(hint)
 	if !ok {
-		name, err := os.Hostname()
-		if err != nil {
-			name = ""
-		}
-		name = name + " " + version.AppVersion
-		b := sha256.Sum256([]byte(name))
+		seed := hint + " " + version.AppVersion
+		b := sha256.Sum256([]byte(seed))
 		b[0] = b[0] & 0b01111111
 		v = int(binary.BigEndian.Uint32(b[:4]))
-		fixedValue.Store(v)
+		fixedValues.Store(hint, v)
 	}
-	return v % n
+	return v.(int) % n
+}
+
+// FixedIntPerHost returns an integer in [0, n) that stays the same
+// on the same host.
+func FixedIntPerHost(n int) int {
+	hostName, _ := os.Hostname()
+	return FixedInt(n, hostName)
 }
 
 // scaleDown returns a random number from [0.0, 1.0), where

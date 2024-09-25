@@ -20,38 +20,119 @@ import (
 	"fmt"
 	mrand "math/rand"
 
+	"github.com/enfein/mieru/pkg/mathext"
 	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/util"
 )
 
 var (
-	recommendedConsecutiveASCIILen = 32 + rng.FixedInt(17)
+	recommendedConsecutiveASCIILen = 24 + rng.FixedIntPerHost(17)
+	recommendedTargetProbability   = 0.375
 )
 
 type paddingOpts struct {
 	// The maxinum length of padding.
 	maxLen int
 
+	ascii *asciiPaddingOpts
+
+	entropy *entropyPaddingOpts
+}
+
+type asciiPaddingOpts struct {
 	// The mininum length of consecutive ASCII characters.
 	// This implies the mininum length of padding.
 	minConsecutiveASCIILen int
 }
 
+type entropyPaddingOpts struct {
+	// The existing data that the padding will be attached to.
+	existingData []byte
+
+	// The target probability of bit 0 or bit 1, whichever is lower,
+	// in the existing data + padding.
+	// This value should be in the range of (0.0, 0.5].
+	//
+	// We will try best effort to meet the target with the given
+	// maximum padding length.
+	targetProbability float64
+}
+
 func newPadding(opts paddingOpts) []byte {
-	if opts.maxLen < opts.minConsecutiveASCIILen {
-		panic(fmt.Sprintf("Invalid padding options: maxLen %d is smaller than minConsecutiveASCIILen %d", opts.maxLen, opts.minConsecutiveASCIILen))
-	}
-	length := rng.Intn(opts.maxLen-opts.minConsecutiveASCIILen+1) + opts.minConsecutiveASCIILen
-	p := make([]byte, length)
-	for {
-		if _, err := crand.Read(p); err == nil {
-			break
+	if opts.ascii != nil {
+		if opts.maxLen < opts.ascii.minConsecutiveASCIILen {
+			panic(fmt.Sprintf("Invalid padding options: maxLen %d is smaller than minConsecutiveASCIILen %d", opts.maxLen, opts.ascii.minConsecutiveASCIILen))
 		}
+
+		length := rng.Intn(opts.maxLen-opts.ascii.minConsecutiveASCIILen+1) + opts.ascii.minConsecutiveASCIILen
+		p := make([]byte, length)
+		for {
+			if _, err := crand.Read(p); err == nil {
+				break
+			}
+		}
+		beginIdx := 0
+		if length > opts.ascii.minConsecutiveASCIILen {
+			beginIdx = mrand.Intn(length - opts.ascii.minConsecutiveASCIILen)
+		}
+		util.ToPrintableChar(p, beginIdx, beginIdx+opts.ascii.minConsecutiveASCIILen)
+		return p
+	} else if opts.entropy != nil {
+		if opts.entropy.targetProbability <= 0.0 || opts.entropy.targetProbability > 0.5 {
+			panic(fmt.Sprintf("Invalid padding options: targetProbability %f is out of range (0.0, 0.5]", opts.entropy.targetProbability))
+		}
+
+		currentBitDistribution := util.ToBitDistribution(opts.entropy.existingData)
+
+		// Determine which bit (0 or 1) has the lower probability.
+		lowerBit := byte(0)
+		lowerBitCount := currentBitDistribution.Bit0Count
+		if currentBitDistribution.Bit1 < currentBitDistribution.Bit0 {
+			lowerBit = byte(1)
+			lowerBitCount = currentBitDistribution.Bit1Count
+		}
+
+		// Let x = lowerBitCount, t = targetProbability, e = existingData bits, p = padding bits.
+		// We need to find p that satisfy x = t * (e + p).
+		// Solve the equation gives p = x / t - e.
+		minPaddingBits := int(float64(lowerBitCount)/opts.entropy.targetProbability - float64(len(opts.entropy.existingData)*8))
+		minPaddingBits = mathext.Max(minPaddingBits, 0)
+		minPaddingBytes := (minPaddingBits + 7) / 8
+
+		// Determine the padding length.
+		var length int
+		if minPaddingBytes >= opts.maxLen {
+			length = opts.maxLen
+		} else {
+			length = rng.Intn(opts.maxLen-minPaddingBytes+1) + minPaddingBytes
+		}
+		p := make([]byte, length)
+
+		// Determine the number of bits that can flip in the padding.
+		flip := mathext.Max(int(float64(len(opts.entropy.existingData)+length)*8*opts.entropy.targetProbability)-lowerBitCount, 0)
+		flip = mathext.Min(flip, length*8)
+
+		if lowerBit == 0 {
+			// Set all the bits in the padding to be 1.
+			util.FillBytes(p, 0xFF)
+
+			// Change at most flip bits in p to bit 0.
+			for i := 0; i < flip; i++ {
+				j := mrand.Intn(len(p) * 8)
+				byteIndex := j / 8
+				bitIndex := j % 8
+				p[byteIndex] &^= (1 << bitIndex)
+			}
+		} else {
+			// Change at most flip bits in p to bit 1.
+			for i := 0; i < flip; i++ {
+				j := mrand.Intn(len(p) * 8)
+				byteIndex := j / 8
+				bitIndex := j % 8
+				p[byteIndex] |= (1 << bitIndex)
+			}
+		}
+		return p
 	}
-	beginIdx := 0
-	if length > opts.minConsecutiveASCIILen {
-		beginIdx = mrand.Intn(length - opts.minConsecutiveASCIILen)
-	}
-	util.ToPrintableChar(p, beginIdx, beginIdx+opts.minConsecutiveASCIILen)
-	return p
+	panic("Detailed padding options are not provided")
 }

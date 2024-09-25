@@ -58,3 +58,51 @@ func TestToCommon64Set(t *testing.T) {
 		}
 	}
 }
+
+func TestMaxConsecutivePrintableLength(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []byte
+		expected int
+	}{
+		{
+			name:     "empty slice",
+			input:    []byte{},
+			expected: 0,
+		},
+		{
+			name:     "all printable",
+			input:    []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"),
+			expected: 62,
+		},
+		{
+			name:     "no printable",
+			input:    []byte{0x01, 0x02, 0x03, 0x04},
+			expected: 0,
+		},
+		{
+			name:     "mixed printable and non-printable",
+			input:    []byte{0x01, 'A', 'B', 0x02, 'C', 'D', 'E', 0x03, 'F', 'G'},
+			expected: 3,
+		},
+		{
+			name:     "printable at the end",
+			input:    []byte{0x01, 0x02, 'A', 'B', 'C'},
+			expected: 3,
+		},
+		{
+			name:     "printable at the beginning",
+			input:    []byte{'A', 'B', 'C', 0x01, 0x02},
+			expected: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := MaxConsecutivePrintableLength(tt.input)
+			if result != tt.expected {
+				t.Errorf("MaxConsecutivePrintableLength(%v) = %d, want %d", tt.name, result, tt.expected)
+			}
+		})
+	}
+}

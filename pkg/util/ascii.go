@@ -77,3 +77,23 @@ func ToCommon64Set(b []byte, beginIdx, endIdx int) {
 		b[i] = Common64Set[setIdx]
 	}
 }
+
+// MaxConsecutivePrintableLength returns the length of the maximum consecutive bytes
+// that are printable.
+func MaxConsecutivePrintableLength(b []byte) int {
+	maxLen := 0
+	currentLen := 0
+
+	for _, c := range b {
+		if c >= PrintableCharSub && c <= PrintableCharSup {
+			currentLen++
+			if currentLen > maxLen {
+				maxLen = currentLen
+			}
+		} else {
+			currentLen = 0
+		}
+	}
+
+	return maxLen
+}

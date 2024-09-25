@@ -252,8 +252,7 @@ func (t *TCPUnderlay) onOpenSessionRequest(seg *segment) error {
 	if found {
 		return fmt.Errorf("%v received open session request, but session ID %d is already used", t, sessionID)
 	}
-	session := NewSession(sessionID, false, t.MTU())
-	session.users = t.users
+	session := NewSession(sessionID, false, t.MTU(), t.users)
 	t.AddSession(session, nil)
 	session.recvChan <- seg
 	t.readySessions <- session
@@ -506,8 +505,10 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 	if ss, ok := toSessionStruct(seg.metadata); ok {
 		maxPaddingSize := MaxPaddingSize(t.mtu, t.IPVersion(), t.TransportProtocol(), int(ss.payloadLen), 0)
 		padding := newPadding(paddingOpts{
-			maxLen:                 maxPaddingSize,
-			minConsecutiveASCIILen: mathext.Min(maxPaddingSize, recommendedConsecutiveASCIILen),
+			maxLen: maxPaddingSize,
+			ascii: &asciiPaddingOpts{
+				minConsecutiveASCIILen: mathext.Min(maxPaddingSize, recommendedConsecutiveASCIILen),
+			},
 		})
 		ss.suffixLen = uint8(len(padding))
 		if log.IsLevelEnabled(log.TraceLevel) {
@@ -543,9 +544,11 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 	} else if das, ok := toDataAckStruct(seg.metadata); ok {
 		padding1 := newPadding(paddingOpts{
 			maxLen: MaxPaddingSize(t.mtu, t.IPVersion(), t.TransportProtocol(), int(das.payloadLen), 0),
+			ascii:  &asciiPaddingOpts{},
 		})
 		padding2 := newPadding(paddingOpts{
 			maxLen: MaxPaddingSize(t.mtu, t.IPVersion(), t.TransportProtocol(), int(das.payloadLen), len(padding1)),
+			ascii:  &asciiPaddingOpts{},
 		})
 		das.prefixLen = uint8(len(padding1))
 		das.suffixLen = uint8(len(padding2))
@@ -609,18 +612,18 @@ func (t *TCPUnderlay) maybeInitSendBlockCipher() error {
 func (t *TCPUnderlay) drainAfterError() {
 	// Set TCP read deadline to avoid being blocked forever.
 	timeoutMillis := rng.IntRange(1000, 10000)
-	timeoutMillis += rng.FixedInt(50000) // Maximum 60 seconds.
+	timeoutMillis += rng.FixedIntPerHost(50000) // Maximum 60 seconds.
 	t.conn.SetReadDeadline(time.Now().Add(time.Duration(timeoutMillis) * time.Millisecond))
 
 	// Determine the read buffer size.
-	bufSizeType := rng.FixedInt(4)
+	bufSizeType := rng.FixedIntPerHost(4)
 	bufSize := 1 << (12 + bufSizeType) // 4, 8, 16, 32 KB
 	buf := make([]byte, bufSize)
 
 	// Determine the number of bytes to read.
 	// Minimum 2 bytes, maximum bufSize bytes.
 	minRead := rng.IntRange(2, bufSize-254)
-	minRead += rng.FixedInt(256)
+	minRead += rng.FixedIntPerHost(256)
 
 	n, err := io.ReadAtLeast(t.conn, buf, minRead)
 	if err != nil {

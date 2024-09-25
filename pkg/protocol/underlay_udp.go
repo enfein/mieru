@@ -293,8 +293,7 @@ func (u *UDPUnderlay) onOpenSessionRequest(seg *segment, remoteAddr net.Addr) er
 		log.Debugf("%v received open session request, but session ID %d is already used", u, sessionID)
 		return nil
 	}
-	session := NewSession(sessionID, false, u.MTU())
-	session.users = u.users
+	session := NewSession(sessionID, false, u.MTU(), u.users)
 	u.AddSession(session, remoteAddr)
 	session.recvChan <- seg
 	u.readySessions <- session
@@ -652,8 +651,10 @@ func (u *UDPUnderlay) writeOneSegment(seg *segment, addr *net.UDPAddr) error {
 	if ss, ok := toSessionStruct(seg.metadata); ok {
 		maxPaddingSize := MaxPaddingSize(u.mtu, u.IPVersion(), u.TransportProtocol(), int(ss.payloadLen), 0)
 		padding := newPadding(paddingOpts{
-			maxLen:                 maxPaddingSize,
-			minConsecutiveASCIILen: mathext.Min(maxPaddingSize, recommendedConsecutiveASCIILen),
+			maxLen: maxPaddingSize,
+			ascii: &asciiPaddingOpts{
+				minConsecutiveASCIILen: mathext.Min(maxPaddingSize, recommendedConsecutiveASCIILen),
+			},
 		})
 		ss.suffixLen = uint8(len(padding))
 		if log.IsLevelEnabled(log.TraceLevel) {
@@ -687,9 +688,11 @@ func (u *UDPUnderlay) writeOneSegment(seg *segment, addr *net.UDPAddr) error {
 	} else if das, ok := toDataAckStruct(seg.metadata); ok {
 		padding1 := newPadding(paddingOpts{
 			maxLen: MaxPaddingSize(u.mtu, u.IPVersion(), u.TransportProtocol(), int(das.payloadLen), 0),
+			ascii:  &asciiPaddingOpts{},
 		})
 		padding2 := newPadding(paddingOpts{
 			maxLen: MaxPaddingSize(u.mtu, u.IPVersion(), u.TransportProtocol(), int(das.payloadLen), len(padding1)),
+			ascii:  &asciiPaddingOpts{},
 		})
 		das.prefixLen = uint8(len(padding1))
 		das.suffixLen = uint8(len(padding2))

@@ -77,15 +77,15 @@ func (ss sessionState) String() string {
 
 type Session struct {
 	conn  Underlay           // underlay connection
-	block cipher.BlockCipher // cipher to encrypt and decrypt data
+	block cipher.BlockCipher // cipher to decrypt data
 
-	id         uint32       // session ID number
-	isClient   bool         // if this session is owned by client
-	mtu        int          // L2 maxinum transmission unit
-	remoteAddr net.Addr     // specify remote network address, used by UDP
-	state      sessionState // session state
-	status     statusCode   // session status
-	users      map[string]*appctlpb.User
+	id         uint32                    // session ID number
+	isClient   bool                      // if this session is owned by client
+	mtu        int                       // L2 maxinum transmission unit
+	remoteAddr net.Addr                  // specify remote network address, used by UDP
+	state      sessionState              // session state
+	status     statusCode                // session status
+	users      map[string]*appctlpb.User // all registered users
 
 	ready         chan struct{} // indicate the session is ready to use
 	done          chan struct{} // indicate the session is complete
@@ -126,7 +126,7 @@ type Session struct {
 var _ net.Conn = &Session{}
 
 // NewSession creates a new session.
-func NewSession(id uint32, isClient bool, mtu int) *Session {
+func NewSession(id uint32, isClient bool, mtu int, users map[string]*appctlpb.User) *Session {
 	rttStat := congestion.NewRTTStats()
 	rttStat.SetMaxAckDelay(outputLoopInterval)
 	rttStat.SetRTOMultiplier(txTimeoutBackOff)
@@ -138,6 +138,7 @@ func NewSession(id uint32, isClient bool, mtu int) *Session {
 		mtu:                 mtu,
 		state:               sessionInit,
 		status:              statusOK,
+		users:               users,
 		ready:               make(chan struct{}),
 		done:                make(chan struct{}),
 		readDeadline:        time.Time{},
@@ -746,8 +747,20 @@ func (s *Session) input(seg *segment) error {
 			return stderror.ErrInvalidArgument
 		}
 	}
+
 	if seg.block != nil {
+		// Validate cipher block user name is consistent.
+		if s.block != nil {
+			prevUserName := s.block.BlockContext().UserName
+			nextUserName := seg.block.BlockContext().UserName
+			if prevUserName != "" && nextUserName != "" && prevUserName != nextUserName {
+				panic(fmt.Sprintf("%v cipher block user name %q is different from segment cipher block user name %q", s, prevUserName, nextUserName))
+			}
+		}
+
 		s.block = seg.block
+
+		// Register server per user metrics.
 		if !s.isClient {
 			if s.uploadBytes == nil && s.block.BlockContext().UserName != "" {
 				s.uploadBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, s.block.BlockContext().UserName), metrics.UserMetricUploadBytes, metrics.COUNTER_TIME_SERIES)
@@ -757,6 +770,7 @@ func (s *Session) input(seg *segment) error {
 			}
 		}
 	}
+
 	s.lastRXTime = time.Now()
 	if protocol == openSessionRequest || protocol == openSessionResponse || protocol == dataServerToClient || protocol == dataClientToServer {
 		return s.inputData(seg)

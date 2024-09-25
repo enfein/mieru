@@ -290,7 +290,7 @@ func (m *Mux) DialContext(ctx context.Context) (net.Conn, error) {
 	defer func() {
 		underlay.Scheduler().DecPending()
 	}()
-	session := NewSession(mrand.Uint32(), true, underlay.MTU())
+	session := NewSession(mrand.Uint32(), true, underlay.MTU(), m.users)
 	if err := underlay.AddSession(session, nil); err != nil {
 		return nil, fmt.Errorf("AddSession() failed: %v", err)
 	}
