@@ -753,8 +753,14 @@ func (s *Session) input(seg *segment) error {
 		if s.block != nil {
 			prevUserName := s.block.BlockContext().UserName
 			nextUserName := seg.block.BlockContext().UserName
-			if prevUserName != "" && nextUserName != "" && prevUserName != nextUserName {
-				panic(fmt.Sprintf("%v cipher block user name %q is different from segment cipher block user name %q", s, prevUserName, nextUserName))
+			if prevUserName == "" {
+				panic(fmt.Sprintf("%v cipher block user name is not set", s))
+			}
+			if nextUserName == "" {
+				panic(fmt.Sprintf("%v cipher block user name is not set", seg))
+			}
+			if prevUserName != nextUserName {
+				panic(fmt.Sprintf("%v cipher block user name %q is different from %v cipher block user name %q", s, prevUserName, seg, nextUserName))
 			}
 		}
 
@@ -762,10 +768,10 @@ func (s *Session) input(seg *segment) error {
 
 		// Register server per user metrics.
 		if !s.isClient {
-			if s.uploadBytes == nil && s.block.BlockContext().UserName != "" {
+			if s.uploadBytes == nil {
 				s.uploadBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, s.block.BlockContext().UserName), metrics.UserMetricUploadBytes, metrics.COUNTER_TIME_SERIES)
 			}
-			if s.downloadBytes == nil && s.block.BlockContext().UserName != "" {
+			if s.downloadBytes == nil {
 				s.downloadBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, s.block.BlockContext().UserName), metrics.UserMetricDownloadBytes, metrics.COUNTER_TIME_SERIES)
 			}
 		}

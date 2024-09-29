@@ -25,13 +25,16 @@ import (
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
-	"github.com/enfein/mieru/pkg/mathext"
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/replay"
 	"github.com/enfein/mieru/pkg/rng"
 	"github.com/enfein/mieru/pkg/stderror"
 	"github.com/enfein/mieru/pkg/util"
 	"github.com/enfein/mieru/pkg/util/sockopts"
+)
+
+const (
+	tcpOverhead = MetadataLength + cipher.DefaultOverhead*2
 )
 
 type TCPUnderlay struct {
@@ -502,23 +505,21 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 	t.sendMutex.Lock()
 	defer t.sendMutex.Unlock()
 
+	if err := t.maybeInitSendBlockCipher(); err != nil {
+		return fmt.Errorf("maybeInitSendBlockCipher() failed: %w", err)
+	}
+
 	if ss, ok := toSessionStruct(seg.metadata); ok {
 		maxPaddingSize := MaxPaddingSize(t.mtu, t.IPVersion(), t.TransportProtocol(), int(ss.payloadLen), 0)
-		padding := newPadding(paddingOpts{
-			maxLen: maxPaddingSize,
-			ascii: &asciiPaddingOpts{
-				minConsecutiveASCIILen: mathext.Min(maxPaddingSize, recommendedConsecutiveASCIILen),
-			},
-		})
+		padding := newPadding(
+			buildRecommendedPaddingOpts(maxPaddingSize, tcpOverhead+int(ss.payloadLen), t.send.BlockContext().UserName),
+		)
 		ss.suffixLen = uint8(len(padding))
 		if log.IsLevelEnabled(log.TraceLevel) {
 			log.Tracef("%v is sending %v", t, seg)
 		}
 
 		plaintextMetadata := seg.metadata.Marshal()
-		if err := t.maybeInitSendBlockCipher(); err != nil {
-			return fmt.Errorf("maybeInitSendBlockCipher() failed: %w", err)
-		}
 		encryptedMetadata, err := t.send.Encrypt(plaintextMetadata)
 		if err != nil {
 			return fmt.Errorf("Encrypt() failed: %w", err)

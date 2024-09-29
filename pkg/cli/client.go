@@ -473,7 +473,7 @@ var clientRunFunc = func(s []string) error {
 	} else {
 		hashedPassword = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
 	}
-	mux = mux.SetClientPassword(hashedPassword)
+	mux = mux.SetClientUserNamePassword(user.GetName(), hashedPassword)
 	mtu := util.DefaultMTU
 	if activeProfile.GetMtu() != 0 {
 		mtu = int(activeProfile.GetMtu())

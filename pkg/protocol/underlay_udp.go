@@ -26,7 +26,6 @@ import (
 	"github.com/enfein/mieru/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/pkg/cipher"
 	"github.com/enfein/mieru/pkg/log"
-	"github.com/enfein/mieru/pkg/mathext"
 	"github.com/enfein/mieru/pkg/metrics"
 	"github.com/enfein/mieru/pkg/replay"
 	"github.com/enfein/mieru/pkg/stderror"
@@ -648,14 +647,15 @@ func (u *UDPUnderlay) writeOneSegment(seg *segment, addr *net.UDPAddr) error {
 		}
 	}
 
+	if blockCipher == nil {
+		panic(fmt.Sprintf("%v cipher block is not ready", u))
+	}
+
 	if ss, ok := toSessionStruct(seg.metadata); ok {
 		maxPaddingSize := MaxPaddingSize(u.mtu, u.IPVersion(), u.TransportProtocol(), int(ss.payloadLen), 0)
-		padding := newPadding(paddingOpts{
-			maxLen: maxPaddingSize,
-			ascii: &asciiPaddingOpts{
-				minConsecutiveASCIILen: mathext.Min(maxPaddingSize, recommendedConsecutiveASCIILen),
-			},
-		})
+		padding := newPadding(
+			buildRecommendedPaddingOpts(maxPaddingSize, udpOverhead+int(ss.payloadLen), blockCipher.BlockContext().UserName),
+		)
 		ss.suffixLen = uint8(len(padding))
 		if log.IsLevelEnabled(log.TraceLevel) {
 			log.Tracef("%v is sending %v", u, seg)

@@ -15,12 +15,18 @@
 
 package util
 
+import "fmt"
+
 // BitDistribution describes the probability of bit 0 and bit 1 in a byte array.
 type BitDistribution struct {
 	Bit0      float64
 	Bit1      float64
 	Bit0Count int
 	Bit1Count int
+}
+
+func (bd BitDistribution) String() string {
+	return fmt.Sprintf("BitDistribution{Bit0=%f, Bit1=%f, Bit0Count=%d, Bit1Count=%d}", bd.Bit0, bd.Bit1, bd.Bit0Count, bd.Bit1Count)
 }
 
 // ToBitDistribution returns the BitDistribution from a byte array.

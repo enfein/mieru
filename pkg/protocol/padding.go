@@ -27,7 +27,7 @@ import (
 
 var (
 	recommendedConsecutiveASCIILen = 24 + rng.FixedIntPerHost(17)
-	recommendedTargetProbability   = 0.375
+	recommendedTargetProbability   = 0.325
 )
 
 type paddingOpts struct {
@@ -56,6 +56,35 @@ type entropyPaddingOpts struct {
 	// We will try best effort to meet the target with the given
 	// maximum padding length.
 	targetProbability float64
+}
+
+func buildRecommendedPaddingOpts(maxLen, randomDataLen int, strategySource string) paddingOpts {
+	// strategySource decides the padding strategy.
+	strategy := rng.FixedInt(2, strategySource)
+	if strategy == 0 {
+		// Use ASCII.
+		return paddingOpts{
+			maxLen: maxLen,
+			ascii: &asciiPaddingOpts{
+				minConsecutiveASCIILen: mathext.Min(maxLen, recommendedConsecutiveASCIILen),
+			},
+		}
+	} else {
+		// Use entropy.
+		randomData := make([]byte, randomDataLen)
+		for {
+			if _, err := crand.Read(randomData); err == nil {
+				break
+			}
+		}
+		return paddingOpts{
+			maxLen: maxLen,
+			entropy: &entropyPaddingOpts{
+				existingData:      randomData,
+				targetProbability: recommendedTargetProbability,
+			},
+		}
+	}
 }
 
 func newPadding(opts paddingOpts) []byte {

@@ -54,6 +54,7 @@ type Mux struct {
 	cleaner     *time.Ticker
 
 	// ---- client fields ----
+	username        string
 	password        []byte
 	multiplexFactor int
 
@@ -100,8 +101,8 @@ func NewMux(isClinet bool) *Mux {
 	return mux
 }
 
-// SetClientPassword panics if the mux is already started.
-func (m *Mux) SetClientPassword(password []byte) *Mux {
+// SetClientUserNamePassword panics if the mux is already started.
+func (m *Mux) SetClientUserNamePassword(username string, password []byte) *Mux {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if !m.isClient {
@@ -110,6 +111,7 @@ func (m *Mux) SetClientPassword(password []byte) *Mux {
 	if m.used {
 		panic("Can't set client password after mux is used")
 	}
+	m.username = username
 	m.password = password
 	return m
 }
@@ -545,6 +547,9 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 		if err != nil {
 			return nil, fmt.Errorf("cipher.BlockCipherFromPassword() failed: %v", err)
 		}
+		block.SetBlockContext(cipher.BlockContext{
+			UserName: m.username,
+		})
 		underlay, err = NewTCPUnderlay(ctx, p.RemoteAddr().Network(), "", p.RemoteAddr().String(), p.MTU(), block)
 		if err != nil {
 			return nil, fmt.Errorf("NewTCPUnderlay() failed: %v", err)
@@ -554,6 +559,9 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 		if err != nil {
 			return nil, fmt.Errorf("cipher.BlockCipherFromPassword() failed: %v", err)
 		}
+		block.SetBlockContext(cipher.BlockContext{
+			UserName: m.username,
+		})
 		underlay, err = NewUDPUnderlay(ctx, p.RemoteAddr().Network(), "", p.RemoteAddr().String(), p.MTU(), block)
 		if err != nil {
 			return nil, fmt.Errorf("NewUDPUnderlay() failed: %v", err)

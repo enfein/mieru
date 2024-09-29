@@ -43,7 +43,7 @@ var users = map[string]*appctlpb.User{
 
 func runClient(t *testing.T, properties UnderlayProperties, username, password []byte, concurrent int) {
 	clientMux := NewMux(true).
-		SetClientPassword(cipher.HashPassword(password, username)).
+		SetClientUserNamePassword(string(username), cipher.HashPassword(password, username)).
 		SetClientMultiplexFactor(2).
 		SetEndpoints([]UnderlayProperties{properties})
 
