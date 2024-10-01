@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"net/url"
 
-	pb "github.com/enfein/mieru/pkg/appctl/appctlpb"
-	"github.com/enfein/mieru/pkg/stderror"
+	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
+	"github.com/enfein/mieru/v3/pkg/stderror"
 	"google.golang.org/protobuf/proto"
 )
 

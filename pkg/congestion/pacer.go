@@ -18,7 +18,7 @@ package congestion
 import (
 	"time"
 
-	"github.com/enfein/mieru/pkg/mathext"
+	"github.com/enfein/mieru/v3/pkg/mathext"
 )
 
 // Pacer limits the speed of sending packets.

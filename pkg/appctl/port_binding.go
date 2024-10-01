@@ -21,7 +21,7 @@ import (
 	"sort"
 	"strconv"
 
-	pb "github.com/enfein/mieru/pkg/appctl/appctlpb"
+	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"google.golang.org/protobuf/proto"
 )
 

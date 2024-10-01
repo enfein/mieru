@@ -18,8 +18,8 @@ package cli
 import (
 	"fmt"
 
-	"github.com/enfein/mieru/pkg/log"
-	"github.com/enfein/mieru/pkg/version"
+	"github.com/enfein/mieru/v3/pkg/log"
+	"github.com/enfein/mieru/v3/pkg/version"
 )
 
 var versionFunc = func(s []string) error {

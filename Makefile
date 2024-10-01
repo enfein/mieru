@@ -32,7 +32,7 @@ PROJECT_NAME=$(shell basename "${ROOT}")
 # - pkg/version/current.go
 #
 # Use `tools/bump_version.sh` script to change all those files at one shot.
-VERSION="3.5.0"
+VERSION="3.5.1"
 
 # Build binaries and installation packages.
 .PHONY: build
@@ -51,6 +51,7 @@ lib: fmt vet
 
 # Run benchmark.
 .PHONY: bench
+bench:
 	CGO_ENABLED=0 go test -bench=. -benchtime=5s ./pkg/cipher
 
 # Generate vendor directory.

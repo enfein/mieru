@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/enfein/mieru/pkg/version"
+	"github.com/enfein/mieru/v3/pkg/version"
 )
 
 var fixedValues sync.Map

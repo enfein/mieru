@@ -15,7 +15,7 @@
 
 package congestion
 
-import "github.com/enfein/mieru/pkg/mathext"
+import "github.com/enfein/mieru/v3/pkg/mathext"
 
 // Implements Kathleen Nichols' algorithm for tracking the minimum (or maximum)
 // estimate of a stream of samples over some fixed time interval. (E.g.,

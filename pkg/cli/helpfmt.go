@@ -15,7 +15,7 @@
 
 package cli
 
-import "github.com/enfein/mieru/pkg/log"
+import "github.com/enfein/mieru/v3/pkg/log"
 
 type helpFormatter struct {
 	appName  string

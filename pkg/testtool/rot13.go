@@ -21,7 +21,7 @@ import (
 	"net"
 	"regexp"
 
-	"github.com/enfein/mieru/pkg/stderror"
+	"github.com/enfein/mieru/v3/pkg/stderror"
 )
 
 // TestHelperGenRot13Input generates valid rotate-13 input.

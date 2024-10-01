@@ -15,7 +15,7 @@
 
 package egress
 
-import "github.com/enfein/mieru/pkg/appctl/appctlpb"
+import "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 
 type Input struct {
 	Protocol appctlpb.ProxyProtocol

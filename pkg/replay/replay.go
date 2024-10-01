@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/enfein/mieru/pkg/metrics"
+	"github.com/enfein/mieru/v3/pkg/metrics"
 )
 
 const (

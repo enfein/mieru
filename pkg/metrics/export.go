@@ -22,9 +22,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/enfein/mieru/pkg/log"
-	"github.com/enfein/mieru/pkg/mathext"
-	pb "github.com/enfein/mieru/pkg/metrics/metricspb"
+	"github.com/enfein/mieru/v3/pkg/log"
+	"github.com/enfein/mieru/v3/pkg/mathext"
+	pb "github.com/enfein/mieru/v3/pkg/metrics/metricspb"
 	"google.golang.org/protobuf/proto"
 )
 

@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/enfein/mieru/pkg/util"
+	"github.com/enfein/mieru/v3/pkg/util"
 )
 
 // NewTestHTTPServer starts a new HTTP server at a random port.

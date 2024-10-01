@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/enfein/mieru/pkg/congestion"
-	"github.com/enfein/mieru/pkg/log"
-	"github.com/enfein/mieru/pkg/testtool"
+	"github.com/enfein/mieru/v3/pkg/congestion"
+	"github.com/enfein/mieru/v3/pkg/log"
+	"github.com/enfein/mieru/v3/pkg/testtool"
 )
 
 type sender struct {

@@ -1,4 +1,4 @@
-module github.com/enfein/mieru
+module github.com/enfein/mieru/v3
 
 go 1.20
 

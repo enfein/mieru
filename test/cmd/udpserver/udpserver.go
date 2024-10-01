@@ -23,8 +23,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/enfein/mieru/pkg/log"
-	"github.com/enfein/mieru/pkg/testtool"
+	"github.com/enfein/mieru/v3/pkg/log"
+	"github.com/enfein/mieru/v3/pkg/testtool"
 )
 
 var port = flag.Int("port", 0, "UDP server listening port.")

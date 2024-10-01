@@ -24,7 +24,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/enfein/mieru/pkg/log"
+	"github.com/enfein/mieru/v3/pkg/log"
 )
 
 type MetricType uint8

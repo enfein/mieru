@@ -18,7 +18,7 @@ package congestion
 import (
 	"sync"
 
-	"github.com/enfein/mieru/pkg/deque"
+	"github.com/enfein/mieru/v3/pkg/deque"
 )
 
 // PacketNumberIndexedQueue is a queue of mostly continuous numbered entries

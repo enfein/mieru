@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/enfein/mieru/pkg/testtool"
-	"github.com/enfein/mieru/pkg/util"
+	"github.com/enfein/mieru/v3/pkg/testtool"
+	"github.com/enfein/mieru/v3/pkg/util"
 )
 
 func newTestSocksServer(port int) {

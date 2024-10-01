@@ -21,8 +21,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/enfein/mieru/pkg/log"
-	"github.com/enfein/mieru/pkg/mathext"
+	"github.com/enfein/mieru/v3/pkg/log"
+	"github.com/enfein/mieru/v3/pkg/mathext"
 )
 
 type bbrMode int

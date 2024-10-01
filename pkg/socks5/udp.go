@@ -20,7 +20,7 @@ import (
 	"io"
 	"net"
 
-	"github.com/enfein/mieru/pkg/stderror"
+	"github.com/enfein/mieru/v3/pkg/stderror"
 )
 
 // UDPAssociateTunnelConn keeps the boundary of UDP packets when transmitted

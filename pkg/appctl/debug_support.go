@@ -8,7 +8,7 @@ import (
 	"runtime/pprof"
 	"sync"
 
-	"github.com/enfein/mieru/pkg/stderror"
+	"github.com/enfein/mieru/v3/pkg/stderror"
 )
 
 var (

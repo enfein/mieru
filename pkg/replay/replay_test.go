@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/enfein/mieru/pkg/replay"
+	"github.com/enfein/mieru/v3/pkg/replay"
 )
 
 func TestDuplicate(t *testing.T) {

@@ -16,8 +16,8 @@
 package egress
 
 import (
-	"github.com/enfein/mieru/pkg/appctl/appctlpb"
-	"github.com/enfein/mieru/pkg/log"
+	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
+	"github.com/enfein/mieru/v3/pkg/log"
 )
 
 type Socks5Controller struct {

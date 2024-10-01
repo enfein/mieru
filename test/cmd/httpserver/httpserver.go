@@ -29,7 +29,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/enfein/mieru/pkg/log"
+	"github.com/enfein/mieru/v3/pkg/log"
 )
 
 var (

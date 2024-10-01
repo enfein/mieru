@@ -19,8 +19,8 @@ import (
 	"os"
 	"testing"
 
-	pb "github.com/enfein/mieru/pkg/appctl/appctlpb"
-	"github.com/enfein/mieru/pkg/util"
+	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
+	"github.com/enfein/mieru/v3/pkg/util"
 	"google.golang.org/protobuf/proto"
 )
 

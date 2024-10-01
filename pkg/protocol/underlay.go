@@ -19,8 +19,8 @@ import (
 	"context"
 	"net"
 
-	"github.com/enfein/mieru/pkg/metrics"
-	"github.com/enfein/mieru/pkg/util"
+	"github.com/enfein/mieru/v3/pkg/metrics"
+	"github.com/enfein/mieru/v3/pkg/util"
 )
 
 var (

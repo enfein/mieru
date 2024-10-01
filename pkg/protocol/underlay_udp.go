@@ -23,14 +23,14 @@ import (
 	"net"
 	"time"
 
-	"github.com/enfein/mieru/pkg/appctl/appctlpb"
-	"github.com/enfein/mieru/pkg/cipher"
-	"github.com/enfein/mieru/pkg/log"
-	"github.com/enfein/mieru/pkg/metrics"
-	"github.com/enfein/mieru/pkg/replay"
-	"github.com/enfein/mieru/pkg/stderror"
-	"github.com/enfein/mieru/pkg/util"
-	"github.com/enfein/mieru/pkg/util/sockopts"
+	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
+	"github.com/enfein/mieru/v3/pkg/cipher"
+	"github.com/enfein/mieru/v3/pkg/log"
+	"github.com/enfein/mieru/v3/pkg/metrics"
+	"github.com/enfein/mieru/v3/pkg/replay"
+	"github.com/enfein/mieru/v3/pkg/stderror"
+	"github.com/enfein/mieru/v3/pkg/util"
+	"github.com/enfein/mieru/v3/pkg/util/sockopts"
 )
 
 const (

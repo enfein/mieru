@@ -20,8 +20,8 @@ import (
 	"net"
 	"sync/atomic"
 
-	"github.com/enfein/mieru/pkg/log"
-	"github.com/enfein/mieru/pkg/stderror"
+	"github.com/enfein/mieru/v3/pkg/log"
+	"github.com/enfein/mieru/v3/pkg/stderror"
 )
 
 // BidiCopyUDP does bi-directional data copy between a proxy client UDP endpoint

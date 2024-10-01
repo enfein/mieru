@@ -10,9 +10,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/enfein/mieru/pkg/log"
-	"github.com/enfein/mieru/pkg/stderror"
-	"github.com/enfein/mieru/pkg/util"
+	"github.com/enfein/mieru/v3/pkg/log"
+	"github.com/enfein/mieru/v3/pkg/stderror"
+	"github.com/enfein/mieru/v3/pkg/util"
 )
 
 // socks5 command types.

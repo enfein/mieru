@@ -20,8 +20,8 @@ import (
 	mrand "math/rand"
 	"testing"
 
-	"github.com/enfein/mieru/pkg/appctl/appctlpb"
-	"github.com/enfein/mieru/pkg/egress"
+	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
+	"github.com/enfein/mieru/v3/pkg/egress"
 	"google.golang.org/protobuf/proto"
 )
 

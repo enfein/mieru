@@ -21,7 +21,7 @@ import (
 	mrand "math/rand"
 	"testing"
 
-	"github.com/enfein/mieru/pkg/util"
+	"github.com/enfein/mieru/v3/pkg/util"
 )
 
 func TestDefaultNonceSize(t *testing.T) {

@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/enfein/mieru/pkg/util"
+	"github.com/enfein/mieru/v3/pkg/util"
 )
 
 // BufPipe is like net.Pipe() but with an internal buffer.

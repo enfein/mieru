@@ -18,8 +18,8 @@ package appctl
 import (
 	"encoding/hex"
 
-	pb "github.com/enfein/mieru/pkg/appctl/appctlpb"
-	"github.com/enfein/mieru/pkg/cipher"
+	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
+	"github.com/enfein/mieru/v3/pkg/cipher"
 	"google.golang.org/protobuf/proto"
 )
 

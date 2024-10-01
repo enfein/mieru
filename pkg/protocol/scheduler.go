@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/enfein/mieru/pkg/rng"
+	"github.com/enfein/mieru/v3/pkg/rng"
 )
 
 var (

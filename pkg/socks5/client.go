@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/enfein/mieru/pkg/util"
+	"github.com/enfein/mieru/v3/pkg/util"
 )
 
 // Client contains socks5 client configuration.

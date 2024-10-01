@@ -27,7 +27,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/enfein/mieru/pkg/mathext"
+	"github.com/enfein/mieru/v3/pkg/mathext"
 )
 
 const (

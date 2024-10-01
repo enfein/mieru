@@ -19,7 +19,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 
-	"github.com/enfein/mieru/pkg/metrics"
+	"github.com/enfein/mieru/v3/pkg/metrics"
 )
 
 const (

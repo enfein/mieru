@@ -20,9 +20,9 @@ import (
 	"fmt"
 	mrand "math/rand"
 
-	"github.com/enfein/mieru/pkg/mathext"
-	"github.com/enfein/mieru/pkg/rng"
-	"github.com/enfein/mieru/pkg/util"
+	"github.com/enfein/mieru/v3/pkg/mathext"
+	"github.com/enfein/mieru/v3/pkg/rng"
+	"github.com/enfein/mieru/v3/pkg/util"
 )
 
 var (

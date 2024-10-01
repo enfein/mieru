@@ -15,6 +15,8 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: Create vendor directory
+        run: make vendor
       - name: Build binaries
         run: make build
       - name: Upload artifacts

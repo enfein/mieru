@@ -19,9 +19,9 @@ package main
 import (
 	"runtime/debug"
 
-	"github.com/enfein/mieru/pkg/appctl"
-	"github.com/enfein/mieru/pkg/cli"
-	"github.com/enfein/mieru/pkg/log"
+	"github.com/enfein/mieru/v3/pkg/appctl"
+	"github.com/enfein/mieru/v3/pkg/cli"
+	"github.com/enfein/mieru/v3/pkg/log"
 )
 
 func main() {

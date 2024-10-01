@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/enfein/mieru/pkg/mathext"
+	"github.com/enfein/mieru/v3/pkg/mathext"
 )
 
 type protocolType byte

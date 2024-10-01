@@ -20,7 +20,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/enfein/mieru/pkg/testtool"
+	"github.com/enfein/mieru/v3/pkg/testtool"
 )
 
 func TestUDPAssociateTunnelConn(t *testing.T) {

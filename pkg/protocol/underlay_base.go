@@ -22,9 +22,9 @@ import (
 	"net"
 	"sync"
 
-	"github.com/enfein/mieru/pkg/metrics"
-	"github.com/enfein/mieru/pkg/stderror"
-	"github.com/enfein/mieru/pkg/util"
+	"github.com/enfein/mieru/v3/pkg/metrics"
+	"github.com/enfein/mieru/v3/pkg/stderror"
+	"github.com/enfein/mieru/v3/pkg/util"
 )
 
 const sessionChanCapacity = 64

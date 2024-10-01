@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/enfein/mieru/pkg/util"
+	"github.com/enfein/mieru/v3/pkg/util"
 
 	"golang.org/x/crypto/chacha20poly1305"
 )

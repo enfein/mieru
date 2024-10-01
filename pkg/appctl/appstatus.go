@@ -18,7 +18,7 @@ package appctl
 import (
 	"sync/atomic"
 
-	pb "github.com/enfein/mieru/pkg/appctl/appctlpb"
+	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 )
 
 // currentAppStatus stores the current application running status.

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/enfein/mieru/pkg/util"
+	"github.com/enfein/mieru/v3/pkg/util"
 )
 
 func TestSocks5Connect(t *testing.T) {

@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	pb "github.com/enfein/mieru/pkg/metrics/metricspb"
+	pb "github.com/enfein/mieru/v3/pkg/metrics/metricspb"
 	"google.golang.org/protobuf/proto"
 )
 

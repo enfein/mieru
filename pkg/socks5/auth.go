@@ -20,8 +20,8 @@ import (
 	"io"
 	"net"
 
-	"github.com/enfein/mieru/pkg/appctl/appctlpb"
-	"github.com/enfein/mieru/pkg/util"
+	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
+	"github.com/enfein/mieru/v3/pkg/util"
 )
 
 const (
