@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 	"github.com/enfein/mieru/v3/pkg/testtool"
 )
@@ -98,7 +99,7 @@ func TestRequestUnsupportedCommand(t *testing.T) {
 		resp []byte
 	}{
 		{
-			[]byte{5, BindCmd, 0, 1, 127, 0, 0, 1, 0, 1},
+			[]byte{5, constant.Socks5BindCmd, 0, 1, 127, 0, 0, 1, 0, 1},
 			[]byte{5, commandNotSupported, 0, 1, 0, 0, 0, 0, 0, 0},
 		},
 	}

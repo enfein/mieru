@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/testtool"
 	"github.com/enfein/mieru/v3/pkg/util"
 )
@@ -50,7 +51,7 @@ func TestSocks5Anonymous(t *testing.T) {
 	}
 	newTestSocksServer(port)
 
-	dialSocksProxy := Dial(fmt.Sprintf("socks5://127.0.0.1:%d?timeout=5s", port), ConnectCmd)
+	dialSocksProxy := Dial(fmt.Sprintf("socks5://127.0.0.1:%d?timeout=5s", port), constant.Socks5ConnectCmd)
 	tr := &http.Transport{Dial: dialSocksProxy}
 	httpClient := &http.Client{Transport: tr}
 	resp, err := httpClient.Get(fmt.Sprintf("http://localhost" + httpTestServer.Addr))

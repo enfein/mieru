@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 	"github.com/enfein/mieru/v3/pkg/util"
@@ -85,7 +86,7 @@ func (p *HTTPProxy) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	}
 
 	// Dialer to socks5 server.
-	dialFunc := Dial(p.ProxyURI, ConnectCmd)
+	dialFunc := Dial(p.ProxyURI, constant.Socks5ConnectCmd)
 
 	if req.Method == http.MethodConnect {
 		// HTTPS

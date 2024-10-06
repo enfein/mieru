@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/util"
 )
 
@@ -27,7 +28,7 @@ type Client struct {
 // Argument proxyURI should be in the format: "socks5://user:password@127.0.0.1:1080?timeout=5s".
 // Only socks5 protocol is supported.
 func Dial(proxyURI string, cmdType byte) func(string, string) (net.Conn, error) {
-	if cmdType != ConnectCmd && cmdType != BindCmd && cmdType != UDPAssociateCmd {
+	if cmdType != constant.Socks5ConnectCmd && cmdType != constant.Socks5BindCmd && cmdType != constant.Socks5UDPAssociateCmd {
 		return dialError(fmt.Errorf("command type %d is invalid", cmdType))
 	}
 	cfg, err := parse(proxyURI)
@@ -48,7 +49,7 @@ func DialSocks5Proxy(c *Client) func(string, string) (net.Conn, *net.UDPConn, *n
 	if c.Host == "" {
 		return dialErrorLong(fmt.Errorf("socks5 client configuration has no proxy host"))
 	}
-	if c.CmdType != ConnectCmd && c.CmdType != BindCmd && c.CmdType != UDPAssociateCmd {
+	if c.CmdType != constant.Socks5ConnectCmd && c.CmdType != constant.Socks5BindCmd && c.CmdType != constant.Socks5UDPAssociateCmd {
 		return dialErrorLong(fmt.Errorf("socks5 client configuration command type %v is invalid", c.CmdType))
 	}
 	return func(_, targetAddr string) (net.Conn, *net.UDPConn, *net.UDPAddr, error) {
@@ -60,12 +61,12 @@ func DialSocks5Proxy(c *Client) func(string, string) (net.Conn, *net.UDPConn, *n
 func TransceiveUDPPacket(conn *net.UDPConn, proxyAddr, dstAddr *net.UDPAddr, payload []byte) ([]byte, error) {
 	header := []byte{0, 0, 0}
 	if dstAddr.IP.To4() != nil {
-		header = append(header, ipv4Address)
+		header = append(header, constant.Socks5IPv4Address)
 		header = append(header, dstAddr.IP.To4()...)
 		header = append(header, byte(dstAddr.Port>>8))
 		header = append(header, byte(dstAddr.Port))
 	} else {
-		header = append(header, ipv6Address)
+		header = append(header, constant.Socks5IPv6Address)
 		header = append(header, dstAddr.IP.To16()...)
 		header = append(header, byte(dstAddr.Port>>8))
 		header = append(header, byte(dstAddr.Port))
@@ -85,10 +86,10 @@ func TransceiveUDPPacket(conn *net.UDPConn, proxyAddr, dstAddr *net.UDPAddr, pay
 	if n <= 10 {
 		return nil, fmt.Errorf("UDP associate response is too short")
 	}
-	if buf[3] == ipv4Address {
+	if buf[3] == constant.Socks5IPv4Address {
 		// Header length is 10 bytes.
 		return buf[10:n], nil
-	} else if buf[3] == ipv6Address {
+	} else if buf[3] == constant.Socks5IPv6Address {
 		// Header length is 22 bytes.
 		return buf[22:n], nil
 	} else {
@@ -133,7 +134,7 @@ func (c *Client) dialSocks5Long(targetAddr string) (conn net.Conn, udpConn *net.
 
 	// Prepare the first request.
 	var req bytes.Buffer
-	version := byte(socks5Version)
+	version := byte(constant.Socks5Version)
 	method := byte(noAuth)
 	if c.Credential != nil {
 		method = userPassAuth
@@ -190,7 +191,7 @@ func (c *Client) dialSocks5Long(targetAddr string) (conn net.Conn, udpConn *net.
 
 	req.Reset()
 	req.Write([]byte{
-		socks5Version,
+		constant.Socks5Version,
 		c.CmdType,
 		0, // reserved, must be zero
 	})
@@ -198,17 +199,17 @@ func (c *Client) dialSocks5Long(targetAddr string) (conn net.Conn, udpConn *net.
 	hostIP := net.ParseIP(host)
 	if hostIP == nil {
 		// Domain name.
-		req.Write([]byte{fqdnAddress, byte(len(host))})
+		req.Write([]byte{constant.Socks5FQDNAddress, byte(len(host))})
 		req.Write([]byte(host))
 	} else {
 		hostIPv4 := hostIP.To4()
 		if hostIPv4 != nil {
 			// IPv4
-			req.Write([]byte{ipv4Address})
+			req.Write([]byte{constant.Socks5IPv4Address})
 			req.Write(hostIPv4)
 		} else {
 			// IPv6
-			req.Write([]byte{ipv6Address})
+			req.Write([]byte{constant.Socks5IPv6Address})
 			req.Write(hostIP)
 		}
 	}
@@ -227,14 +228,14 @@ func (c *Client) dialSocks5Long(targetAddr string) (conn net.Conn, udpConn *net.
 		return nil, nil, nil, fmt.Errorf("socks5 connection is not successful")
 	}
 
-	if c.CmdType == UDPAssociateCmd {
+	if c.CmdType == constant.Socks5UDPAssociateCmd {
 		// Get the endpoint to relay UDP packets.
 		var ip net.IP
 		switch resp[3] {
-		case ipv4Address:
+		case constant.Socks5IPv4Address:
 			ip = net.IP(resp[4:8])
 			port = uint16(resp[8])<<8 + uint16(resp[9])
-		case ipv6Address:
+		case constant.Socks5IPv6Address:
 			if len(resp) < 22 {
 				return nil, nil, nil, fmt.Errorf("server response is too short")
 			}

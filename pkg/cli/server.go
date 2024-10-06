@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/enfein/mieru/v3/pkg/appctl"
+	"github.com/enfein/mieru/v3/pkg/appctl/appctlgrpc"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
 	"github.com/enfein/mieru/v3/pkg/egress"
@@ -336,8 +337,8 @@ var serverRunFunc = func(s []string) error {
 		}
 		grpcServer := grpc.NewServer()
 		appctl.SetServerRPCServerRef(grpcServer)
-		appctlpb.RegisterServerLifecycleServiceServer(grpcServer, appctl.NewServerLifecycleService())
-		appctlpb.RegisterServerConfigServiceServer(grpcServer, appctl.NewServerConfigService())
+		appctlgrpc.RegisterServerLifecycleServiceServer(grpcServer, appctl.NewServerLifecycleService())
+		appctlgrpc.RegisterServerConfigServiceServer(grpcServer, appctl.NewServerConfigService())
 		close(appctl.ServerRPCServerStarted)
 		log.Infof("mita server daemon RPC server is running")
 		if err = grpcServer.Serve(rpcListener); err != nil {

@@ -20,6 +20,7 @@ import (
 	"io"
 	"net"
 
+	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/util"
 )
@@ -67,7 +68,7 @@ func (s *Server) handleAuthentication(conn net.Conn) error {
 		HandshakeErrors.Add(1)
 		return fmt.Errorf("get socks version failed: %w", err)
 	}
-	if version[0] != socks5Version {
+	if version[0] != constant.Socks5Version {
 		HandshakeErrors.Add(1)
 		return fmt.Errorf("unsupported socks version: %v", version)
 	}
@@ -102,7 +103,7 @@ func (s *Server) handleAuthentication(conn net.Conn) error {
 
 	if !requestNoAuth && !requestUserPassAuth {
 		HandshakeErrors.Add(1)
-		if _, err := conn.Write([]byte{socks5Version, noAcceptableAuth}); err != nil {
+		if _, err := conn.Write([]byte{constant.Socks5Version, noAcceptableAuth}); err != nil {
 			return fmt.Errorf("write authentication response (no acceptable methods) failed: %w", err)
 		}
 		return fmt.Errorf("socks5 client provided authentication is not supported by socks5 server")
@@ -113,7 +114,7 @@ func (s *Server) handleAuthentication(conn net.Conn) error {
 			HandshakeErrors.Add(1)
 			return fmt.Errorf("socks5 client requested no authentication, but user and password are required by socks5 server")
 		}
-		if _, err := conn.Write([]byte{socks5Version, noAuth}); err != nil {
+		if _, err := conn.Write([]byte{constant.Socks5Version, noAuth}); err != nil {
 			HandshakeErrors.Add(1)
 			return fmt.Errorf("write authentication response (no authentication required) failed: %w", err)
 		}
@@ -125,7 +126,7 @@ func (s *Server) handleAuthentication(conn net.Conn) error {
 		}
 
 		// Tell the client to use user password authentication.
-		if _, err := conn.Write([]byte{socks5Version, userPassAuth}); err != nil {
+		if _, err := conn.Write([]byte{constant.Socks5Version, userPassAuth}); err != nil {
 			HandshakeErrors.Add(1)
 			return fmt.Errorf("write user password authentication request failed: %w", err)
 		}
@@ -186,7 +187,7 @@ func (s *Server) dialWithAuthentication(proxyConn net.Conn, auth *appctlpb.Auth)
 
 	if auth == nil || auth.GetUser() == "" || auth.GetPassword() == "" {
 		// No authentication required.
-		if _, err := proxyConn.Write([]byte{socks5Version, 1, noAuth}); err != nil {
+		if _, err := proxyConn.Write([]byte{constant.Socks5Version, 1, noAuth}); err != nil {
 			HandshakeErrors.Add(1)
 			proxyConn.Close()
 			return fmt.Errorf("failed to write socks5 authentication header to egress proxy: %w", err)
@@ -198,14 +199,14 @@ func (s *Server) dialWithAuthentication(proxyConn net.Conn, auth *appctlpb.Auth)
 			proxyConn.Close()
 			return fmt.Errorf("failed to read socks5 authentication response from egress proxy: %w", err)
 		}
-		if resp[0] != socks5Version || resp[1] != noAuth {
+		if resp[0] != constant.Socks5Version || resp[1] != noAuth {
 			HandshakeErrors.Add(1)
 			proxyConn.Close()
 			return fmt.Errorf("got unexpected socks5 authentication response from egress proxy: %v", resp)
 		}
 	} else {
 		// User password authentication.
-		if _, err := proxyConn.Write([]byte{socks5Version, 1, userPassAuth}); err != nil {
+		if _, err := proxyConn.Write([]byte{constant.Socks5Version, 1, userPassAuth}); err != nil {
 			HandshakeErrors.Add(1)
 			proxyConn.Close()
 			return fmt.Errorf("failed to write socks5 authentication header to egress proxy: %w", err)
@@ -217,7 +218,7 @@ func (s *Server) dialWithAuthentication(proxyConn net.Conn, auth *appctlpb.Auth)
 			proxyConn.Close()
 			return fmt.Errorf("failed to read socks5 authentication response from egress proxy: %w", err)
 		}
-		if resp[0] != socks5Version || resp[1] != userPassAuth {
+		if resp[0] != constant.Socks5Version || resp[1] != userPassAuth {
 			HandshakeErrors.Add(1)
 			proxyConn.Close()
 			return fmt.Errorf("got unexpected socks5 authentication response from egress proxy: %v", resp)

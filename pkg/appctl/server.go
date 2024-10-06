@@ -27,6 +27,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/enfein/mieru/v3/pkg/appctl/appctlgrpc"
 	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/egress"
 	"github.com/enfein/mieru/v3/pkg/log"
@@ -83,7 +84,7 @@ func ServerUDS() string {
 
 // serverLifecycleService implements ServerLifecycleService defined in lifecycle.proto.
 type serverLifecycleService struct {
-	pb.UnimplementedServerLifecycleServiceServer
+	appctlgrpc.UnimplementedServerLifecycleServiceServer
 }
 
 func (s *serverLifecycleService) GetStatus(ctx context.Context, req *pb.Empty) (*pb.AppStatusMsg, error) {
@@ -285,7 +286,7 @@ func NewServerLifecycleService() *serverLifecycleService {
 }
 
 // NewServerLifecycleRPCClient creates a new ServerLifecycleService RPC client.
-func NewServerLifecycleRPCClient() (pb.ServerLifecycleServiceClient, error) {
+func NewServerLifecycleRPCClient() (appctlgrpc.ServerLifecycleServiceClient, error) {
 	rpcAddr := "unix://" + ServerUDS()
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), RPCTimeout)
 	defer cancelFunc()
@@ -293,12 +294,12 @@ func NewServerLifecycleRPCClient() (pb.ServerLifecycleServiceClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("grpc.DialContext() failed: %w", err)
 	}
-	return pb.NewServerLifecycleServiceClient(conn), nil
+	return appctlgrpc.NewServerLifecycleServiceClient(conn), nil
 }
 
 // serverConfigService implements ServerConfigService defined in servercfg.proto.
 type serverConfigService struct {
-	pb.UnimplementedServerConfigServiceServer
+	appctlgrpc.UnimplementedServerConfigServiceServer
 }
 
 func (s *serverConfigService) GetConfig(ctx context.Context, req *pb.Empty) (*pb.ServerConfig, error) {
@@ -326,7 +327,7 @@ func NewServerConfigService() *serverConfigService {
 }
 
 // NewServerConfigRPCClient creates a new ServerConfigService RPC client.
-func NewServerConfigRPCClient() (pb.ServerConfigServiceClient, error) {
+func NewServerConfigRPCClient() (appctlgrpc.ServerConfigServiceClient, error) {
 	rpcAddr := "unix://" + ServerUDS()
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), RPCTimeout)
 	defer cancelFunc()
@@ -334,7 +335,7 @@ func NewServerConfigRPCClient() (pb.ServerConfigServiceClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("grpc.DialContext() failed: %w", err)
 	}
-	return pb.NewServerConfigServiceClient(conn), nil
+	return appctlgrpc.NewServerConfigServiceClient(conn), nil
 }
 
 // GetServerStatusWithRPC gets server application status via ServerLifecycleService.GetStatus() RPC.

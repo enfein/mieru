@@ -20,7 +20,25 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
+
+func TestEnableAndDisableLogging(t *testing.T) {
+	if err := SetLoggingDuration(10 * time.Millisecond); err != nil {
+		t.Fatalf("SetLoggingDuration() failed: %v", err)
+	}
+	EnableLogging()
+	time.Sleep(50 * time.Millisecond) // Allow the log metrics loop to run.
+	DisableLogging()
+
+	// Disable logging is idempotent.
+	DisableLogging()
+	DisableLogging()
+
+	// Can enable and disable logging again.
+	EnableLogging()
+	DisableLogging()
+}
 
 func TestMetricsDump(t *testing.T) {
 	dumpPath := filepath.Join(t.TempDir(), "metrics.pb")

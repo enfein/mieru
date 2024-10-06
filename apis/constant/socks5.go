@@ -13,33 +13,23 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-syntax = "proto3";
+package constant
 
-package appctl;
+const (
+	// socks5 version number.
+	Socks5Version byte = 5
+)
 
-option go_package = "github.com/enfein/mieru/v3/pkg/appctl/appctlpb";
+// socks5 command types.
+const (
+	Socks5ConnectCmd      byte = 1
+	Socks5BindCmd         byte = 2
+	Socks5UDPAssociateCmd byte = 3
+)
 
-message Metrics {
-    // JSON dump of metrics.
-    optional string json = 1;
-}
-
-message ProfileSavePath {
-    // Location to save profile results.
-    optional string filePath = 1;
-}
-
-message SessionInfo {
-    // Table of sessions.
-    repeated string table = 1;
-}
-
-message ThreadDump {
-    // Full thread dump of the application.
-    optional string threadDump = 1;
-}
-
-message MemoryStatistics {
-    // JSON dump of memory statistics.
-    optional string json = 1;
-}
+// socks5 address types.
+const (
+	Socks5IPv4Address byte = 1
+	Socks5FQDNAddress byte = 3
+	Socks5IPv6Address byte = 4
+)

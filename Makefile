@@ -413,8 +413,8 @@ protobuf:
 	fi
 
 	PATH=${PATH}:"${ROOT}/tools/build" ${ROOT}/tools/build/protoc -I="${ROOT}/pkg/appctl/proto" \
-		--go_out="${ROOT}/pkg/appctl" --go_opt=module="github.com/enfein/mieru/pkg/appctl" \
-		--go-grpc_out="${ROOT}/pkg/appctl" --go-grpc_opt=module="github.com/enfein/mieru/pkg/appctl" \
+		--go_out="${ROOT}/pkg/appctl" --go_opt=module="github.com/enfein/mieru/v3/pkg/appctl" \
+		--go-grpc_out="${ROOT}/pkg/appctl" --go-grpc_opt=module="github.com/enfein/mieru/v3/pkg/appctl" \
 		--proto_path="${ROOT}/pkg" \
 		"${ROOT}/pkg/appctl/proto/base.proto" \
 		"${ROOT}/pkg/appctl/proto/clientcfg.proto" \
@@ -423,7 +423,7 @@ protobuf:
 		"${ROOT}/pkg/appctl/proto/servercfg.proto"
 
 	PATH=${PATH}:"${ROOT}/tools/build" ${ROOT}/tools/build/protoc -I="${ROOT}/pkg/metrics/proto" \
-		--go_out="${ROOT}/pkg/metrics" --go_opt=module="github.com/enfein/mieru/pkg/metrics" \
+		--go_out="${ROOT}/pkg/metrics" --go_opt=module="github.com/enfein/mieru/v3/pkg/metrics" \
 		--proto_path="${ROOT}/pkg" \
 		"${ROOT}/pkg/metrics/proto/metrics.proto"
 

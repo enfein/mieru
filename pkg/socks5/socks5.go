@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/egress"
 	"github.com/enfein/mieru/v3/pkg/log"
@@ -15,11 +16,6 @@ import (
 	"github.com/enfein/mieru/v3/pkg/protocol"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 	"github.com/enfein/mieru/v3/pkg/util"
-)
-
-const (
-	// socks5 version number.
-	socks5Version byte = 5
 )
 
 var (
@@ -231,7 +227,7 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 	request, err := s.newRequest(conn)
 	if err != nil {
 		HandshakeErrors.Add(1)
-		if errors.Is(err, errUnrecognizedAddrType) {
+		if errors.Is(err, model.ErrUnrecognizedAddrType) {
 			if err := sendReply(conn, addrTypeNotSupported, nil); err != nil {
 				return fmt.Errorf("failed to send reply: %w", err)
 			}

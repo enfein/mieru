@@ -37,28 +37,32 @@ var logMutex sync.Mutex
 
 func init() {
 	logDuration = time.Minute
-	stopLogging = make(chan struct{})
+	stopLogging = make(chan struct{}, 1) // doesn't block
 }
 
 // Enable metrics logging with the given time duration.
+// This function should not be called again before disable logging.
 func EnableLogging() {
 	logMutex.Lock()
 	defer logMutex.Unlock()
 	if logTicker == nil {
 		logTicker = time.NewTicker(logDuration)
-		go logMetricsLoop()
-		log.Infof("enabled metrics logging with duration %v", logDuration)
+	} else {
+		logTicker.Reset(logDuration)
 	}
+	go logMetricsLoop()
+	log.Infof("enabled metrics logging with duration %v", logDuration)
 }
 
 // Disable metrics logging.
 func DisableLogging() {
 	logMutex.Lock()
 	defer logMutex.Unlock()
-	stopLogging <- struct{}{}
+	if len(stopLogging) == 0 {
+		stopLogging <- struct{}{}
+	}
 	if logTicker != nil {
 		logTicker.Stop()
-		logTicker = nil
 		log.Infof("disabled metrics logging")
 	}
 }

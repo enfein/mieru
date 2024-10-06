@@ -21,7 +21,7 @@ import "base.proto";
 import "misc.proto";
 import "servercfg.proto";
 
-option go_package = "github.com/enfein/mieru/pkg/appctl/appctlpb";
+option go_package = "github.com/enfein/mieru/v3/pkg/appctl/appctlgrpc";
 
 service ClientLifecycleService {
     // Fetch client application status.

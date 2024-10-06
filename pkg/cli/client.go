@@ -31,7 +31,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/appctl"
+	"github.com/enfein/mieru/v3/pkg/appctl/appctlgrpc"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
 	"github.com/enfein/mieru/v3/pkg/log"
@@ -444,7 +446,7 @@ var clientRunFunc = func(s []string) error {
 			}
 			grpcServer := grpc.NewServer()
 			appctl.SetClientRPCServerRef(grpcServer)
-			appctlpb.RegisterClientLifecycleServiceServer(grpcServer, appctl.NewClientLifecycleService())
+			appctlgrpc.RegisterClientLifecycleServiceServer(grpcServer, appctl.NewClientLifecycleService())
 			close(appctl.ClientRPCServerStarted)
 			log.Infof("mieru client RPC server is running")
 			if err = grpcServer.Serve(rpcListener); err != nil {
@@ -459,12 +461,12 @@ var clientRunFunc = func(s []string) error {
 	// Collect remote proxy addresses and password.
 	mux := protocol.NewMux(true)
 	appctl.SetClientMuxRef(mux)
-	var hashedPassword []byte
 	activeProfile, err := appctl.GetActiveProfileFromConfig(config, config.GetActiveProfile())
 	if err != nil {
 		return fmt.Errorf(stderror.ClientGetActiveProfileFailedErr, err)
 	}
 	user := activeProfile.GetUser()
+	var hashedPassword []byte
 	if user.GetHashedPassword() != "" {
 		hashedPassword, err = hex.DecodeString(user.GetHashedPassword())
 		if err != nil {
@@ -474,10 +476,7 @@ var clientRunFunc = func(s []string) error {
 		hashedPassword = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
 	}
 	mux = mux.SetClientUserNamePassword(user.GetName(), hashedPassword)
-	mtu := util.DefaultMTU
-	if activeProfile.GetMtu() != 0 {
-		mtu = int(activeProfile.GetMtu())
-	}
+
 	multiplexFactor := 1
 	switch activeProfile.GetMultiplexing().GetLevel() {
 	case appctlpb.MultiplexingLevel_MULTIPLEXING_OFF:
@@ -490,6 +489,11 @@ var clientRunFunc = func(s []string) error {
 		multiplexFactor = 3
 	}
 	mux = mux.SetClientMultiplexFactor(multiplexFactor)
+
+	mtu := util.DefaultMTU
+	if activeProfile.GetMtu() != 0 {
+		mtu = int(activeProfile.GetMtu())
+	}
 	endpoints := make([]protocol.UnderlayProperties, 0)
 	resolver := &util.DNSResolver{}
 	for _, serverInfo := range activeProfile.GetServers() {
@@ -659,7 +663,7 @@ var clientTestFunc = func(s []string) error {
 
 	httpClient := &http.Client{
 		Transport: &http.Transport{
-			Dial: socks5.Dial(fmt.Sprintf("socks5://127.0.0.1:%d", config.GetSocks5Port()), socks5.ConnectCmd),
+			Dial: socks5.Dial(fmt.Sprintf("socks5://127.0.0.1:%d", config.GetSocks5Port()), constant.Socks5ConnectCmd),
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return nil
@@ -912,7 +916,7 @@ var clientStopCPUProfileFunc = func(s []string) error {
 
 // newClientLifecycleRPCClient returns a new client lifecycle RPC client.
 // No RPC client is returned if mieru is not running.
-func newClientLifecycleRPCClient(ctx context.Context) (client appctlpb.ClientLifecycleServiceClient, running bool, err error) {
+func newClientLifecycleRPCClient(ctx context.Context) (client appctlgrpc.ClientLifecycleServiceClient, running bool, err error) {
 	if err := appctl.IsClientDaemonRunning(ctx); err != nil {
 		return nil, false, nil
 	}

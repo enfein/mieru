@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/socks5"
 	"github.com/enfein/mieru/v3/pkg/testtool"
@@ -80,7 +81,7 @@ func main() {
 func CreateNewConnAndDoRequest(nRequest int, dstAddr *net.UDPAddr) {
 	socksDialer := socks5.DialSocks5Proxy(&socks5.Client{
 		Host:    *localProxyHost + ":" + strconv.Itoa(*localProxyPort),
-		CmdType: socks5.UDPAssociateCmd,
+		CmdType: constant.Socks5UDPAssociateCmd,
 	})
 	ctrlConn, udpConn, proxyAddr, err := socksDialer("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
 	if err != nil {

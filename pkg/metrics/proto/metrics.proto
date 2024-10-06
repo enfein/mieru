@@ -17,7 +17,7 @@ syntax = "proto3";
 
 package metrics;
 
-option go_package = "github.com/enfein/mieru/pkg/metrics/metricspb";
+option go_package = "github.com/enfein/mieru/v3/pkg/metrics/metricspb";
 
 message AllMetrics {
     repeated MetricGroup groups = 1;

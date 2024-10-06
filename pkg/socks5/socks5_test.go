@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/util"
 )
 
@@ -87,8 +88,8 @@ func TestSocks5Connect(t *testing.T) {
 
 	// Verify response from socks server.
 	want := []byte{
-		socks5Version, noAuth,
-		socks5Version, 0, 0, 1,
+		constant.Socks5Version, noAuth,
+		constant.Socks5Version, 0, 0, 1,
 		127, 0, 0, 1,
 		0, 0,
 		'p', 'o', 'n', 'g',
@@ -192,8 +193,8 @@ func TestSocks5UDPAssociation(t *testing.T) {
 
 	// Verify response from socks server.
 	want := []byte{
-		socks5Version, noAuth,
-		socks5Version, 0, 0, 1,
+		constant.Socks5Version, noAuth,
+		constant.Socks5Version, 0, 0, 1,
 		0, 0, 0, 0,
 		0, 0,
 	}

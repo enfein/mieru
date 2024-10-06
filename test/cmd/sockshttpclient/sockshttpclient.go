@@ -31,6 +31,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/socks5"
 )
@@ -133,7 +134,7 @@ func main() {
 			if *proxyMode == Socks5ProxyMode {
 				socksDialer := socks5.DialSocks5Proxy(&socks5.Client{
 					Host:    *localProxyHost + ":" + strconv.Itoa(*localProxyPort),
-					CmdType: socks5.ConnectCmd,
+					CmdType: constant.Socks5ConnectCmd,
 				})
 				conn, _, _, err = socksDialer("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
 			} else if *proxyMode == HTTPProxyMode {
@@ -210,7 +211,7 @@ func CreateNewConnAndDoRequest(seq int, proxyMode string) {
 		if proxyMode == Socks5ProxyMode {
 			socksDialer := socks5.DialSocks5Proxy(&socks5.Client{
 				Host:    *localProxyHost + ":" + strconv.Itoa(*localProxyPort),
-				CmdType: socks5.ConnectCmd,
+				CmdType: constant.Socks5ConnectCmd,
 			})
 			conn, _, _, err = socksDialer("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
 		} else if proxyMode == HTTPProxyMode {

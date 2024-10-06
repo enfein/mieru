@@ -17,7 +17,7 @@ syntax = "proto3";
 
 package appctl;
 
-option go_package = "github.com/enfein/mieru/pkg/appctl/appctlpb";
+option go_package = "github.com/enfein/mieru/v3/pkg/appctl/appctlpb";
 
 message Empty {}
 
