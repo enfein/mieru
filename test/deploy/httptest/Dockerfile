@@ -20,7 +20,7 @@ FROM ubuntu:24.04
 WORKDIR /test
 
 # Copy binaries, data and test script into the container.
-COPY mieru mita httpserver sockshttpclient socksudpclient udpserver \
+COPY exampleapiclient mieru mita httpserver sockshttpclient socksudpclient udpserver \
     test/deploy/httptest/client_mix.json test/deploy/httptest/server_mix.json \
     test/deploy/httptest/client_tcp.json test/deploy/httptest/server_tcp.json \
     test/deploy/httptest/client_udp.json test/deploy/httptest/server_udp.json \

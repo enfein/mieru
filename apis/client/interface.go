@@ -25,9 +25,10 @@ import (
 )
 
 var (
-	ErrNoClientConfig      = errors.New("no client config")
-	ErrInvalidConfigConfig = errors.New("invalid client config")
-	ErrClientIsNotRunning  = errors.New("client is not running")
+	ErrNoClientConfig              = errors.New("no client config")
+	ErrInvalidConfigConfig         = errors.New("invalid client config")
+	ErrClientIsNotRunning          = errors.New("client is not running")
+	ErrStoreClientConfigAfterStart = errors.New("can't store client config after start")
 )
 
 // Client contains methods supported by a mieru client.
@@ -44,7 +45,7 @@ type ClientConfigurationService interface {
 	Load() (*ClientConfig, error)
 
 	// Store saves the client config.
-	// It returns wrapped ErrInvalidConfigConfig if client config is invalid.
+	// It returns wrapped ErrInvalidConfigConfig if the provided client config is invalid.
 	Store(*ClientConfig) error
 }
 
@@ -64,16 +65,19 @@ type ClientLifecycleService interface {
 	IsRunning() bool
 }
 
-// ClientNetworkService contains methods to establish proxy connections.
+// ClientNetworkService contains methods to establish connections to proxy server.
 type ClientNetworkService interface {
-	// DialContext returns a new mieru connection to reach proxy server.
+	// DialContext returns a new proxy connection to reach proxy server.
 	// It returns an error if the client has not been started,
 	// or has been stopped.
 	DialContext(context.Context) (net.Conn, error)
 
-	// HandshakeWithConnect completes the socks5 CONNECT request with proxy server.
-	// After this, the mieru connection is able to send and receive user payload.
-	// The mieru connection is NOT terminated when an error is returned.
+	// HandshakeWithConnect completes the socks5 CONNECT request with proxy server
+	// in the given proxy connection.
+	// You may need to send a response back to the application that initiated
+	// the proxy connection.
+	// After that, the proxy connection is able to send and receive user payload.
+	// The proxy connection is NOT terminated when an error is returned.
 	HandshakeWithConnect(context.Context, net.Conn, model.AddrSpec) error
 }
 
@@ -82,7 +86,7 @@ type ClientConfig struct {
 	Profile *appctlpb.ClientProfile
 }
 
-// NewClient returns a blank mieru client.
+// NewClient creates a blank mieru client with no client config.
 func NewClient() Client {
 	mc := &mieruClient{}
 	mc.initOnce()

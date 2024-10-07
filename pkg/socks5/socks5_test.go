@@ -73,9 +73,8 @@ func TestSocks5Connect(t *testing.T) {
 	}
 
 	req := bytes.NewBuffer(nil)
-	req.Write([]byte{5})
-	req.Write([]byte{1, noAuth})
-	req.Write([]byte{5, 1, 0, 1, 127, 0, 0, 1})
+	req.Write([]byte{constant.Socks5Version, 1, constant.Socks5NoAuth})
+	req.Write([]byte{constant.Socks5Version, constant.Socks5ConnectCmd, 0, constant.Socks5IPv4Address, 127, 0, 0, 1})
 	port := []byte{0, 0}
 	binary.BigEndian.PutUint16(port, uint16(lAddr.Port))
 	req.Write(port)
@@ -88,8 +87,8 @@ func TestSocks5Connect(t *testing.T) {
 
 	// Verify response from socks server.
 	want := []byte{
-		constant.Socks5Version, noAuth,
-		constant.Socks5Version, 0, 0, 1,
+		constant.Socks5Version, constant.Socks5NoAuth,
+		constant.Socks5Version, 0, 0, constant.Socks5IPv4Address,
 		127, 0, 0, 1,
 		0, 0,
 		'p', 'o', 'n', 'g',
@@ -182,9 +181,8 @@ func TestSocks5UDPAssociation(t *testing.T) {
 	}
 
 	req := bytes.NewBuffer(nil)
-	req.Write([]byte{5})
-	req.Write([]byte{1, noAuth})
-	req.Write([]byte{5, 3, 0, 1, 127, 0, 0, 1, 0, 0})
+	req.Write([]byte{constant.Socks5Version, 1, constant.Socks5NoAuth})
+	req.Write([]byte{constant.Socks5Version, constant.Socks5UDPAssociateCmd, 0, constant.Socks5IPv4Address, 127, 0, 0, 1, 0, 0})
 
 	// Send initial UDP association request.
 	if _, err := conn.Write(req.Bytes()); err != nil {
@@ -193,8 +191,8 @@ func TestSocks5UDPAssociation(t *testing.T) {
 
 	// Verify response from socks server.
 	want := []byte{
-		constant.Socks5Version, noAuth,
-		constant.Socks5Version, 0, 0, 1,
+		constant.Socks5Version, constant.Socks5NoAuth,
+		constant.Socks5Version, 0, 0, constant.Socks5IPv4Address,
 		0, 0, 0, 0,
 		0, 0,
 	}

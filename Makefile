@@ -32,7 +32,7 @@ PROJECT_NAME=$(shell basename "${ROOT}")
 # - pkg/version/current.go
 #
 # Use `tools/bump_version.sh` script to change all those files at one shot.
-VERSION="3.5.1"
+VERSION="3.6.0"
 
 # Build binaries and installation packages.
 .PHONY: build
@@ -353,6 +353,7 @@ test-binary:
 	CGO_ENABLED=0 go build -ldflags="-X 'github.com/enfein/mieru/pkg/log.LogPrefix=S'" -o mita cmd/mita/mita.go
 	CGO_ENABLED=1 go build -race -ldflags="-X 'github.com/enfein/mieru/pkg/log.LogPrefix=C2'" -o mieru2 cmd/mieru/mieru.go
 	CGO_ENABLED=1 go build -race -ldflags="-X 'github.com/enfein/mieru/pkg/log.LogPrefix=S2'" -o mita2 cmd/mita/mita.go
+	CGO_ENABLED=0 go build test/cmd/exampleapiclient/exampleapiclient.go
 	CGO_ENABLED=0 go build test/cmd/httpserver/httpserver.go
 	CGO_ENABLED=0 go build test/cmd/sockshttpclient/sockshttpclient.go
 	CGO_ENABLED=0 go build test/cmd/socksudpclient/socksudpclient.go
@@ -365,14 +366,14 @@ test-container: test-binary
 		docker build -t mieru_httptest:${SHORT_SHA} -f test/deploy/httptest/Dockerfile .;\
 		docker build -t mieru_proxychain:${SHORT_SHA} -f test/deploy/proxychain/Dockerfile .;\
 	fi
-	rm -f mieru mieru2 mita mita2 httpserver sockshttpclient socksudpclient udpserver
+	rm -f exampleapiclient mieru mieru2 mita mita2 httpserver sockshttpclient socksudpclient udpserver
 
 # Run docker integration tests.
 .PHONY: run-container-test
 run-container-test: test-container
 	if [ ! -z $$(command -v docker) ]; then\
-		docker run mieru_proxychain:${SHORT_SHA};\
 		docker run mieru_httptest:${SHORT_SHA};\
+		docker run mieru_proxychain:${SHORT_SHA};\
 	fi
 
 # Format source code.

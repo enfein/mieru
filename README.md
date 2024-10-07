@@ -19,14 +19,12 @@ For an explanation of the mieru protocol, see [mieru Proxy Protocol](./docs/prot
 
 ## Features
 
-1. mieru uses a high-strength XChaCha20-Poly1305 encryption algorithm that generates encryption keys based on username, password and system time.
-1. mieru implements complete encryption of all transmitted content between the client and the proxy server, without transmitting any plaintext information.
-1. When mieru sends a packet, it is padded with random bytes at the end. Even when the same content is transmitted, the packet size varies.
-1. When using the UDP transport protocol, mieru does not require a handshake between client and server.
-1. When the server can not decrypt the data sent by the client, no content is returned. it is difficult for GFW to discover the mieru service through active probing.
-1. mieru supports multiple users sharing a single proxy server.
-1. mieru supports IPv4 and IPv6.
-1. mieru provides socks5, HTTP and HTTPS proxy.
+1. Provides socks5, HTTP, and HTTPS proxy interfaces.
+1. Does not use TLS protocol. No need to register a domain name or set up a fake website.
+1. Uses the high-strength XChaCha20-Poly1305 encryption algorithm that generates encryption keys based on username, password and system time.
+1. Utilizes random padding and replay attack detection to prevent GFW from detecting the mieru service.
+1. Supports multiple users sharing a single proxy server.
+1. Supports both IPv4 and IPv6.
 1. The server software supports socks5 outbound (proxy chain).
 1. The client software supports Windows, Mac OS, Linux and Android. Android clients include
    - [NekoBox](https://github.com/MatsuriDayo/NekoBoxForAndroid) version 1.3.1 or above, with [mieru plugin](https://github.com/enfein/NekoBoxPlugins).

@@ -135,9 +135,9 @@ func (c *Client) dialSocks5Long(targetAddr string) (conn net.Conn, udpConn *net.
 	// Prepare the first request.
 	var req bytes.Buffer
 	version := byte(constant.Socks5Version)
-	method := byte(noAuth)
+	method := byte(constant.Socks5NoAuth)
 	if c.Credential != nil {
-		method = userPassAuth
+		method = constant.Socks5UserPassAuth
 	}
 	req.Write([]byte{
 		version,
@@ -158,7 +158,7 @@ func (c *Client) dialSocks5Long(targetAddr string) (conn net.Conn, udpConn *net.
 		return nil, nil, nil, fmt.Errorf("socks method negotiation failed")
 	}
 	if c.Credential != nil {
-		version := byte(userPassAuthVersion)
+		version := byte(constant.Socks5UserPassAuthVersion)
 		req.Reset()
 		req.Write([]byte{version})
 		req.Write([]byte{byte(len(c.Credential.User))})
@@ -173,7 +173,7 @@ func (c *Client) dialSocks5Long(targetAddr string) (conn net.Conn, udpConn *net.
 			return nil, nil, nil, fmt.Errorf("server does not respond properly")
 		} else if resp[0] != version {
 			return nil, nil, nil, fmt.Errorf("server does not support user/password version 1")
-		} else if resp[1] != authSuccess {
+		} else if resp[1] != constant.Socks5AuthSuccess {
 			return nil, nil, nil, fmt.Errorf("user/password login failed")
 		}
 	}

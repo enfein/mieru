@@ -78,4 +78,5 @@ if [ "$?" -ne "0" ]; then
 fi
 
 echo "Test is successful."
+sleep 1
 exit 0

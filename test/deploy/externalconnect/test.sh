@@ -44,4 +44,5 @@ echo "========== BEGIN OF TCP TEST =========="
 echo "==========  END OF TCP TEST  =========="
 
 echo "Test is successful."
+sleep 1
 exit 0

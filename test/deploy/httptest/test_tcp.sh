@@ -55,6 +55,10 @@ if [[ "$?" -ne 0 ]]; then
 fi
 ./mieru profile cpu start /test/mieru.tcp.cpu.gz
 
+# Start mieru API client.
+./exampleapiclient -port=1081 -username=baozi -password=manlianpenfen \
+  -server_ip=127.0.0.1 -server_port=8964 -server_protocol=TCP &
+
 # Start testing.
 sleep 2
 echo ">>> socks5 - new connections - TCP <<<"
@@ -66,6 +70,16 @@ if [ "$?" -ne "0" ]; then
     print_mieru_client_thread_dump
     print_mieru_server_thread_dump
     echo "TCP - test socks5 new_conn failed."
+    exit 1
+fi
+
+sleep 1
+echo ">>> socks5 - new connections with API client - TCP <<<"
+./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
+  -local_proxy_host=127.0.0.1 -local_proxy_port=1081 \
+  -test_case=new_conn -num_request=3000
+if [ "$?" -ne "0" ]; then
+    echo "TCP - test socks5 new_conn with API client failed."
     exit 1
 fi
 

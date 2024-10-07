@@ -75,6 +75,9 @@ func (mc *mieruClient) Store(config *ClientConfig) error {
 	if config.Profile == nil {
 		return fmt.Errorf("%w: client config profile is nil", ErrInvalidConfigConfig)
 	}
+	if mc.running {
+		return ErrStoreClientConfigAfterStart
+	}
 	if err := appctl.ValidateClientConfigSingleProfile(config.Profile); err != nil {
 		return fmt.Errorf("%w: %s", ErrInvalidConfigConfig, err.Error())
 	}
@@ -120,7 +123,7 @@ func (mc *mieruClient) Start() error {
 	}
 	mc.mux = mc.mux.SetClientMultiplexFactor(multiplexFactor)
 
-	// Set endpoints.
+	// Set server endpoints.
 	mtu := util.DefaultMTU
 	if activeProfile.GetMtu() != 0 {
 		mtu = int(activeProfile.GetMtu())

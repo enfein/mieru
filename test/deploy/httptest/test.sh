@@ -35,11 +35,6 @@ sleep 1
 ./mita run &
 sleep 1
 
-# Run UDP associate test.
-echo "========== BEGIN OF UDP ASSOCIATE TEST =========="
-./test_mix_udp_associate.sh
-echo "==========  END OF UDP ASSOCIATE TEST  =========="
-
 # Run TCP test.
 echo "========== BEGIN OF TCP TEST =========="
 ./test_tcp.sh
@@ -50,5 +45,11 @@ echo "========== BEGIN OF UDP TEST =========="
 ./test_udp.sh
 echo "==========  END OF UDP TEST  =========="
 
+# Run UDP associate test.
+echo "========== BEGIN OF UDP ASSOCIATE TEST =========="
+./test_mix_udp_associate.sh
+echo "==========  END OF UDP ASSOCIATE TEST  =========="
+
 echo "Test is successful."
+sleep 1
 exit 0

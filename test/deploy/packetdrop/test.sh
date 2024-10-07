@@ -90,4 +90,5 @@ iptables -D INPUT -p tcp --sport 8964 -m statistic --mode random --probability 0
 iptables -D INPUT -p udp --sport 8964 -m statistic --mode random --probability 0.001 -j DROP
 
 echo "Test is successful."
+sleep 1
 exit 0

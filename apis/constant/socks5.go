@@ -33,3 +33,15 @@ const (
 	Socks5FQDNAddress byte = 3
 	Socks5IPv6Address byte = 4
 )
+
+// socks5 authentication options.
+const (
+	Socks5NoAuth           byte = 0
+	Socks5UserPassAuth     byte = 2
+	Socks5NoAcceptableAuth byte = 255
+
+	Socks5UserPassAuthVersion byte = 1
+
+	Socks5AuthSuccess byte = 0
+	Socks5AuthFailure byte = 1
+)
