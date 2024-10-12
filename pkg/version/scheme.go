@@ -43,8 +43,8 @@ func (v Version) ToTag() string {
 	return fmt.Sprintf("v%d.%d.%d", v.Major, v.Minor, v.Patch)
 }
 
-// LessThan returns true if the current version is less than the compared version.
-func (v Version) LessThan(another Version) bool {
+// IsLessThan returns true if the current version is less than the compared version.
+func (v Version) IsLessThan(another Version) bool {
 	if v.Major > another.Major {
 		return false
 	}

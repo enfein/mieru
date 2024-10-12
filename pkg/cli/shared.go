@@ -16,22 +16,11 @@
 package cli
 
 import (
-	"fmt"
-
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/version"
 )
 
 var versionFunc = func(s []string) error {
 	log.Infof(version.AppVersion)
-	return nil
-}
-
-var checkUpdateFunc = func(s []string) error {
-	_, msg, err := version.CheckUpdate()
-	if err != nil {
-		return fmt.Errorf("check update failed: %w", err)
-	}
-	log.Infof("%s", msg)
 	return nil
 }

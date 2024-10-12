@@ -32,7 +32,7 @@ PROJECT_NAME=$(shell basename "${ROOT}")
 # - pkg/version/current.go
 #
 # Use `tools/bump_version.sh` script to change all those files at one shot.
-VERSION="3.6.0"
+VERSION="3.7.0"
 
 # Build binaries and installation packages.
 .PHONY: build
@@ -427,6 +427,11 @@ protobuf:
 		--go_out="${ROOT}/pkg/metrics" --go_opt=module="github.com/enfein/mieru/v3/pkg/metrics" \
 		--proto_path="${ROOT}/pkg" \
 		"${ROOT}/pkg/metrics/proto/metrics.proto"
+
+	PATH=${PATH}:"${ROOT}/tools/build" ${ROOT}/tools/build/protoc -I="${ROOT}/pkg/version/updater/proto" \
+		--go_out="${ROOT}/pkg/version/updater" --go_opt=module="github.com/enfein/mieru/v3/pkg/version/updater" \
+		--proto_path="${ROOT}/pkg" \
+		"${ROOT}/pkg/version/updater/proto/history.proto"
 
 # Package source code.
 .PHONY: src

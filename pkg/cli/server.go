@@ -39,6 +39,7 @@ import (
 	"github.com/enfein/mieru/v3/pkg/socks5"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 	"github.com/enfein/mieru/v3/pkg/util"
+	"github.com/enfein/mieru/v3/pkg/version/updater"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 )
@@ -129,7 +130,7 @@ func RegisterServerCommands() {
 		func(s []string) error {
 			return unexpectedArgsError(s, 3)
 		},
-		checkUpdateFunc,
+		serverCheckUpdateFunc,
 	)
 	RegisterCallback(
 		[]string{"", "get", "metrics"},
@@ -335,7 +336,7 @@ var serverRunFunc = func(s []string) error {
 				log.Fatalf("update server unix domain socket permission failed: %v", err)
 			}
 		}
-		grpcServer := grpc.NewServer()
+		grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(appctl.MaxRecvMsgSize))
 		appctl.SetServerRPCServerRef(grpcServer)
 		appctlgrpc.RegisterServerLifecycleServiceServer(grpcServer, appctl.NewServerLifecycleService())
 		appctlgrpc.RegisterServerConfigServiceServer(grpcServer, appctl.NewServerConfigService())
@@ -658,6 +659,15 @@ var serverDeleteUserFunc = func(s []string) error {
 	if err != nil {
 		return fmt.Errorf(stderror.SetServerConfigFailedErr, err)
 	}
+	return nil
+}
+
+var serverCheckUpdateFunc = func(s []string) error {
+	_, msg, err := updater.CheckUpdate("")
+	if err != nil {
+		return fmt.Errorf("check update failed: %w", err)
+	}
+	log.Infof("%s", msg)
 	return nil
 }
 

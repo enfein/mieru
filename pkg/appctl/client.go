@@ -36,6 +36,7 @@ import (
 	"github.com/enfein/mieru/v3/pkg/stderror"
 	"github.com/enfein/mieru/v3/pkg/util"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -163,7 +164,7 @@ func NewClientLifecycleService() *clientLifecycleService {
 
 // NewClientLifecycleRPCClient creates a new ClientLifecycleService RPC client.
 // It loads client config to find the server address.
-func NewClientLifecycleRPCClient(ctx context.Context) (appctlgrpc.ClientLifecycleServiceClient, error) {
+func NewClientLifecycleRPCClient() (appctlgrpc.ClientLifecycleServiceClient, error) {
 	config, err := LoadClientConfig()
 	if err != nil {
 		return nil, fmt.Errorf("LoadClientConfig() failed: %w", err)
@@ -175,17 +176,18 @@ func NewClientLifecycleRPCClient(ctx context.Context) (appctlgrpc.ClientLifecycl
 		return nil, fmt.Errorf("RPC port number %d is invalid", config.GetRpcPort())
 	}
 	rpcAddr := "localhost:" + strconv.Itoa(int(config.GetRpcPort()))
-	return newClientLifecycleRPCClient(ctx, rpcAddr)
+	return newClientLifecycleRPCClient(rpcAddr)
 }
 
-// IsClientDaemonRunning detects if client daemon is running by using ClientLifecycleService.GetStatus() RPC.
+// IsClientDaemonRunning detects if client daemon is running by using
+// ClientLifecycleService.GetStatus() RPC.
 func IsClientDaemonRunning(ctx context.Context) error {
-	timedctx, cancelFunc := context.WithTimeout(ctx, RPCTimeout)
-	defer cancelFunc()
-	client, err := NewClientLifecycleRPCClient(timedctx)
+	client, err := NewClientLifecycleRPCClient()
 	if err != nil {
 		return fmt.Errorf("NewClientLifecycleRPCClient() failed: %w", err)
 	}
+	timedctx, cancelFunc := context.WithTimeout(ctx, RPCTimeout)
+	defer cancelFunc()
 	if _, err = client.GetStatus(timedctx, &pb.Empty{}); err != nil {
 		return fmt.Errorf("ClientLifecycleService.GetStatus() failed: %w", err)
 	}
@@ -489,12 +491,21 @@ func GetActiveProfileFromConfig(config *pb.ClientConfig, name string) (*pb.Clien
 	return nil, fmt.Errorf("profile %q is not found", name)
 }
 
+// ClientUpdaterHistoryPath returns the file path to retrieve
+// client updater history.
+func ClientUpdaterHistoryPath() (string, error) {
+	if err := prepareClientConfigDir(); err != nil {
+		return "", err
+	}
+	return filepath.Join(cachedClientConfigDir, "client.updater.pb"), nil
+}
+
 // newClientLifecycleRPCClient creates a new ClientLifecycleService RPC client
 // and connects to the given server address.
-func newClientLifecycleRPCClient(ctx context.Context, serverAddr string) (appctlgrpc.ClientLifecycleServiceClient, error) {
-	conn, err := grpc.DialContext(ctx, serverAddr, grpc.WithInsecure())
+func newClientLifecycleRPCClient(serverAddr string) (appctlgrpc.ClientLifecycleServiceClient, error) {
+	conn, err := grpc.NewClient(serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(MaxRecvMsgSize)))
 	if err != nil {
-		return nil, fmt.Errorf("grpc.DialContext() failed: %w", err)
+		return nil, fmt.Errorf("grpc.NewClient() failed: %w", err)
 	}
 	return appctlgrpc.NewClientLifecycleServiceClient(conn), nil
 }

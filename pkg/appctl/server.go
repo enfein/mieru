@@ -37,6 +37,7 @@ import (
 	"github.com/enfein/mieru/v3/pkg/stderror"
 	"github.com/enfein/mieru/v3/pkg/util"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -288,11 +289,9 @@ func NewServerLifecycleService() *serverLifecycleService {
 // NewServerLifecycleRPCClient creates a new ServerLifecycleService RPC client.
 func NewServerLifecycleRPCClient() (appctlgrpc.ServerLifecycleServiceClient, error) {
 	rpcAddr := "unix://" + ServerUDS()
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), RPCTimeout)
-	defer cancelFunc()
-	conn, err := grpc.DialContext(timedctx, rpcAddr, grpc.WithInsecure())
+	conn, err := grpc.NewClient(rpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(MaxRecvMsgSize)))
 	if err != nil {
-		return nil, fmt.Errorf("grpc.DialContext() failed: %w", err)
+		return nil, fmt.Errorf("grpc.NewClient() failed: %w", err)
 	}
 	return appctlgrpc.NewServerLifecycleServiceClient(conn), nil
 }
@@ -329,11 +328,9 @@ func NewServerConfigService() *serverConfigService {
 // NewServerConfigRPCClient creates a new ServerConfigService RPC client.
 func NewServerConfigRPCClient() (appctlgrpc.ServerConfigServiceClient, error) {
 	rpcAddr := "unix://" + ServerUDS()
-	timedctx, cancelFunc := context.WithTimeout(context.Background(), RPCTimeout)
-	defer cancelFunc()
-	conn, err := grpc.DialContext(timedctx, rpcAddr, grpc.WithInsecure())
+	conn, err := grpc.NewClient(rpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(MaxRecvMsgSize)))
 	if err != nil {
-		return nil, fmt.Errorf("grpc.DialContext() failed: %w", err)
+		return nil, fmt.Errorf("grpc.NewClient() failed: %w", err)
 	}
 	return appctlgrpc.NewServerConfigServiceClient(conn), nil
 }

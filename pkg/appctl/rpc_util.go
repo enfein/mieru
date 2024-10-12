@@ -16,6 +16,7 @@
 package appctl
 
 import (
+	"math"
 	"time"
 )
 
@@ -24,4 +25,8 @@ const (
 	// We use a very large timeout that works for embedded computer
 	// and anti-virus sandbox environment.
 	RPCTimeout = time.Second * 10
+
+	// MaxRecvMsgSize is the maximum message size in bytes that
+	// can be received in gRPC.
+	MaxRecvMsgSize = math.MaxInt32
 )

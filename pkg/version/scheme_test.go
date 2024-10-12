@@ -77,7 +77,7 @@ func TestLessThan(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		res := tc.my.LessThan(tc.another)
+		res := tc.my.IsLessThan(tc.another)
 		if res != tc.isLess {
 			t.Errorf("%s less than %s got %v, want %v", tc.my.String(), tc.another.String(), res, tc.isLess)
 		}

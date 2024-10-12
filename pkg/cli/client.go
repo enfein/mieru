@@ -43,6 +43,7 @@ import (
 	"github.com/enfein/mieru/v3/pkg/stderror"
 	"github.com/enfein/mieru/v3/pkg/util"
 	"github.com/enfein/mieru/v3/pkg/util/sockopts"
+	"github.com/enfein/mieru/v3/pkg/version/updater"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 )
@@ -175,7 +176,7 @@ func RegisterClientCommands() {
 		func(s []string) error {
 			return unexpectedArgsError(s, 3)
 		},
-		checkUpdateFunc,
+		clientCheckUpdateFunc,
 	)
 	RegisterCallback(
 		[]string{"", "get", "metrics"},
@@ -382,6 +383,14 @@ var clientStartFunc = func(s []string) error {
 			} else {
 				log.Infof("mieru client is started, listening to socks5://127.0.0.1:%d", config.GetSocks5Port())
 			}
+
+			if should, _ := clientShouldCheckUpdate(); should {
+				msg, _ := clientCheckUpdateAndUpdateHistory(fmt.Sprintf("socks5://127.0.0.1:%d", config.GetSocks5Port()))
+				if msg != updater.UpToDateMessage {
+					log.Infof("")
+					log.Infof(msg)
+				}
+			}
 			return nil
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -444,7 +453,7 @@ var clientRunFunc = func(s []string) error {
 			if err != nil {
 				log.Fatalf("listen on RPC address tcp %q failed: %v", rpcAddr, err)
 			}
-			grpcServer := grpc.NewServer()
+			grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(appctl.MaxRecvMsgSize))
 			appctl.SetClientRPCServerRef(grpcServer)
 			appctlgrpc.RegisterClientLifecycleServiceServer(grpcServer, appctl.NewClientLifecycleService())
 			close(appctl.ClientRPCServerStarted)
@@ -785,6 +794,29 @@ var clientDeleteSocks5AuthenticationFunc = func(_ []string) error {
 	return nil
 }
 
+var clientCheckUpdateFunc = func(s []string) error {
+	var socks5ProxyURI string
+	if err := appctl.IsClientDaemonRunning(context.Background()); err == nil {
+		// Client is running. Use the socks5 proxy to check update.
+		config, err := appctl.LoadClientConfig()
+		if err == nil {
+			socks5ProxyURI = fmt.Sprintf("socks5://127.0.0.1:%d", config.GetSocks5Port())
+		}
+		// Otherwise, sliently drop the error.
+	}
+
+	msg, err := clientCheckUpdateAndUpdateHistory(socks5ProxyURI)
+	if err != nil {
+		if socks5ProxyURI == "" {
+			return fmt.Errorf("check update without proxy failed: %w; please start mieru proxy client and try again", err)
+		} else {
+			return fmt.Errorf("check update with proxy %s failed: %w", socks5ProxyURI, err)
+		}
+	}
+	log.Infof("%s", msg)
+	return nil
+}
+
 var clientGetMetricsFunc = func(s []string) error {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
@@ -921,9 +953,36 @@ func newClientLifecycleRPCClient(ctx context.Context) (client appctlgrpc.ClientL
 		return nil, false, nil
 	}
 	running = true
-	client, err = appctl.NewClientLifecycleRPCClient(ctx)
+	client, err = appctl.NewClientLifecycleRPCClient()
 	if err != nil {
 		return nil, true, fmt.Errorf(stderror.CreateClientLifecycleRPCClientFailedErr, err)
 	}
 	return
+}
+
+func clientShouldCheckUpdate() (bool, error) {
+	historyFile, err := appctl.ClientUpdaterHistoryPath()
+	if err != nil {
+		return false, fmt.Errorf("failed to get client updater history file path")
+	}
+	h := updater.NewHistory()
+	if err := h.LoadFrom(historyFile); err != nil {
+		// History file doesn't exist or is corrupted.
+		return true, nil
+	}
+	return h.ShouldCheckUpdate(), nil
+}
+
+func clientCheckUpdateAndUpdateHistory(socks5ProxyURI string) (string, error) {
+	historyFile, err := appctl.ClientUpdaterHistoryPath()
+	if err != nil {
+		return "", fmt.Errorf("failed to get client updater history file path")
+	}
+	h := updater.NewHistory()
+	h.LoadFrom(historyFile) // OK to fail. No side effect.
+	record, msg, checkErr := updater.CheckUpdate(socks5ProxyURI)
+	h.Insert(record)
+	h.Trim()
+	h.StoreTo(historyFile) // OK to fail.
+	return msg, checkErr
 }

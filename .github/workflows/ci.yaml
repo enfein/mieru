@@ -17,6 +17,8 @@ jobs:
           go-version-file: go.mod
       - name: Create vendor directory
         run: make vendor
+      - name: Run benchmark
+        run: make bench
       - name: Build binaries
         run: make build
       - name: Upload artifacts
