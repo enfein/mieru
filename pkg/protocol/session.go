@@ -27,12 +27,12 @@ import (
 
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
+	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/congestion"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/mathext"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 	"github.com/enfein/mieru/v3/pkg/stderror"
-	"github.com/enfein/mieru/v3/pkg/util"
 )
 
 const (
@@ -350,9 +350,9 @@ func (s *Session) Close() error {
 		}
 		s.nextSend++
 		switch s.conn.TransportProtocol() {
-		case util.TCPTransport:
+		case common.TCPTransport:
 			s.sendQueue.InsertBlocking(seg)
-		case util.UDPTransport:
+		case common.UDPTransport:
 			if err := s.output(seg, s.RemoteAddr()); err != nil {
 				log.Debugf("output() failed: %v", err)
 			}
@@ -380,7 +380,7 @@ func (s *Session) LocalAddr() net.Addr {
 }
 
 func (s *Session) RemoteAddr() net.Addr {
-	if !util.IsNilNetAddr(s.remoteAddr) {
+	if !common.IsNilNetAddr(s.remoteAddr) {
 		return s.remoteAddr
 	}
 	return s.conn.RemoteAddr()
@@ -582,7 +582,7 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 		}
 
 		switch s.conn.TransportProtocol() {
-		case util.TCPTransport:
+		case common.TCPTransport:
 			for {
 				seg, ok := s.sendQueue.DeleteMin()
 				if !ok {
@@ -596,7 +596,7 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 					break
 				}
 			}
-		case util.UDPTransport:
+		case common.UDPTransport:
 			closeSession := false
 			hasLoss := false
 			hasTimeout := false
@@ -790,10 +790,10 @@ func (s *Session) input(seg *segment) error {
 
 func (s *Session) inputData(seg *segment) error {
 	switch s.conn.TransportProtocol() {
-	case util.TCPTransport:
+	case common.TCPTransport:
 		// Deliver the segment directly to recvQueue.
 		s.recvQueue.InsertBlocking(seg)
-	case util.UDPTransport:
+	case common.UDPTransport:
 		// Delete all previous acknowledged segments from sendBuf.
 		var priorInFlight int64
 		s.sendBuf.Ascend(func(iter *segment) bool {
@@ -902,10 +902,10 @@ func (s *Session) inputData(seg *segment) error {
 
 func (s *Session) inputAck(seg *segment) error {
 	switch s.conn.TransportProtocol() {
-	case util.TCPTransport:
+	case common.TCPTransport:
 		// Do nothing when receive ACK from TCP protocol.
 		return nil
-	case util.UDPTransport:
+	case common.UDPTransport:
 		// Delete all previous acknowledged segments from sendBuf.
 		var priorInFlight int64
 		s.sendBuf.Ascend(func(iter *segment) bool {
@@ -995,11 +995,11 @@ func (s *Session) inputClose(seg *segment) error {
 
 func (s *Session) output(seg *segment, remoteAddr net.Addr) error {
 	switch s.conn.TransportProtocol() {
-	case util.TCPTransport:
+	case common.TCPTransport:
 		if err := s.conn.(*TCPUnderlay).writeOneSegment(seg); err != nil {
 			return fmt.Errorf("TCPUnderlay.writeOneSegment() failed: %v", err)
 		}
-	case util.UDPTransport:
+	case common.UDPTransport:
 		err := s.conn.(*UDPUnderlay).writeOneSegment(seg, remoteAddr.(*net.UDPAddr))
 		if err != nil {
 			if !stderror.IsNotReady(err) {

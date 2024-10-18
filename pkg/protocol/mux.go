@@ -29,11 +29,11 @@ import (
 
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
+	"github.com/enfein/mieru/v3/pkg/common"
+	"github.com/enfein/mieru/v3/pkg/common/sockopts"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/mathext"
 	"github.com/enfein/mieru/v3/pkg/stderror"
-	"github.com/enfein/mieru/v3/pkg/util"
-	"github.com/enfein/mieru/v3/pkg/util/sockopts"
 )
 
 const (
@@ -213,7 +213,7 @@ func (m *Mux) Close() error {
 
 // Addr is not supported by Mux.
 func (m *Mux) Addr() net.Addr {
-	return util.NilNetAddr()
+	return common.NilNetAddr()
 }
 
 // Start listens on all the server addresses for incoming connections.
@@ -230,7 +230,7 @@ func (m *Mux) Start() error {
 		return fmt.Errorf("no server listening endpoint found")
 	}
 	for _, p := range m.endpoints {
-		if util.IsNilNetAddr(p.LocalAddr()) {
+		if common.IsNilNetAddr(p.LocalAddr()) {
 			return fmt.Errorf("endpoint local address is not set")
 		}
 	}
@@ -257,7 +257,7 @@ func (m *Mux) DialContext(ctx context.Context) (net.Conn, error) {
 		return nil, fmt.Errorf("no server listening endpoint found")
 	}
 	for _, p := range m.endpoints {
-		if util.IsNilNetAddr(p.RemoteAddr()) {
+		if common.IsNilNetAddr(p.RemoteAddr()) {
 			return nil, fmt.Errorf("endpoint remote address is not set")
 		}
 	}
@@ -542,7 +542,7 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 	i := mrand.Intn(len(m.endpoints))
 	p := m.endpoints[i]
 	switch p.TransportProtocol() {
-	case util.TCPTransport:
+	case common.TCPTransport:
 		block, err := cipher.BlockCipherFromPassword(m.password, false)
 		if err != nil {
 			return nil, fmt.Errorf("cipher.BlockCipherFromPassword() failed: %v", err)
@@ -554,7 +554,7 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 		if err != nil {
 			return nil, fmt.Errorf("NewTCPUnderlay() failed: %v", err)
 		}
-	case util.UDPTransport:
+	case common.UDPTransport:
 		block, err := cipher.BlockCipherFromPassword(m.password, true)
 		if err != nil {
 			return nil, fmt.Errorf("cipher.BlockCipherFromPassword() failed: %v", err)

@@ -17,6 +17,7 @@ package testtool
 
 import (
 	"fmt"
+	"io"
 	mrand "math/rand"
 	"net"
 	"regexp"
@@ -68,7 +69,7 @@ func TestHelperRot13(in []byte) ([]byte, error) {
 
 // TestHelperServeConn serves client requests and returns the rotate-13 of
 // the input.
-func TestHelperServeConn(conn net.Conn) error {
+func TestHelperServeConn(conn io.ReadWriteCloser) error {
 	defer conn.Close()
 	buf := make([]byte, 1024*1024) // maximum Read() or Write() size is 1 MB
 	for {

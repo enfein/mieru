@@ -1,4 +1,4 @@
-// Copyright (C) 2022  mieru authors
+// Copyright (C) 2023  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,11 +13,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package testtool
+package common
 
-// ReplayRecord is a bundle that helps to test replay attack.
-type ReplayRecord struct {
-	Data   []byte        // the recorded data
-	Ready  chan struct{} // indicate the data is recorded and ready to process
-	Finish chan struct{} // indicate the record is processed and no longer needed
-}
+type TransportProtocol uint8
+
+const (
+	UnknownTransport TransportProtocol = iota
+	UDPTransport
+	TCPTransport
+)

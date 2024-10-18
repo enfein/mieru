@@ -29,13 +29,13 @@ import (
 
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlgrpc"
 	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
+	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/egress"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 	"github.com/enfein/mieru/v3/pkg/protocol"
 	"github.com/enfein/mieru/v3/pkg/socks5"
 	"github.com/enfein/mieru/v3/pkg/stderror"
-	"github.com/enfein/mieru/v3/pkg/util"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
@@ -116,7 +116,7 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 
 	mux := protocol.NewMux(false).SetServerUsers(UserListToMap(config.GetUsers()))
 	SetServerMuxRef(mux)
-	mtu := util.DefaultMTU
+	mtu := common.DefaultMTU
 	if config.GetMtu() != 0 {
 		mtu = int(config.GetMtu())
 	}
@@ -201,7 +201,7 @@ func (s *serverLifecycleService) Reload(ctx context.Context, req *pb.Empty) (*pb
 	mux := serverMuxRef.Load()
 	if mux != nil {
 		// Adjust portBindings.
-		mtu := util.DefaultMTU
+		mtu := common.DefaultMTU
 		if config.GetMtu() != 0 {
 			mtu = int(config.GetMtu())
 		}
@@ -378,9 +378,9 @@ func GetJSONServerConfig() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("LoadServerConfig() failed: %w", err)
 	}
-	b, err := util.MarshalJSON(config)
+	b, err := common.MarshalJSON(config)
 	if err != nil {
-		return "", fmt.Errorf("util.MarshalJSON() failed: %w", err)
+		return "", fmt.Errorf("common.MarshalJSON() failed: %w", err)
 	}
 	return string(b), nil
 }
@@ -419,8 +419,8 @@ func LoadServerConfig() (*pb.ServerConfig, error) {
 			return nil, fmt.Errorf("proto.Unmarshal() failed: %w", err)
 		}
 	case JSON_CONFIG_FILE_TYPE:
-		if err := util.UnmarshalJSON(b, s); err != nil {
-			return nil, fmt.Errorf("util.UnmarshalJSON() failed: %w", err)
+		if err := common.UnmarshalJSON(b, s); err != nil {
+			return nil, fmt.Errorf("common.UnmarshalJSON() failed: %w", err)
 		}
 	default:
 		return nil, fmt.Errorf("config file type is invalid")
@@ -454,8 +454,8 @@ func StoreServerConfig(config *pb.ServerConfig) error {
 			return fmt.Errorf("proto.Marshal() failed: %w", err)
 		}
 	case JSON_CONFIG_FILE_TYPE:
-		if b, err = util.MarshalJSON(config); err != nil {
-			return fmt.Errorf("util.MarshalJSON() failed: %w", err)
+		if b, err = common.MarshalJSON(config); err != nil {
+			return fmt.Errorf("common.MarshalJSON() failed: %w", err)
 		}
 	default:
 		return fmt.Errorf("config file type is invalid")
@@ -475,8 +475,8 @@ func ApplyJSONServerConfig(path string) error {
 		return fmt.Errorf("os.ReadFile(%q) failed: %w", path, err)
 	}
 	s := &pb.ServerConfig{}
-	if err = util.UnmarshalJSON(b, s); err != nil {
-		return fmt.Errorf("util.UnmarshalJSON() failed: %w", err)
+	if err = common.UnmarshalJSON(b, s); err != nil {
+		return fmt.Errorf("common.UnmarshalJSON() failed: %w", err)
 	}
 	if err := ValidateServerConfigPatch(s); err != nil {
 		return fmt.Errorf("ValidateServerConfigPatch() failed: %w", err)
@@ -653,8 +653,8 @@ func ValidateFullServerConfig(config *pb.ServerConfig) error {
 // PortBindingsToUnderlayProperties converts port bindings to underlay properties.
 func PortBindingsToUnderlayProperties(portBindings []*pb.PortBinding, mtu int) ([]protocol.UnderlayProperties, error) {
 	endpoints := make([]protocol.UnderlayProperties, 0)
-	listenIP := net.ParseIP(util.AllIPAddr())
-	ipVersion := util.GetIPVersion(listenIP.String())
+	listenIP := net.ParseIP(common.AllIPAddr())
+	ipVersion := common.GetIPVersion(listenIP.String())
 	if listenIP == nil {
 		return endpoints, fmt.Errorf(stderror.ParseIPFailed)
 	}
@@ -668,10 +668,10 @@ func PortBindingsToUnderlayProperties(portBindings []*pb.PortBinding, mtu int) (
 		port := portBindings[i].GetPort()
 		switch proto {
 		case pb.TransportProtocol_TCP:
-			endpoint := protocol.NewUnderlayProperties(mtu, ipVersion, util.TCPTransport, &net.TCPAddr{IP: listenIP, Port: int(port)}, nil)
+			endpoint := protocol.NewUnderlayProperties(mtu, ipVersion, common.TCPTransport, &net.TCPAddr{IP: listenIP, Port: int(port)}, nil)
 			endpoints = append(endpoints, endpoint)
 		case pb.TransportProtocol_UDP:
-			endpoint := protocol.NewUnderlayProperties(mtu, ipVersion, util.UDPTransport, &net.UDPAddr{IP: listenIP, Port: int(port)}, nil)
+			endpoint := protocol.NewUnderlayProperties(mtu, ipVersion, common.UDPTransport, &net.UDPAddr{IP: listenIP, Port: int(port)}, nil)
 			endpoints = append(endpoints, endpoint)
 		default:
 			return []protocol.UnderlayProperties{}, fmt.Errorf(stderror.InvalidTransportProtocol)

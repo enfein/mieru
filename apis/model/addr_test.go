@@ -18,10 +18,25 @@ package model
 import (
 	"bytes"
 	"net"
+	"reflect"
 	"testing"
 
 	"github.com/enfein/mieru/v3/apis/constant"
 )
+
+// netAddr implements net.Addr interface.
+type netAddr struct {
+	Net string
+	Str string
+}
+
+func (a netAddr) Network() string {
+	return a.Net
+}
+
+func (a netAddr) String() string {
+	return a.Str
+}
 
 func TestAddrSpecAddress(t *testing.T) {
 	testCases := []struct {
@@ -43,11 +58,7 @@ func TestAddrSpecAddress(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		addr := tc.input.Address()
-		if addr != tc.wantAddr {
-			t.Errorf("got %v, want %v", addr, tc.wantAddr)
-		}
-		addr = tc.input.String()
+		addr := tc.input.String()
 		if addr != tc.wantAddr {
 			t.Errorf("got %v, want %v", addr, tc.wantAddr)
 		}
@@ -106,6 +117,75 @@ func TestAddrSpecReadWrite(t *testing.T) {
 		outputBytes := output.Bytes()
 		if !bytes.Equal(outputBytes, tc.input) {
 			t.Errorf("got %v, want %v", outputBytes, tc.input)
+		}
+	}
+}
+
+func TestNetAddrSpecFrom(t *testing.T) {
+	testCases := []struct {
+		netAddrSpec NetAddrSpec
+		addr        net.Addr
+		wantErr     bool
+	}{
+		{
+			netAddrSpec: NetAddrSpec{
+				AddrSpec: AddrSpec{
+					IP:   net.ParseIP("192.0.2.1"),
+					Port: 8080,
+				},
+				Net: "tcp",
+			},
+			addr: &net.TCPAddr{
+				IP:   net.ParseIP("192.0.2.1"),
+				Port: 8080,
+			},
+		},
+		{
+			netAddrSpec: NetAddrSpec{
+				AddrSpec: AddrSpec{
+					IP:   net.ParseIP("2001:db8::1"),
+					Port: 8080,
+				},
+				Net: "udp",
+			},
+			addr: &net.UDPAddr{
+				IP:   net.ParseIP("2001:db8::1"),
+				Port: 8080,
+			},
+		},
+		{
+			netAddrSpec: NetAddrSpec{
+				AddrSpec: AddrSpec{
+					FQDN: "example.com",
+					Port: 8080,
+				},
+				Net: "tcp",
+			},
+			addr: netAddr{
+				Net: "tcp",
+				Str: "example.com:8080",
+			},
+		},
+		{
+			netAddrSpec: NetAddrSpec{},
+			addr: &net.TCPAddr{
+				Port: 8080,
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		n := &NetAddrSpec{}
+		err := n.From(tc.addr)
+		if (err != nil) != tc.wantErr {
+			t.Fatalf("From() error = %v, wantErr %v", err, tc.wantErr)
+		}
+		if tc.wantErr {
+			continue
+		}
+		if !reflect.DeepEqual(*n, tc.netAddrSpec) {
+			t.Errorf("got %v, want %v", n, tc.netAddrSpec)
 		}
 	}
 }

@@ -22,9 +22,9 @@ import (
 	"net"
 	"sync"
 
+	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 	"github.com/enfein/mieru/v3/pkg/stderror"
-	"github.com/enfein/mieru/v3/pkg/util"
 )
 
 const sessionChanCapacity = 64
@@ -33,7 +33,7 @@ const sessionChanCapacity = 64
 type baseUnderlay struct {
 	isClient  bool
 	mtu       int
-	ipVersion util.IPVersion
+	ipVersion common.IPVersion
 	done      chan struct{} // if the underlay is closed
 
 	sessionMap    sync.Map      // Map<sessionID, *Session>
@@ -55,7 +55,7 @@ func newBaseUnderlay(isClient bool, mtu int) *baseUnderlay {
 	return &baseUnderlay{
 		isClient:      isClient,
 		mtu:           mtu,
-		ipVersion:     util.IPVersionUnknown,
+		ipVersion:     common.IPVersionUnknown,
 		done:          make(chan struct{}),
 		readySessions: make(chan *Session, sessionChanCapacity),
 		scheduler:     &ScheduleController{},
@@ -96,27 +96,27 @@ func (b *baseUnderlay) Close() error {
 
 // Addr implements net.Listener interface.
 func (b *baseUnderlay) Addr() net.Addr {
-	return util.NilNetAddr()
+	return common.NilNetAddr()
 }
 
 func (b *baseUnderlay) MTU() int {
 	return b.mtu
 }
 
-func (b *baseUnderlay) IPVersion() util.IPVersion {
+func (b *baseUnderlay) IPVersion() common.IPVersion {
 	return b.ipVersion
 }
 
-func (b *baseUnderlay) TransportProtocol() util.TransportProtocol {
-	return util.UnknownTransport
+func (b *baseUnderlay) TransportProtocol() common.TransportProtocol {
+	return common.UnknownTransport
 }
 
 func (b *baseUnderlay) LocalAddr() net.Addr {
-	return util.NilNetAddr()
+	return common.NilNetAddr()
 }
 
 func (b *baseUnderlay) RemoteAddr() net.Addr {
-	return util.NilNetAddr()
+	return common.NilNetAddr()
 }
 
 func (b *baseUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {

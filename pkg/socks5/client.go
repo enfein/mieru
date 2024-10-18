@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/enfein/mieru/v3/apis/constant"
-	"github.com/enfein/mieru/v3/pkg/util"
+	"github.com/enfein/mieru/v3/pkg/common"
 )
 
 // Client contains socks5 client configuration.
@@ -147,7 +147,7 @@ func (c *Client) dialSocks5Long(targetAddr string) (conn net.Conn, udpConn *net.
 
 	// Process the first response.
 	var resp []byte
-	resp, err = util.SendReceive(ctx, conn, req.Bytes())
+	resp, err = common.RoundTrip(ctx, conn, req.Bytes(), 4)
 	if err != nil {
 		return nil, nil, nil, err
 	} else if len(resp) != 2 {
@@ -166,7 +166,7 @@ func (c *Client) dialSocks5Long(targetAddr string) (conn net.Conn, udpConn *net.
 		req.Write([]byte{byte(len(c.Credential.Password))})
 		req.Write([]byte(c.Credential.Password))
 
-		resp, err = util.SendReceive(ctx, conn, req.Bytes())
+		resp, err = common.RoundTrip(ctx, conn, req.Bytes(), 4)
 		if err != nil {
 			return nil, nil, nil, err
 		} else if len(resp) != 2 {
@@ -219,7 +219,7 @@ func (c *Client) dialSocks5Long(targetAddr string) (conn net.Conn, udpConn *net.
 	})
 
 	// Process the second response.
-	resp, err = util.SendReceive(ctx, conn, req.Bytes())
+	resp, err = common.RoundTrip(ctx, conn, req.Bytes(), 512)
 	if err != nil {
 		return
 	} else if len(resp) < 10 {

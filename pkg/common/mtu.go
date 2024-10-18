@@ -13,12 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package util
+package common
 
-type TransportProtocol uint8
-
-const (
-	UnknownTransport TransportProtocol = iota
-	UDPTransport
-	TCPTransport
-)
+// DefaultMTU is the default MTU of L2 packets in the network.
+const DefaultMTU = 1400

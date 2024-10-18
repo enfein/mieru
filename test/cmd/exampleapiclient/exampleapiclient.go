@@ -27,7 +27,7 @@ import (
 	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
-	"github.com/enfein/mieru/v3/pkg/util"
+	"github.com/enfein/mieru/v3/pkg/common"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -131,26 +131,25 @@ func handleOneSocks5Conn(c client.Client, conn net.Conn) {
 	if _, err := io.ReadFull(conn, socks5Header); err != nil {
 		panic(fmt.Sprintf("Read socks5 header failed: %v", err))
 	}
-	addr := model.AddrSpec{}
-	if err := addr.ReadFromSocks5(conn); err != nil {
+	netAddr := model.NetAddrSpec{
+		Net: "tcp",
+	}
+	if err := netAddr.ReadFromSocks5(conn); err != nil {
 		panic(fmt.Sprintf("ReadFromSocks5() failed: %v", err))
 	}
 
 	// Dial to proxy server and do handshake.
 	ctx := context.Background()
-	proxyConn, err := c.DialContext(ctx)
+	proxyConn, err := c.DialContext(ctx, netAddr)
 	if err != nil {
 		panic(fmt.Sprintf("DialContext() failed: %v", err))
 	}
 	defer proxyConn.Close()
-	if err := c.HandshakeWithConnect(ctx, proxyConn, addr); err != nil {
-		panic(fmt.Sprintf("HandshakeWithConnect() failed: %v", err))
-	}
 
 	// Send the connect response back to the application.
 	var resp bytes.Buffer
 	resp.Write([]byte{constant.Socks5Version, 0, 0})
-	if err := addr.WriteToSocks5(&resp); err != nil {
+	if err := netAddr.WriteToSocks5(&resp); err != nil {
 		panic(fmt.Sprintf("WriteToSocks5() failed: %v", err))
 	}
 	if _, err := conn.Write(resp.Bytes()); err != nil {
@@ -158,7 +157,7 @@ func handleOneSocks5Conn(c client.Client, conn net.Conn) {
 	}
 
 	// Exchange payload.
-	util.BidiCopy(conn, proxyConn)
+	common.BidiCopy(conn, proxyConn)
 }
 
 func socks5ClientHandshake(conn net.Conn) error {

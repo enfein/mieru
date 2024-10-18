@@ -21,10 +21,10 @@ import (
 	"time"
 
 	"github.com/enfein/mieru/v3/pkg/cipher"
+	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/mathext"
 	"github.com/enfein/mieru/v3/pkg/stderror"
-	"github.com/enfein/mieru/v3/pkg/util"
 	"github.com/google/btree"
 )
 
@@ -40,19 +40,19 @@ const (
 )
 
 // MaxFragmentSize returns the maximum payload size in a fragment.
-func MaxFragmentSize(mtu int, ipVersion util.IPVersion, transport util.TransportProtocol) int {
-	if transport == util.TCPTransport {
+func MaxFragmentSize(mtu int, ipVersion common.IPVersion, transport common.TransportProtocol) int {
+	if transport == common.TCPTransport {
 		// No fragment needed.
 		return maxPDU
 	}
 
 	res := mtu - udpOverhead
-	if ipVersion == util.IPVersion4 {
+	if ipVersion == common.IPVersion4 {
 		res -= 20
 	} else {
 		res -= 40
 	}
-	if transport == util.UDPTransport {
+	if transport == common.UDPTransport {
 		res -= 8
 	} else {
 		res -= 20
@@ -61,19 +61,19 @@ func MaxFragmentSize(mtu int, ipVersion util.IPVersion, transport util.Transport
 }
 
 // MaxPaddingSize returns the maximum padding size of a segment.
-func MaxPaddingSize(mtu int, ipVersion util.IPVersion, transport util.TransportProtocol, fragmentSize int, existingPaddingSize int) int {
-	if transport == util.TCPTransport {
+func MaxPaddingSize(mtu int, ipVersion common.IPVersion, transport common.TransportProtocol, fragmentSize int, existingPaddingSize int) int {
+	if transport == common.TCPTransport {
 		// No limit.
 		return 255
 	}
 
 	res := mtu - fragmentSize - udpOverhead
-	if ipVersion == util.IPVersion4 {
+	if ipVersion == common.IPVersion4 {
 		res -= 20
 	} else {
 		res -= 40
 	}
-	if transport == util.UDPTransport {
+	if transport == common.UDPTransport {
 		res -= 8
 	} else {
 		res -= 20
@@ -87,13 +87,13 @@ func MaxPaddingSize(mtu int, ipVersion util.IPVersion, transport util.TransportP
 // segment contains metadata and actual payload.
 type segment struct {
 	metadata  metadata
-	payload   []byte                 // also can be a fragment
-	transport util.TransportProtocol // transport protocol
-	ackCount  byte                   // number of acknowledges before the next transmission
-	txCount   byte                   // number of transmission times
-	txTime    time.Time              // most recent transmission time
-	txTimeout time.Duration          // need to receive ACK within this duration
-	block     cipher.BlockCipher     // cipher block to encrypt or decrypt the payload
+	payload   []byte                   // also can be a fragment
+	transport common.TransportProtocol // transport protocol
+	ackCount  byte                     // number of acknowledges before the next transmission
+	txCount   byte                     // number of transmission times
+	txTime    time.Time                // most recent transmission time
+	txTimeout time.Duration            // need to receive ACK within this duration
+	block     cipher.BlockCipher       // cipher block to encrypt or decrypt the payload
 }
 
 // Protocol returns the protocol of the segment.
@@ -150,7 +150,7 @@ func (s *segment) Less(other *segment) bool {
 }
 
 func (s *segment) String() string {
-	if s.transport == util.UDPTransport && (!s.txTime.IsZero() || s.txTimeout != 0) {
+	if s.transport == common.UDPTransport && (!s.txTime.IsZero() || s.txTimeout != 0) {
 		return fmt.Sprintf("segment{metadata=%v, realPayloadLen=%v, ackCount=%v, txCount=%v, txTime=%v, txTimeout=%v}", s.metadata, len(s.payload), s.ackCount, s.txCount, s.txTime.Format(segmentTimeFormat), s.txTimeout)
 	}
 	return fmt.Sprintf("segment{metadata=%v, realPayloadLen=%v}", s.metadata, len(s.payload))

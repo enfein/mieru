@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/enfein/mieru/v3/apis/constant"
-	"github.com/enfein/mieru/v3/pkg/util"
+	"github.com/enfein/mieru/v3/pkg/common"
 )
 
 func TestSocks5Connect(t *testing.T) {
@@ -54,9 +54,9 @@ func TestSocks5Connect(t *testing.T) {
 	}
 
 	// Socks server start listening.
-	serverPort, err := util.UnusedTCPPort()
+	serverPort, err := common.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("common.UnusedTCPPort() failed: %v", err)
 	}
 	go func() {
 		if err := serv.ListenAndServe("tcp", "127.0.0.1:"+strconv.Itoa(serverPort)); err != nil {
@@ -162,9 +162,9 @@ func TestSocks5UDPAssociation(t *testing.T) {
 	}
 
 	// Socks server start listening.
-	serverPort, err := util.UnusedTCPPort()
+	serverPort, err := common.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("common.UnusedTCPPort() failed: %v", err)
 	}
 	go func() {
 		if err := serv.ListenAndServe("tcp", "127.0.0.1:"+strconv.Itoa(serverPort)); err != nil {

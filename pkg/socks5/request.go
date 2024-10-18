@@ -13,9 +13,9 @@ import (
 
 	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/apis/model"
+	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/stderror"
-	"github.com/enfein/mieru/v3/pkg/util"
 )
 
 // socks5 error types.
@@ -48,8 +48,8 @@ func (s *Server) newRequest(conn io.Reader) (*Request, error) {
 	// Read the version byte.
 	header := []byte{0, 0, 0}
 	if netConn, ok := conn.(net.Conn); ok {
-		util.SetReadTimeout(netConn, s.config.HandshakeTimeout)
-		defer util.SetReadTimeout(netConn, 0)
+		common.SetReadTimeout(netConn, s.config.HandshakeTimeout)
+		defer common.SetReadTimeout(netConn, 0)
 	}
 	if _, err := io.ReadFull(conn, header); err != nil {
 		return nil, fmt.Errorf("failed to get command version: %w", err)
@@ -119,7 +119,7 @@ func (s *Server) handleRequest(ctx context.Context, req *Request, conn io.ReadWr
 // handleConnect is used to handle a connect command.
 func (s *Server) handleConnect(ctx context.Context, req *Request, conn io.ReadWriteCloser) error {
 	var d net.Dialer
-	target, err := d.DialContext(ctx, "tcp", req.DstAddr.Address())
+	target, err := d.DialContext(ctx, "tcp", req.DstAddr.String())
 	if err != nil {
 		msg := err.Error()
 		var resp uint8
@@ -148,7 +148,7 @@ func (s *Server) handleConnect(ctx context.Context, req *Request, conn io.ReadWr
 		return fmt.Errorf("failed to send reply: %w", err)
 	}
 
-	return util.BidiCopy(conn, target)
+	return common.BidiCopy(conn, target)
 }
 
 // handleBind is used to handle a bind command.
@@ -165,7 +165,7 @@ func (s *Server) handleBind(_ context.Context, _ *Request, conn io.ReadWriteClos
 func (s *Server) handleAssociate(_ context.Context, _ *Request, conn io.ReadWriteCloser) error {
 	// Create a UDP listener on a random port.
 	// All the requests associated to this connection will go through this port.
-	udpListenerAddr, err := net.ResolveUDPAddr("udp", util.MaybeDecorateIPv6(util.AllIPAddr())+":0")
+	udpListenerAddr, err := net.ResolveUDPAddr("udp", common.MaybeDecorateIPv6(common.AllIPAddr())+":0")
 	if err != nil {
 		UDPAssociateErrors.Add(1)
 		return fmt.Errorf("failed to resolve UDP address: %w", err)
@@ -349,9 +349,9 @@ func (s *Server) handleAssociate(_ context.Context, _ *Request, conn io.ReadWrit
 // between socks5 client and server.
 func (s *Server) proxySocks5AuthReq(conn, proxyConn net.Conn) error {
 	// Send the version and authtication methods to the server.
-	defer util.SetReadTimeout(conn, 0)
-	defer util.SetReadTimeout(proxyConn, 0)
-	util.SetReadTimeout(conn, s.config.HandshakeTimeout)
+	defer common.SetReadTimeout(conn, 0)
+	defer common.SetReadTimeout(proxyConn, 0)
+	common.SetReadTimeout(conn, s.config.HandshakeTimeout)
 	version := []byte{0}
 	if _, err := io.ReadFull(conn, version); err != nil {
 		return fmt.Errorf("failed to get version byte: %w", err)
@@ -376,7 +376,7 @@ func (s *Server) proxySocks5AuthReq(conn, proxyConn net.Conn) error {
 	}
 
 	// Get server authentication response.
-	util.SetReadTimeout(proxyConn, s.config.HandshakeTimeout)
+	common.SetReadTimeout(proxyConn, s.config.HandshakeTimeout)
 	authResp := make([]byte, 2)
 	if _, err := io.ReadFull(proxyConn, authResp); err != nil {
 		return fmt.Errorf("failed to read authentication response from the socks5 server: %w", err)
@@ -393,9 +393,9 @@ func (s *Server) proxySocks5AuthReq(conn, proxyConn net.Conn) error {
 // return the created UDP connection.
 func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, error) {
 	// Send the connection request to the server.
-	defer util.SetReadTimeout(conn, 0)
-	defer util.SetReadTimeout(proxyConn, 0)
-	util.SetReadTimeout(conn, s.config.HandshakeTimeout)
+	defer common.SetReadTimeout(conn, 0)
+	defer common.SetReadTimeout(proxyConn, 0)
+	common.SetReadTimeout(conn, s.config.HandshakeTimeout)
 	connReq := make([]byte, 4)
 	if _, err := io.ReadFull(conn, connReq); err != nil {
 		return nil, fmt.Errorf("failed to get socks5 connection request: %w", err)
@@ -431,7 +431,7 @@ func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, err
 	log.Debugf("Sent socks5 request %v to server", connReq)
 
 	// Get server connection response.
-	util.SetReadTimeout(proxyConn, s.config.HandshakeTimeout)
+	common.SetReadTimeout(proxyConn, s.config.HandshakeTimeout)
 	connResp := make([]byte, 4)
 	if _, err := io.ReadFull(proxyConn, connResp); err != nil {
 		return nil, fmt.Errorf("failed to read connection response from the server: %w", err)

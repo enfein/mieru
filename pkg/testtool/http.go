@@ -22,13 +22,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/enfein/mieru/v3/pkg/util"
+	"github.com/enfein/mieru/v3/pkg/common"
 )
 
 // NewTestHTTPServer starts a new HTTP server at a random port.
 // For each HTTP request, it returns the given response.
 func NewTestHTTPServer(resp []byte) *http.Server {
-	httpTestPort, err := util.UnusedTCPPort()
+	httpTestPort, err := common.UnusedTCPPort()
 	if err != nil {
 		panic(err)
 	}

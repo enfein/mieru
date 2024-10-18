@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/enfein/mieru/v3/apis/constant"
+	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/testtool"
-	"github.com/enfein/mieru/v3/pkg/util"
 )
 
 func newTestSocksServer(port int) {
@@ -45,9 +45,9 @@ func newTestSocksServer(port int) {
 func TestSocks5Anonymous(t *testing.T) {
 	httpTestServer := testtool.NewTestHTTPServer([]byte("hello"))
 
-	port, err := util.UnusedTCPPort()
+	port, err := common.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("common.UnusedTCPPort() failed: %v", err)
 	}
 	newTestSocksServer(port)
 

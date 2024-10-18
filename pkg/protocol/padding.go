@@ -20,9 +20,9 @@ import (
 	"fmt"
 	mrand "math/rand"
 
+	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/mathext"
 	"github.com/enfein/mieru/v3/pkg/rng"
-	"github.com/enfein/mieru/v3/pkg/util"
 )
 
 var (
@@ -104,14 +104,14 @@ func newPadding(opts paddingOpts) []byte {
 		if length > opts.ascii.minConsecutiveASCIILen {
 			beginIdx = mrand.Intn(length - opts.ascii.minConsecutiveASCIILen)
 		}
-		util.ToPrintableChar(p, beginIdx, beginIdx+opts.ascii.minConsecutiveASCIILen)
+		common.ToPrintableChar(p, beginIdx, beginIdx+opts.ascii.minConsecutiveASCIILen)
 		return p
 	} else if opts.entropy != nil {
 		if opts.entropy.targetProbability <= 0.0 || opts.entropy.targetProbability > 0.5 {
 			panic(fmt.Sprintf("Invalid padding options: targetProbability %f is out of range (0.0, 0.5]", opts.entropy.targetProbability))
 		}
 
-		currentBitDistribution := util.ToBitDistribution(opts.entropy.existingData)
+		currentBitDistribution := common.ToBitDistribution(opts.entropy.existingData)
 
 		// Determine which bit (0 or 1) has the lower probability.
 		lowerBit := byte(0)
@@ -143,7 +143,7 @@ func newPadding(opts paddingOpts) []byte {
 
 		if lowerBit == 0 {
 			// Set all the bits in the padding to be 1.
-			util.FillBytes(p, 0xFF)
+			common.FillBytes(p, 0xFF)
 
 			// Change at most flip bits in p to bit 0.
 			for i := 0; i < flip; i++ {

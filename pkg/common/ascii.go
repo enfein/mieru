@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package util
+package common
 
 import (
 	crand "crypto/rand"
@@ -25,6 +25,7 @@ const (
 	PrintableCharSup = 0x7E // 0x7E, i.e. '~', is the last printable ASCII character
 
 	// Common64Set contains 64 selected common characters.
+	// This value can change in different software releases.
 	Common64Set = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-"
 )
 

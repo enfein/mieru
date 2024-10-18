@@ -22,7 +22,7 @@ import (
 
 	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
-	"github.com/enfein/mieru/v3/pkg/util"
+	"github.com/enfein/mieru/v3/pkg/common"
 )
 
 // Auth provide authentication settings to socks5 server.
@@ -50,8 +50,8 @@ type Credential struct {
 
 func (s *Server) handleAuthentication(conn net.Conn) error {
 	// Read the version byte and ensure we are compatible.
-	util.SetReadTimeout(conn, s.config.HandshakeTimeout)
-	defer util.SetReadTimeout(conn, 0)
+	common.SetReadTimeout(conn, s.config.HandshakeTimeout)
+	defer common.SetReadTimeout(conn, 0)
 	version := []byte{0}
 	if _, err := io.ReadFull(conn, version); err != nil {
 		HandshakeErrors.Add(1)
@@ -171,8 +171,8 @@ func (s *Server) handleAuthentication(conn net.Conn) error {
 // dialWithAuthentication dials to another socks5 server with given credential.
 // The proxy connection is closed if there is any error.
 func (s *Server) dialWithAuthentication(proxyConn net.Conn, auth *appctlpb.Auth) error {
-	util.SetReadTimeout(proxyConn, s.config.HandshakeTimeout)
-	defer util.SetReadTimeout(proxyConn, 0)
+	common.SetReadTimeout(proxyConn, s.config.HandshakeTimeout)
+	defer common.SetReadTimeout(proxyConn, 0)
 
 	if auth == nil || auth.GetUser() == "" || auth.GetPassword() == "" {
 		// No authentication required.

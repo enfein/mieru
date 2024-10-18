@@ -19,8 +19,8 @@ import (
 	"context"
 	"net"
 
+	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/metrics"
-	"github.com/enfein/mieru/v3/pkg/util"
 )
 
 var (
@@ -38,10 +38,10 @@ type UnderlayProperties interface {
 	MTU() int
 
 	// The IP version used to establish the underlay.
-	IPVersion() util.IPVersion
+	IPVersion() common.IPVersion
 
 	// The transport protocol used to implement the underlay.
-	TransportProtocol() util.TransportProtocol
+	TransportProtocol() common.TransportProtocol
 
 	// LocalAddr implements net.Conn interface.
 	LocalAddr() net.Addr
@@ -87,8 +87,8 @@ type Underlay interface {
 // underlayDescriptor implements UnderlayProperties.
 type underlayDescriptor struct {
 	mtu               int
-	ipVersion         util.IPVersion
-	transportProtocol util.TransportProtocol
+	ipVersion         common.IPVersion
+	transportProtocol common.TransportProtocol
 	localAddr         net.Addr
 	remoteAddr        net.Addr
 }
@@ -99,11 +99,11 @@ func (d *underlayDescriptor) MTU() int {
 	return d.mtu
 }
 
-func (d *underlayDescriptor) IPVersion() util.IPVersion {
+func (d *underlayDescriptor) IPVersion() common.IPVersion {
 	return d.ipVersion
 }
 
-func (d *underlayDescriptor) TransportProtocol() util.TransportProtocol {
+func (d *underlayDescriptor) TransportProtocol() common.TransportProtocol {
 	return d.transportProtocol
 }
 
@@ -116,7 +116,7 @@ func (d *underlayDescriptor) RemoteAddr() net.Addr {
 }
 
 // NewUnderlayProperties creates a new instance of UnderlayProperties.
-func NewUnderlayProperties(mtu int, ipVersion util.IPVersion, transportProtocol util.TransportProtocol, localAddr net.Addr, remoteAddr net.Addr) UnderlayProperties {
+func NewUnderlayProperties(mtu int, ipVersion common.IPVersion, transportProtocol common.TransportProtocol, localAddr net.Addr, remoteAddr net.Addr) UnderlayProperties {
 	d := &underlayDescriptor{
 		mtu:               mtu,
 		ipVersion:         ipVersion,
@@ -125,10 +125,10 @@ func NewUnderlayProperties(mtu int, ipVersion util.IPVersion, transportProtocol 
 		remoteAddr:        remoteAddr,
 	}
 	if localAddr == nil {
-		d.localAddr = util.NilNetAddr()
+		d.localAddr = common.NilNetAddr()
 	}
 	if remoteAddr == nil {
-		d.remoteAddr = util.NilNetAddr()
+		d.remoteAddr = common.NilNetAddr()
 	}
 	return d
 }

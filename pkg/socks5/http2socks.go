@@ -25,9 +25,9 @@ import (
 	"time"
 
 	"github.com/enfein/mieru/v3/apis/constant"
+	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/metrics"
-	"github.com/enfein/mieru/v3/pkg/util"
 )
 
 const (
@@ -121,14 +121,14 @@ func (p *HTTPProxy) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		}
 
 		// Dial to socks server.
-		socksConn, err := dialFunc("tcp", util.MaybeDecorateIPv6(req.URL.Hostname())+":"+port)
+		socksConn, err := dialFunc("tcp", common.MaybeDecorateIPv6(req.URL.Hostname())+":"+port)
 		if err != nil {
 			HTTPConnErrors.Add(1)
 			log.Debugf("HTTP proxy dial to socks5 server failed: %v", err)
 			return
 		}
 		httpConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
-		util.BidiCopy(httpConn, socksConn)
+		common.BidiCopy(httpConn, socksConn)
 	} else {
 		// HTTP
 		p.mu.Lock()

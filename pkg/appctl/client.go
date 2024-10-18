@@ -29,12 +29,12 @@ import (
 
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlgrpc"
 	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
+	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 	"github.com/enfein/mieru/v3/pkg/protocol"
 	"github.com/enfein/mieru/v3/pkg/socks5"
 	"github.com/enfein/mieru/v3/pkg/stderror"
-	"github.com/enfein/mieru/v3/pkg/util"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
@@ -200,9 +200,9 @@ func GetJSONClientConfig() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("LoadClientConfig() failed: %w", err)
 	}
-	b, err := util.MarshalJSON(config)
+	b, err := common.MarshalJSON(config)
 	if err != nil {
-		return "", fmt.Errorf("util.MarshalJSON() failed: %w", err)
+		return "", fmt.Errorf("common.MarshalJSON() failed: %w", err)
 	}
 	return string(b), nil
 }
@@ -254,8 +254,8 @@ func LoadClientConfig() (*pb.ClientConfig, error) {
 			return nil, fmt.Errorf("proto.Unmarshal() failed: %w", err)
 		}
 	case JSON_CONFIG_FILE_TYPE:
-		if err := util.UnmarshalJSON(b, c); err != nil {
-			return nil, fmt.Errorf("util.UnmarshalJSON() failed: %w", err)
+		if err := common.UnmarshalJSON(b, c); err != nil {
+			return nil, fmt.Errorf("common.UnmarshalJSON() failed: %w", err)
 		}
 	default:
 		return nil, fmt.Errorf("config file type is invalid")
@@ -288,8 +288,8 @@ func StoreClientConfig(config *pb.ClientConfig) error {
 			return fmt.Errorf("proto.Marshal() failed: %w", err)
 		}
 	case JSON_CONFIG_FILE_TYPE:
-		if b, err = util.MarshalJSON(config); err != nil {
-			return fmt.Errorf("util.MarshalJSON() failed: %w", err)
+		if b, err = common.MarshalJSON(config); err != nil {
+			return fmt.Errorf("common.MarshalJSON() failed: %w", err)
 		}
 	default:
 		return fmt.Errorf("config file type is invalid")
@@ -310,8 +310,8 @@ func ApplyJSONClientConfig(path string) error {
 		return fmt.Errorf("os.ReadFile(%q) failed: %w", path, err)
 	}
 	c := &pb.ClientConfig{}
-	if err = util.UnmarshalJSON(b, c); err != nil {
-		return fmt.Errorf("util.UnmarshalJSON() failed: %w", err)
+	if err = common.UnmarshalJSON(b, c); err != nil {
+		return fmt.Errorf("common.UnmarshalJSON() failed: %w", err)
 	}
 	return applyClientConfig(c)
 }

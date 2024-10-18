@@ -24,13 +24,13 @@ import (
 
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
+	"github.com/enfein/mieru/v3/pkg/common"
+	"github.com/enfein/mieru/v3/pkg/common/sockopts"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 	"github.com/enfein/mieru/v3/pkg/replay"
 	"github.com/enfein/mieru/v3/pkg/rng"
 	"github.com/enfein/mieru/v3/pkg/stderror"
-	"github.com/enfein/mieru/v3/pkg/util"
-	"github.com/enfein/mieru/v3/pkg/util/sockopts"
 )
 
 const (
@@ -116,32 +116,32 @@ func (t *TCPUnderlay) Addr() net.Addr {
 	return t.LocalAddr()
 }
 
-func (t *TCPUnderlay) IPVersion() util.IPVersion {
+func (t *TCPUnderlay) IPVersion() common.IPVersion {
 	t.ipVersionMutex.Lock()
 	defer t.ipVersionMutex.Unlock()
 	if t.conn == nil {
-		return util.IPVersionUnknown
+		return common.IPVersionUnknown
 	}
-	if t.ipVersion == util.IPVersionUnknown {
-		t.ipVersion = util.GetIPVersion(t.conn.LocalAddr().String())
+	if t.ipVersion == common.IPVersionUnknown {
+		t.ipVersion = common.GetIPVersion(t.conn.LocalAddr().String())
 	}
 	return t.ipVersion
 }
 
-func (t *TCPUnderlay) TransportProtocol() util.TransportProtocol {
-	return util.TCPTransport
+func (t *TCPUnderlay) TransportProtocol() common.TransportProtocol {
+	return common.TCPTransport
 }
 
 func (t *TCPUnderlay) LocalAddr() net.Addr {
 	if t.conn == nil {
-		return util.NilNetAddr()
+		return common.NilNetAddr()
 	}
 	return t.conn.LocalAddr()
 }
 
 func (t *TCPUnderlay) RemoteAddr() net.Addr {
 	if t.conn == nil {
-		return util.NilNetAddr()
+		return common.NilNetAddr()
 	}
 	return t.conn.RemoteAddr()
 }
@@ -429,7 +429,7 @@ func (t *TCPUnderlay) readSessionSegment(ss *sessionStruct) (*segment, error, st
 	return &segment{
 		metadata:  ss,
 		payload:   decryptedPayload,
-		transport: util.TCPTransport,
+		transport: common.TCPTransport,
 		block:     t.recv,
 	}, nil, stderror.NO_ERROR
 }
@@ -492,7 +492,7 @@ func (t *TCPUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error, s
 	return &segment{
 		metadata:  das,
 		payload:   decryptedPayload,
-		transport: util.TCPTransport,
+		transport: common.TCPTransport,
 		block:     t.recv,
 	}, nil, stderror.NO_ERROR
 }

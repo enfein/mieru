@@ -10,12 +10,12 @@ import (
 
 	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
+	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/egress"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 	"github.com/enfein/mieru/v3/pkg/protocol"
 	"github.com/enfein/mieru/v3/pkg/stderror"
-	"github.com/enfein/mieru/v3/pkg/util"
 )
 
 var (
@@ -42,7 +42,7 @@ type Config struct {
 	EgressController egress.Controller
 
 	// Resolver can be provided to do custom name resolution.
-	Resolver *util.DNSResolver
+	Resolver *common.DNSResolver
 
 	// BindIP is used for bind or udp associate
 	BindIP net.IP
@@ -84,12 +84,12 @@ func New(conf *Config) (*Server, error) {
 
 	// Ensure we have a DNS resolver.
 	if conf.Resolver == nil {
-		conf.Resolver = &util.DNSResolver{}
+		conf.Resolver = &common.DNSResolver{}
 	}
 
 	// Provide a default bind IP.
 	if conf.BindIP == nil {
-		conf.BindIP = net.ParseIP(util.AllIPAddr())
+		conf.BindIP = net.ParseIP(common.AllIPAddr())
 		if conf.BindIP == nil {
 			return nil, fmt.Errorf("set socks5 bind IP failed")
 		}
@@ -144,7 +144,7 @@ func (s *Server) Serve(l net.Listener) error {
 
 // ServeConn is used to serve a single connection.
 func (s *Server) ServeConn(conn net.Conn) error {
-	conn = util.WrapHierarchyConn(conn)
+	conn = common.WrapHierarchyConn(conn)
 	defer conn.Close()
 	log.Debugf("socks5 server starts to serve connection [%v - %v]", conn.LocalAddr(), conn.RemoteAddr())
 
@@ -207,14 +207,14 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 
 	if udpAssociateConn != nil {
 		log.Debugf("UDP association is listening on %v", udpAssociateConn.LocalAddr())
-		conn.(util.HierarchyConn).AddSubConnection(udpAssociateConn)
+		conn.(common.HierarchyConn).AddSubConnection(udpAssociateConn)
 		go func() {
-			util.WaitForClose(conn)
+			common.ReadAllAndDiscard(conn)
 			conn.Close()
 		}()
 		return BidiCopyUDP(udpAssociateConn, WrapUDPAssociateTunnel(proxyConn))
 	}
-	return util.BidiCopy(conn, proxyConn)
+	return common.BidiCopy(conn, proxyConn)
 }
 
 func (s *Server) serverServeConn(conn net.Conn) error {
@@ -242,9 +242,9 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 	if action.Action == appctlpb.EgressAction_PROXY {
 		proxy := action.Proxy
 		if proxy.GetSocks5Authentication().GetUser() != "" && proxy.GetSocks5Authentication().GetPassword() != "" {
-			log.Debugf("Egress decision of socks5 request %v is %s to %v with user password authentication", request.Raw, action.Action.String(), util.MaybeDecorateIPv6(proxy.GetHost())+":"+strconv.Itoa(int(proxy.GetPort())))
+			log.Debugf("Egress decision of socks5 request %v is %s to %v with user password authentication", request.Raw, action.Action.String(), common.MaybeDecorateIPv6(proxy.GetHost())+":"+strconv.Itoa(int(proxy.GetPort())))
 		} else {
-			log.Debugf("Egress decision of socks5 request %v is %s to %v with no authentication", request.Raw, action.Action.String(), util.MaybeDecorateIPv6(proxy.GetHost())+":"+strconv.Itoa(int(proxy.GetPort())))
+			log.Debugf("Egress decision of socks5 request %v is %s to %v with no authentication", request.Raw, action.Action.String(), common.MaybeDecorateIPv6(proxy.GetHost())+":"+strconv.Itoa(int(proxy.GetPort())))
 		}
 	} else {
 		log.Debugf("Egress decision of socks5 request %v is %s", request.Raw, action.Action.String())
@@ -268,7 +268,7 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 func (s *Server) handleForwarding(req *Request, conn net.Conn, proxy *appctlpb.EgressProxy) error {
 	forwardHost := proxy.GetHost()
 	forwardPort := proxy.GetPort()
-	proxyConn, err := net.Dial("tcp", util.MaybeDecorateIPv6(forwardHost)+":"+strconv.Itoa(int(forwardPort)))
+	proxyConn, err := net.Dial("tcp", common.MaybeDecorateIPv6(forwardHost)+":"+strconv.Itoa(int(forwardPort)))
 	if err != nil {
 		HandshakeErrors.Add(1)
 		return fmt.Errorf("dial to egress proxy failed: %w", err)
@@ -283,5 +283,5 @@ func (s *Server) handleForwarding(req *Request, conn net.Conn, proxy *appctlpb.E
 		proxyConn.Close()
 		return fmt.Errorf("failed to write socks5 request to egress proxy: %w", err)
 	}
-	return util.BidiCopy(conn, proxyConn)
+	return common.BidiCopy(conn, proxyConn)
 }

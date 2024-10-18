@@ -20,8 +20,8 @@ import (
 	mrand "math/rand"
 	"testing"
 
+	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/rng"
-	"github.com/enfein/mieru/v3/pkg/util"
 )
 
 func TestNewASCIIPadding(t *testing.T) {
@@ -40,7 +40,7 @@ func TestNewASCIIPadding(t *testing.T) {
 	if len(padding) < minConsecutiveASCIILen {
 		t.Errorf("Padding length %d is smaller than the minimum length %d", len(padding), minConsecutiveASCIILen)
 	}
-	consecutive := util.MaxConsecutivePrintableLength(padding)
+	consecutive := common.MaxConsecutivePrintableLength(padding)
 	if consecutive < minConsecutiveASCIILen {
 		t.Errorf("Padding's consecutive printable length %d is smaller than the required minimum consecutive ASCII length %d", consecutive, minConsecutiveASCIILen)
 	}
@@ -69,11 +69,11 @@ func TestNewEntropyPadding(t *testing.T) {
 			t.Errorf("Padding length %d is bigger than the maximum length %d", len(padding), maxPaddingLen)
 		}
 		combined := append(existingData, padding...)
-		bitDistribution := util.ToBitDistribution(combined)
+		bitDistribution := common.ToBitDistribution(combined)
 		if bitDistribution.Bit0 > targetProbability && bitDistribution.Bit1 > targetProbability {
 			// Doesn't meet the target.
 			// In this case, the padding bits are either all 0 or all 1.
-			if !util.IsBitsAllZero(padding) && !util.IsBitsAllOne(padding) {
+			if !common.IsBitsAllZero(padding) && !common.IsBitsAllOne(padding) {
 				t.Errorf("Can't meet target probability %f, but padding %v is not pure 0 bit or 1 bit", targetProbability, padding)
 			} else {
 				miss++

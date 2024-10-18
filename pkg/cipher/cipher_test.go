@@ -21,7 +21,7 @@ import (
 	mrand "math/rand"
 	"testing"
 
-	"github.com/enfein/mieru/v3/pkg/util"
+	"github.com/enfein/mieru/v3/pkg/common"
 )
 
 func TestDefaultNonceSize(t *testing.T) {
@@ -217,7 +217,7 @@ func TestAEADBlockCipherNewNonce(t *testing.T) {
 		t.Fatalf("newXChaCha20Poly1305BlockCipher() failed: %v", err)
 	}
 	s := make(map[byte]struct{})
-	for _, c := range []byte(util.Common64Set) {
+	for _, c := range []byte(common.Common64Set) {
 		s[c] = struct{}{}
 	}
 	distribution := make(map[byte]int32)

@@ -36,13 +36,13 @@ import (
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlgrpc"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
+	"github.com/enfein/mieru/v3/pkg/common"
+	"github.com/enfein/mieru/v3/pkg/common/sockopts"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 	"github.com/enfein/mieru/v3/pkg/protocol"
 	"github.com/enfein/mieru/v3/pkg/socks5"
 	"github.com/enfein/mieru/v3/pkg/stderror"
-	"github.com/enfein/mieru/v3/pkg/util"
-	"github.com/enfein/mieru/v3/pkg/util/sockopts"
 	"github.com/enfein/mieru/v3/pkg/version/updater"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -499,12 +499,12 @@ var clientRunFunc = func(s []string) error {
 	}
 	mux = mux.SetClientMultiplexFactor(multiplexFactor)
 
-	mtu := util.DefaultMTU
+	mtu := common.DefaultMTU
 	if activeProfile.GetMtu() != 0 {
 		mtu = int(activeProfile.GetMtu())
 	}
 	endpoints := make([]protocol.UnderlayProperties, 0)
-	resolver := &util.DNSResolver{}
+	resolver := &common.DNSResolver{}
 	for _, serverInfo := range activeProfile.GetServers() {
 		var proxyHost string
 		var proxyIP net.IP
@@ -521,7 +521,7 @@ var clientRunFunc = func(s []string) error {
 				return fmt.Errorf(stderror.ParseIPFailed)
 			}
 		}
-		ipVersion := util.GetIPVersion(proxyIP.String())
+		ipVersion := common.GetIPVersion(proxyIP.String())
 		portBindings, err := appctl.FlatPortBindings(serverInfo.GetPortBindings())
 		if err != nil {
 			return fmt.Errorf(stderror.InvalidPortBindingsErr, err)
@@ -530,10 +530,10 @@ var clientRunFunc = func(s []string) error {
 			proxyPort := bindingInfo.GetPort()
 			switch bindingInfo.GetProtocol() {
 			case appctlpb.TransportProtocol_TCP:
-				endpoint := protocol.NewUnderlayProperties(mtu, ipVersion, util.TCPTransport, nil, &net.TCPAddr{IP: proxyIP, Port: int(proxyPort)})
+				endpoint := protocol.NewUnderlayProperties(mtu, ipVersion, common.TCPTransport, nil, &net.TCPAddr{IP: proxyIP, Port: int(proxyPort)})
 				endpoints = append(endpoints, endpoint)
 			case appctlpb.TransportProtocol_UDP:
-				endpoint := protocol.NewUnderlayProperties(mtu, ipVersion, util.UDPTransport, nil, &net.UDPAddr{IP: proxyIP, Port: int(proxyPort)})
+				endpoint := protocol.NewUnderlayProperties(mtu, ipVersion, common.UDPTransport, nil, &net.UDPAddr{IP: proxyIP, Port: int(proxyPort)})
 				endpoints = append(endpoints, endpoint)
 			default:
 				return fmt.Errorf(stderror.InvalidTransportProtocol)
@@ -568,9 +568,9 @@ var clientRunFunc = func(s []string) error {
 	// Run the local socks5 server in the background.
 	var socks5Addr string
 	if config.GetSocks5ListenLAN() {
-		socks5Addr = util.MaybeDecorateIPv6(util.AllIPAddr()) + ":" + strconv.Itoa(int(config.GetSocks5Port()))
+		socks5Addr = common.MaybeDecorateIPv6(common.AllIPAddr()) + ":" + strconv.Itoa(int(config.GetSocks5Port()))
 	} else {
-		socks5Addr = util.MaybeDecorateIPv6(util.LocalIPAddr()) + ":" + strconv.Itoa(int(config.GetSocks5Port()))
+		socks5Addr = common.MaybeDecorateIPv6(common.LocalIPAddr()) + ":" + strconv.Itoa(int(config.GetSocks5Port()))
 	}
 	wg.Add(1)
 	go func(socks5Addr string) {
@@ -598,9 +598,9 @@ var clientRunFunc = func(s []string) error {
 		go func(socks5Addr string) {
 			var httpServerAddr string
 			if config.GetHttpProxyListenLAN() {
-				httpServerAddr = util.MaybeDecorateIPv6(util.AllIPAddr()) + ":" + strconv.Itoa(int(config.GetHttpProxyPort()))
+				httpServerAddr = common.MaybeDecorateIPv6(common.AllIPAddr()) + ":" + strconv.Itoa(int(config.GetHttpProxyPort()))
 			} else {
-				httpServerAddr = util.MaybeDecorateIPv6(util.LocalIPAddr()) + ":" + strconv.Itoa(int(config.GetHttpProxyPort()))
+				httpServerAddr = common.MaybeDecorateIPv6(common.LocalIPAddr()) + ":" + strconv.Itoa(int(config.GetHttpProxyPort()))
 			}
 			httpServer := socks5.NewHTTPProxyServer(httpServerAddr, &socks5.HTTPProxy{
 				ProxyURI: "socks5://" + socks5Addr + "?timeout=10s",

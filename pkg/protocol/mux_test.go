@@ -28,9 +28,9 @@ import (
 
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
+	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/testtool"
-	"github.com/enfein/mieru/v3/pkg/util"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -95,11 +95,11 @@ func runClient(t *testing.T, properties UnderlayProperties, username, password [
 func TestIPv4TCPUnderlay(t *testing.T) {
 	log.SetOutputToTest(t)
 	log.SetLevel("DEBUG")
-	port, err := util.UnusedTCPPort()
+	port, err := common.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("common.UnusedTCPPort() failed: %v", err)
 	}
-	serverProperties := NewUnderlayProperties(1500, util.IPVersion4, util.TCPTransport, &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port}, nil)
+	serverProperties := NewUnderlayProperties(1500, common.IPVersion4, common.TCPTransport, &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port}, nil)
 	serverMux := NewMux(false).
 		SetServerUsers(users).
 		SetEndpoints([]UnderlayProperties{serverProperties})
@@ -117,7 +117,7 @@ func TestIPv4TCPUnderlay(t *testing.T) {
 	defer testServer.Close()
 	time.Sleep(100 * time.Millisecond)
 
-	clientProperties := NewUnderlayProperties(1500, util.IPVersion4, util.TCPTransport, nil, &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
+	clientProperties := NewUnderlayProperties(1500, common.IPVersion4, common.TCPTransport, nil, &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
 	runClient(t, clientProperties, []byte("xiaochitang"), []byte("kuiranbudong"), 4)
 	if err := serverMux.Close(); err != nil {
 		t.Errorf("Server mux close failed: %v", err)
@@ -127,11 +127,11 @@ func TestIPv4TCPUnderlay(t *testing.T) {
 func TestIPv6TCPUnderlay(t *testing.T) {
 	log.SetOutputToTest(t)
 	log.SetLevel("DEBUG")
-	port, err := util.UnusedTCPPort()
+	port, err := common.UnusedTCPPort()
 	if err != nil {
-		t.Fatalf("util.UnusedTCPPort() failed: %v", err)
+		t.Fatalf("common.UnusedTCPPort() failed: %v", err)
 	}
-	serverProperties := NewUnderlayProperties(1500, util.IPVersion6, util.TCPTransport, &net.TCPAddr{IP: net.ParseIP("::1"), Port: port}, nil)
+	serverProperties := NewUnderlayProperties(1500, common.IPVersion6, common.TCPTransport, &net.TCPAddr{IP: net.ParseIP("::1"), Port: port}, nil)
 	serverMux := NewMux(false).
 		SetServerUsers(users).
 		SetEndpoints([]UnderlayProperties{serverProperties})
@@ -149,7 +149,7 @@ func TestIPv6TCPUnderlay(t *testing.T) {
 	defer testServer.Close()
 	time.Sleep(100 * time.Millisecond)
 
-	clientProperties := NewUnderlayProperties(1500, util.IPVersion6, util.TCPTransport, nil, &net.TCPAddr{IP: net.ParseIP("::1"), Port: port})
+	clientProperties := NewUnderlayProperties(1500, common.IPVersion6, common.TCPTransport, nil, &net.TCPAddr{IP: net.ParseIP("::1"), Port: port})
 	runClient(t, clientProperties, []byte("xiaochitang"), []byte("kuiranbudong"), 4)
 	if err := serverMux.Close(); err != nil {
 		t.Errorf("Server mux close failed: %v", err)
@@ -159,11 +159,11 @@ func TestIPv6TCPUnderlay(t *testing.T) {
 func TestIPv4UDPUnderlay(t *testing.T) {
 	log.SetOutputToTest(t)
 	log.SetLevel("DEBUG")
-	port, err := util.UnusedUDPPort()
+	port, err := common.UnusedUDPPort()
 	if err != nil {
-		t.Fatalf("util.UnusedUDPPort() failed: %v", err)
+		t.Fatalf("common.UnusedUDPPort() failed: %v", err)
 	}
-	serverProperties := NewUnderlayProperties(1500, util.IPVersion4, util.UDPTransport, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port}, nil)
+	serverProperties := NewUnderlayProperties(1500, common.IPVersion4, common.UDPTransport, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port}, nil)
 	serverMux := NewMux(false).
 		SetServerUsers(users).
 		SetEndpoints([]UnderlayProperties{serverProperties})
@@ -181,7 +181,7 @@ func TestIPv4UDPUnderlay(t *testing.T) {
 	defer testServer.Close()
 	time.Sleep(100 * time.Millisecond)
 
-	clientProperties := NewUnderlayProperties(1500, util.IPVersion4, util.UDPTransport, nil, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
+	clientProperties := NewUnderlayProperties(1500, common.IPVersion4, common.UDPTransport, nil, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
 	runClient(t, clientProperties, []byte("xiaochitang"), []byte("kuiranbudong"), 4)
 	if err := serverMux.Close(); err != nil {
 		t.Errorf("Server mux close failed: %v", err)
@@ -191,11 +191,11 @@ func TestIPv4UDPUnderlay(t *testing.T) {
 func TestIPv6UDPUnderlay(t *testing.T) {
 	log.SetOutputToTest(t)
 	log.SetLevel("DEBUG")
-	port, err := util.UnusedUDPPort()
+	port, err := common.UnusedUDPPort()
 	if err != nil {
-		t.Fatalf("util.UnusedUDPPort() failed: %v", err)
+		t.Fatalf("common.UnusedUDPPort() failed: %v", err)
 	}
-	serverProperties := NewUnderlayProperties(1500, util.IPVersion6, util.UDPTransport, &net.UDPAddr{IP: net.ParseIP("::1"), Port: port}, nil)
+	serverProperties := NewUnderlayProperties(1500, common.IPVersion6, common.UDPTransport, &net.UDPAddr{IP: net.ParseIP("::1"), Port: port}, nil)
 	serverMux := NewMux(false).
 		SetServerUsers(users).
 		SetEndpoints([]UnderlayProperties{serverProperties})
@@ -213,7 +213,7 @@ func TestIPv6UDPUnderlay(t *testing.T) {
 	defer testServer.Close()
 	time.Sleep(100 * time.Millisecond)
 
-	clientProperties := NewUnderlayProperties(1500, util.IPVersion6, util.UDPTransport, nil, &net.UDPAddr{IP: net.ParseIP("::1"), Port: port})
+	clientProperties := NewUnderlayProperties(1500, common.IPVersion6, common.UDPTransport, nil, &net.UDPAddr{IP: net.ParseIP("::1"), Port: port})
 	runClient(t, clientProperties, []byte("xiaochitang"), []byte("kuiranbudong"), 4)
 	if err := serverMux.Close(); err != nil {
 		t.Errorf("Server mux close failed: %v", err)
@@ -234,30 +234,30 @@ func TestNewEndpoints(t *testing.T) {
 		{
 			nil,
 			[]UnderlayProperties{
-				NewUnderlayProperties(1500, util.IPVersion4, util.TCPTransport, util.NilNetAddr(), util.NilNetAddr()),
+				NewUnderlayProperties(1500, common.IPVersion4, common.TCPTransport, common.NilNetAddr(), common.NilNetAddr()),
 			},
 			[]UnderlayProperties{
-				NewUnderlayProperties(1500, util.IPVersion4, util.TCPTransport, util.NilNetAddr(), util.NilNetAddr()),
+				NewUnderlayProperties(1500, common.IPVersion4, common.TCPTransport, common.NilNetAddr(), common.NilNetAddr()),
 			},
 		},
 		{
 			[]UnderlayProperties{
-				NewUnderlayProperties(1500, util.IPVersion4, util.TCPTransport, util.NilNetAddr(), util.NilNetAddr()),
+				NewUnderlayProperties(1500, common.IPVersion4, common.TCPTransport, common.NilNetAddr(), common.NilNetAddr()),
 			},
 			nil,
 			[]UnderlayProperties{},
 		},
 		{
 			[]UnderlayProperties{
-				NewUnderlayProperties(1500, util.IPVersion4, util.TCPTransport, util.NilNetAddr(), util.NilNetAddr()),
-				NewUnderlayProperties(1500, util.IPVersion6, util.TCPTransport, util.NilNetAddr(), util.NilNetAddr()),
+				NewUnderlayProperties(1500, common.IPVersion4, common.TCPTransport, common.NilNetAddr(), common.NilNetAddr()),
+				NewUnderlayProperties(1500, common.IPVersion6, common.TCPTransport, common.NilNetAddr(), common.NilNetAddr()),
 			},
 			[]UnderlayProperties{
-				NewUnderlayProperties(1500, util.IPVersion6, util.TCPTransport, util.NilNetAddr(), util.NilNetAddr()),
-				NewUnderlayProperties(1500, util.IPVersion6, util.UDPTransport, util.NilNetAddr(), util.NilNetAddr()),
+				NewUnderlayProperties(1500, common.IPVersion6, common.TCPTransport, common.NilNetAddr(), common.NilNetAddr()),
+				NewUnderlayProperties(1500, common.IPVersion6, common.UDPTransport, common.NilNetAddr(), common.NilNetAddr()),
 			},
 			[]UnderlayProperties{
-				NewUnderlayProperties(1500, util.IPVersion6, util.UDPTransport, util.NilNetAddr(), util.NilNetAddr()),
+				NewUnderlayProperties(1500, common.IPVersion6, common.UDPTransport, common.NilNetAddr(), common.NilNetAddr()),
 			},
 		},
 	}

@@ -20,7 +20,6 @@ import (
 	"errors"
 	"net"
 
-	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 )
 
@@ -65,20 +64,17 @@ type ClientLifecycleService interface {
 	IsRunning() bool
 }
 
-// ClientNetworkService contains methods to establish connections to proxy server.
+// ClientNetworkService contains methods to establish connections
+// to destinations using proxy servers.
 type ClientNetworkService interface {
-	// DialContext returns a new proxy connection to reach proxy server.
+	// DialContext returns a new proxy connection to reach the destination.
 	// It returns an error if the client has not been started,
 	// or has been stopped.
-	DialContext(context.Context) (net.Conn, error)
+	DialContext(context.Context, net.Addr) (net.Conn, error)
 
-	// HandshakeWithConnect completes the socks5 CONNECT request with proxy server
-	// in the given proxy connection.
-	// You may need to send a response back to the application that initiated
-	// the proxy connection.
-	// After that, the proxy connection is able to send and receive user payload.
-	// The proxy connection is NOT terminated when an error is returned.
-	HandshakeWithConnect(context.Context, net.Conn, model.AddrSpec) error
+	// DialContextWithConn is similar to DialContext, but use the given
+	// connection to establish a new proxy connection.
+	DialContextWithConn(context.Context, net.Conn, net.Addr) (net.Conn, error)
 }
 
 // ClientConfig stores proxy client configuration.

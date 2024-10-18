@@ -1,4 +1,4 @@
-// Copyright (C) 2022  mieru authors
+// Copyright (C) 2023  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,27 +13,31 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package util
+package common
 
 import (
-	"io"
+	"fmt"
+	"net"
 )
 
-// BidiCopy does bi-directional data copy.
-func BidiCopy(conn1, conn2 io.ReadWriteCloser) error {
-	errCh := make(chan error, 2)
-	go func() {
-		_, err := io.Copy(conn1, conn2)
-		conn1.Close()
-		errCh <- err
-	}()
-	go func() {
-		_, err := io.Copy(conn2, conn1)
-		conn2.Close()
-		errCh <- err
-	}()
+// UnusedTCPPort returns an unused TCP port in the local network.
+func UnusedTCPPort() (int, error) {
+	l, err := net.Listen("tcp", ":0")
+	if err != nil {
+		return 0, fmt.Errorf("net.Listen() failed: %w", err)
+	}
+	port := l.Addr().(*net.TCPAddr).Port
+	l.Close()
+	return port, nil
+}
 
-	err := <-errCh
-	<-errCh
-	return err
+// UnusedUDPPort returns an unused UDP port in the local network.
+func UnusedUDPPort() (int, error) {
+	l, err := net.ListenPacket("udp", ":0")
+	if err != nil {
+		return 0, fmt.Errorf("net.ListenPacket() failed: %w", err)
+	}
+	port := l.LocalAddr().(*net.UDPAddr).Port
+	l.Close()
+	return port, nil
 }

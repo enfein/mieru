@@ -22,8 +22,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/enfein/mieru/v3/pkg/util"
-
+	"github.com/enfein/mieru/v3/pkg/common"
 	"golang.org/x/crypto/chacha20poly1305"
 )
 
@@ -292,7 +291,7 @@ func (c *AEADBlockCipher) newNonce() ([]byte, error) {
 	if rewriteLen > c.NonceSize() {
 		rewriteLen = c.NonceSize()
 	}
-	util.ToCommon64Set(nonce, 0, rewriteLen)
+	common.ToCommon64Set(nonce, 0, rewriteLen)
 	return nonce, nil
 }
 

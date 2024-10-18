@@ -32,13 +32,13 @@ import (
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlgrpc"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
+	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/egress"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 	"github.com/enfein/mieru/v3/pkg/protocol"
 	"github.com/enfein/mieru/v3/pkg/socks5"
 	"github.com/enfein/mieru/v3/pkg/stderror"
-	"github.com/enfein/mieru/v3/pkg/util"
 	"github.com/enfein/mieru/v3/pkg/version/updater"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -397,7 +397,7 @@ var serverRunFunc = func(s []string) error {
 	}
 
 	// Detect and log TCP congestion control algorithm.
-	if algo := util.TCPCongestionControlAlgorithm(); algo != "" {
+	if algo := common.TCPCongestionControlAlgorithm(); algo != "" {
 		log.Infof("TCP congestion control algorithm is %q", algo)
 	}
 
@@ -407,7 +407,7 @@ var serverRunFunc = func(s []string) error {
 
 		mux := protocol.NewMux(false).SetServerUsers(appctl.UserListToMap(config.GetUsers()))
 		appctl.SetServerMuxRef(mux)
-		mtu := util.DefaultMTU
+		mtu := common.DefaultMTU
 		if config.GetMtu() != 0 {
 			mtu = int(config.GetMtu())
 		}
@@ -568,8 +568,8 @@ var serverApplyConfigFunc = func(s []string) error {
 		return fmt.Errorf("os.ReadFile(%q) failed: %w", path, err)
 	}
 	patch := &appctlpb.ServerConfig{}
-	if err = util.UnmarshalJSON(b, patch); err != nil {
-		return fmt.Errorf("util.UnmarshalJSON() failed: %w", err)
+	if err = common.UnmarshalJSON(b, patch); err != nil {
+		return fmt.Errorf("common.UnmarshalJSON() failed: %w", err)
 	}
 	if err := appctl.ValidateServerConfigPatch(patch); err != nil {
 		return fmt.Errorf(stderror.ValidateServerConfigPatchFailedErr, err)
@@ -610,9 +610,9 @@ var serverDescribeConfigFunc = func(s []string) error {
 	if err != nil {
 		return fmt.Errorf(stderror.GetServerConfigFailedErr, err)
 	}
-	jsonBytes, err := util.MarshalJSON(config)
+	jsonBytes, err := common.MarshalJSON(config)
 	if err != nil {
-		return fmt.Errorf("util.MarshalJSON() failed: %w", err)
+		return fmt.Errorf("common.MarshalJSON() failed: %w", err)
 	}
 	log.Infof("%s", string(jsonBytes))
 	return nil

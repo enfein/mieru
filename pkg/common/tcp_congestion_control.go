@@ -1,4 +1,4 @@
-// Copyright (C) 2022  mieru authors
+// Copyright (C) 2024  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,29 +13,25 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package util
+package common
 
 import (
-	"net"
-	"testing"
+	"os"
+	"runtime"
+	"strings"
 )
 
-type counterCloser struct {
-	net.Conn
-	Counter *int
-}
-
-func (cc counterCloser) Close() error {
-	*cc.Counter = *cc.Counter + 1
-	return nil
-}
-
-func TestHierarchyConn(t *testing.T) {
-	counter := 0
-	parent := WrapHierarchyConn(counterCloser{Conn: nil, Counter: &counter})
-	parent.AddSubConnection(counterCloser{Conn: nil, Counter: &counter})
-	parent.Close()
-	if counter != 2 {
-		t.Errorf("counter = %d, want %d", counter, 2)
+// TCPCongestionControlAlgorithm returns the TCP congestion control algorithm
+// used by the operating system.
+func TCPCongestionControlAlgorithm() string {
+	if runtime.GOOS == "linux" {
+		v, err := os.ReadFile("/proc/sys/net/ipv4/tcp_congestion_control")
+		if err != nil {
+			return ""
+		}
+		return strings.TrimSpace(string(v))
+	} else {
+		// Unsupported platform.
+		return ""
 	}
 }

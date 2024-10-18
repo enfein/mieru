@@ -18,6 +18,7 @@ package model
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"strconv"
@@ -37,13 +38,9 @@ type AddrSpec struct {
 	Port int
 }
 
+// String returns a string that can be used by Dial function.
+// It prefers IP address over FQDN.
 func (a AddrSpec) String() string {
-	return a.Address()
-}
-
-// Address returns a string suitable to dial.
-// Prefer returning IP-based address, fallback to FQDN.
-func (a AddrSpec) Address() string {
 	if len(a.IP) != 0 {
 		return net.JoinHostPort(a.IP.String(), strconv.Itoa(a.Port))
 	}
@@ -121,4 +118,48 @@ func (a AddrSpec) WriteToSocks5(w io.Writer) error {
 
 	_, err := w.Write(b.Bytes())
 	return err
+}
+
+// NetAddrSpec is a AddrSpec with a network type.
+// It implements the net.Addr interface.
+type NetAddrSpec struct {
+	AddrSpec
+	Net string
+}
+
+var _ net.Addr = NetAddrSpec{}
+var _ net.Addr = &NetAddrSpec{}
+
+// Network returns a network type that can be used by Dial function.
+func (n NetAddrSpec) Network() string {
+	return n.Net
+}
+
+// From modifies the NetAddrSpec object with the given network address.
+func (n *NetAddrSpec) From(addr net.Addr) error {
+	n.Net = addr.Network()
+
+	host, portStr, err := net.SplitHostPort(addr.String())
+	if err != nil {
+		return fmt.Errorf("split host port failed: %w", err)
+	}
+	if host == "" {
+		return fmt.Errorf("host is empty")
+	}
+
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return fmt.Errorf("parse port failed: %w", err)
+	}
+	n.Port = port
+
+	if ip := net.ParseIP(host); ip != nil {
+		n.IP = ip
+		n.FQDN = ""
+		return nil
+	}
+
+	n.IP = nil
+	n.FQDN = host
+	return nil
 }

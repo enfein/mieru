@@ -1,4 +1,4 @@
-// Copyright (C) 2024  mieru authors
+// Copyright (C) 2023  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,31 +13,36 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package util
+package common
 
-// FillBytes fills the byte slice with the given value.
-func FillBytes(b []byte, value byte) {
-	for i := range b {
-		b[i] = value
+import (
+	"fmt"
+	"net"
+	"testing"
+)
+
+func TestUnusedTCPPort(t *testing.T) {
+	port, err := UnusedTCPPort()
+	if err != nil {
+		t.Fatalf("UnusedTCPPort() failed: %v", err)
 	}
+
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		t.Fatalf("net.Listen() on port %d failed: %v", port, err)
+	}
+	l.Close()
 }
 
-// IsBitsAllZero returns true if all bits in the slice are zero.
-func IsBitsAllZero(b []byte) bool {
-	for _, v := range b {
-		if v != 0 {
-			return false
-		}
+func TestUnusedUDPPort(t *testing.T) {
+	port, err := UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("UnusedUDPPort() failed: %v", err)
 	}
-	return true
-}
 
-// IsBitsAllOne returns true if all bits in the slice are one.
-func IsBitsAllOne(b []byte) bool {
-	for _, v := range b {
-		if v != 0xFF {
-			return false
-		}
+	l, err := net.ListenPacket("udp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		t.Fatalf("net.ListenPacket() on port %d failed: %v", port, err)
 	}
-	return true
+	l.Close()
 }

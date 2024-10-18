@@ -19,12 +19,13 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	mrand "math/rand"
 	"net"
 	"runtime"
 	"sync"
 	"time"
 
-	"github.com/enfein/mieru/v3/pkg/util"
+	"github.com/enfein/mieru/v3/pkg/common"
 )
 
 // BufPipe is like net.Pipe() but with an internal buffer.
@@ -82,8 +83,13 @@ func (e *ioEndpoint) Read(b []byte) (n int, err error) {
 	if errors.Is(err, io.EOF) {
 		// io.ReadFull() with partial result will not fail.
 		err = nil
-		// Allow the writer to catch up.
-		runtime.Gosched()
+		action := mrand.Intn(2)
+		if action == 0 {
+			// Allow the writer to catch up.
+			runtime.Gosched()
+		} else {
+			time.Sleep(time.Microsecond)
+		}
 	}
 	return
 }
@@ -110,11 +116,11 @@ func (e *ioEndpoint) Close() error {
 }
 
 func (e *ioEndpoint) LocalAddr() net.Addr {
-	return util.NilNetAddr()
+	return common.NilNetAddr()
 }
 
 func (e *ioEndpoint) RemoteAddr() net.Addr {
-	return util.NilNetAddr()
+	return common.NilNetAddr()
 }
 
 func (e *ioEndpoint) SetDeadline(t time.Time) error {

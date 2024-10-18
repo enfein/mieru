@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,10 +31,10 @@ import (
 	"github.com/enfein/mieru/v3/pkg/appctl"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
+	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/protocol"
 	"github.com/enfein/mieru/v3/pkg/stderror"
-	"github.com/enfein/mieru/v3/pkg/util"
 )
 
 // mieruClient is the official implementation of mieru client APIs.
@@ -124,12 +125,12 @@ func (mc *mieruClient) Start() error {
 	mc.mux = mc.mux.SetClientMultiplexFactor(multiplexFactor)
 
 	// Set server endpoints.
-	mtu := util.DefaultMTU
+	mtu := common.DefaultMTU
 	if activeProfile.GetMtu() != 0 {
 		mtu = int(activeProfile.GetMtu())
 	}
 	endpoints := make([]protocol.UnderlayProperties, 0)
-	resolver := &util.DNSResolver{}
+	resolver := &common.DNSResolver{}
 	for _, serverInfo := range activeProfile.GetServers() {
 		var proxyHost string
 		var proxyIP net.IP
@@ -146,7 +147,7 @@ func (mc *mieruClient) Start() error {
 				return fmt.Errorf(stderror.ParseIPFailed)
 			}
 		}
-		ipVersion := util.GetIPVersion(proxyIP.String())
+		ipVersion := common.GetIPVersion(proxyIP.String())
 		portBindings, err := appctl.FlatPortBindings(serverInfo.GetPortBindings())
 		if err != nil {
 			return fmt.Errorf(stderror.InvalidPortBindingsErr, err)
@@ -155,10 +156,10 @@ func (mc *mieruClient) Start() error {
 			proxyPort := bindingInfo.GetPort()
 			switch bindingInfo.GetProtocol() {
 			case appctlpb.TransportProtocol_TCP:
-				endpoint := protocol.NewUnderlayProperties(mtu, ipVersion, util.TCPTransport, nil, &net.TCPAddr{IP: proxyIP, Port: int(proxyPort)})
+				endpoint := protocol.NewUnderlayProperties(mtu, ipVersion, common.TCPTransport, nil, &net.TCPAddr{IP: proxyIP, Port: int(proxyPort)})
 				endpoints = append(endpoints, endpoint)
 			case appctlpb.TransportProtocol_UDP:
-				endpoint := protocol.NewUnderlayProperties(mtu, ipVersion, util.UDPTransport, nil, &net.UDPAddr{IP: proxyIP, Port: int(proxyPort)})
+				endpoint := protocol.NewUnderlayProperties(mtu, ipVersion, common.UDPTransport, nil, &net.UDPAddr{IP: proxyIP, Port: int(proxyPort)})
 				endpoints = append(endpoints, endpoint)
 			default:
 				return fmt.Errorf(stderror.InvalidTransportProtocol)
@@ -188,43 +189,60 @@ func (mc *mieruClient) IsRunning() bool {
 	return mc.running
 }
 
-func (mc *mieruClient) DialContext(ctx context.Context) (net.Conn, error) {
+func (mc *mieruClient) DialContext(ctx context.Context, addr net.Addr) (net.Conn, error) {
 	mc.mu.RLock()
 	defer mc.mu.RUnlock()
 	if !mc.running {
 		return nil, ErrClientIsNotRunning
 	}
-	return mc.mux.DialContext(ctx)
-}
 
-func (mc *mieruClient) HandshakeWithConnect(ctx context.Context, conn net.Conn, addr model.AddrSpec) error {
-	mc.mu.RLock()
-	defer mc.mu.RUnlock()
+	// Check destination address.
+	var netAddrSpec model.NetAddrSpec
+	if nas, ok := addr.(model.NetAddrSpec); ok {
+		netAddrSpec = nas
+	} else if nas, ok := addr.(*model.NetAddrSpec); ok {
+		netAddrSpec = *nas
+	} else {
+		if err := netAddrSpec.From(addr); err != nil {
+			return nil, fmt.Errorf("invalid destination address: %w", err)
+		}
+	}
+	if !strings.HasPrefix(netAddrSpec.Network(), "tcp") {
+		return nil, fmt.Errorf("only tcp network is supported")
+	}
 
+	conn, err := mc.mux.DialContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	var req bytes.Buffer
 	req.Write([]byte{constant.Socks5Version, constant.Socks5ConnectCmd, 0})
-	if err := addr.WriteToSocks5(&req); err != nil {
-		return err
+	if err := netAddrSpec.WriteToSocks5(&req); err != nil {
+		return nil, err
 	}
 	if _, err := conn.Write(req.Bytes()); err != nil {
-		return fmt.Errorf("failed to write socks5 connection request to the server: %w", err)
+		return nil, fmt.Errorf("failed to write socks5 connection request to the server: %w", err)
 	}
 
-	util.SetReadTimeout(conn, 10*time.Second)
+	common.SetReadTimeout(conn, 10*time.Second)
 	defer func() {
-		util.SetReadTimeout(conn, 0)
+		common.SetReadTimeout(conn, 0)
 	}()
 
 	resp := make([]byte, 3)
 	if _, err := io.ReadFull(conn, resp); err != nil {
-		return fmt.Errorf("failed to read socks5 connection response from the server: %w", err)
+		return nil, fmt.Errorf("failed to read socks5 connection response from the server: %w", err)
 	}
-	var respAddr model.AddrSpec
+	var respAddr model.NetAddrSpec
 	if err := respAddr.ReadFromSocks5(conn); err != nil {
-		return fmt.Errorf("failed to read socks5 connection address response from the server: %w", err)
+		return nil, fmt.Errorf("failed to read socks5 connection address response from the server: %w", err)
 	}
 	if resp[1] != 0 {
-		return fmt.Errorf("server returned socks5 error code %d", resp[1])
+		return nil, fmt.Errorf("server returned socks5 error code %d", resp[1])
 	}
-	return nil
+	return conn, nil
+}
+
+func (mc *mieruClient) DialContextWithConn(ctx context.Context, conn net.Conn, addr net.Addr) (net.Conn, error) {
+	return nil, fmt.Errorf("not implemented")
 }

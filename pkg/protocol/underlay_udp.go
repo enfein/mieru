@@ -25,12 +25,12 @@ import (
 
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
+	"github.com/enfein/mieru/v3/pkg/common"
+	"github.com/enfein/mieru/v3/pkg/common/sockopts"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 	"github.com/enfein/mieru/v3/pkg/replay"
 	"github.com/enfein/mieru/v3/pkg/stderror"
-	"github.com/enfein/mieru/v3/pkg/util"
-	"github.com/enfein/mieru/v3/pkg/util/sockopts"
 )
 
 const (
@@ -132,20 +132,20 @@ func (u *UDPUnderlay) Close() error {
 	return u.conn.Close()
 }
 
-func (u *UDPUnderlay) IPVersion() util.IPVersion {
+func (u *UDPUnderlay) IPVersion() common.IPVersion {
 	u.ipVersionMutex.Lock()
 	defer u.ipVersionMutex.Unlock()
 	if u.conn == nil {
-		return util.IPVersionUnknown
+		return common.IPVersionUnknown
 	}
-	if u.ipVersion == util.IPVersionUnknown {
-		u.ipVersion = util.GetIPVersion(u.conn.LocalAddr().String())
+	if u.ipVersion == common.IPVersionUnknown {
+		u.ipVersion = common.GetIPVersion(u.conn.LocalAddr().String())
 	}
 	return u.ipVersion
 }
 
-func (u *UDPUnderlay) TransportProtocol() util.TransportProtocol {
-	return util.UDPTransport
+func (u *UDPUnderlay) TransportProtocol() common.TransportProtocol {
+	return common.UDPTransport
 }
 
 func (u *UDPUnderlay) LocalAddr() net.Addr {
@@ -156,7 +156,7 @@ func (u *UDPUnderlay) RemoteAddr() net.Addr {
 	if u.isClient && u.serverAddr != nil {
 		return u.serverAddr
 	}
-	return util.NilNetAddr()
+	return common.NilNetAddr()
 }
 
 func (u *UDPUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
@@ -341,8 +341,8 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 		default:
 		}
 
-		util.SetReadTimeout(u.conn, readOneSegmentTimeout)
-		defer util.SetReadTimeout(u.conn, 0)
+		common.SetReadTimeout(u.conn, readOneSegmentTimeout)
+		defer common.SetReadTimeout(u.conn, 0)
 		// Peer may select a different MTU.
 		// Use the largest possible value here to avoid error.
 		b := make([]byte, 1500)
@@ -554,7 +554,7 @@ func (u *UDPUnderlay) readSessionSegment(ss *sessionStruct, nonce, remaining []b
 	return &segment{
 		metadata:  ss,
 		payload:   decryptedPayload,
-		transport: util.UDPTransport,
+		transport: common.UDPTransport,
 	}, nil
 }
 
@@ -603,7 +603,7 @@ func (u *UDPUnderlay) readDataAckSegment(das *dataAckStruct, nonce, remaining []
 	return &segment{
 		metadata:  das,
 		payload:   decryptedPayload,
-		transport: util.UDPTransport,
+		transport: common.UDPTransport,
 	}, nil
 }
 

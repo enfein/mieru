@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
-	"github.com/enfein/mieru/v3/pkg/util"
+	"github.com/enfein/mieru/v3/pkg/common"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -56,8 +56,8 @@ func TestApply2ServerConfig(t *testing.T) {
 		t.Errorf("LoadServerConfig() failed: %v", err)
 	}
 	if !proto.Equal(merged, want) {
-		mergedJSON, _ := util.MarshalJSON(merged)
-		wantJSON, _ := util.MarshalJSON(want)
+		mergedJSON, _ := common.MarshalJSON(merged)
+		wantJSON, _ := common.MarshalJSON(want)
 		t.Errorf("server config doesn't equal:\ngot = %v\nwant = %v", string(mergedJSON), string(wantJSON))
 	}
 

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package util
+package common
 
 import (
 	"context"
@@ -64,4 +64,13 @@ func (d *DNSResolver) LookupIP(ctx context.Context, host string) (net.IP, error)
 		return nil, fmt.Errorf("lookup IP from %s returned no result", host)
 	}
 	return ips[0], nil
+}
+
+// ForbidDefaultResolver causes the process to panic if
+// net.DefaultResolver is used.
+func ForbidDefaultResolver() {
+	net.DefaultResolver.PreferGo = true
+	net.DefaultResolver.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {
+		panic("Using net.DefaultResolver is forbidden")
+	}
 }
