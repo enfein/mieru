@@ -29,7 +29,7 @@
                     ]
                 }
             ],
-            "mtu": 1500,
+            "mtu": 1400,
             "multiplexing": {
                 "level": "MULTIPLEXING_HIGH"
             }

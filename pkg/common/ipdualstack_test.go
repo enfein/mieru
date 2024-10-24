@@ -19,23 +19,6 @@ import (
 	"testing"
 )
 
-func TestGetIPVersion(t *testing.T) {
-	testcases := []struct {
-		input string
-		want  IPVersion
-	}{
-		{"google.com", IPVersionUnknown},
-		{"127.0.0.1", IPVersion4},
-		{"1234::0", IPVersion6},
-	}
-
-	for _, tc := range testcases {
-		if out := GetIPVersion(tc.input); out != tc.want {
-			t.Errorf("GetIPVersion(%v) = %v, want %v", tc.input, out, tc.want)
-		}
-	}
-}
-
 func TestMaybeDecorateIPv6(t *testing.T) {
 	testcases := []struct {
 		input string

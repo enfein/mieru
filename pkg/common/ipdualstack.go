@@ -23,27 +23,6 @@ import (
 	"strings"
 )
 
-type IPVersion uint8
-
-const (
-	IPVersionUnknown IPVersion = iota
-	IPVersion4
-	IPVersion6
-)
-
-func (v IPVersion) String() string {
-	switch v {
-	case IPVersionUnknown:
-		return "UNKNOWN"
-	case IPVersion4:
-		return "IPV4"
-	case IPVersion6:
-		return "IPV6"
-	default:
-		return "UNSPECIFIED"
-	}
-}
-
 // IsIPDualStack returns true if an IPv6 socket is able to send and receive
 // both IPv4 and IPv6 packets.
 //
@@ -86,8 +65,18 @@ func LocalIPAddr() string {
 	return "127.0.0.1"
 }
 
-// GetIPVersion returns the IP version of the given network address.
-func GetIPVersion(addr string) IPVersion {
+// MaybeDecorateIPv6 adds [ and ] before and after an IPv6 address. If the
+// input string is a IPv4 address or not a valid IP address (e.g. is a domain name),
+// the same string is returned.
+func MaybeDecorateIPv6(addr string) string {
+	if isIPv6(addr) {
+		return "[" + addr + "]"
+	}
+	return addr
+}
+
+// isIPv6 returns true if the given network address is IPv6.
+func isIPv6(addr string) bool {
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
 		// Assume there is no port.
@@ -95,21 +84,7 @@ func GetIPVersion(addr string) IPVersion {
 	}
 	ip := net.ParseIP(host)
 	if ip == nil {
-		return IPVersionUnknown
+		return false
 	}
-	ip4 := ip.To4()
-	if ip4 != nil {
-		return IPVersion4
-	}
-	return IPVersion6
-}
-
-// MaybeDecorateIPv6 adds [ and ] before and after an IPv6 address. If the
-// input string is a IPv4 address or not a valid IP address (e.g. is a domain),
-// the same string is returned.
-func MaybeDecorateIPv6(addr string) string {
-	if GetIPVersion(addr) == IPVersion6 {
-		return "[" + addr + "]"
-	}
-	return addr
+	return ip.To4() == nil
 }

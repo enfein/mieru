@@ -654,7 +654,6 @@ func ValidateFullServerConfig(config *pb.ServerConfig) error {
 func PortBindingsToUnderlayProperties(portBindings []*pb.PortBinding, mtu int) ([]protocol.UnderlayProperties, error) {
 	endpoints := make([]protocol.UnderlayProperties, 0)
 	listenIP := net.ParseIP(common.AllIPAddr())
-	ipVersion := common.GetIPVersion(listenIP.String())
 	if listenIP == nil {
 		return endpoints, fmt.Errorf(stderror.ParseIPFailed)
 	}
@@ -668,10 +667,10 @@ func PortBindingsToUnderlayProperties(portBindings []*pb.PortBinding, mtu int) (
 		port := portBindings[i].GetPort()
 		switch proto {
 		case pb.TransportProtocol_TCP:
-			endpoint := protocol.NewUnderlayProperties(mtu, ipVersion, common.TCPTransport, &net.TCPAddr{IP: listenIP, Port: int(port)}, nil)
+			endpoint := protocol.NewUnderlayProperties(mtu, common.TCPTransport, &net.TCPAddr{IP: listenIP, Port: int(port)}, nil)
 			endpoints = append(endpoints, endpoint)
 		case pb.TransportProtocol_UDP:
-			endpoint := protocol.NewUnderlayProperties(mtu, ipVersion, common.UDPTransport, &net.UDPAddr{IP: listenIP, Port: int(port)}, nil)
+			endpoint := protocol.NewUnderlayProperties(mtu, common.UDPTransport, &net.UDPAddr{IP: listenIP, Port: int(port)}, nil)
 			endpoints = append(endpoints, endpoint)
 		default:
 			return []protocol.UnderlayProperties{}, fmt.Errorf(stderror.InvalidTransportProtocol)

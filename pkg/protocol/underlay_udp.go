@@ -111,9 +111,9 @@ func (u *UDPUnderlay) String() string {
 		return "UDPUnderlay{}"
 	}
 	if u.isClient {
-		return fmt.Sprintf("UDPUnderlay{local=%v, remote=%v, mtu=%v, ipVersion=%v}", u.LocalAddr(), u.RemoteAddr(), u.mtu, u.IPVersion())
+		return fmt.Sprintf("UDPUnderlay{local=%v, remote=%v, mtu=%v}", u.LocalAddr(), u.RemoteAddr(), u.mtu)
 	} else {
-		return fmt.Sprintf("UDPUnderlay{local=%v, mtu=%v, ipVersion=%v}", u.LocalAddr(), u.mtu, u.IPVersion())
+		return fmt.Sprintf("UDPUnderlay{local=%v, mtu=%v}", u.LocalAddr(), u.mtu)
 	}
 }
 
@@ -130,18 +130,6 @@ func (u *UDPUnderlay) Close() error {
 	u.idleSessionTicker.Stop()
 	u.baseUnderlay.Close()
 	return u.conn.Close()
-}
-
-func (u *UDPUnderlay) IPVersion() common.IPVersion {
-	u.ipVersionMutex.Lock()
-	defer u.ipVersionMutex.Unlock()
-	if u.conn == nil {
-		return common.IPVersionUnknown
-	}
-	if u.ipVersion == common.IPVersionUnknown {
-		u.ipVersion = common.GetIPVersion(u.conn.LocalAddr().String())
-	}
-	return u.ipVersion
 }
 
 func (u *UDPUnderlay) TransportProtocol() common.TransportProtocol {
@@ -652,7 +640,7 @@ func (u *UDPUnderlay) writeOneSegment(seg *segment, addr *net.UDPAddr) error {
 	}
 
 	if ss, ok := toSessionStruct(seg.metadata); ok {
-		maxPaddingSize := MaxPaddingSize(u.mtu, u.IPVersion(), u.TransportProtocol(), int(ss.payloadLen), 0)
+		maxPaddingSize := MaxPaddingSize(u.mtu, u.TransportProtocol(), int(ss.payloadLen), 0)
 		padding := newPadding(
 			buildRecommendedPaddingOpts(maxPaddingSize, udpOverhead+int(ss.payloadLen), blockCipher.BlockContext().UserName),
 		)
@@ -687,11 +675,11 @@ func (u *UDPUnderlay) writeOneSegment(seg *segment, addr *net.UDPAddr) error {
 		metrics.OutputPaddingBytes.Add(int64(len(padding)))
 	} else if das, ok := toDataAckStruct(seg.metadata); ok {
 		padding1 := newPadding(paddingOpts{
-			maxLen: MaxPaddingSize(u.mtu, u.IPVersion(), u.TransportProtocol(), int(das.payloadLen), 0),
+			maxLen: MaxPaddingSize(u.mtu, u.TransportProtocol(), int(das.payloadLen), 0),
 			ascii:  &asciiPaddingOpts{},
 		})
 		padding2 := newPadding(paddingOpts{
-			maxLen: MaxPaddingSize(u.mtu, u.IPVersion(), u.TransportProtocol(), int(das.payloadLen), len(padding1)),
+			maxLen: MaxPaddingSize(u.mtu, u.TransportProtocol(), int(das.payloadLen), len(padding1)),
 			ascii:  &asciiPaddingOpts{},
 		})
 		das.prefixLen = uint8(len(padding1))

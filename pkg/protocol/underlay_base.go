@@ -31,17 +31,15 @@ const sessionChanCapacity = 64
 
 // baseUnderlay contains a partial implementation of underlay.
 type baseUnderlay struct {
-	isClient  bool
-	mtu       int
-	ipVersion common.IPVersion
-	done      chan struct{} // if the underlay is closed
+	isClient bool
+	mtu      int
+	done     chan struct{} // if the underlay is closed
 
 	sessionMap    sync.Map      // Map<sessionID, *Session>
 	readySessions chan *Session // sessions that completed handshake and ready for consume
 
-	sendMutex      sync.Mutex // protect writing data to the connection
-	closeMutex     sync.Mutex // protect closing the connection
-	ipVersionMutex sync.Mutex // protect getting and setting IPVersion
+	sendMutex  sync.Mutex // protect writing data to the connection
+	closeMutex sync.Mutex // protect closing the connection
 
 	// ---- client fields ----
 	scheduler *ScheduleController
@@ -55,7 +53,6 @@ func newBaseUnderlay(isClient bool, mtu int) *baseUnderlay {
 	return &baseUnderlay{
 		isClient:      isClient,
 		mtu:           mtu,
-		ipVersion:     common.IPVersionUnknown,
 		done:          make(chan struct{}),
 		readySessions: make(chan *Session, sessionChanCapacity),
 		scheduler:     &ScheduleController{},
@@ -101,10 +98,6 @@ func (b *baseUnderlay) Addr() net.Addr {
 
 func (b *baseUnderlay) MTU() int {
 	return b.mtu
-}
-
-func (b *baseUnderlay) IPVersion() common.IPVersion {
-	return b.ipVersion
 }
 
 func (b *baseUnderlay) TransportProtocol() common.TransportProtocol {

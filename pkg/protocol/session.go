@@ -481,7 +481,7 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 
 	// Determine number of fragments to write.
 	nFragment := 1
-	fragmentSize := MaxFragmentSize(s.mtu, s.conn.IPVersion(), s.conn.TransportProtocol())
+	fragmentSize := MaxFragmentSize(s.mtu, s.conn.TransportProtocol())
 	if len(b) > fragmentSize {
 		nFragment = (len(b)-1)/fragmentSize + 1
 	}

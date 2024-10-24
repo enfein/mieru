@@ -95,7 +95,7 @@ func (t *TCPUnderlay) String() string {
 	if t.conn == nil {
 		return "TCPUnderlay{}"
 	}
-	return fmt.Sprintf("TCPUnderlay{local=%v, remote=%v, mtu=%v, ipVersion=%v}", t.conn.LocalAddr(), t.conn.RemoteAddr(), t.mtu, t.IPVersion())
+	return fmt.Sprintf("TCPUnderlay{local=%v, remote=%v, mtu=%v}", t.conn.LocalAddr(), t.conn.RemoteAddr(), t.mtu)
 }
 
 func (t *TCPUnderlay) Close() error {
@@ -114,18 +114,6 @@ func (t *TCPUnderlay) Close() error {
 
 func (t *TCPUnderlay) Addr() net.Addr {
 	return t.LocalAddr()
-}
-
-func (t *TCPUnderlay) IPVersion() common.IPVersion {
-	t.ipVersionMutex.Lock()
-	defer t.ipVersionMutex.Unlock()
-	if t.conn == nil {
-		return common.IPVersionUnknown
-	}
-	if t.ipVersion == common.IPVersionUnknown {
-		t.ipVersion = common.GetIPVersion(t.conn.LocalAddr().String())
-	}
-	return t.ipVersion
 }
 
 func (t *TCPUnderlay) TransportProtocol() common.TransportProtocol {
@@ -510,7 +498,7 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 	}
 
 	if ss, ok := toSessionStruct(seg.metadata); ok {
-		maxPaddingSize := MaxPaddingSize(t.mtu, t.IPVersion(), t.TransportProtocol(), int(ss.payloadLen), 0)
+		maxPaddingSize := MaxPaddingSize(t.mtu, t.TransportProtocol(), int(ss.payloadLen), 0)
 		padding := newPadding(
 			buildRecommendedPaddingOpts(maxPaddingSize, tcpOverhead+int(ss.payloadLen), t.send.BlockContext().UserName),
 		)
@@ -544,11 +532,11 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 		metrics.OutputPaddingBytes.Add(int64(len(padding)))
 	} else if das, ok := toDataAckStruct(seg.metadata); ok {
 		padding1 := newPadding(paddingOpts{
-			maxLen: MaxPaddingSize(t.mtu, t.IPVersion(), t.TransportProtocol(), int(das.payloadLen), 0),
+			maxLen: MaxPaddingSize(t.mtu, t.TransportProtocol(), int(das.payloadLen), 0),
 			ascii:  &asciiPaddingOpts{},
 		})
 		padding2 := newPadding(paddingOpts{
-			maxLen: MaxPaddingSize(t.mtu, t.IPVersion(), t.TransportProtocol(), int(das.payloadLen), len(padding1)),
+			maxLen: MaxPaddingSize(t.mtu, t.TransportProtocol(), int(das.payloadLen), len(padding1)),
 			ascii:  &asciiPaddingOpts{},
 		})
 		das.prefixLen = uint8(len(padding1))

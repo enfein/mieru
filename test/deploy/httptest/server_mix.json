@@ -27,5 +27,5 @@
         "allowLocalDestination": true
     },
     "loggingLevel": "DEBUG",
-    "mtu": 1460
+    "mtu": 1400
 }

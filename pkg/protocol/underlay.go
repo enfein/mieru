@@ -34,11 +34,9 @@ var (
 
 // UnderlayProperties defines network properties of a underlay.
 type UnderlayProperties interface {
-	// Layer 2 MTU of this network connection.
+	// Maximum transission unit of this network connection
+	// in the current network layer.
 	MTU() int
-
-	// The IP version used to establish the underlay.
-	IPVersion() common.IPVersion
 
 	// The transport protocol used to implement the underlay.
 	TransportProtocol() common.TransportProtocol
@@ -87,7 +85,6 @@ type Underlay interface {
 // underlayDescriptor implements UnderlayProperties.
 type underlayDescriptor struct {
 	mtu               int
-	ipVersion         common.IPVersion
 	transportProtocol common.TransportProtocol
 	localAddr         net.Addr
 	remoteAddr        net.Addr
@@ -97,10 +94,6 @@ var _ UnderlayProperties = &underlayDescriptor{}
 
 func (d *underlayDescriptor) MTU() int {
 	return d.mtu
-}
-
-func (d *underlayDescriptor) IPVersion() common.IPVersion {
-	return d.ipVersion
 }
 
 func (d *underlayDescriptor) TransportProtocol() common.TransportProtocol {
@@ -116,10 +109,9 @@ func (d *underlayDescriptor) RemoteAddr() net.Addr {
 }
 
 // NewUnderlayProperties creates a new instance of UnderlayProperties.
-func NewUnderlayProperties(mtu int, ipVersion common.IPVersion, transportProtocol common.TransportProtocol, localAddr net.Addr, remoteAddr net.Addr) UnderlayProperties {
+func NewUnderlayProperties(mtu int, transportProtocol common.TransportProtocol, localAddr net.Addr, remoteAddr net.Addr) UnderlayProperties {
 	d := &underlayDescriptor{
 		mtu:               mtu,
-		ipVersion:         ipVersion,
 		transportProtocol: transportProtocol,
 		localAddr:         localAddr,
 		remoteAddr:        remoteAddr,

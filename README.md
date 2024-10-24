@@ -27,8 +27,8 @@ For an explanation of the mieru protocol, see [mieru Proxy Protocol](./docs/prot
 1. Supports both IPv4 and IPv6.
 1. The server software supports socks5 outbound (proxy chain).
 1. The client software supports Windows, Mac OS, Linux and Android. Android clients include
-   - [NekoBox](https://github.com/MatsuriDayo/NekoBoxForAndroid) version 1.3.1 or above, with [mieru plugin](https://github.com/enfein/NekoBoxPlugins).
-   - [Exclave](https://github.com/dyhkwong/Exclave), with [mieru plugin](https://github.com/dyhkwong/Exclave/releases?q=mieru-plugin).
+   - [NekoBox](https://github.com/MatsuriDayo/NekoBoxForAndroid) with [mieru plugin](https://github.com/enfein/NekoBoxPlugins).
+   - [Exclave](https://github.com/dyhkwong/Exclave) with [mieru plugin](https://github.com/dyhkwong/Exclave/releases?q=mieru-plugin).
    - [husi](https://github.com/xchacha20-poly1305/husi) with [mieru plugin](https://github.com/xchacha20-poly1305/husi/releases?q=plugin-mieru).
 1. If you need advanced features like global proxy or customized routing rules, you can use mieru as the backend of a proxy platform such as [Xray](https://github.com/XTLS/Xray-core) and [sing-box](https://github.com/SagerNet/sing-box).
 

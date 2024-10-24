@@ -40,18 +40,13 @@ const (
 )
 
 // MaxFragmentSize returns the maximum payload size in a fragment.
-func MaxFragmentSize(mtu int, ipVersion common.IPVersion, transport common.TransportProtocol) int {
+func MaxFragmentSize(mtu int, transport common.TransportProtocol) int {
 	if transport == common.TCPTransport {
 		// No fragment needed.
 		return maxPDU
 	}
 
 	res := mtu - udpOverhead
-	if ipVersion == common.IPVersion4 {
-		res -= 20
-	} else {
-		res -= 40
-	}
 	if transport == common.UDPTransport {
 		res -= 8
 	} else {
@@ -61,18 +56,13 @@ func MaxFragmentSize(mtu int, ipVersion common.IPVersion, transport common.Trans
 }
 
 // MaxPaddingSize returns the maximum padding size of a segment.
-func MaxPaddingSize(mtu int, ipVersion common.IPVersion, transport common.TransportProtocol, fragmentSize int, existingPaddingSize int) int {
+func MaxPaddingSize(mtu int, transport common.TransportProtocol, fragmentSize int, existingPaddingSize int) int {
 	if transport == common.TCPTransport {
 		// No limit.
 		return 255
 	}
 
 	res := mtu - fragmentSize - udpOverhead
-	if ipVersion == common.IPVersion4 {
-		res -= 20
-	} else {
-		res -= 40
-	}
 	if transport == common.UDPTransport {
 		res -= 8
 	} else {

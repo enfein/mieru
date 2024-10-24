@@ -27,5 +27,5 @@
         "allowLocalDestination": true
     },
     "loggingLevel": "INFO",
-    "mtu": 1500
+    "mtu": 1400
 }
