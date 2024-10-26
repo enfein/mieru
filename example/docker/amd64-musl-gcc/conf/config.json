@@ -1,0 +1,16 @@
+{
+  "portBindings": [
+    {
+      "portRange": "27017-27019",
+      "protocol": "UDP"
+    }
+  ],
+  "users": [
+    {
+      "name": "uname1",
+      "password": "pwd1"
+    }
+  ],
+  "loggingLevel": "INFO",
+  "mtu": 1400
+}

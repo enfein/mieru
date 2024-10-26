@@ -1,0 +1,24 @@
+FROM golang:alpine AS builder
+
+RUN apk update && apk add --no-cache git
+
+RUN git clone https://github.com/enfein/mieru.git /build
+
+WORKDIR /build
+
+RUN go mod tidy
+
+RUN GOOS=linux GOARCH=amd64 CGO_ENABLED=0 GOCC=musl-gcc go build -ldflags="-s -w" -o mita cmd/mita/mita.go
+
+
+FROM alpine AS base
+
+COPY --from=builder /build/mita /usr/local/bin/
+
+WORKDIR /app
+
+COPY . .
+
+RUN chmod +x ./start.sh && adduser -H -D -g "" mita && mkdir -p /etc/mita
+
+CMD ["./start.sh"]

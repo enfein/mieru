@@ -1,0 +1,16 @@
+services:
+  meiru:
+    build: .
+    image: meiru
+    container_name: meiru
+    stop_grace_period: 60s
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: 10
+    ports:
+      - 27017-27019:27017-27019/udp
+    environment:
+      - TZ=Asia/Shanghai
