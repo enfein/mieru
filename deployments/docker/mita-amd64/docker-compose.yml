@@ -1,0 +1,16 @@
+services:
+  mita:
+    build: .
+    image: mita
+    container_name: mita
+    stop_grace_period: 5s
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: 10
+    ports:
+      - 27017-27019:27017-27019/udp
+    environment:
+      - TZ=Asia/Shanghai
