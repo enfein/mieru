@@ -119,7 +119,7 @@ var (
 // baseStruct is shared by all metadata struct.
 type baseStruct struct {
 	protocol  uint8  // byte 0: protocol type
-	reserved  uint8  // byte 1: reserved
+	_         uint8  // byte 1: reserved
 	timestamp uint32 // byte 2 - 5: timestamp, number of minutes after UNIX epoch
 }
 

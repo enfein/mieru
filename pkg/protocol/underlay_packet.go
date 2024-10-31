@@ -34,8 +34,8 @@ import (
 )
 
 const (
-	udpOverhead          = cipher.DefaultNonceSize + MetadataLength + cipher.DefaultOverhead*2
-	udpNonHeaderPosition = cipher.DefaultNonceSize + MetadataLength + cipher.DefaultOverhead
+	packetOverhead          = cipher.DefaultNonceSize + MetadataLength + cipher.DefaultOverhead*2
+	packetNonHeaderPosition = cipher.DefaultNonceSize + MetadataLength + cipher.DefaultOverhead
 
 	idleSessionTickerInterval = 5 * time.Second
 	idleSessionTimeout        = time.Minute
@@ -43,36 +43,38 @@ const (
 	readOneSegmentTimeout = 5 * time.Second
 )
 
-var udpReplayCache = replay.NewCache(4*1024*1024, cipher.KeyRefreshInterval*3)
+var packetReplayCache = replay.NewCache(4*1024*1024, cipher.KeyRefreshInterval*3)
 
-type UDPUnderlay struct {
+type PacketUnderlay struct {
 	// ---- common fields ----
 	baseUnderlay
-	conn *net.UDPConn
+	conn net.PacketConn
 
 	idleSessionTicker *time.Ticker
 
 	// ---- client fields ----
-	serverAddr *net.UDPAddr
+	serverAddr net.Addr
 	block      cipher.BlockCipher
 
 	// ---- server fields ----
 	users map[string]*appctlpb.User
 }
 
-var _ Underlay = &UDPUnderlay{}
+var _ Underlay = &PacketUnderlay{}
 
-// NewUDPUnderlay connects to the remote address "raddr" on the network "udp"
+// NewPacketUnderlay connects to the remote address "raddr" on the network
 // with packet encryption. If "laddr" is empty, an automatic address is used.
 // "block" is the block encryption algorithm to encrypt packets.
-func NewUDPUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, block cipher.BlockCipher) (*UDPUnderlay, error) {
+//
+// This function is only used by proxy client.
+func NewPacketUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, block cipher.BlockCipher) (*PacketUnderlay, error) {
 	switch network {
 	case "udp", "udp4", "udp6":
 	default:
-		return nil, fmt.Errorf("network %s is not supported by UDP underlay", network)
+		return nil, fmt.Errorf("network %s is not supported by packet underlay", network)
 	}
 	if !block.IsStateless() {
-		return nil, fmt.Errorf("UDP block cipher must be stateless")
+		return nil, fmt.Errorf("packet underlay block cipher must be stateless")
 	}
 	var localAddr *net.UDPAddr
 	var err error
@@ -94,7 +96,7 @@ func NewUDPUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, 
 	if err := sockopts.ApplyUDPControls(conn); err != nil {
 		return nil, fmt.Errorf("ApplyUDPControls() failed: %w", err)
 	}
-	u := &UDPUnderlay{
+	u := &PacketUnderlay{
 		baseUnderlay:      *newBaseUnderlay(true, mtu),
 		conn:              conn,
 		idleSessionTicker: time.NewTicker(idleSessionTickerInterval),
@@ -106,18 +108,18 @@ func NewUDPUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, 
 	return u, nil
 }
 
-func (u *UDPUnderlay) String() string {
+func (u *PacketUnderlay) String() string {
 	if u.conn == nil {
-		return "UDPUnderlay{}"
+		return "PacketUnderlay{}"
 	}
 	if u.isClient {
-		return fmt.Sprintf("UDPUnderlay{local=%v, remote=%v, mtu=%v}", u.LocalAddr(), u.RemoteAddr(), u.mtu)
+		return fmt.Sprintf("PacketUnderlay{local=%v, remote=%v, mtu=%v}", u.LocalAddr(), u.RemoteAddr(), u.mtu)
 	} else {
-		return fmt.Sprintf("UDPUnderlay{local=%v, mtu=%v}", u.LocalAddr(), u.mtu)
+		return fmt.Sprintf("PacketUnderlay{local=%v, mtu=%v}", u.LocalAddr(), u.mtu)
 	}
 }
 
-func (u *UDPUnderlay) Close() error {
+func (u *PacketUnderlay) Close() error {
 	u.closeMutex.Lock()
 	defer u.closeMutex.Unlock()
 	select {
@@ -132,22 +134,22 @@ func (u *UDPUnderlay) Close() error {
 	return u.conn.Close()
 }
 
-func (u *UDPUnderlay) TransportProtocol() common.TransportProtocol {
-	return common.UDPTransport
+func (u *PacketUnderlay) TransportProtocol() common.TransportProtocol {
+	return common.PacketTransport
 }
 
-func (u *UDPUnderlay) LocalAddr() net.Addr {
+func (u *PacketUnderlay) LocalAddr() net.Addr {
 	return u.conn.LocalAddr()
 }
 
-func (u *UDPUnderlay) RemoteAddr() net.Addr {
+func (u *PacketUnderlay) RemoteAddr() net.Addr {
 	if u.isClient && u.serverAddr != nil {
 		return u.serverAddr
 	}
 	return common.NilNetAddr()
 }
 
-func (u *UDPUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
+func (u *PacketUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
 	if err := u.baseUnderlay.AddSession(s, remoteAddr); err != nil {
 		return err
 	}
@@ -171,7 +173,7 @@ func (u *UDPUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
 	return nil
 }
 
-func (u *UDPUnderlay) RunEventLoop(ctx context.Context) error {
+func (u *PacketUnderlay) RunEventLoop(ctx context.Context) error {
 	if u.conn == nil {
 		return stderror.ErrNullPointer
 	}
@@ -229,7 +231,7 @@ func (u *UDPUnderlay) RunEventLoop(ctx context.Context) error {
 					return fmt.Errorf("onCloseSession() failed: %w", err)
 				}
 			default:
-				panic(fmt.Sprintf("Protocol %d is a session protocol but not recognized by UDP underlay", seg.metadata.Protocol()))
+				panic(fmt.Sprintf("Protocol %d is a session protocol but not recognized by packet underlay", seg.metadata.Protocol()))
 			}
 		} else if isDataAckProtocol(seg.metadata.Protocol()) {
 			das, _ := toDataAckStruct(seg.metadata)
@@ -264,7 +266,7 @@ func (u *UDPUnderlay) RunEventLoop(ctx context.Context) error {
 	}
 }
 
-func (u *UDPUnderlay) onOpenSessionRequest(seg *segment, remoteAddr net.Addr) error {
+func (u *PacketUnderlay) onOpenSessionRequest(seg *segment, remoteAddr net.Addr) error {
 	if u.isClient {
 		return stderror.ErrInvalidOperation
 	}
@@ -287,7 +289,7 @@ func (u *UDPUnderlay) onOpenSessionRequest(seg *segment, remoteAddr net.Addr) er
 	return nil
 }
 
-func (u *UDPUnderlay) onOpenSessionResponse(seg *segment) error {
+func (u *PacketUnderlay) onOpenSessionResponse(seg *segment) error {
 	if !u.isClient {
 		return stderror.ErrInvalidOperation
 	}
@@ -301,7 +303,7 @@ func (u *UDPUnderlay) onOpenSessionResponse(seg *segment) error {
 	return nil
 }
 
-func (u *UDPUnderlay) onCloseSession(seg *segment) error {
+func (u *PacketUnderlay) onCloseSession(seg *segment) error {
 	ss := seg.metadata.(*sessionStruct)
 	sessionID := ss.sessionID
 	session, found := u.sessionMap.Load(sessionID)
@@ -318,9 +320,9 @@ func (u *UDPUnderlay) onCloseSession(seg *segment) error {
 	return nil
 }
 
-func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
+func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 	var n int
-	var addr *net.UDPAddr
+	var addr net.Addr
 	var err error
 	for {
 		select {
@@ -334,24 +336,24 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 		// Peer may select a different MTU.
 		// Use the largest possible value here to avoid error.
 		b := make([]byte, 1500)
-		n, addr, err = u.conn.ReadFromUDP(b)
+		n, addr, err = u.conn.ReadFrom(b)
 		if err != nil {
 			if stderror.IsTimeout(err) {
 				return nil, nil, stderror.ErrTimeout
 			}
-			return nil, nil, fmt.Errorf("ReadFromUDP() failed: %w", err)
+			return nil, nil, fmt.Errorf("ReadFrom() failed: %w", err)
 		}
 		if u.isClient && addr.String() != u.serverAddr.String() {
 			UnderlayUnsolicitedUDP.Add(1)
 			if log.IsLevelEnabled(log.TraceLevel) {
-				log.Tracef("%v received unsolicited UDP packet from %v", u, addr)
+				log.Tracef("%v received unsolicited packet from %v", u, addr)
 			}
 			continue
 		}
-		if n < udpNonHeaderPosition {
+		if n < packetNonHeaderPosition {
 			UnderlayMalformedUDP.Add(1)
 			if log.IsLevelEnabled(log.TraceLevel) {
-				log.Tracef("%v received UDP packet from %v with only %d bytes, which is too short", u, addr, n)
+				log.Tracef("%v received packet from %v with only %d bytes, which is too short", u, addr, n)
 			}
 			continue
 		}
@@ -363,9 +365,9 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 		}
 
 		// Read encrypted metadata.
-		encryptedMeta := b[:udpNonHeaderPosition]
+		encryptedMeta := b[:packetNonHeaderPosition]
 		isNewSessionReplay := false
-		if udpReplayCache.IsDuplicate(encryptedMeta[:cipher.DefaultOverhead], addr.String()) {
+		if packetReplayCache.IsDuplicate(encryptedMeta[:cipher.DefaultOverhead], addr.String()) {
 			replay.NewSession.Add(1)
 			isNewSessionReplay = true
 		}
@@ -380,7 +382,7 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 			if err != nil {
 				cipher.ClientFailedDirectDecrypt.Add(1)
 				if log.IsLevelEnabled(log.TraceLevel) {
-					log.Tracef("%v Decrypt() failed with UDP packet from %v", u, addr)
+					log.Tracef("%v Decrypt() failed with packet from %v", u, addr)
 				}
 				continue
 			}
@@ -428,12 +430,12 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 				if isNewSessionReplay {
 					log.Debugf("found possible replay attack in %v from %v", u, addr)
 				} else if log.IsLevelEnabled(log.TraceLevel) {
-					log.Tracef("%v TryDecrypt() failed with UDP packet from %v", u, addr)
+					log.Tracef("%v TryDecrypt() failed with packet from %v", u, addr)
 				}
 				continue
 			} else {
 				if blockCipher == nil {
-					panic("UDPUnderlay readOneSegment(): block cipher is nil after decryption is successful")
+					panic("PacketUnderlay readOneSegment(): block cipher is nil after decryption is successful")
 				}
 				if isNewSessionReplay {
 					replay.NewSessionDecrypted.Add(1)
@@ -459,7 +461,7 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 					continue
 				}
 			}
-			seg, err = u.readSessionSegment(ss, nonce, b[udpNonHeaderPosition:], blockCipher)
+			seg, err = u.readSessionSegment(ss, nonce, b[packetNonHeaderPosition:], blockCipher)
 			if err != nil {
 				if u.isClient {
 					return nil, nil, err
@@ -482,7 +484,7 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 					continue
 				}
 			}
-			seg, err = u.readDataAckSegment(das, nonce, b[udpNonHeaderPosition:], blockCipher)
+			seg, err = u.readDataAckSegment(das, nonce, b[packetNonHeaderPosition:], blockCipher)
 			if err != nil {
 				if u.isClient {
 					return nil, nil, err
@@ -500,19 +502,19 @@ func (u *UDPUnderlay) readOneSegment() (*segment, *net.UDPAddr, error) {
 	}
 }
 
-func (u *UDPUnderlay) readSessionSegment(ss *sessionStruct, nonce, remaining []byte, blockCipher cipher.BlockCipher) (*segment, error) {
+func (u *PacketUnderlay) readSessionSegment(ss *sessionStruct, nonce, remaining []byte, blockCipher cipher.BlockCipher) (*segment, error) {
 	var decryptedPayload []byte
 	var err error
 
 	if ss.payloadLen > 0 {
 		if len(remaining) < int(ss.payloadLen)+cipher.DefaultOverhead {
-			return nil, fmt.Errorf("payload: received incomplete UDP packet")
+			return nil, fmt.Errorf("payload: received incomplete packet")
 		}
 		if blockCipher == nil {
 			if u.isClient {
 				blockCipher = u.block
 			} else {
-				panic("UDPUnderlay readSessionSegment(): block is nil")
+				panic("PacketUnderlay readSessionSegment(): block is nil")
 			}
 		}
 		encryptedPayload := remaining[:ss.payloadLen+cipher.DefaultOverhead]
@@ -542,11 +544,11 @@ func (u *UDPUnderlay) readSessionSegment(ss *sessionStruct, nonce, remaining []b
 	return &segment{
 		metadata:  ss,
 		payload:   decryptedPayload,
-		transport: common.UDPTransport,
+		transport: common.PacketTransport,
 	}, nil
 }
 
-func (u *UDPUnderlay) readDataAckSegment(das *dataAckStruct, nonce, remaining []byte, blockCipher cipher.BlockCipher) (*segment, error) {
+func (u *PacketUnderlay) readDataAckSegment(das *dataAckStruct, nonce, remaining []byte, blockCipher cipher.BlockCipher) (*segment, error) {
 	var decryptedPayload []byte
 	var err error
 
@@ -555,13 +557,13 @@ func (u *UDPUnderlay) readDataAckSegment(das *dataAckStruct, nonce, remaining []
 	}
 	if das.payloadLen > 0 {
 		if len(remaining) < int(das.payloadLen)+cipher.DefaultOverhead {
-			return nil, fmt.Errorf("payload: received incomplete UDP packet")
+			return nil, fmt.Errorf("payload: received incomplete packet")
 		}
 		if blockCipher == nil {
 			if u.isClient {
 				blockCipher = u.block
 			} else {
-				panic("UDPUnderlay readDataAckSegment(): block is nil")
+				panic("PacketUnderlay readDataAckSegment(): block is nil")
 			}
 		}
 		encryptedPayload := remaining[:das.payloadLen+cipher.DefaultOverhead]
@@ -591,16 +593,16 @@ func (u *UDPUnderlay) readDataAckSegment(das *dataAckStruct, nonce, remaining []
 	return &segment{
 		metadata:  das,
 		payload:   decryptedPayload,
-		transport: common.UDPTransport,
+		transport: common.PacketTransport,
 	}, nil
 }
 
-func (u *UDPUnderlay) writeOneSegment(seg *segment, addr *net.UDPAddr) error {
+func (u *PacketUnderlay) writeOneSegment(seg *segment, addr net.Addr) error {
 	if seg == nil {
 		return stderror.ErrNullPointer
 	}
 	if u.isClient && addr.String() != u.serverAddr.String() {
-		return fmt.Errorf("can't write to %v, UDP server address is %v", addr, u.serverAddr)
+		return fmt.Errorf("can't write to %v, server address is %v", addr, u.serverAddr)
 	}
 
 	u.sendMutex.Lock()
@@ -642,7 +644,7 @@ func (u *UDPUnderlay) writeOneSegment(seg *segment, addr *net.UDPAddr) error {
 	if ss, ok := toSessionStruct(seg.metadata); ok {
 		maxPaddingSize := MaxPaddingSize(u.mtu, u.TransportProtocol(), int(ss.payloadLen), 0)
 		padding := newPadding(
-			buildRecommendedPaddingOpts(maxPaddingSize, udpOverhead+int(ss.payloadLen), blockCipher.BlockContext().UserName),
+			buildRecommendedPaddingOpts(maxPaddingSize, packetOverhead+int(ss.payloadLen), blockCipher.BlockContext().UserName),
 		)
 		ss.suffixLen = uint8(len(padding))
 		if log.IsLevelEnabled(log.TraceLevel) {
@@ -664,8 +666,8 @@ func (u *UDPUnderlay) writeOneSegment(seg *segment, addr *net.UDPAddr) error {
 			dataToSend = append(dataToSend, encryptedPayload...)
 		}
 		dataToSend = append(dataToSend, padding...)
-		if _, err := u.conn.WriteToUDP(dataToSend, addr); err != nil {
-			return fmt.Errorf("WriteToUDP() failed: %w", err)
+		if _, err := u.conn.WriteTo(dataToSend, addr); err != nil {
+			return fmt.Errorf("WriteTo() failed: %w", err)
 		}
 		if u.isClient {
 			metrics.UploadBytes.Add(int64(len(dataToSend)))
@@ -703,8 +705,8 @@ func (u *UDPUnderlay) writeOneSegment(seg *segment, addr *net.UDPAddr) error {
 			dataToSend = append(dataToSend, encryptedPayload...)
 		}
 		dataToSend = append(dataToSend, padding2...)
-		if _, err := u.conn.WriteToUDP(dataToSend, addr); err != nil {
-			return fmt.Errorf("WriteToUDP() failed: %w", err)
+		if _, err := u.conn.WriteTo(dataToSend, addr); err != nil {
+			return fmt.Errorf("WriteTo() failed: %w", err)
 		}
 		if u.isClient {
 			metrics.UploadBytes.Add(int64(len(dataToSend)))

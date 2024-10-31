@@ -164,7 +164,7 @@ func (b *baseUnderlay) RemoveSession(s *Session) error {
 	return nil
 }
 
-func (b *baseUnderlay) NSessions() int {
+func (b *baseUnderlay) SessionCount() int {
 	n := 0
 	b.sessionMap.Range(func(k, v any) bool {
 		n++

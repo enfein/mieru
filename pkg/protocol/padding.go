@@ -58,6 +58,20 @@ type entropyPaddingOpts struct {
 	targetProbability float64
 }
 
+// MaxPaddingSize returns the maximum padding size of a segment.
+func MaxPaddingSize(mtu int, transport common.TransportProtocol, fragmentSize int, existingPaddingSize int) int {
+	if transport == common.StreamTransport {
+		// No limit.
+		return 255
+	}
+
+	res := mtu - fragmentSize - packetOverhead
+	if res <= int(existingPaddingSize) {
+		return 0
+	}
+	return mathext.Min(res-int(existingPaddingSize), 255)
+}
+
 func buildRecommendedPaddingOpts(maxLen, randomDataLen int, strategySource string) paddingOpts {
 	// strategySource decides the padding strategy.
 	strategy := rng.FixedInt(2, strategySource)

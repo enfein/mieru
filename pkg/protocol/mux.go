@@ -143,7 +143,7 @@ func (m *Mux) SetServerUsers(users map[string]*appctlpb.User) *Mux {
 		// Update the users in UDPUnderlay.
 		// Don't update TCPUnderlay and Session, so existing connections still work.
 		for _, underlay := range m.underlays {
-			if udpUnderlay, ok := underlay.(*UDPUnderlay); ok {
+			if udpUnderlay, ok := underlay.(*PacketUnderlay); ok {
 				udpUnderlay.users = m.users
 			}
 		}
@@ -299,6 +299,41 @@ func (m *Mux) DialContext(ctx context.Context) (net.Conn, error) {
 	return session, nil
 }
 
+// DialContextWithConn returns a network connection for the client to consume.
+// The connection is a session established from a underlay constructed from
+// the given connection.
+func (m *Mux) DialContextWithConn(ctx context.Context, conn net.Conn) (net.Conn, error) {
+	if !m.isClient {
+		return nil, stderror.ErrInvalidOperation
+	}
+	if len(m.password) == 0 {
+		return nil, fmt.Errorf("client password is not set")
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.used = true
+
+	m.cleanUnderlay(true)
+	block, err := cipher.BlockCipherFromPassword(m.password, false)
+	if err != nil {
+		return nil, fmt.Errorf("cipher.BlockCipherFromPassword() failed: %v", err)
+	}
+	block.SetBlockContext(cipher.BlockContext{
+		UserName: m.username,
+	})
+	// The MTU value is not used by TCP connection.
+	underlay, err := NewStreamUnderlayWithConn(conn, common.DefaultMTU, block)
+	if err != nil {
+		return nil, fmt.Errorf("NewTCPUnderlayWithConn() failed: %v", err)
+	}
+	session := NewSession(mrand.Uint32(), true, underlay.MTU(), m.users)
+	if err := underlay.AddSession(session, nil); err != nil {
+		return nil, fmt.Errorf("AddSession() failed: %v", err)
+	}
+	return session, nil
+}
+
 // ExportSessionInfoTable returns multiple lines of strings that display
 // session info in a table format.
 func (m *Mux) ExportSessionInfoTable() []string {
@@ -447,7 +482,7 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 			return
 		}
 		log.Infof("Mux is listening to endpoint %s %s", network, laddr)
-		underlay := &UDPUnderlay{
+		underlay := &PacketUnderlay{
 			baseUnderlay:      *newBaseUnderlay(false, properties.MTU()),
 			conn:              conn,
 			idleSessionTicker: time.NewTicker(idleSessionTickerInterval),
@@ -527,9 +562,9 @@ func (m *Mux) serverWrapTCPConn(rawConn net.Conn, mtu int, users map[string]*app
 		}
 		blocks = append(blocks, blocksFromUser...)
 	}
-	return &TCPUnderlay{
+	return &StreamUnderlay{
 		baseUnderlay: *newBaseUnderlay(false, mtu),
-		conn:         rawConn.(*net.TCPConn),
+		conn:         rawConn,
 		candidates:   blocks,
 		users:        users,
 	}
@@ -542,7 +577,7 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 	i := mrand.Intn(len(m.endpoints))
 	p := m.endpoints[i]
 	switch p.TransportProtocol() {
-	case common.TCPTransport:
+	case common.StreamTransport:
 		block, err := cipher.BlockCipherFromPassword(m.password, false)
 		if err != nil {
 			return nil, fmt.Errorf("cipher.BlockCipherFromPassword() failed: %v", err)
@@ -550,11 +585,11 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 		block.SetBlockContext(cipher.BlockContext{
 			UserName: m.username,
 		})
-		underlay, err = NewTCPUnderlay(ctx, p.RemoteAddr().Network(), "", p.RemoteAddr().String(), p.MTU(), block)
+		underlay, err = NewStreamUnderlay(ctx, p.RemoteAddr().Network(), "", p.RemoteAddr().String(), p.MTU(), block)
 		if err != nil {
 			return nil, fmt.Errorf("NewTCPUnderlay() failed: %v", err)
 		}
-	case common.UDPTransport:
+	case common.PacketTransport:
 		block, err := cipher.BlockCipherFromPassword(m.password, true)
 		if err != nil {
 			return nil, fmt.Errorf("cipher.BlockCipherFromPassword() failed: %v", err)
@@ -562,7 +597,7 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 		block.SetBlockContext(cipher.BlockContext{
 			UserName: m.username,
 		})
-		underlay, err = NewUDPUnderlay(ctx, p.RemoteAddr().Network(), "", p.RemoteAddr().String(), p.MTU(), block)
+		underlay, err = NewPacketUnderlay(ctx, p.RemoteAddr().Network(), "", p.RemoteAddr().String(), p.MTU(), block)
 		if err != nil {
 			return nil, fmt.Errorf("NewUDPUnderlay() failed: %v", err)
 		}
@@ -622,12 +657,12 @@ func (m *Mux) cleanUnderlay(alsoDisableIdleUnderlay bool) {
 		select {
 		case <-underlay.Done():
 		default:
-			if alsoDisableIdleUnderlay && underlay.NSessions() == 0 {
+			if alsoDisableIdleUnderlay && underlay.SessionCount() == 0 {
 				if underlay.Scheduler().TryDisable() {
 					disable++
 				}
 			}
-			if underlay.NSessions() == 0 && underlay.Scheduler().Idle() {
+			if underlay.SessionCount() == 0 && underlay.Scheduler().Idle() {
 				underlay.Close()
 				close++
 			} else {

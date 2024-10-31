@@ -19,6 +19,6 @@ type TransportProtocol uint8
 
 const (
 	UnknownTransport TransportProtocol = iota
-	UDPTransport
-	TCPTransport
+	StreamTransport
+	PacketTransport
 )

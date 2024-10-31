@@ -24,6 +24,44 @@ import (
 	"github.com/enfein/mieru/v3/pkg/rng"
 )
 
+func TestMaxPaddingSize(t *testing.T) {
+	testcases := []struct {
+		mtu                 int
+		transport           common.TransportProtocol
+		fragmentSize        int
+		existingPaddingSize int
+		want                int
+	}{
+		{
+			1400,
+			common.StreamTransport,
+			maxPDU,
+			255,
+			255,
+		},
+		{
+			1400,
+			common.PacketTransport,
+			1400 - packetOverhead - 16,
+			12,
+			4,
+		},
+		{
+			1400,
+			common.UnknownTransport,
+			0,
+			255,
+			255,
+		},
+	}
+	for _, tc := range testcases {
+		got := MaxPaddingSize(tc.mtu, tc.transport, tc.fragmentSize, tc.existingPaddingSize)
+		if got != tc.want {
+			t.Errorf("MaxPaddingSize() = %d, want %d", got, tc.want)
+		}
+	}
+}
+
 func TestNewASCIIPadding(t *testing.T) {
 	maxPaddingLen := rng.Intn(256)
 	minConsecutiveASCIILen := rng.IntRange(0, maxPaddingLen+1)

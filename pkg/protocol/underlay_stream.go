@@ -34,12 +34,14 @@ import (
 )
 
 const (
-	tcpOverhead = MetadataLength + cipher.DefaultOverhead*2
+	streamOverhead = MetadataLength + cipher.DefaultOverhead*2
 )
 
-type TCPUnderlay struct {
+var streamReplayCache = replay.NewCache(4*1024*1024, cipher.KeyRefreshInterval*3)
+
+type StreamUnderlay struct {
 	baseUnderlay
-	conn *net.TCPConn
+	conn net.Conn
 
 	send cipher.BlockCipher
 	recv cipher.BlockCipher
@@ -52,21 +54,21 @@ type TCPUnderlay struct {
 	users map[string]*appctlpb.User
 }
 
-var _ Underlay = &TCPUnderlay{}
+var _ Underlay = &StreamUnderlay{}
 
-var tcpReplayCache = replay.NewCache(4*1024*1024, cipher.KeyRefreshInterval*3)
-
-// NewTCPUnderlay connects to the remote address "raddr" on the network "tcp"
+// NewStreamUnderlay connects to the remote address "raddr" on the network
 // with packet encryption. If "laddr" is empty, an automatic address is used.
 // "block" is the block encryption algorithm to encrypt packets.
-func NewTCPUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, block cipher.BlockCipher) (*TCPUnderlay, error) {
+//
+// This function is only used by proxy client.
+func NewStreamUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, block cipher.BlockCipher) (*StreamUnderlay, error) {
 	switch network {
 	case "tcp", "tcp4", "tcp6":
 	default:
-		return nil, fmt.Errorf("network %s is not supported by TCP underlay", network)
+		return nil, fmt.Errorf("network %s is not supported by stream underlay", network)
 	}
 	if block.IsStateless() {
-		return nil, fmt.Errorf("TCP block cipher must not be stateless")
+		return nil, fmt.Errorf("stream underlay block cipher must be stateful")
 	}
 	dialer := net.Dialer{
 		Control: sockopts.ReuseAddrPort(),
@@ -83,22 +85,36 @@ func NewTCPUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, 
 	if err != nil {
 		return nil, fmt.Errorf("DialContext() failed: %w", err)
 	}
-	t := &TCPUnderlay{
+	t := &StreamUnderlay{
 		baseUnderlay: *newBaseUnderlay(true, mtu),
-		conn:         conn.(*net.TCPConn),
+		conn:         conn,
 		candidates:   []cipher.BlockCipher{block},
 	}
 	return t, nil
 }
 
-func (t *TCPUnderlay) String() string {
-	if t.conn == nil {
-		return "TCPUnderlay{}"
+// NewStreamUnderlayWithConn creates a StreamUnderlay with an existing connection.
+//
+// This function is only used by proxy client.
+func NewStreamUnderlayWithConn(conn net.Conn, mtu int, block cipher.BlockCipher) (*StreamUnderlay, error) {
+	if block.IsStateless() {
+		return nil, fmt.Errorf("stream underlay block cipher must be stateful")
 	}
-	return fmt.Sprintf("TCPUnderlay{local=%v, remote=%v, mtu=%v}", t.conn.LocalAddr(), t.conn.RemoteAddr(), t.mtu)
+	return &StreamUnderlay{
+		baseUnderlay: *newBaseUnderlay(true, mtu),
+		conn:         conn,
+		candidates:   []cipher.BlockCipher{block},
+	}, nil
 }
 
-func (t *TCPUnderlay) Close() error {
+func (t *StreamUnderlay) String() string {
+	if t.conn == nil {
+		return "StreamUnderlay{}"
+	}
+	return fmt.Sprintf("StreamUnderlay{local=%v, remote=%v, mtu=%v}", t.conn.LocalAddr(), t.conn.RemoteAddr(), t.mtu)
+}
+
+func (t *StreamUnderlay) Close() error {
 	t.closeMutex.Lock()
 	defer t.closeMutex.Unlock()
 	select {
@@ -112,29 +128,29 @@ func (t *TCPUnderlay) Close() error {
 	return t.conn.Close()
 }
 
-func (t *TCPUnderlay) Addr() net.Addr {
+func (t *StreamUnderlay) Addr() net.Addr {
 	return t.LocalAddr()
 }
 
-func (t *TCPUnderlay) TransportProtocol() common.TransportProtocol {
-	return common.TCPTransport
+func (t *StreamUnderlay) TransportProtocol() common.TransportProtocol {
+	return common.StreamTransport
 }
 
-func (t *TCPUnderlay) LocalAddr() net.Addr {
+func (t *StreamUnderlay) LocalAddr() net.Addr {
 	if t.conn == nil {
 		return common.NilNetAddr()
 	}
 	return t.conn.LocalAddr()
 }
 
-func (t *TCPUnderlay) RemoteAddr() net.Addr {
+func (t *StreamUnderlay) RemoteAddr() net.Addr {
 	if t.conn == nil {
 		return common.NilNetAddr()
 	}
 	return t.conn.RemoteAddr()
 }
 
-func (t *TCPUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
+func (t *StreamUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
 	if err := t.baseUnderlay.AddSession(s, remoteAddr); err != nil {
 		return err
 	}
@@ -158,7 +174,7 @@ func (t *TCPUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
 	return nil
 }
 
-func (t *TCPUnderlay) RunEventLoop(ctx context.Context) error {
+func (t *StreamUnderlay) RunEventLoop(ctx context.Context) error {
 	if t.conn == nil {
 		return stderror.ErrNullPointer
 	}
@@ -171,8 +187,15 @@ func (t *TCPUnderlay) RunEventLoop(ctx context.Context) error {
 			return nil
 		default:
 		}
-		seg, err, errType := t.readOneSegment()
+		seg, err := t.readOneSegment()
 		if err != nil {
+			errType := stderror.GetErrorType(err)
+			if errType == stderror.NO_ERROR {
+				panic(fmt.Sprintf("%v error type is NO_ERROR while error is not nil", t))
+			}
+			if errType == stderror.UNKNOWN_ERROR {
+				panic(fmt.Sprintf("%v got unexpected error type UNKNOWN_ERROR", t))
+			}
 			if errType == stderror.CRYPTO_ERROR || errType == stderror.REPLAY_ERROR {
 				t.drainAfterError()
 			}
@@ -196,7 +219,7 @@ func (t *TCPUnderlay) RunEventLoop(ctx context.Context) error {
 					return fmt.Errorf("onCloseSession() failed: %w", err)
 				}
 			default:
-				panic(fmt.Sprintf("Protocol %d is a session protocol but not recognized by TCP underlay", seg.metadata.Protocol()))
+				panic(fmt.Sprintf("Protocol %d is a session protocol but not recognized by stream underlay", seg.metadata.Protocol()))
 			}
 		} else if isDataAckProtocol(seg.metadata.Protocol()) {
 			das, _ := toDataAckStruct(seg.metadata)
@@ -228,7 +251,7 @@ func (t *TCPUnderlay) RunEventLoop(ctx context.Context) error {
 	}
 }
 
-func (t *TCPUnderlay) onOpenSessionRequest(seg *segment) error {
+func (t *StreamUnderlay) onOpenSessionRequest(seg *segment) error {
 	if t.isClient {
 		return stderror.ErrInvalidOperation
 	}
@@ -250,7 +273,7 @@ func (t *TCPUnderlay) onOpenSessionRequest(seg *segment) error {
 	return nil
 }
 
-func (t *TCPUnderlay) onOpenSessionResponse(seg *segment) error {
+func (t *StreamUnderlay) onOpenSessionResponse(seg *segment) error {
 	if !t.isClient {
 		return stderror.ErrInvalidOperation
 	}
@@ -264,7 +287,7 @@ func (t *TCPUnderlay) onOpenSessionResponse(seg *segment) error {
 	return nil
 }
 
-func (t *TCPUnderlay) onCloseSession(seg *segment) error {
+func (t *StreamUnderlay) onCloseSession(seg *segment) error {
 	ss := seg.metadata.(*sessionStruct)
 	sessionID := ss.sessionID
 	session, found := t.sessionMap.Load(sessionID)
@@ -281,7 +304,7 @@ func (t *TCPUnderlay) onCloseSession(seg *segment) error {
 	return nil
 }
 
-func (t *TCPUnderlay) readOneSegment() (*segment, error, stderror.ErrorType) {
+func (t *StreamUnderlay) readOneSegment() (*segment, error) {
 	var firstRead bool
 	var err error
 
@@ -294,7 +317,8 @@ func (t *TCPUnderlay) readOneSegment() (*segment, error, stderror.ErrorType) {
 	}
 	encryptedMeta := make([]byte, readLen)
 	if _, err := io.ReadFull(t.conn, encryptedMeta); err != nil {
-		return nil, fmt.Errorf("metadata: read %d bytes from TCPUnderlay failed: %w", readLen, err), stderror.NETWORK_ERROR
+		err = fmt.Errorf("metadata: read %d bytes from StreamUnderlay failed: %w", readLen, err)
+		return nil, stderror.WrapErrorWithType(err, stderror.NETWORK_ERROR)
 	}
 	if t.isClient {
 		metrics.DownloadBytes.Add(int64(len(encryptedMeta)))
@@ -302,7 +326,7 @@ func (t *TCPUnderlay) readOneSegment() (*segment, error, stderror.ErrorType) {
 		metrics.UploadBytes.Add(int64(len(encryptedMeta)))
 	}
 	isNewSessionReplay := false
-	if tcpReplayCache.IsDuplicate(encryptedMeta[:cipher.DefaultOverhead], replay.EmptyTag) {
+	if streamReplayCache.IsDuplicate(encryptedMeta[:cipher.DefaultOverhead], replay.EmptyTag) {
 		if firstRead {
 			replay.NewSession.Add(1)
 			isNewSessionReplay = true
@@ -323,13 +347,16 @@ func (t *TCPUnderlay) readOneSegment() (*segment, error, stderror.ErrorType) {
 		if err != nil {
 			cipher.ServerFailedIterateDecrypt.Add(1)
 			if isNewSessionReplay {
-				return nil, fmt.Errorf("found possible replay attack in %v", t), stderror.REPLAY_ERROR
+				err = fmt.Errorf("found possible replay attack in %v", t)
+				return nil, stderror.WrapErrorWithType(err, stderror.REPLAY_ERROR)
 			} else {
-				return nil, fmt.Errorf("cipher.SelectDecrypt() failed: %w", err), stderror.CRYPTO_ERROR
+				err = fmt.Errorf("cipher.SelectDecrypt() failed: %w", err)
+				return nil, stderror.WrapErrorWithType(err, stderror.CRYPTO_ERROR)
 			}
 		} else if isNewSessionReplay {
 			replay.NewSessionDecrypted.Add(1)
-			return nil, fmt.Errorf("found possible replay attack with payload decrypted in %v", t), stderror.REPLAY_ERROR
+			err = fmt.Errorf("found possible replay attack with payload decrypted in %v", t)
+			return nil, stderror.WrapErrorWithType(err, stderror.REPLAY_ERROR)
 		}
 		t.recv = peerBlock.Clone()
 	} else {
@@ -345,11 +372,13 @@ func (t *TCPUnderlay) readOneSegment() (*segment, error, stderror.ErrorType) {
 			} else {
 				cipher.ServerFailedDirectDecrypt.Add(1)
 			}
-			return nil, fmt.Errorf("Decrypt() failed: %w", err), stderror.CRYPTO_ERROR
+			err = fmt.Errorf("Decrypt() failed: %w", err)
+			return nil, stderror.WrapErrorWithType(err, stderror.CRYPTO_ERROR)
 		}
 	}
 	if len(decryptedMeta) != MetadataLength {
-		return nil, fmt.Errorf("decrypted metadata size %d is unexpected", len(decryptedMeta)), stderror.PROTOCOL_ERROR
+		err = fmt.Errorf("decrypted metadata size %d is unexpected", len(decryptedMeta))
+		return nil, stderror.WrapErrorWithType(err, stderror.PROTOCOL_ERROR)
 	}
 
 	// Read payload and construct segment.
@@ -357,34 +386,39 @@ func (t *TCPUnderlay) readOneSegment() (*segment, error, stderror.ErrorType) {
 	if isSessionProtocol(protocolType(p)) {
 		ss := &sessionStruct{}
 		if err := ss.Unmarshal(decryptedMeta); err != nil {
-			return nil, fmt.Errorf("Unmarshal() to sessionStruct failed: %w", err), stderror.PROTOCOL_ERROR
+			err = fmt.Errorf("Unmarshal() to sessionStruct failed: %w", err)
+			return nil, stderror.WrapErrorWithType(err, stderror.PROTOCOL_ERROR)
 		}
 		return t.readSessionSegment(ss)
 	} else if isDataAckProtocol(protocolType(p)) {
 		das := &dataAckStruct{}
 		if err := das.Unmarshal(decryptedMeta); err != nil {
-			return nil, fmt.Errorf("Unmarshal() to dataAckStruct failed: %w", err), stderror.PROTOCOL_ERROR
+			err = fmt.Errorf("Unmarshal() to dataAckStruct failed: %w", err)
+			return nil, stderror.WrapErrorWithType(err, stderror.PROTOCOL_ERROR)
 		}
 		return t.readDataAckSegment(das)
+	} else {
+		err = fmt.Errorf("unable to handle protocol %d", p)
+		return nil, stderror.WrapErrorWithType(err, stderror.PROTOCOL_ERROR)
 	}
-	return nil, fmt.Errorf("unable to handle protocol %d", p), stderror.PROTOCOL_ERROR
 }
 
-func (t *TCPUnderlay) readSessionSegment(ss *sessionStruct) (*segment, error, stderror.ErrorType) {
+func (t *StreamUnderlay) readSessionSegment(ss *sessionStruct) (*segment, error) {
 	var decryptedPayload []byte
 	var err error
 
 	if ss.payloadLen > 0 {
 		encryptedPayload := make([]byte, ss.payloadLen+cipher.DefaultOverhead)
 		if _, err := io.ReadFull(t.conn, encryptedPayload); err != nil {
-			return nil, fmt.Errorf("payload: read %d bytes from TCPUnderlay failed: %w", ss.payloadLen+cipher.DefaultOverhead, err), stderror.NETWORK_ERROR
+			err = fmt.Errorf("payload: read %d bytes from StreamUnderlay failed: %w", ss.payloadLen+cipher.DefaultOverhead, err)
+			return nil, stderror.WrapErrorWithType(err, stderror.NETWORK_ERROR)
 		}
 		if t.isClient {
 			metrics.DownloadBytes.Add(int64(len(encryptedPayload)))
 		} else {
 			metrics.UploadBytes.Add(int64(len(encryptedPayload)))
 		}
-		if tcpReplayCache.IsDuplicate(encryptedPayload[:cipher.DefaultOverhead], replay.EmptyTag) {
+		if streamReplayCache.IsDuplicate(encryptedPayload[:cipher.DefaultOverhead], replay.EmptyTag) {
 			replay.KnownSession.Add(1)
 		}
 		decryptedPayload, err = t.recv.Decrypt(encryptedPayload)
@@ -399,13 +433,15 @@ func (t *TCPUnderlay) readSessionSegment(ss *sessionStruct) (*segment, error, st
 			} else {
 				cipher.ServerFailedDirectDecrypt.Add(1)
 			}
-			return nil, fmt.Errorf("Decrypt() failed: %w", err), stderror.CRYPTO_ERROR
+			err = fmt.Errorf("Decrypt() failed: %w", err)
+			return nil, stderror.WrapErrorWithType(err, stderror.CRYPTO_ERROR)
 		}
 	}
 	if ss.suffixLen > 0 {
 		padding := make([]byte, ss.suffixLen)
 		if _, err := io.ReadFull(t.conn, padding); err != nil {
-			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", ss.suffixLen, err), stderror.NETWORK_ERROR
+			err = fmt.Errorf("padding: read %d bytes from StreamUnderlay failed: %w", ss.suffixLen, err)
+			return nil, stderror.WrapErrorWithType(err, stderror.NETWORK_ERROR)
 		}
 		if t.isClient {
 			metrics.DownloadBytes.Add(int64(len(padding)))
@@ -417,19 +453,20 @@ func (t *TCPUnderlay) readSessionSegment(ss *sessionStruct) (*segment, error, st
 	return &segment{
 		metadata:  ss,
 		payload:   decryptedPayload,
-		transport: common.TCPTransport,
+		transport: common.StreamTransport,
 		block:     t.recv,
-	}, nil, stderror.NO_ERROR
+	}, nil
 }
 
-func (t *TCPUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error, stderror.ErrorType) {
+func (t *StreamUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error) {
 	var decryptedPayload []byte
 	var err error
 
 	if das.prefixLen > 0 {
 		padding1 := make([]byte, das.prefixLen)
 		if _, err := io.ReadFull(t.conn, padding1); err != nil {
-			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", das.prefixLen, err), stderror.NETWORK_ERROR
+			err = fmt.Errorf("padding: read %d bytes from StreamUnderlay failed: %w", das.prefixLen, err)
+			return nil, stderror.WrapErrorWithType(err, stderror.NETWORK_ERROR)
 		}
 		if t.isClient {
 			metrics.DownloadBytes.Add(int64(len(padding1)))
@@ -440,14 +477,15 @@ func (t *TCPUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error, s
 	if das.payloadLen > 0 {
 		encryptedPayload := make([]byte, das.payloadLen+cipher.DefaultOverhead)
 		if _, err := io.ReadFull(t.conn, encryptedPayload); err != nil {
-			return nil, fmt.Errorf("payload: read %d bytes from TCPUnderlay failed: %w", das.payloadLen+cipher.DefaultOverhead, err), stderror.NETWORK_ERROR
+			err = fmt.Errorf("payload: read %d bytes from StreamUnderlay failed: %w", das.payloadLen+cipher.DefaultOverhead, err)
+			return nil, stderror.WrapErrorWithType(err, stderror.NETWORK_ERROR)
 		}
 		if t.isClient {
 			metrics.DownloadBytes.Add(int64(len(encryptedPayload)))
 		} else {
 			metrics.UploadBytes.Add(int64(len(encryptedPayload)))
 		}
-		if tcpReplayCache.IsDuplicate(encryptedPayload[:cipher.DefaultOverhead], replay.EmptyTag) {
+		if streamReplayCache.IsDuplicate(encryptedPayload[:cipher.DefaultOverhead], replay.EmptyTag) {
 			replay.KnownSession.Add(1)
 		}
 		decryptedPayload, err = t.recv.Decrypt(encryptedPayload)
@@ -462,13 +500,15 @@ func (t *TCPUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error, s
 			} else {
 				cipher.ServerFailedDirectDecrypt.Add(1)
 			}
-			return nil, fmt.Errorf("Decrypt() failed: %w", err), stderror.CRYPTO_ERROR
+			err = fmt.Errorf("Decrypt() failed: %w", err)
+			return nil, stderror.WrapErrorWithType(err, stderror.CRYPTO_ERROR)
 		}
 	}
 	if das.suffixLen > 0 {
 		padding2 := make([]byte, das.suffixLen)
 		if _, err := io.ReadFull(t.conn, padding2); err != nil {
-			return nil, fmt.Errorf("padding: read %d bytes from TCPUnderlay failed: %w", das.suffixLen, err), stderror.NETWORK_ERROR
+			err = fmt.Errorf("padding: read %d bytes from StreamUnderlay failed: %w", das.suffixLen, err)
+			return nil, stderror.WrapErrorWithType(err, stderror.NETWORK_ERROR)
 		}
 		if t.isClient {
 			metrics.DownloadBytes.Add(int64(len(padding2)))
@@ -480,12 +520,12 @@ func (t *TCPUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error, s
 	return &segment{
 		metadata:  das,
 		payload:   decryptedPayload,
-		transport: common.TCPTransport,
+		transport: common.StreamTransport,
 		block:     t.recv,
-	}, nil, stderror.NO_ERROR
+	}, nil
 }
 
-func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
+func (t *StreamUnderlay) writeOneSegment(seg *segment) error {
 	if seg == nil {
 		return stderror.ErrNullPointer
 	}
@@ -500,7 +540,7 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 	if ss, ok := toSessionStruct(seg.metadata); ok {
 		maxPaddingSize := MaxPaddingSize(t.mtu, t.TransportProtocol(), int(ss.payloadLen), 0)
 		padding := newPadding(
-			buildRecommendedPaddingOpts(maxPaddingSize, tcpOverhead+int(ss.payloadLen), t.send.BlockContext().UserName),
+			buildRecommendedPaddingOpts(maxPaddingSize, streamOverhead+int(ss.payloadLen), t.send.BlockContext().UserName),
 		)
 		ss.suffixLen = uint8(len(padding))
 		if log.IsLevelEnabled(log.TraceLevel) {
@@ -578,7 +618,7 @@ func (t *TCPUnderlay) writeOneSegment(seg *segment) error {
 	return nil
 }
 
-func (t *TCPUnderlay) maybeInitSendBlockCipher() error {
+func (t *StreamUnderlay) maybeInitSendBlockCipher() error {
 	if t.send != nil {
 		return nil
 	}
@@ -596,10 +636,10 @@ func (t *TCPUnderlay) maybeInitSendBlockCipher() error {
 	return nil
 }
 
-// drainAfterError continues to read some data from the TCP connection after
-// an error happened to confuse possible attacks.
-func (t *TCPUnderlay) drainAfterError() {
-	// Set TCP read deadline to avoid being blocked forever.
+// drainAfterError continues to read some data from the stream network connection
+// after an error happened to confuse possible attacks.
+func (t *StreamUnderlay) drainAfterError() {
+	// Set read deadline to avoid being blocked forever.
 	timeoutMillis := rng.IntRange(1000, 10000)
 	timeoutMillis += rng.FixedIntPerHost(50000) // Maximum 60 seconds.
 	t.conn.SetReadDeadline(time.Now().Add(time.Duration(timeoutMillis) * time.Millisecond))
@@ -616,8 +656,8 @@ func (t *TCPUnderlay) drainAfterError() {
 
 	n, err := io.ReadAtLeast(t.conn, buf, minRead)
 	if err != nil {
-		log.Debugf("%v read after TCP error failed to complete: %v", t, err)
+		log.Debugf("%v read after stream error failed to complete: %v", t, err)
 	} else {
-		log.Debugf("%v read at least %d bytes after TCP error", t, n)
+		log.Debugf("%v read at least %d bytes after stream error", t, n)
 	}
 }

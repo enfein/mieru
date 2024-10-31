@@ -155,10 +155,10 @@ func (mc *mieruClient) Start() error {
 			proxyPort := bindingInfo.GetPort()
 			switch bindingInfo.GetProtocol() {
 			case appctlpb.TransportProtocol_TCP:
-				endpoint := protocol.NewUnderlayProperties(mtu, common.TCPTransport, nil, &net.TCPAddr{IP: proxyIP, Port: int(proxyPort)})
+				endpoint := protocol.NewUnderlayProperties(mtu, common.StreamTransport, nil, &net.TCPAddr{IP: proxyIP, Port: int(proxyPort)})
 				endpoints = append(endpoints, endpoint)
 			case appctlpb.TransportProtocol_UDP:
-				endpoint := protocol.NewUnderlayProperties(mtu, common.UDPTransport, nil, &net.UDPAddr{IP: proxyIP, Port: int(proxyPort)})
+				endpoint := protocol.NewUnderlayProperties(mtu, common.PacketTransport, nil, &net.UDPAddr{IP: proxyIP, Port: int(proxyPort)})
 				endpoints = append(endpoints, endpoint)
 			default:
 				return fmt.Errorf(stderror.InvalidTransportProtocol)

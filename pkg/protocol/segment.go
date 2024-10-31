@@ -41,37 +41,13 @@ const (
 
 // MaxFragmentSize returns the maximum payload size in a fragment.
 func MaxFragmentSize(mtu int, transport common.TransportProtocol) int {
-	if transport == common.TCPTransport {
+	if transport == common.StreamTransport {
 		// No fragment needed.
 		return maxPDU
 	}
 
-	res := mtu - udpOverhead
-	if transport == common.UDPTransport {
-		res -= 8
-	} else {
-		res -= 20
-	}
+	res := mtu - packetOverhead
 	return mathext.Max(0, res)
-}
-
-// MaxPaddingSize returns the maximum padding size of a segment.
-func MaxPaddingSize(mtu int, transport common.TransportProtocol, fragmentSize int, existingPaddingSize int) int {
-	if transport == common.TCPTransport {
-		// No limit.
-		return 255
-	}
-
-	res := mtu - fragmentSize - udpOverhead
-	if transport == common.UDPTransport {
-		res -= 8
-	} else {
-		res -= 20
-	}
-	if res <= int(existingPaddingSize) {
-		return 0
-	}
-	return mathext.Min(res-int(existingPaddingSize), 255)
 }
 
 // segment contains metadata and actual payload.
@@ -140,7 +116,7 @@ func (s *segment) Less(other *segment) bool {
 }
 
 func (s *segment) String() string {
-	if s.transport == common.UDPTransport && (!s.txTime.IsZero() || s.txTimeout != 0) {
+	if s.transport == common.PacketTransport && (!s.txTime.IsZero() || s.txTimeout != 0) {
 		return fmt.Sprintf("segment{metadata=%v, realPayloadLen=%v, ackCount=%v, txCount=%v, txTime=%v, txTimeout=%v}", s.metadata, len(s.payload), s.ackCount, s.txCount, s.txTime.Format(segmentTimeFormat), s.txTimeout)
 	}
 	return fmt.Sprintf("segment{metadata=%v, realPayloadLen=%v}", s.metadata, len(s.payload))

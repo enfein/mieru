@@ -350,9 +350,9 @@ func (s *Session) Close() error {
 		}
 		s.nextSend++
 		switch s.conn.TransportProtocol() {
-		case common.TCPTransport:
+		case common.StreamTransport:
 			s.sendQueue.InsertBlocking(seg)
-		case common.UDPTransport:
+		case common.PacketTransport:
 			if err := s.output(seg, s.RemoteAddr()); err != nil {
 				log.Debugf("output() failed: %v", err)
 			}
@@ -416,10 +416,10 @@ func (s *Session) ToSessionInfo() SessionInfo {
 		SendQBuf:   fmt.Sprintf("%d+%d", s.sendQueue.Len(), s.sendBuf.Len()),
 		LastSend:   fmt.Sprintf("%v (%d)", time.Since(s.lastTXTime).Truncate(time.Second), s.nextSend-1),
 	}
-	if _, ok := s.conn.(*TCPUnderlay); ok {
+	if _, ok := s.conn.(*StreamUnderlay); ok {
 		info.Protocol = "TCP"
 		info.LastRecv = fmt.Sprintf("%v", time.Since(s.lastRXTime).Truncate(time.Second)) // TCP nextRecv is not used
-	} else if _, ok := s.conn.(*UDPUnderlay); ok {
+	} else if _, ok := s.conn.(*PacketUnderlay); ok {
 		info.Protocol = "UDP"
 		info.LastRecv = fmt.Sprintf("%v (%d)", time.Since(s.lastRXTime).Truncate(time.Second), s.nextRecv-1)
 	} else {
@@ -582,7 +582,7 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 		}
 
 		switch s.conn.TransportProtocol() {
-		case common.TCPTransport:
+		case common.StreamTransport:
 			for {
 				seg, ok := s.sendQueue.DeleteMin()
 				if !ok {
@@ -596,7 +596,7 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 					break
 				}
 			}
-		case common.UDPTransport:
+		case common.PacketTransport:
 			closeSession := false
 			hasLoss := false
 			hasTimeout := false
@@ -605,7 +605,7 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 			// To avoid deadlock, session can't be closed inside Ascend().
 			var bytesInFlight int64
 			s.sendBuf.Ascend(func(iter *segment) bool {
-				bytesInFlight += int64(udpOverhead + len(iter.payload))
+				bytesInFlight += int64(packetOverhead + len(iter.payload))
 				if iter.txCount >= txCountLimit {
 					err := fmt.Errorf("too many retransmission of %v", iter)
 					log.Debugf("%v is unhealthy: %v", s, err)
@@ -634,7 +634,7 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 						closeSession = true
 						return false
 					}
-					bytesInFlight += int64(udpOverhead + len(iter.payload))
+					bytesInFlight += int64(packetOverhead + len(iter.payload))
 					return true
 				}
 				return true
@@ -650,7 +650,7 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 			if s.sendQueue.Len() > 0 {
 				for {
 					seg, deleted := s.sendQueue.DeleteMinIf(func(iter *segment) bool {
-						return s.sendAlgorithm.CanSend(bytesInFlight, int64(udpOverhead+len(iter.payload)))
+						return s.sendAlgorithm.CanSend(bytesInFlight, int64(packetOverhead+len(iter.payload)))
 					})
 					if !deleted {
 						break
@@ -678,7 +678,7 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 							s.Close()
 							break
 						}
-						newBytesInFlight := int64(udpOverhead + len(seg.payload))
+						newBytesInFlight := int64(packetOverhead + len(seg.payload))
 						s.sendAlgorithm.OnPacketSent(time.Now(), bytesInFlight, int64(seq), newBytesInFlight, true)
 						bytesInFlight += newBytesInFlight
 					}
@@ -719,7 +719,7 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 						s.outputErr <- err
 						s.Close()
 					}
-					newBytesInFlight := int64(udpOverhead + len(ackSeg.payload))
+					newBytesInFlight := int64(packetOverhead + len(ackSeg.payload))
 					s.sendAlgorithm.OnPacketSent(time.Now(), bytesInFlight, int64(seq), newBytesInFlight, true)
 					bytesInFlight += newBytesInFlight
 				}
@@ -790,14 +790,14 @@ func (s *Session) input(seg *segment) error {
 
 func (s *Session) inputData(seg *segment) error {
 	switch s.conn.TransportProtocol() {
-	case common.TCPTransport:
+	case common.StreamTransport:
 		// Deliver the segment directly to recvQueue.
 		s.recvQueue.InsertBlocking(seg)
-	case common.UDPTransport:
+	case common.PacketTransport:
 		// Delete all previous acknowledged segments from sendBuf.
 		var priorInFlight int64
 		s.sendBuf.Ascend(func(iter *segment) bool {
-			priorInFlight += int64(udpOverhead + len(iter.payload))
+			priorInFlight += int64(packetOverhead + len(iter.payload))
 			return true
 		})
 		das, ok := seg.metadata.(*dataAckStruct)
@@ -817,7 +817,7 @@ func (s *Session) inputData(seg *segment) error {
 				seq, _ := seg2.Seq()
 				ackedPackets = append(ackedPackets, congestion.AckedPacketInfo{
 					PacketNumber:     int64(seq),
-					BytesAcked:       int64(udpOverhead + len(seg2.payload)),
+					BytesAcked:       int64(packetOverhead + len(seg2.payload)),
 					ReceiveTimestamp: time.Now(),
 				})
 			}
@@ -902,14 +902,14 @@ func (s *Session) inputData(seg *segment) error {
 
 func (s *Session) inputAck(seg *segment) error {
 	switch s.conn.TransportProtocol() {
-	case common.TCPTransport:
+	case common.StreamTransport:
 		// Do nothing when receive ACK from TCP protocol.
 		return nil
-	case common.UDPTransport:
+	case common.PacketTransport:
 		// Delete all previous acknowledged segments from sendBuf.
 		var priorInFlight int64
 		s.sendBuf.Ascend(func(iter *segment) bool {
-			priorInFlight += int64(udpOverhead + len(iter.payload))
+			priorInFlight += int64(packetOverhead + len(iter.payload))
 			return true
 		})
 		das := seg.metadata.(*dataAckStruct)
@@ -928,7 +928,7 @@ func (s *Session) inputAck(seg *segment) error {
 			seq, _ := seg2.Seq()
 			ackedPackets = append(ackedPackets, congestion.AckedPacketInfo{
 				PacketNumber:     int64(seq),
-				BytesAcked:       int64(udpOverhead + len(seg2.payload)),
+				BytesAcked:       int64(packetOverhead + len(seg2.payload)),
 				ReceiveTimestamp: time.Now(),
 			})
 		}
@@ -995,12 +995,12 @@ func (s *Session) inputClose(seg *segment) error {
 
 func (s *Session) output(seg *segment, remoteAddr net.Addr) error {
 	switch s.conn.TransportProtocol() {
-	case common.TCPTransport:
-		if err := s.conn.(*TCPUnderlay).writeOneSegment(seg); err != nil {
+	case common.StreamTransport:
+		if err := s.conn.(*StreamUnderlay).writeOneSegment(seg); err != nil {
 			return fmt.Errorf("TCPUnderlay.writeOneSegment() failed: %v", err)
 		}
-	case common.UDPTransport:
-		err := s.conn.(*UDPUnderlay).writeOneSegment(seg, remoteAddr.(*net.UDPAddr))
+	case common.PacketTransport:
+		err := s.conn.(*PacketUnderlay).writeOneSegment(seg, remoteAddr)
 		if err != nil {
 			if !stderror.IsNotReady(err) {
 				return fmt.Errorf("UDPUnderlay.writeOneSegment() failed: %v", err)

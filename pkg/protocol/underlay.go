@@ -66,7 +66,7 @@ type Underlay interface {
 	RemoveSession(*Session) error
 
 	// Returns the number of sessions.
-	NSessions() int
+	SessionCount() int
 
 	// Returns detailed information of all the sessions.
 	Sessions() []SessionInfo

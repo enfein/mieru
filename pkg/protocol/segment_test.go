@@ -32,63 +32,25 @@ func TestMaxFragmentSize(t *testing.T) {
 		want      int
 	}{
 		{
-			1500,
-			common.TCPTransport,
+			1400,
+			common.StreamTransport,
 			maxPDU,
 		},
 		{
-			1500,
-			common.UDPTransport,
-			1500 - 8 - udpOverhead,
+			1400,
+			common.PacketTransport,
+			1400 - packetOverhead,
 		},
 		{
-			1500,
+			1400,
 			common.UnknownTransport,
-			1500 - 20 - udpOverhead,
+			1400 - packetOverhead,
 		},
 	}
 	for _, tc := range testcases {
 		got := MaxFragmentSize(tc.mtu, tc.transport)
 		if got != tc.want {
 			t.Errorf("MaxFragmentSize() = %d, want %d", got, tc.want)
-		}
-	}
-}
-
-func TestMaxPaddingSize(t *testing.T) {
-	testcases := []struct {
-		mtu                 int
-		transport           common.TransportProtocol
-		fragmentSize        int
-		existingPaddingSize int
-		want                int
-	}{
-		{
-			1500,
-			common.TCPTransport,
-			maxPDU,
-			255,
-			255,
-		},
-		{
-			1500,
-			common.UDPTransport,
-			1500 - 8 - udpOverhead - 16,
-			12,
-			4,
-		},
-		{
-			1500,
-			common.UnknownTransport,
-			0,
-			255,
-			255,
-		},
-	}
-	for _, tc := range testcases {
-		got := MaxPaddingSize(tc.mtu, tc.transport, tc.fragmentSize, tc.existingPaddingSize)
-		if got != tc.want {
-			t.Errorf("MaxPaddingSize() = %d, want %d", got, tc.want)
 		}
 	}
 }

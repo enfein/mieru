@@ -49,6 +49,16 @@ lib: fmt vet
 	CGO_ENABLED=0 go test -timeout=1m0s -coverprofile coverage.out ./...
 	go tool cover -html coverage.out -o coverage.html
 
+# Format source code.
+.PHONY: fmt
+fmt:
+	CGO_ENABLED=0 go fmt ./...
+
+# Run go vet.
+.PHONY: vet
+vet:
+	CGO_ENABLED=0 go vet ./...
+
 # Run benchmark.
 .PHONY: bench
 bench:
@@ -375,16 +385,6 @@ run-container-test: test-container
 		docker run mieru_httptest:${SHORT_SHA};\
 		docker run mieru_proxychain:${SHORT_SHA};\
 	fi
-
-# Format source code.
-.PHONY: fmt
-fmt:
-	CGO_ENABLED=0 go fmt ./...
-
-# Run go vet.
-.PHONY: vet
-vet:
-	CGO_ENABLED=0 go vet ./...
 
 # Generate source code from protobuf.
 # Call this after proto files are changed.

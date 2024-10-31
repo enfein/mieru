@@ -667,10 +667,10 @@ func PortBindingsToUnderlayProperties(portBindings []*pb.PortBinding, mtu int) (
 		port := portBindings[i].GetPort()
 		switch proto {
 		case pb.TransportProtocol_TCP:
-			endpoint := protocol.NewUnderlayProperties(mtu, common.TCPTransport, &net.TCPAddr{IP: listenIP, Port: int(port)}, nil)
+			endpoint := protocol.NewUnderlayProperties(mtu, common.StreamTransport, &net.TCPAddr{IP: listenIP, Port: int(port)}, nil)
 			endpoints = append(endpoints, endpoint)
 		case pb.TransportProtocol_UDP:
-			endpoint := protocol.NewUnderlayProperties(mtu, common.UDPTransport, &net.UDPAddr{IP: listenIP, Port: int(port)}, nil)
+			endpoint := protocol.NewUnderlayProperties(mtu, common.PacketTransport, &net.UDPAddr{IP: listenIP, Port: int(port)}, nil)
 			endpoints = append(endpoints, endpoint)
 		default:
 			return []protocol.UnderlayProperties{}, fmt.Errorf(stderror.InvalidTransportProtocol)
