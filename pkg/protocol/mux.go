@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
 	"github.com/enfein/mieru/v3/pkg/common"
@@ -48,6 +49,7 @@ type Mux struct {
 	underlays   []Underlay
 	chAccept    chan net.Conn
 	chAcceptErr chan error
+	resolver    apicommon.DNSResolver
 	used        bool
 	done        chan struct{}
 	mu          sync.Mutex
@@ -76,6 +78,7 @@ func NewMux(isClinet bool) *Mux {
 		underlays:   make([]Underlay, 0),
 		chAccept:    make(chan net.Conn, sessionChanCapacity),
 		chAcceptErr: make(chan error, 1), // non-blocking
+		resolver:    &net.Resolver{PreferGo: true},
 		done:        make(chan struct{}),
 		cleaner:     time.NewTicker(idleUnderlayTickerInterval),
 	}
@@ -99,6 +102,42 @@ func NewMux(isClinet bool) *Mux {
 		}
 	}()
 	return mux
+}
+
+// SetEndpoints updates the endpoints that mux is listening to.
+// If mux is started and new endpoints are added, mux also starts
+// to listen to those new endpoints. In that case, old endpoints
+// are not impacted.
+func (m *Mux) SetEndpoints(endpoints []UnderlayProperties) *Mux {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	new := m.newEndpoints(m.endpoints, endpoints)
+	if len(new) > 0 {
+		if m.used {
+			select {
+			case <-m.done:
+				log.Infof("Unable to add new endpoint after multiplexer is closed")
+			default:
+				for _, p := range new {
+					go m.acceptUnderlayLoop(context.Background(), p)
+				}
+				m.endpoints = endpoints
+			}
+		} else {
+			m.endpoints = new
+		}
+	}
+	log.Infof("Mux now has %d endpoints", len(m.endpoints))
+	return m
+}
+
+// SetResolver updates the DNS resolver used by the mux.
+func (m *Mux) SetResolver(resolver apicommon.DNSResolver) *Mux {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.resolver = resolver
+	log.Infof("Mux DNS resolver has been updated")
+	return m
 }
 
 // SetClientUserNamePassword panics if the mux is already started.
@@ -148,33 +187,6 @@ func (m *Mux) SetServerUsers(users map[string]*appctlpb.User) *Mux {
 			}
 		}
 	}
-	return m
-}
-
-// SetEndpoints updates the endpoints that mux is listening to.
-// If mux is started and new endpoints are added, mux also starts
-// to listen to those new endpoints. In that case, old endpoints
-// are not impacted.
-func (m *Mux) SetEndpoints(endpoints []UnderlayProperties) *Mux {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	new := m.newEndpoints(m.endpoints, endpoints)
-	if len(new) > 0 {
-		if m.used {
-			select {
-			case <-m.done:
-				log.Infof("Unable to add new endpoint after multiplexer is closed")
-			default:
-				for _, p := range new {
-					go m.acceptUnderlayLoop(context.Background(), p)
-				}
-				m.endpoints = endpoints
-			}
-		} else {
-			m.endpoints = new
-		}
-	}
-	log.Infof("Mux now has %d endpoints", len(m.endpoints))
 	return m
 }
 
