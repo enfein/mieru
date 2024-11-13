@@ -20,6 +20,7 @@ import (
 	"errors"
 	"net"
 
+	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 )
 
@@ -79,7 +80,8 @@ type ClientNetworkService interface {
 
 // ClientConfig stores proxy client configuration.
 type ClientConfig struct {
-	Profile *appctlpb.ClientProfile
+	Profile  *appctlpb.ClientProfile
+	Resolver apicommon.DNSResolver
 }
 
 // NewClient creates a blank mieru client with no client config.

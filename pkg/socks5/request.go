@@ -11,6 +11,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/common"
@@ -83,15 +84,19 @@ func (s *Server) handleRequest(ctx context.Context, req *Request, conn io.ReadWr
 	// Resolve the address if we have a FQDN.
 	dst := req.DstAddr
 	if dst.FQDN != "" {
-		addr, err := s.config.Resolver.LookupIP(ctx, dst.FQDN)
-		if err != nil {
+		ips, err := s.config.Resolver.LookupIP(ctx, "ip", dst.FQDN)
+		if err != nil || len(ips) == 0 {
 			DNSResolveErrors.Add(1)
 			if err := sendReply(conn, hostUnreachable, nil); err != nil {
 				return fmt.Errorf("failed to send reply: %w", err)
 			}
-			return fmt.Errorf("failed to resolve destination %q: %w", dst.FQDN, err)
+			if err != nil {
+				return fmt.Errorf("failed to resolve destination %q: %w", dst.FQDN, err)
+			} else {
+				return fmt.Errorf(stderror.IPAddressNotFound, dst.FQDN)
+			}
 		}
-		dst.IP = addr
+		dst.IP = ips[0]
 	}
 
 	// Return error if access local destination is not allowed.
@@ -165,7 +170,7 @@ func (s *Server) handleBind(_ context.Context, _ *Request, conn io.ReadWriteClos
 func (s *Server) handleAssociate(_ context.Context, _ *Request, conn io.ReadWriteCloser) error {
 	// Create a UDP listener on a random port.
 	// All the requests associated to this connection will go through this port.
-	udpListenerAddr, err := net.ResolveUDPAddr("udp", common.MaybeDecorateIPv6(common.AllIPAddr())+":0")
+	udpListenerAddr, err := apicommon.ResolveUDPAddr(s.config.Resolver, "udp", common.MaybeDecorateIPv6(common.AllIPAddr())+":0")
 	if err != nil {
 		UDPAssociateErrors.Add(1)
 		return fmt.Errorf("failed to resolve UDP address: %w", err)
@@ -267,7 +272,7 @@ func (s *Server) handleAssociate(_ context.Context, _ *Request, conn io.ReadWrit
 			case 0x03:
 				fqdnLen := buf[4]
 				fqdn := string(buf[5 : 5+fqdnLen])
-				dstAddr, err := net.ResolveUDPAddr("udp", fqdn+":"+strconv.Itoa(int(buf[5+fqdnLen])<<8+int(buf[6+fqdnLen])))
+				dstAddr, err := apicommon.ResolveUDPAddr(s.config.Resolver, "udp", fqdn+":"+strconv.Itoa(int(buf[5+fqdnLen])<<8+int(buf[6+fqdnLen])))
 				if err != nil {
 					log.Debugf("UDP associate %v ResolveUDPAddr() failed: %v", udpConn.LocalAddr(), err)
 					UDPAssociateErrors.Add(1)

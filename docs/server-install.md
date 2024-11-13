@@ -8,32 +8,32 @@ Before installation and configuration, connect to the server via SSH and then ex
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.7.0/mita_3.7.0_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.8.0/mita_3.8.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.7.0/mita_3.7.0_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.8.0/mita_3.8.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.7.0/mita-3.7.0-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.8.0/mita-3.8.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.7.0/mita-3.7.0-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.8.0/mita-3.8.0-1.aarch64.rpm
 ```
 
 ## Install mita package
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_3.7.0_amd64.deb
+sudo dpkg -i mita_3.8.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_3.7.0_arm64.deb
+sudo dpkg -i mita_3.8.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-3.7.0-1.x86_64.rpm
+sudo rpm -Uvh --force mita-3.8.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-3.7.0-1.aarch64.rpm
+sudo rpm -Uvh --force mita-3.8.0-1.aarch64.rpm
 ```
 
 Those instructions can also be used to upgrade the version of mita software package.
@@ -106,7 +106,7 @@ to modify the proxy server settings. `<FILE>` is a JSON formatted configuration 
 2. The `portBindings` -> `protocol` property can be set to `TCP` or `UDP`.
 3. Fill in the `users` -> `name` property with the user name.
 4. Fill in the `users` -> `password` property with the user's password.
-5. The `mtu` property is the maximum data link layer payload size when using the UDP proxy protocol. The default value is 1400. You can choose a value between 1280 and 1500.
+5. The `mtu` property is the maximum transport layer payload size when using the UDP proxy protocol. The default value is 1400. The minimum value is 1280.
 
 In addition to this, mita can listen to several different ports. We recommend using multiple ports in both server and client configurations.
 

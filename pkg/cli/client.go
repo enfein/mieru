@@ -31,6 +31,7 @@ import (
 	"sync"
 	"time"
 
+	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/appctl"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlgrpc"
@@ -439,6 +440,8 @@ var clientRunFunc = func(s []string) error {
 		serverDecryptionMetricGroup.DisableLogging()
 	}
 
+	resolver := &net.Resolver{}
+
 	var wg sync.WaitGroup
 
 	// RPC port is allowed to set to 0. In that case, don't run RPC server.
@@ -448,10 +451,16 @@ var clientRunFunc = func(s []string) error {
 		wg.Add(1)
 		go func() {
 			rpcAddr := "localhost:" + strconv.Itoa(int(config.GetRpcPort()))
-			listenConfig := sockopts.ListenConfigWithControls()
-			rpcListener, err := listenConfig.Listen(context.Background(), "tcp", rpcAddr)
+			rpcTCPAddr, err := apicommon.ResolveTCPAddr(resolver, "tcp", rpcAddr)
 			if err != nil {
-				log.Fatalf("listen on RPC address tcp %q failed: %v", rpcAddr, err)
+				log.Fatalf("Resolve RPC address %q failed: %v", rpcAddr, err)
+			}
+			rpcListener, err := net.ListenTCP("tcp", rpcTCPAddr)
+			if err != nil {
+				log.Fatalf("Listen on RPC address %q failed: %v", rpcAddr, err)
+			}
+			if err := sockopts.ApplyTCPControls(rpcListener); err != nil {
+				log.Fatalf("ApplyTCPControls() failed: %v", err)
 			}
 			grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(appctl.MaxRecvMsgSize))
 			appctl.SetClientRPCServerRef(grpcServer)
@@ -504,16 +513,19 @@ var clientRunFunc = func(s []string) error {
 		mtu = int(activeProfile.GetMtu())
 	}
 	endpoints := make([]protocol.UnderlayProperties, 0)
-	resolver := &common.DNSResolver{}
 	for _, serverInfo := range activeProfile.GetServers() {
 		var proxyHost string
 		var proxyIP net.IP
 		if serverInfo.GetDomainName() != "" {
 			proxyHost = serverInfo.GetDomainName()
-			proxyIP, err = resolver.LookupIP(context.Background(), proxyHost)
+			proxyIPs, err := resolver.LookupIP(context.Background(), "ip", proxyHost)
 			if err != nil {
 				return fmt.Errorf(stderror.LookupIPFailedErr, err)
 			}
+			if len(proxyIPs) == 0 {
+				return fmt.Errorf(stderror.IPAddressNotFound, proxyHost)
+			}
+			proxyIP = proxyIPs[0]
 		} else {
 			proxyHost = serverInfo.GetIpAddress()
 			proxyIP = net.ParseIP(proxyHost)
@@ -556,6 +568,7 @@ var clientRunFunc = func(s []string) error {
 			IngressCredentials:       socks5IngressCredentials,
 		},
 		ProxyMux:         mux,
+		Resolver:         resolver,
 		HandshakeTimeout: 10 * time.Second,
 	}
 	socks5Server, err := socks5.New(socks5Config)
@@ -573,14 +586,20 @@ var clientRunFunc = func(s []string) error {
 	}
 	wg.Add(1)
 	go func(socks5Addr string) {
-		listenConfig := sockopts.ListenConfigWithControls()
-		l, err := listenConfig.Listen(context.Background(), "tcp", socks5Addr)
+		socks5TCPAddr, err := apicommon.ResolveTCPAddr(resolver, "tcp", socks5Addr)
 		if err != nil {
-			log.Fatalf("listen on socks5 address tcp %q failed: %v", socks5Addr, err)
+			log.Fatalf("Resolve socks5 address %q failed: %v", socks5Addr, err)
+		}
+		socks5Listener, err := net.ListenTCP("tcp", socks5TCPAddr)
+		if err != nil {
+			log.Fatalf("Listen on socks5 address %q failed: %v", socks5Addr, err)
+		}
+		if err := sockopts.ApplyTCPControls(socks5Listener); err != nil {
+			log.Fatalf("ApplyTCPControls() failed: %v", err)
 		}
 		close(appctl.ClientSocks5ServerStarted)
 		log.Infof("mieru client socks5 server is running")
-		if err = socks5Server.Serve(l); err != nil {
+		if err = socks5Server.Serve(socks5Listener); err != nil {
 			log.Fatalf("run socks5 server failed: %v", err)
 		}
 		log.Infof("mieru client socks5 server is stopped")

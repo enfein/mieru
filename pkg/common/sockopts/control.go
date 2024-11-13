@@ -22,7 +22,7 @@ import (
 	"syscall"
 )
 
-// Control is the Control function used by net.Dialer and net.ListenConfig.
+// Control is the Control function used by net.Dialer.
 type Control = func(network, address string, c syscall.RawConn) error
 
 // RawControl is the Control function used by syscall.RawConn.
@@ -31,31 +31,19 @@ type RawControl = func(fd uintptr)
 // RawControlErr returns an error with RawControl.
 type RawControlErr = func(fd uintptr) error
 
-// Append returns a Control function that chains next after prev.
-func Append(prev, next Control) Control {
-	if prev == nil {
-		return next
-	} else if next == nil {
-		return prev
+// ApplyTCPControls applies all the recommended controls to the TCP listener.
+func ApplyTCPControls(listener *net.TCPListener) error {
+	rawConn, err := listener.SyscallConn()
+	if err != nil {
+		return fmt.Errorf("SyscallConn() failed: %w", err)
 	}
-	return func(network, address string, c syscall.RawConn) error {
-		if err := prev(network, address, c); err != nil {
-			return err
-		}
-		return next(network, address, c)
+	if err := rawConn.Control(ReuseAddrPortRaw()); err != nil {
+		return err
 	}
-}
-
-// ListenConfigWithControls returns a net.ListenConfig with
-// all the recommended controls applied.
-func ListenConfigWithControls() net.ListenConfig {
-	var protectPathControl Control
 	if path, found := os.LookupEnv("MIERU_PROTECT_PATH"); found {
-		protectPathControl = ProtectPath(path)
+		return rawConn.Control(ProtectPathRaw(path))
 	}
-	return net.ListenConfig{
-		Control: Append(ReuseAddrPort(), protectPathControl),
-	}
+	return nil
 }
 
 // ApplyUDPControls applies all the recommended controls to the UDP connection.

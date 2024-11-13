@@ -104,3 +104,12 @@ func ResolveUDPAddr(r DNSResolver, network, address string) (*net.UDPAddr, error
 
 	return &net.UDPAddr{IP: ips[0], Port: port}, nil
 }
+
+// ForbidDefaultResolver causes the process to panic if
+// net.DefaultResolver object is used.
+func ForbidDefaultResolver() {
+	net.DefaultResolver.PreferGo = true
+	net.DefaultResolver.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {
+		panic("Using net.DefaultResolver is forbidden")
+	}
+}

@@ -78,7 +78,7 @@ func NewMux(isClinet bool) *Mux {
 		underlays:   make([]Underlay, 0),
 		chAccept:    make(chan net.Conn, sessionChanCapacity),
 		chAcceptErr: make(chan error, 1), // non-blocking
-		resolver:    &net.Resolver{PreferGo: true},
+		resolver:    &net.Resolver{},
 		done:        make(chan struct{}),
 		cleaner:     time.NewTicker(idleUnderlayTickerInterval),
 	}
@@ -426,10 +426,18 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 	network := properties.LocalAddr().Network()
 	switch network {
 	case "tcp", "tcp4", "tcp6":
-		listenConfig := sockopts.ListenConfigWithControls()
-		rawListener, err := listenConfig.Listen(ctx, network, laddr)
+		tcpAddr, err := apicommon.ResolveTCPAddr(m.resolver, "tcp", laddr)
 		if err != nil {
-			m.chAcceptErr <- fmt.Errorf("Listen() failed: %w", err)
+			m.chAcceptErr <- fmt.Errorf("ResolveTCPAddr() failed: %w", err)
+			return
+		}
+		rawListener, err := net.ListenTCP("tcp", tcpAddr)
+		if err != nil {
+			m.chAcceptErr <- fmt.Errorf("ListenTCP() failed: %w", err)
+			return
+		}
+		if err := sockopts.ApplyTCPControls(rawListener); err != nil {
+			m.chAcceptErr <- fmt.Errorf("ApplyTCPControls() failed: %w", err)
 			return
 		}
 		log.Infof("Mux is listening to endpoint %s %s", network, laddr)
@@ -597,7 +605,7 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 		block.SetBlockContext(cipher.BlockContext{
 			UserName: m.username,
 		})
-		underlay, err = NewStreamUnderlay(ctx, p.RemoteAddr().Network(), "", p.RemoteAddr().String(), p.MTU(), block)
+		underlay, err = NewStreamUnderlay(ctx, p.RemoteAddr().Network(), "", p.RemoteAddr().String(), p.MTU(), block, m.resolver)
 		if err != nil {
 			return nil, fmt.Errorf("NewTCPUnderlay() failed: %v", err)
 		}
@@ -609,7 +617,7 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 		block.SetBlockContext(cipher.BlockContext{
 			UserName: m.username,
 		})
-		underlay, err = NewPacketUnderlay(ctx, p.RemoteAddr().Network(), "", p.RemoteAddr().String(), p.MTU(), block)
+		underlay, err = NewPacketUnderlay(ctx, p.RemoteAddr().Network(), "", p.RemoteAddr().String(), p.MTU(), block, m.resolver)
 		if err != nil {
 			return nil, fmt.Errorf("NewUDPUnderlay() failed: %v", err)
 		}

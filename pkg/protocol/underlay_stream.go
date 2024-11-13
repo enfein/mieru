@@ -22,6 +22,7 @@ import (
 	"net"
 	"time"
 
+	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
 	"github.com/enfein/mieru/v3/pkg/common"
@@ -61,7 +62,7 @@ var _ Underlay = &StreamUnderlay{}
 // "block" is the block encryption algorithm to encrypt packets.
 //
 // This function is only used by proxy client.
-func NewStreamUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, block cipher.BlockCipher) (*StreamUnderlay, error) {
+func NewStreamUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, block cipher.BlockCipher, resolver apicommon.DNSResolver) (*StreamUnderlay, error) {
 	switch network {
 	case "tcp", "tcp4", "tcp6":
 	default:
@@ -74,9 +75,9 @@ func NewStreamUnderlay(ctx context.Context, network, laddr, raddr string, mtu in
 		Control: sockopts.ReuseAddrPort(),
 	}
 	if laddr != "" {
-		tcpLocalAddr, err := net.ResolveTCPAddr(network, laddr)
+		tcpLocalAddr, err := apicommon.ResolveTCPAddr(resolver, network, laddr)
 		if err != nil {
-			return nil, fmt.Errorf("net.ResolveTCPAddr() failed: %w", err)
+			return nil, fmt.Errorf("ResolveTCPAddr() failed: %w", err)
 		}
 		dialer.LocalAddr = tcpLocalAddr
 	}

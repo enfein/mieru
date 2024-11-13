@@ -38,6 +38,7 @@ const (
 	GetThreadDumpFailedErr                  = "get thread dump failed: %w"
 	InvalidPortBindingsErr                  = "invalid port bindings: %w"
 	InvalidTransportProtocol                = "invalid transport protocol"
+	IPAddressNotFound                       = "IP address not found from domain name %q"
 	LookupIPFailedErr                       = "look up IP address failed: %w"
 	ParseIPFailed                           = "parse IP address failed"
 	ReloadServerFailedErr                   = "reload mita server failed: %w"

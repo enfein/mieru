@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/common"
@@ -42,7 +43,7 @@ type Config struct {
 	EgressController egress.Controller
 
 	// Resolver can be provided to do custom name resolution.
-	Resolver *common.DNSResolver
+	Resolver apicommon.DNSResolver
 
 	// BindIP is used for bind or udp associate
 	BindIP net.IP
@@ -84,7 +85,7 @@ func New(conf *Config) (*Server, error) {
 
 	// Ensure we have a DNS resolver.
 	if conf.Resolver == nil {
-		conf.Resolver = &common.DNSResolver{}
+		conf.Resolver = &net.Resolver{}
 	}
 
 	// Provide a default bind IP.

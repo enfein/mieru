@@ -413,6 +413,9 @@ func (b *BBRSender) OnCongestionEvent(priorInFlight int64, eventTime time.Time, 
 // OnApplicationLimited updates BBR sender state when there is no application
 // data to send.
 func (b *BBRSender) OnApplicationLimited(bytesInFlight int64) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	if bytesInFlight >= b.getCongestionWindow() {
 		return
 	}
@@ -425,6 +428,7 @@ func (b *BBRSender) OnApplicationLimited(bytesInFlight int64) {
 func (b *BBRSender) CanSend(bytesInFlight, bytes int64) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+
 	pacerCanSend := b.pacer.CanSend(time.Now(), bytes, b.getPacingRate())
 	return bytesInFlight < b.getCongestionWindow() && pacerCanSend
 }

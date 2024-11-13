@@ -23,6 +23,7 @@ import (
 	"net"
 	"time"
 
+	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
 	"github.com/enfein/mieru/v3/pkg/common"
@@ -67,7 +68,7 @@ var _ Underlay = &PacketUnderlay{}
 // "block" is the block encryption algorithm to encrypt packets.
 //
 // This function is only used by proxy client.
-func NewPacketUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, block cipher.BlockCipher) (*PacketUnderlay, error) {
+func NewPacketUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, block cipher.BlockCipher, resolver apicommon.DNSResolver) (*PacketUnderlay, error) {
 	switch network {
 	case "udp", "udp4", "udp6":
 	default:
@@ -79,14 +80,14 @@ func NewPacketUnderlay(ctx context.Context, network, laddr, raddr string, mtu in
 	var localAddr *net.UDPAddr
 	var err error
 	if laddr != "" {
-		localAddr, err = net.ResolveUDPAddr("udp", laddr)
+		localAddr, err = apicommon.ResolveUDPAddr(resolver, "udp", laddr)
 		if err != nil {
-			return nil, fmt.Errorf("net.ResolveUDPAddr() failed: %w", err)
+			return nil, fmt.Errorf("ResolveUDPAddr() failed: %w", err)
 		}
 	}
-	remoteAddr, err := net.ResolveUDPAddr("udp", raddr)
+	remoteAddr, err := apicommon.ResolveUDPAddr(resolver, "udp", raddr)
 	if err != nil {
-		return nil, fmt.Errorf("net.ResolveUDPAddr() failed: %w", err)
+		return nil, fmt.Errorf("ResolveUDPAddr() failed: %w", err)
 	}
 
 	conn, err := net.ListenUDP(network, localAddr)
@@ -189,7 +190,7 @@ func (u *PacketUnderlay) RunEventLoop(ctx context.Context) error {
 			u.sessionMap.Range(func(k, v any) bool {
 				session := v.(*Session)
 				select {
-				case <-session.done:
+				case <-session.closedChan:
 					log.Debugf("Found closed %v", session)
 					if err := u.RemoveSession(session); err != nil {
 						log.Debugf("%v RemoveSession() failed: %v", u, err)

@@ -137,6 +137,17 @@ func (n NetAddrSpec) Network() string {
 
 // From modifies the NetAddrSpec object with the given network address.
 func (n *NetAddrSpec) From(addr net.Addr) error {
+	if nas, ok := addr.(NetAddrSpec); ok {
+		n.AddrSpec = nas.AddrSpec
+		n.Net = nas.Net
+		return nil
+	}
+	if nas, ok := addr.(*NetAddrSpec); ok {
+		n.AddrSpec = nas.AddrSpec
+		n.Net = nas.Net
+		return nil
+	}
+
 	n.Net = addr.Network()
 
 	host, portStr, err := net.SplitHostPort(addr.String())

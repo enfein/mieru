@@ -8,32 +8,32 @@
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.7.0/mita_3.7.0_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.8.0/mita_3.8.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.7.0/mita_3.7.0_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.8.0/mita_3.8.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.7.0/mita-3.7.0-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.8.0/mita-3.8.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.7.0/mita-3.7.0-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.8.0/mita-3.8.0-1.aarch64.rpm
 ```
 
 ## 安装 mita 软件包
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_3.7.0_amd64.deb
+sudo dpkg -i mita_3.8.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_3.7.0_arm64.deb
+sudo dpkg -i mita_3.8.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-3.7.0-1.x86_64.rpm
+sudo rpm -Uvh --force mita-3.8.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-3.7.0-1.aarch64.rpm
+sudo rpm -Uvh --force mita-3.8.0-1.aarch64.rpm
 ```
 
 上述指令也可以用来升级 mita 软件包的版本。
@@ -106,7 +106,7 @@ mita apply config <FILE>
 2. `portBindings` -> `protocol` 属性可以使用 `TCP` 或者 `UDP`。
 3. 在 `users` -> `name` 属性中填写用户名。
 4. 在 `users` -> `password` 属性中填写该用户的密码。
-5. `mtu` 属性是使用 UDP 代理协议时，数据链路层最大的载荷大小。默认值是 1400，可以选择 1280 到 1500 之间的值。
+5. `mtu` 属性是使用 UDP 代理协议时，传输层最大的载荷大小。默认值是 1400，最小值是 1280。
 
 除此之外，mita 可以监听多个不同的端口。我们建议在服务器和客户端配置中使用多个端口。
 

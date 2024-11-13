@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/appctl"
@@ -97,6 +98,15 @@ func (mc *mieruClient) Start() error {
 	mc.mux = protocol.NewMux(true)
 	activeProfile := mc.config.Profile
 
+	// Set DNS resolver.
+	var resolver apicommon.DNSResolver
+	if mc.config.Resolver != nil {
+		resolver = mc.config.Resolver
+	} else {
+		resolver = &net.Resolver{} // Default DNS resolver.
+	}
+	mc.mux.SetResolver(resolver)
+
 	// Set user name and password.
 	user := activeProfile.GetUser()
 	var hashedPassword []byte
@@ -130,16 +140,19 @@ func (mc *mieruClient) Start() error {
 		mtu = int(activeProfile.GetMtu())
 	}
 	endpoints := make([]protocol.UnderlayProperties, 0)
-	resolver := &common.DNSResolver{}
 	for _, serverInfo := range activeProfile.GetServers() {
 		var proxyHost string
 		var proxyIP net.IP
 		if serverInfo.GetDomainName() != "" {
 			proxyHost = serverInfo.GetDomainName()
-			proxyIP, err = resolver.LookupIP(context.Background(), proxyHost)
+			proxyIPs, err := resolver.LookupIP(context.Background(), "ip", proxyHost)
 			if err != nil {
 				return fmt.Errorf(stderror.LookupIPFailedErr, err)
 			}
+			if len(proxyIPs) == 0 {
+				return fmt.Errorf(stderror.IPAddressNotFound, proxyHost)
+			}
+			proxyIP = proxyIPs[0]
 		} else {
 			proxyHost = serverInfo.GetIpAddress()
 			proxyIP = net.ParseIP(proxyHost)
@@ -197,14 +210,8 @@ func (mc *mieruClient) DialContext(ctx context.Context, addr net.Addr) (net.Conn
 
 	// Check destination address.
 	var netAddrSpec model.NetAddrSpec
-	if nas, ok := addr.(model.NetAddrSpec); ok {
-		netAddrSpec = nas
-	} else if nas, ok := addr.(*model.NetAddrSpec); ok {
-		netAddrSpec = *nas
-	} else {
-		if err := netAddrSpec.From(addr); err != nil {
-			return nil, fmt.Errorf("invalid destination address: %w", err)
-		}
+	if err := netAddrSpec.From(addr); err != nil {
+		return nil, fmt.Errorf("invalid destination address: %w", err)
 	}
 	if !strings.HasPrefix(netAddrSpec.Network(), "tcp") {
 		return nil, fmt.Errorf("only tcp network is supported")
@@ -214,6 +221,33 @@ func (mc *mieruClient) DialContext(ctx context.Context, addr net.Addr) (net.Conn
 	if err != nil {
 		return nil, err
 	}
+	return mc.dialPostHandshake(conn, netAddrSpec)
+}
+
+func (mc *mieruClient) DialContextWithConn(ctx context.Context, conn net.Conn, addr net.Addr) (net.Conn, error) {
+	mc.mu.RLock()
+	defer mc.mu.RUnlock()
+	if !mc.running {
+		return nil, ErrClientIsNotRunning
+	}
+
+	// Check destination address.
+	var netAddrSpec model.NetAddrSpec
+	if err := netAddrSpec.From(addr); err != nil {
+		return nil, fmt.Errorf("invalid destination address: %w", err)
+	}
+	if !strings.HasPrefix(netAddrSpec.Network(), "tcp") {
+		return nil, fmt.Errorf("only tcp network is supported")
+	}
+
+	subConn, err := mc.mux.DialContextWithConn(ctx, conn)
+	if err != nil {
+		return nil, err
+	}
+	return mc.dialPostHandshake(subConn, netAddrSpec)
+}
+
+func (mc *mieruClient) dialPostHandshake(conn net.Conn, netAddrSpec model.NetAddrSpec) (net.Conn, error) {
 	var req bytes.Buffer
 	req.Write([]byte{constant.Socks5Version, constant.Socks5ConnectCmd, 0})
 	if err := netAddrSpec.WriteToSocks5(&req); err != nil {
@@ -240,8 +274,4 @@ func (mc *mieruClient) DialContext(ctx context.Context, addr net.Addr) (net.Conn
 		return nil, fmt.Errorf("server returned socks5 error code %d", resp[1])
 	}
 	return conn, nil
-}
-
-func (mc *mieruClient) DialContextWithConn(ctx context.Context, conn net.Conn, addr net.Addr) (net.Conn, error) {
-	return nil, fmt.Errorf("not implemented")
 }
