@@ -243,9 +243,9 @@ func TestSegmentTreeDeleteMinIf(t *testing.T) {
 			seq: 300,
 		},
 	}
-	st.InsertBlocking(seg3)
-	st.InsertBlocking(seg2)
-	st.InsertBlocking(seg1)
+	if !st.Insert(seg3) || !st.Insert(seg2) || !st.Insert(seg1) {
+		t.Fatalf("Insert segments failed")
+	}
 
 	f := func(s *segment) bool {
 		seq, err := s.Seq()
@@ -297,9 +297,9 @@ func TestSegmentTreeAscend(t *testing.T) {
 			seq: 300,
 		},
 	}
-	st.InsertBlocking(seg3)
-	st.InsertBlocking(seg2)
-	st.InsertBlocking(seg1)
+	if !st.Insert(seg3) || !st.Insert(seg2) || !st.Insert(seg1) {
+		t.Fatalf("Insert segments failed")
+	}
 
 	got := make([]uint32, 0)
 	st.Ascend(func(s *segment) bool {

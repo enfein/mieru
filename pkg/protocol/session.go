@@ -289,8 +289,12 @@ func (s *Session) Write(b []byte) (n int, err error) {
 		if log.IsLevelEnabled(log.TraceLevel) {
 			log.Tracef("%v writing %d bytes with open session request", s, len(seg.payload))
 		}
-		s.sendQueue.InsertBlocking(seg)
-		s.oLock.Unlock()
+		if !s.sendQueue.Insert(seg) {
+			s.oLock.Unlock()
+			return 0, fmt.Errorf("insert %v to send queue failed", seg)
+		} else {
+			s.oLock.Unlock()
+		}
 		if len(seg.payload) > 0 {
 			return len(seg.payload), nil
 		}
@@ -472,7 +476,10 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 		}
 		copy(seg.payload, part)
 		s.nextSend++
-		s.sendQueue.InsertBlocking(seg)
+		if !s.sendQueue.Insert(seg) {
+			s.oLock.Unlock()
+			return 0, fmt.Errorf("insert %v to send queue failed", seg)
+		}
 		ptr = ptr[partLen:]
 	}
 	s.oLock.Unlock()
@@ -636,8 +643,14 @@ func (s *Session) runOutputOncePacket() {
 				das, _ := toDataAckStruct(seg.metadata)
 				das.unAckSeq = s.nextRecv
 			}
-			s.sendBuf.InsertBlocking(seg)
-
+			if !s.sendBuf.Insert(seg) {
+				s.oLock.Unlock()
+				err := fmt.Errorf("output() failed: insert %v to send buffer failed", seg)
+				log.Debugf("%v %v", s, err)
+				s.outputErr <- err
+				s.closeWithError(err)
+				break
+			}
 			if err := s.output(seg, s.RemoteAddr()); err != nil {
 				s.oLock.Unlock()
 				err = fmt.Errorf("output() failed: %w", err)
@@ -767,7 +780,9 @@ func (s *Session) inputData(seg *segment) error {
 	switch s.conn.TransportProtocol() {
 	case common.StreamTransport:
 		// Deliver the segment directly to recvQueue.
-		s.recvQueue.InsertBlocking(seg)
+		if !s.recvQueue.Insert(seg) {
+			return fmt.Errorf("insert %v to receive queue failed", seg)
+		}
 	case common.PacketTransport:
 		// Delete all previous acknowledged segments from sendBuf.
 		var priorInFlight int64
@@ -803,7 +818,9 @@ func (s *Session) inputData(seg *segment) error {
 		}
 
 		// Deliver the segment to recvBuf.
-		s.recvBuf.InsertBlocking(seg)
+		if !s.recvBuf.Insert(seg) {
+			return fmt.Errorf("insert %v to receive buffer failed", seg)
+		}
 
 		// Move recvBuf to recvQueue.
 		for {
@@ -816,7 +833,9 @@ func (s *Session) inputData(seg *segment) error {
 			}
 			seq, _ := seg3.Seq()
 			if seq == s.nextRecv {
-				s.recvQueue.InsertBlocking(seg3)
+				if !s.recvQueue.Insert(seg3) {
+					return fmt.Errorf("insert %v to receive queue failed", seg3)
+				}
 				s.nextRecv++
 				das, ok := seg3.metadata.(*dataAckStruct)
 				if ok {
@@ -867,9 +886,13 @@ func (s *Session) inputData(seg *segment) error {
 			if log.IsLevelEnabled(log.TraceLevel) {
 				log.Tracef("%v writing open session response", s)
 			}
-			s.sendQueue.InsertBlocking(seg4)
-			s.forwardStateTo(sessionEstablished)
-			s.oLock.Unlock()
+			if !s.sendQueue.Insert(seg4) {
+				s.oLock.Unlock()
+				return fmt.Errorf("insert %v to send queue failed", seg4)
+			} else {
+				s.oLock.Unlock()
+				s.forwardStateTo(sessionEstablished)
+			}
 		}
 	}
 	return nil
@@ -1026,13 +1049,16 @@ func (s *Session) closeWithError(err error) error {
 
 		var gracefulCloseSuccess bool
 		if gracefulClose {
-			s.sendQueue.InsertBlocking(seg)
-			s.oLock.Unlock()
-			for i := 0; i < 1000; i++ {
-				time.Sleep(time.Millisecond)
-				if s.lastSend >= closeRequestSeq {
-					gracefulCloseSuccess = true
-					break
+			if !s.sendQueue.Insert(seg) {
+				s.oLock.Unlock()
+			} else {
+				s.oLock.Unlock()
+				for i := 0; i < 1000; i++ {
+					time.Sleep(time.Millisecond)
+					if s.lastSend >= closeRequestSeq {
+						gracefulCloseSuccess = true
+						break
+					}
 				}
 			}
 		} else {

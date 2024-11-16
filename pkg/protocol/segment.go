@@ -136,7 +136,6 @@ type segmentTree struct {
 	cap int
 
 	mu                sync.Mutex
-	notFull           sync.Cond
 	chanEmptyEvent    chan struct{}
 	chanNotEmptyEvent chan struct{}
 }
@@ -149,7 +148,6 @@ func newSegmentTree(capacity int) *segmentTree {
 		tr:  btree.NewG(4, segmentLessFunc),
 		cap: capacity,
 	}
-	st.notFull = *sync.NewCond(&st.mu)
 	st.chanEmptyEvent = make(chan struct{}, 1)
 	st.chanNotEmptyEvent = make(chan struct{}, 1)
 	return st
@@ -179,28 +177,6 @@ func (t *segmentTree) Insert(seg *segment) (ok bool) {
 	return true
 }
 
-// InsertBlocking is same as Insert, but blocks when the tree is full.
-func (t *segmentTree) InsertBlocking(seg *segment) {
-	t.checkNil(seg)
-	t.checkSeq(seg)
-	t.checkProtocolType(seg)
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	for t.tr.Len() >= t.cap {
-		t.notifyNotEmpty()
-		t.notFull.Wait()
-	}
-	prev, replace := t.tr.ReplaceOrInsert(seg)
-	if replace {
-		if log.IsLevelEnabled(log.TraceLevel) {
-			log.Tracef("%v is replaced by %v", prev, seg)
-		}
-	} else {
-		t.notifyNotEmpty()
-	}
-}
-
 // DeleteMin removes the smallest item from the tree.
 // It returns true if delete is successful.
 func (t *segmentTree) DeleteMin() (*segment, bool) {
@@ -217,7 +193,6 @@ func (t *segmentTree) DeleteMin() (*segment, bool) {
 	if seg == nil {
 		panic("segmentTree.DeleteMin() return nil")
 	}
-	t.notFull.Broadcast()
 	if t.tr.Len() > 0 {
 		t.notifyNotEmpty()
 	} else {
@@ -252,7 +227,6 @@ func (t *segmentTree) DeleteMinIf(si segmentIterator) (*segment, bool) {
 		if seg == nil {
 			panic("segmentTree.DeleteMin() return nil")
 		}
-		t.notFull.Broadcast()
 	}
 	if t.tr.Len() > 0 {
 		t.notifyNotEmpty()
@@ -269,7 +243,6 @@ func (t *segmentTree) DeleteAll() {
 
 	t.tr.Clear(false)
 	t.notifyEmpty()
-	t.notFull.Broadcast()
 }
 
 // Ascend iterates the segment tree in ascending order, until the iterator returns false.

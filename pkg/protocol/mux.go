@@ -339,6 +339,13 @@ func (m *Mux) DialContextWithConn(ctx context.Context, conn net.Conn) (net.Conn,
 	if err != nil {
 		return nil, fmt.Errorf("NewTCPUnderlayWithConn() failed: %v", err)
 	}
+	go func() {
+		err := underlay.RunEventLoop(ctx)
+		if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
+			log.Debugf("%v RunEventLoop(): %v", underlay, err)
+		}
+		underlay.Close()
+	}()
 	session := NewSession(mrand.Uint32(), true, underlay.MTU(), m.users)
 	if err := underlay.AddSession(session, nil); err != nil {
 		return nil, fmt.Errorf("AddSession() failed: %v", err)
