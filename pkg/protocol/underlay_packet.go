@@ -394,11 +394,11 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 			cipher.ServerIterateDecrypt.Add(1)
 			u.sessionMap.Range(func(k, v any) bool {
 				session := v.(*Session)
-				if session.block != nil && session.RemoteAddr().String() == addr.String() {
-					decryptedMeta, err = session.block.Decrypt(encryptedMeta)
+				if session.block.Load() != nil && session.RemoteAddr().String() == addr.String() {
+					decryptedMeta, err = (*session.block.Load()).Decrypt(encryptedMeta)
 					if err == nil {
 						decrypted = true
-						blockCipher = session.block
+						blockCipher = *session.block.Load()
 						return false
 					}
 				}
@@ -629,11 +629,11 @@ func (u *PacketUnderlay) writeOneSegment(seg *segment, addr net.Addr) error {
 				return fmt.Errorf("session %d not found", sessionID)
 			}
 			s := session.(*Session)
-			if s.block == nil {
+			if s.block.Load() == nil {
 				// stderror.ErrNotReady is needed to trigger stderror.ShouldRetry.
 				return fmt.Errorf("%v cipher block is not ready, please try again later: %w", s, stderror.ErrNotReady)
 			} else {
-				blockCipher = s.block
+				blockCipher = *s.block.Load()
 			}
 		}
 	}

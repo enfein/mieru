@@ -272,10 +272,14 @@ func (c *AEADBlockCipher) IsStateless() bool {
 }
 
 func (c *AEADBlockCipher) BlockContext() BlockContext {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return c.ctx
 }
 
 func (c *AEADBlockCipher) SetBlockContext(bc BlockContext) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.ctx = bc
 }
 

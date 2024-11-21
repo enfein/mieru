@@ -76,8 +76,8 @@ func (ss sessionState) String() string {
 }
 
 type Session struct {
-	conn  Underlay           // underlay connection
-	block cipher.BlockCipher // cipher to decrypt data
+	conn  Underlay                           // underlay connection
+	block atomic.Pointer[cipher.BlockCipher] // cipher to decrypt data
 
 	id         uint32                    // session ID number
 	isClient   bool                      // if this session is owned by client
@@ -133,7 +133,7 @@ func NewSession(id uint32, isClient bool, mtu int, users map[string]*appctlpb.Us
 	rttStat.SetRTOMultiplier(txTimeoutBackOff)
 	return &Session{
 		conn:                nil,
-		block:               nil,
+		block:               atomic.Pointer[cipher.BlockCipher]{},
 		id:                  id,
 		isClient:            isClient,
 		mtu:                 mtu,
@@ -738,8 +738,8 @@ func (s *Session) input(seg *segment) error {
 
 	if seg.block != nil {
 		// Validate cipher block user name is consistent.
-		if s.block != nil {
-			prevUserName := s.block.BlockContext().UserName
+		if s.block.Load() != nil {
+			prevUserName := (*s.block.Load()).BlockContext().UserName
 			nextUserName := seg.block.BlockContext().UserName
 			if prevUserName == "" {
 				panic(fmt.Sprintf("%v cipher block user name is not set", s))
@@ -752,15 +752,15 @@ func (s *Session) input(seg *segment) error {
 			}
 		}
 
-		s.block = seg.block
+		s.block.Store(&seg.block)
 
 		// Register server per user metrics.
 		if !s.isClient {
 			if s.uploadBytes == nil {
-				s.uploadBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, s.block.BlockContext().UserName), metrics.UserMetricUploadBytes, metrics.COUNTER_TIME_SERIES)
+				s.uploadBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, (*s.block.Load()).BlockContext().UserName), metrics.UserMetricUploadBytes, metrics.COUNTER_TIME_SERIES)
 			}
 			if s.downloadBytes == nil {
-				s.downloadBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, s.block.BlockContext().UserName), metrics.UserMetricDownloadBytes, metrics.COUNTER_TIME_SERIES)
+				s.downloadBytes = metrics.RegisterMetric(fmt.Sprintf(metrics.UserMetricGroupFormat, (*s.block.Load()).BlockContext().UserName), metrics.UserMetricDownloadBytes, metrics.COUNTER_TIME_SERIES)
 			}
 		}
 	}
@@ -856,8 +856,8 @@ func (s *Session) inputData(seg *segment) error {
 			var userName string
 			if seg.block != nil && seg.block.BlockContext().UserName != "" {
 				userName = seg.block.BlockContext().UserName
-			} else if s.block != nil && s.block.BlockContext().UserName != "" {
-				userName = s.block.BlockContext().UserName
+			} else if s.block.Load() != nil && (*s.block.Load()).BlockContext().UserName != "" {
+				userName = (*s.block.Load()).BlockContext().UserName
 			}
 			if userName != "" {
 				quotaOK, err := s.checkQuota(userName)
