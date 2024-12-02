@@ -340,7 +340,8 @@ func (m *Mux) DialContextWithConn(ctx context.Context, conn net.Conn) (net.Conn,
 		return nil, fmt.Errorf("NewTCPUnderlayWithConn() failed: %v", err)
 	}
 	go func() {
-		err := underlay.RunEventLoop(ctx)
+		// This is a long running loop, detach from client dial context.
+		err := underlay.RunEventLoop(context.Background())
 		if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
 			log.Debugf("%v RunEventLoop(): %v", underlay, err)
 		}
@@ -639,7 +640,8 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 		UnderlayMaxConn.Store(currEst)
 	}
 	go func() {
-		err := underlay.RunEventLoop(ctx)
+		// This is a long running loop, detach from client dial context.
+		err := underlay.RunEventLoop(context.Background())
 		if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
 			log.Debugf("%v RunEventLoop(): %v", underlay, err)
 		}

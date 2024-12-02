@@ -1,4 +1,4 @@
-package appctl
+package common
 
 import (
 	"encoding/json"
@@ -13,12 +13,13 @@ import (
 
 var (
 	cpuProfileFile *os.File
-	mu             sync.Mutex
+	debugMutex     sync.Mutex
 )
 
-func getThreadDump() []byte {
-	mu.Lock()
-	defer mu.Unlock()
+// GetAllStackTrace returns the stack trace of all goroutines.
+func GetAllStackTrace() string {
+	debugMutex.Lock()
+	defer debugMutex.Unlock()
 	buf := make([]byte, 16384)
 	for {
 		n := runtime.Stack(buf, true)
@@ -28,12 +29,25 @@ func getThreadDump() []byte {
 		}
 		buf = make([]byte, 4*len(buf))
 	}
-	return buf
+	return string(buf)
 }
 
-func startCPUProfile(filePath string) error {
-	mu.Lock()
-	defer mu.Unlock()
+// GetStackTrace returns the stack trace of this goroutine.
+func GetStackTrace() string {
+	debugMutex.Lock()
+	defer debugMutex.Unlock()
+	buf := make([]byte, 4096) // maximum length
+	n := runtime.Stack(buf, false)
+	if n < len(buf) {
+		buf = buf[:n]
+	}
+	return string(buf)
+}
+
+// StartCPUProfile starts CPU profile and writes result to the file.
+func StartCPUProfile(filePath string) error {
+	debugMutex.Lock()
+	defer debugMutex.Unlock()
 	if filePath == "" {
 		return fmt.Errorf("file path is empty")
 	}
@@ -50,9 +64,10 @@ func startCPUProfile(filePath string) error {
 	return nil
 }
 
-func stopCPUProfile() {
-	mu.Lock()
-	defer mu.Unlock()
+// StopCPUProfile stops CPU profile.
+func StopCPUProfile() {
+	debugMutex.Lock()
+	defer debugMutex.Unlock()
 	pprof.StopCPUProfile()
 	if cpuProfileFile != nil {
 		cpuProfileFile.Close()
@@ -60,9 +75,10 @@ func stopCPUProfile() {
 	cpuProfileFile = nil
 }
 
-func getHeapProfile(filePath string) error {
-	mu.Lock()
-	defer mu.Unlock()
+// GetHeapProfile generates a heap profile file.
+func GetHeapProfile(filePath string) error {
+	debugMutex.Lock()
+	defer debugMutex.Unlock()
 	if filePath == "" {
 		return fmt.Errorf("file path is empty")
 	}
@@ -78,9 +94,10 @@ func getHeapProfile(filePath string) error {
 	return nil
 }
 
-func getMemoryStats() string {
-	mu.Lock()
-	defer mu.Unlock()
+// GetMemoryStats returns JSON formatted memory statistics.
+func GetMemoryStats() string {
+	debugMutex.Lock()
+	defer debugMutex.Unlock()
 	runtime.GC()
 	ms := &runtime.MemStats{}
 	runtime.ReadMemStats(ms)

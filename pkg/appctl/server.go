@@ -259,26 +259,26 @@ func (s *serverLifecycleService) GetSessionInfo(context.Context, *pb.Empty) (*pb
 }
 
 func (s *serverLifecycleService) GetThreadDump(ctx context.Context, req *pb.Empty) (*pb.ThreadDump, error) {
-	return &pb.ThreadDump{ThreadDump: proto.String(string(getThreadDump()))}, nil
+	return &pb.ThreadDump{ThreadDump: proto.String(common.GetAllStackTrace())}, nil
 }
 
 func (s *serverLifecycleService) StartCPUProfile(ctx context.Context, req *pb.ProfileSavePath) (*pb.Empty, error) {
-	err := startCPUProfile(req.GetFilePath())
+	err := common.StartCPUProfile(req.GetFilePath())
 	return &pb.Empty{}, err
 }
 
 func (s *serverLifecycleService) StopCPUProfile(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
-	stopCPUProfile()
+	common.StopCPUProfile()
 	return &pb.Empty{}, nil
 }
 
 func (s *serverLifecycleService) GetHeapProfile(ctx context.Context, req *pb.ProfileSavePath) (*pb.Empty, error) {
-	err := getHeapProfile(req.GetFilePath())
+	err := common.GetHeapProfile(req.GetFilePath())
 	return &pb.Empty{}, err
 }
 
 func (s *serverLifecycleService) GetMemoryStatistics(ctx context.Context, req *pb.Empty) (*pb.MemoryStatistics, error) {
-	return &pb.MemoryStatistics{Json: proto.String(getMemoryStats())}, nil
+	return &pb.MemoryStatistics{Json: proto.String(common.GetMemoryStats())}, nil
 }
 
 // NewServerLifecycleService creates a new ServerLifecycleService RPC server.
