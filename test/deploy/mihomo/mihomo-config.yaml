@@ -1,3 +1,7 @@
+dns:
+  enable: true
+  nameserver:
+    - 8.8.8.8
 log-level: warning
 mixed-port: 1080
 mode: rule
