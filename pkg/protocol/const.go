@@ -20,5 +20,6 @@ package protocol
 import "time"
 
 const (
-	outputLoopInterval = 1 * time.Millisecond
+	// tickInterval is the event trigger interval.
+	tickInterval = 1 * time.Millisecond
 )

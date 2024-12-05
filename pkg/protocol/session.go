@@ -129,7 +129,7 @@ var _ net.Conn = &Session{}
 // NewSession creates a new session.
 func NewSession(id uint32, isClient bool, mtu int, users map[string]*appctlpb.User) *Session {
 	rttStat := congestion.NewRTTStats()
-	rttStat.SetMaxAckDelay(outputLoopInterval)
+	rttStat.SetMaxAckDelay(tickInterval)
 	rttStat.SetRTOMultiplier(txTimeoutBackOff)
 	return &Session{
 		conn:                nil,
@@ -300,16 +300,16 @@ func (s *Session) Write(b []byte) (n int, err error) {
 		}
 	}
 
-	n = len(b)
 	if log.IsLevelEnabled(log.TraceLevel) {
 		log.Tracef("%v writing %d bytes", s, n)
 	}
 	for len(b) > 0 {
 		sizeToSend := mathext.Min(len(b), maxPDU)
-		if _, err = s.writeChunk(b[:sizeToSend]); err != nil {
-			return 0, err
+		if sent, err := s.writeChunk(b[:sizeToSend]); sent == 0 || err != nil {
+			return n, err
 		}
 		b = b[sizeToSend:]
+		n += sizeToSend
 	}
 	if log.IsLevelEnabled(log.TraceLevel) {
 		log.Tracef("%v wrote %d bytes", s, n)
@@ -430,10 +430,15 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 	seqBeforeWrite, _ := s.sendQueue.MinSeq()
 
 	// Determine number of fragments to write.
+	// Return if there is no enough space in send queue.
 	nFragment := 1
 	fragmentSize := MaxFragmentSize(s.mtu, s.conn.TransportProtocol())
 	if len(b) > fragmentSize {
 		nFragment = (len(b)-1)/fragmentSize + 1
+	}
+	if s.sendQueue.Remaining() <= nFragment { // leave one slot in case it is needed
+		time.Sleep(tickInterval) // add back pressure
+		return 0, nil
 	}
 
 	s.oLock.Lock()
@@ -527,7 +532,7 @@ func (s *Session) runInputLoop(ctx context.Context) error {
 }
 
 func (s *Session) runOutputLoop(ctx context.Context) error {
-	ticker := time.NewTicker(outputLoopInterval)
+	ticker := time.NewTicker(tickInterval)
 	defer ticker.Stop()
 	for {
 		select {
