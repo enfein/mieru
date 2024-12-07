@@ -35,7 +35,7 @@ var _ DNSResolver = &net.Resolver{}
 type NilDNSResolver struct{}
 
 func (r NilDNSResolver) LookupIP(ctx context.Context, network, host string) ([]net.IP, error) {
-	return nil, fmt.Errorf("look up IP address of %s is unsupported", host)
+	return nil, fmt.Errorf("look up IP address of %s is not supported", host)
 }
 
 var _ DNSResolver = NilDNSResolver{}

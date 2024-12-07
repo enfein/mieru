@@ -593,7 +593,7 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 		block.SetBlockContext(cipher.BlockContext{
 			UserName: m.username,
 		})
-		underlay, err = NewPacketUnderlay(ctx, p.RemoteAddr().Network(), "", p.RemoteAddr().String(), p.MTU(), block, m.resolver)
+		underlay, err = NewPacketUnderlay(ctx, p.RemoteAddr().Network(), p.RemoteAddr().String(), p.MTU(), block, m.resolver)
 		if err != nil {
 			return nil, fmt.Errorf("NewUDPUnderlay() failed: %v", err)
 		}

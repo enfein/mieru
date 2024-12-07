@@ -63,12 +63,12 @@ type PacketUnderlay struct {
 
 var _ Underlay = &PacketUnderlay{}
 
-// NewPacketUnderlay connects to the remote address "raddr" on the network
-// with packet encryption. If "laddr" is empty, an automatic address is used.
+// NewPacketUnderlay connects to the remote address "addr" on the network
+// with packet encryption.
 // "block" is the block encryption algorithm to encrypt packets.
 //
 // This function is only used by proxy client.
-func NewPacketUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, block cipher.BlockCipher, resolver apicommon.DNSResolver) (*PacketUnderlay, error) {
+func NewPacketUnderlay(ctx context.Context, network, addr string, mtu int, block cipher.BlockCipher, resolver apicommon.DNSResolver) (*PacketUnderlay, error) {
 	switch network {
 	case "udp", "udp4", "udp6":
 	default:
@@ -77,15 +77,8 @@ func NewPacketUnderlay(ctx context.Context, network, laddr, raddr string, mtu in
 	if !block.IsStateless() {
 		return nil, fmt.Errorf("packet underlay block cipher must be stateless")
 	}
-	var localAddr *net.UDPAddr
-	var err error
-	if laddr != "" {
-		localAddr, err = apicommon.ResolveUDPAddr(resolver, "udp", laddr)
-		if err != nil {
-			return nil, fmt.Errorf("ResolveUDPAddr() failed: %w", err)
-		}
-	}
-	remoteAddr, err := apicommon.ResolveUDPAddr(resolver, "udp", raddr)
+	localAddr := &net.UDPAddr{}
+	remoteAddr, err := apicommon.ResolveUDPAddr(resolver, "udp", addr)
 	if err != nil {
 		return nil, fmt.Errorf("ResolveUDPAddr() failed: %w", err)
 	}

@@ -79,7 +79,7 @@ echo ">>> socks5 - new connections with API client - TCP <<<"
   -local_proxy_host=127.0.0.1 -local_proxy_port=1081 \
   -test_case=new_conn -num_request=3000
 if [ "$?" -ne "0" ]; then
-    echo "TCP - test socks5 new_conn with API client 1 failed."
+    echo "TCP - test socks5 new_conn with API client failed."
     exit 1
 fi
 

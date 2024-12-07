@@ -98,12 +98,18 @@ func (mc *mieruClient) Start() error {
 	mc.mux = protocol.NewMux(true)
 	activeProfile := mc.config.Profile
 
+	// Set dialer.
+	if mc.config.Dialer != nil {
+		mc.mux.SetDialer(mc.config.Dialer)
+	}
+
 	// Set DNS resolver.
-	var resolver apicommon.DNSResolver
+	// If DNS resolver is not provided, disable DNS resolution.
+	enableDNS := false
+	var resolver apicommon.DNSResolver = apicommon.NilDNSResolver{}
 	if mc.config.Resolver != nil {
+		enableDNS = true
 		resolver = mc.config.Resolver
-	} else {
-		resolver = &net.Resolver{} // Default DNS resolver.
 	}
 	mc.mux.SetResolver(resolver)
 
@@ -145,14 +151,16 @@ func (mc *mieruClient) Start() error {
 		var proxyIP net.IP
 		if serverInfo.GetDomainName() != "" {
 			proxyHost = serverInfo.GetDomainName()
-			proxyIPs, err := resolver.LookupIP(context.Background(), "ip", proxyHost)
-			if err != nil {
-				return fmt.Errorf(stderror.LookupIPFailedErr, err)
+			if enableDNS {
+				proxyIPs, err := resolver.LookupIP(context.Background(), "ip", proxyHost)
+				if err != nil {
+					return fmt.Errorf(stderror.LookupIPFailedErr, err)
+				}
+				if len(proxyIPs) == 0 {
+					return fmt.Errorf(stderror.IPAddressNotFound, proxyHost)
+				}
+				proxyIP = proxyIPs[0]
 			}
-			if len(proxyIPs) == 0 {
-				return fmt.Errorf(stderror.IPAddressNotFound, proxyHost)
-			}
-			proxyIP = proxyIPs[0]
 		} else {
 			proxyHost = serverInfo.GetIpAddress()
 			proxyIP = net.ParseIP(proxyHost)
@@ -166,15 +174,29 @@ func (mc *mieruClient) Start() error {
 		}
 		for _, bindingInfo := range portBindings {
 			proxyPort := bindingInfo.GetPort()
+			var endpoint protocol.UnderlayProperties
 			switch bindingInfo.GetProtocol() {
 			case appctlpb.TransportProtocol_TCP:
-				endpoint := protocol.NewUnderlayProperties(mtu, common.StreamTransport, nil, &net.TCPAddr{IP: proxyIP, Port: int(proxyPort)})
-				endpoints = append(endpoints, endpoint)
+				if proxyIP != nil {
+					endpoint = protocol.NewUnderlayProperties(mtu, common.StreamTransport, nil, &net.TCPAddr{IP: proxyIP, Port: int(proxyPort)})
+				} else {
+					endpoint = protocol.NewUnderlayProperties(mtu, common.StreamTransport, nil,
+						&model.NetAddrSpec{Net: "tcp", AddrSpec: model.AddrSpec{FQDN: proxyHost, Port: int(proxyPort)}},
+					)
+				}
 			case appctlpb.TransportProtocol_UDP:
-				endpoint := protocol.NewUnderlayProperties(mtu, common.PacketTransport, nil, &net.UDPAddr{IP: proxyIP, Port: int(proxyPort)})
-				endpoints = append(endpoints, endpoint)
+				if proxyIP != nil {
+					endpoint = protocol.NewUnderlayProperties(mtu, common.PacketTransport, nil, &net.UDPAddr{IP: proxyIP, Port: int(proxyPort)})
+				} else {
+					endpoint = protocol.NewUnderlayProperties(mtu, common.PacketTransport, nil,
+						&model.NetAddrSpec{Net: "udp", AddrSpec: model.AddrSpec{FQDN: proxyHost, Port: int(proxyPort)}},
+					)
+				}
 			default:
 				return fmt.Errorf(stderror.InvalidTransportProtocol)
+			}
+			if endpoint != nil {
+				endpoints = append(endpoints, endpoint)
 			}
 		}
 	}
