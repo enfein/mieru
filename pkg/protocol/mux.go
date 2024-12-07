@@ -47,9 +47,10 @@ type Mux struct {
 	isClient    bool
 	endpoints   []UnderlayProperties
 	underlays   []Underlay
+	dialer      apicommon.Dialer
+	resolver    apicommon.DNSResolver
 	chAccept    chan net.Conn
 	chAcceptErr chan error
-	resolver    apicommon.DNSResolver
 	used        bool
 	done        chan struct{}
 	mu          sync.Mutex
@@ -76,9 +77,10 @@ func NewMux(isClinet bool) *Mux {
 	mux := &Mux{
 		isClient:    isClinet,
 		underlays:   make([]Underlay, 0),
+		dialer:      &net.Dialer{Timeout: 10 * time.Second, Control: sockopts.ReuseAddrPort()},
+		resolver:    &net.Resolver{},
 		chAccept:    make(chan net.Conn, sessionChanCapacity),
 		chAcceptErr: make(chan error, 1), // non-blocking
-		resolver:    &net.Resolver{},
 		done:        make(chan struct{}),
 		cleaner:     time.NewTicker(idleUnderlayTickerInterval),
 	}
@@ -128,6 +130,15 @@ func (m *Mux) SetEndpoints(endpoints []UnderlayProperties) *Mux {
 		}
 	}
 	log.Infof("Mux now has %d endpoints", len(m.endpoints))
+	return m
+}
+
+// SetDialer updates the dialer used by the mux.
+func (m *Mux) SetDialer(dialer apicommon.Dialer) *Mux {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.dialer = dialer
+	log.Infof("Mux dialer has been updated")
 	return m
 }
 
@@ -303,49 +314,6 @@ func (m *Mux) DialContext(ctx context.Context) (net.Conn, error) {
 	}
 	defer func() {
 		underlay.Scheduler().DecPending()
-	}()
-	session := NewSession(mrand.Uint32(), true, underlay.MTU(), m.users)
-	if err := underlay.AddSession(session, nil); err != nil {
-		return nil, fmt.Errorf("AddSession() failed: %v", err)
-	}
-	return session, nil
-}
-
-// DialContextWithConn returns a network connection for the client to consume.
-// The connection is a session established from a underlay constructed from
-// the given connection.
-func (m *Mux) DialContextWithConn(ctx context.Context, conn net.Conn) (net.Conn, error) {
-	if !m.isClient {
-		return nil, stderror.ErrInvalidOperation
-	}
-	if len(m.password) == 0 {
-		return nil, fmt.Errorf("client password is not set")
-	}
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.used = true
-
-	m.cleanUnderlay(true)
-	block, err := cipher.BlockCipherFromPassword(m.password, false)
-	if err != nil {
-		return nil, fmt.Errorf("cipher.BlockCipherFromPassword() failed: %v", err)
-	}
-	block.SetBlockContext(cipher.BlockContext{
-		UserName: m.username,
-	})
-	// The MTU value is not used by TCP connection.
-	underlay, err := NewStreamUnderlayWithConn(conn, common.DefaultMTU, block)
-	if err != nil {
-		return nil, fmt.Errorf("NewTCPUnderlayWithConn() failed: %v", err)
-	}
-	go func() {
-		// This is a long running loop, detach from client dial context.
-		err := underlay.RunEventLoop(context.Background())
-		if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
-			log.Debugf("%v RunEventLoop(): %v", underlay, err)
-		}
-		underlay.Close()
 	}()
 	session := NewSession(mrand.Uint32(), true, underlay.MTU(), m.users)
 	if err := underlay.AddSession(session, nil); err != nil {
@@ -613,7 +581,7 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 		block.SetBlockContext(cipher.BlockContext{
 			UserName: m.username,
 		})
-		underlay, err = NewStreamUnderlay(ctx, p.RemoteAddr().Network(), "", p.RemoteAddr().String(), p.MTU(), block, m.resolver)
+		underlay, err = NewStreamUnderlay(ctx, m.dialer, p.RemoteAddr().Network(), p.RemoteAddr().String(), p.MTU(), block)
 		if err != nil {
 			return nil, fmt.Errorf("NewTCPUnderlay() failed: %v", err)
 		}

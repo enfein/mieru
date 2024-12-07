@@ -56,7 +56,7 @@ fi
 ./mieru profile cpu start /test/mieru.udp.cpu.gz
 
 # Start mieru API client.
-./exampleapiclient -port=1083 -username=baozi -password=manlianpenfen \
+./exampleapiclient -port=1082 -username=baozi -password=manlianpenfen \
   -server_ip=127.0.0.1 -server_port=8964 -server_protocol=UDP &
 
 # Start testing.
@@ -76,7 +76,7 @@ fi
 sleep 1
 echo ">>> socks5 - new connections with API client - UDP <<<"
 ./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
-  -local_proxy_host=127.0.0.1 -local_proxy_port=1083 \
+  -local_proxy_host=127.0.0.1 -local_proxy_port=1082 \
   -test_case=new_conn -num_request=3000
 if [ "$?" -ne "0" ]; then
     echo "UDP - test socks5 new_conn with API client failed."

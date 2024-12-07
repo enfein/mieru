@@ -45,7 +45,10 @@ type ClientConfigurationService interface {
 	Load() (*ClientConfig, error)
 
 	// Store saves the client config.
-	// It returns wrapped ErrInvalidConfigConfig if the provided client config is invalid.
+	// It returns wrapped ErrInvalidConfigConfig error
+	// if the provided client config is invalid.
+	// It returns ErrStoreClientConfigAfterStart error
+	// if it is called after start.
 	Store(*ClientConfig) error
 }
 
@@ -69,18 +72,23 @@ type ClientLifecycleService interface {
 // to destinations using proxy servers.
 type ClientNetworkService interface {
 	// DialContext returns a new proxy connection to reach the destination.
+	// It uses the dialer in ClientConfig to connect to a proxy server endpoint.
 	// It returns an error if the client has not been started,
 	// or has been stopped.
 	DialContext(context.Context, net.Addr) (net.Conn, error)
-
-	// DialContextWithConn is similar to DialContext, but use the given
-	// connection to establish a new proxy connection.
-	DialContextWithConn(context.Context, net.Conn, net.Addr) (net.Conn, error)
 }
 
 // ClientConfig stores proxy client configuration.
 type ClientConfig struct {
-	Profile  *appctlpb.ClientProfile
+	Profile *appctlpb.ClientProfile
+
+	// A dialer to connect to proxy server via stream-oriented network connections.
+	// If this field is not set, a default dialer is used.
+	Dialer apicommon.Dialer
+
+	// If set, the resolver translates proxy server domain name into IP addresses.
+	// This field is not required, if Dialer is able to do DNS, or proxy server
+	// endpoints are IP addresses rather than domain names.
 	Resolver apicommon.DNSResolver
 }
 

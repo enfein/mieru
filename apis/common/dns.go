@@ -17,6 +17,7 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strconv"
 )
@@ -28,6 +29,16 @@ type DNSResolver interface {
 
 // Standard library Resolver implements the DNSResolver interface.
 var _ DNSResolver = &net.Resolver{}
+
+// NilDNSResolver implements the DNSResolver interface but
+// it is not able to look up IP addresses.
+type NilDNSResolver struct{}
+
+func (r NilDNSResolver) LookupIP(ctx context.Context, network, host string) ([]net.IP, error) {
+	return nil, fmt.Errorf("look up IP address of %s is unsupported", host)
+}
+
+var _ DNSResolver = NilDNSResolver{}
 
 // ResolveTCPAddr returns a TCP address using the DNSResolver.
 func ResolveTCPAddr(r DNSResolver, network, address string) (*net.TCPAddr, error) {

@@ -224,29 +224,6 @@ func (mc *mieruClient) DialContext(ctx context.Context, addr net.Addr) (net.Conn
 	return mc.dialPostHandshake(conn, netAddrSpec)
 }
 
-func (mc *mieruClient) DialContextWithConn(ctx context.Context, conn net.Conn, addr net.Addr) (net.Conn, error) {
-	mc.mu.RLock()
-	defer mc.mu.RUnlock()
-	if !mc.running {
-		return nil, ErrClientIsNotRunning
-	}
-
-	// Check destination address.
-	var netAddrSpec model.NetAddrSpec
-	if err := netAddrSpec.From(addr); err != nil {
-		return nil, fmt.Errorf("invalid destination address: %w", err)
-	}
-	if !strings.HasPrefix(netAddrSpec.Network(), "tcp") {
-		return nil, fmt.Errorf("only tcp network is supported")
-	}
-
-	subConn, err := mc.mux.DialContextWithConn(ctx, conn)
-	if err != nil {
-		return nil, err
-	}
-	return mc.dialPostHandshake(subConn, netAddrSpec)
-}
-
 func (mc *mieruClient) dialPostHandshake(conn net.Conn, netAddrSpec model.NetAddrSpec) (net.Conn, error) {
 	var req bytes.Buffer
 	req.Write([]byte{constant.Socks5Version, constant.Socks5ConnectCmd, 0})

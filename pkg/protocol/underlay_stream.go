@@ -26,7 +26,6 @@ import (
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
 	"github.com/enfein/mieru/v3/pkg/common"
-	"github.com/enfein/mieru/v3/pkg/common/sockopts"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 	"github.com/enfein/mieru/v3/pkg/replay"
@@ -57,12 +56,12 @@ type StreamUnderlay struct {
 
 var _ Underlay = &StreamUnderlay{}
 
-// NewStreamUnderlay connects to the remote address "raddr" on the network
-// with packet encryption. If "laddr" is empty, an automatic address is used.
+// NewStreamUnderlay connects to the remote address "addr" on the network
+// with packet encryption.
 // "block" is the block encryption algorithm to encrypt packets.
 //
 // This function is only used by proxy client.
-func NewStreamUnderlay(ctx context.Context, network, laddr, raddr string, mtu int, block cipher.BlockCipher, resolver apicommon.DNSResolver) (*StreamUnderlay, error) {
+func NewStreamUnderlay(ctx context.Context, dialer apicommon.Dialer, network, addr string, mtu int, block cipher.BlockCipher) (*StreamUnderlay, error) {
 	switch network {
 	case "tcp", "tcp4", "tcp6":
 	default:
@@ -71,18 +70,7 @@ func NewStreamUnderlay(ctx context.Context, network, laddr, raddr string, mtu in
 	if block.IsStateless() {
 		return nil, fmt.Errorf("stream underlay block cipher must be stateful")
 	}
-	dialer := net.Dialer{
-		Control: sockopts.ReuseAddrPort(),
-	}
-	if laddr != "" {
-		tcpLocalAddr, err := apicommon.ResolveTCPAddr(resolver, network, laddr)
-		if err != nil {
-			return nil, fmt.Errorf("ResolveTCPAddr() failed: %w", err)
-		}
-		dialer.LocalAddr = tcpLocalAddr
-	}
-
-	conn, err := dialer.DialContext(ctx, network, raddr)
+	conn, err := dialer.DialContext(ctx, network, addr)
 	if err != nil {
 		return nil, fmt.Errorf("DialContext() failed: %w", err)
 	}
@@ -92,20 +80,6 @@ func NewStreamUnderlay(ctx context.Context, network, laddr, raddr string, mtu in
 		candidates:   []cipher.BlockCipher{block},
 	}
 	return t, nil
-}
-
-// NewStreamUnderlayWithConn creates a StreamUnderlay with an existing connection.
-//
-// This function is only used by proxy client.
-func NewStreamUnderlayWithConn(conn net.Conn, mtu int, block cipher.BlockCipher) (*StreamUnderlay, error) {
-	if block.IsStateless() {
-		return nil, fmt.Errorf("stream underlay block cipher must be stateful")
-	}
-	return &StreamUnderlay{
-		baseUnderlay: *newBaseUnderlay(true, mtu),
-		conn:         conn,
-		candidates:   []cipher.BlockCipher{block},
-	}, nil
 }
 
 func (t *StreamUnderlay) String() string {

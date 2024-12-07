@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"strconv"
 
 	"github.com/enfein/mieru/v3/apis/client"
 	"github.com/enfein/mieru/v3/apis/constant"
@@ -39,7 +38,6 @@ var (
 	serverIP       = flag.String("server_ip", "", "IP address of mieru proxy server")
 	serverPort     = flag.Int("server_port", 0, "Port number of mieru proxy server")
 	serverProtocol = flag.String("server_protocol", "", "Transport protocol: TCP or UDP")
-	dialWithConn   = flag.Bool("dial_with_conn", false, "Dial to proxy server with provided TCP connection")
 )
 
 func main() {
@@ -144,25 +142,11 @@ func handleOneSocks5Conn(c client.Client, conn net.Conn) {
 	ctx := context.Background()
 	var proxyConn net.Conn
 	var err error
-	if *dialWithConn && *serverProtocol == "TCP" {
-		serverAddress := common.MaybeDecorateIPv6(*serverIP) + ":" + strconv.Itoa(*serverPort)
-		underlayConn, err := (&net.Dialer{}).DialContext(ctx, "tcp", serverAddress)
-		if err != nil {
-			panic(fmt.Sprintf("DialContext() failed: %v", err))
-		}
-		defer underlayConn.Close()
-		proxyConn, err = c.DialContextWithConn(ctx, underlayConn, netAddr)
-		if err != nil {
-			panic(fmt.Sprintf("DialContextWithConn() failed: %v", err))
-		}
-		defer proxyConn.Close()
-	} else {
-		proxyConn, err = c.DialContext(ctx, netAddr)
-		if err != nil {
-			panic(fmt.Sprintf("DialContext() failed: %v", err))
-		}
-		defer proxyConn.Close()
+	proxyConn, err = c.DialContext(ctx, netAddr)
+	if err != nil {
+		panic(fmt.Sprintf("DialContext() failed: %v", err))
 	}
+	defer proxyConn.Close()
 
 	// Send the connect response back to the application.
 	var resp bytes.Buffer

@@ -14,6 +14,7 @@ import (
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/egress"
 	"github.com/enfein/mieru/v3/pkg/log"
+	"github.com/enfein/mieru/v3/pkg/mathext"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 	"github.com/enfein/mieru/v3/pkg/protocol"
 	"github.com/enfein/mieru/v3/pkg/stderror"
@@ -95,6 +96,9 @@ func New(conf *Config) (*Server, error) {
 			return nil, fmt.Errorf("set socks5 bind IP failed")
 		}
 	}
+
+	// Ensure HandshakeTimeout is not negative.
+	conf.HandshakeTimeout = mathext.Max(conf.HandshakeTimeout, 0)
 
 	return &Server{
 		config:      conf,
