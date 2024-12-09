@@ -1,0 +1,24 @@
+name: 'mihomo test'
+on: [workflow_dispatch]
+jobs:
+  run-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out mieru repository code
+        uses: actions/checkout@v4
+        with:
+          path: mieru
+      - name: Check out mihomo repository code
+        uses: actions/checkout@v4
+        with:
+          ref: Alpha
+          path: mihomo
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Update mieru reference
+        run: echo "replace github.com/enfein/mieru/v3 => ../mieru" >> go.mod
+      - name: Build mihomo
+        run: make linux-amd64-compatible

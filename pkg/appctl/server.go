@@ -27,6 +27,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/enfein/mieru/v3/pkg/appctl/appctlcommon"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlgrpc"
 	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/common"
@@ -551,7 +552,7 @@ func DeleteServerUsers(names []string) error {
 // 5.3. the action must be "PROXY"
 // 5.4. the proxy name is defined
 func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
-	if _, err := FlatPortBindings(patch.GetPortBindings()); err != nil {
+	if _, err := appctlcommon.FlatPortBindings(patch.GetPortBindings()); err != nil {
 		return err
 	}
 	for _, user := range patch.GetUsers() {
@@ -657,7 +658,7 @@ func PortBindingsToUnderlayProperties(portBindings []*pb.PortBinding, mtu int) (
 	if listenIP == nil {
 		return endpoints, fmt.Errorf(stderror.ParseIPFailed)
 	}
-	portBindings, err := FlatPortBindings(portBindings)
+	portBindings, err := appctlcommon.FlatPortBindings(portBindings)
 	if err != nil {
 		return endpoints, fmt.Errorf(stderror.InvalidPortBindingsErr, err)
 	}

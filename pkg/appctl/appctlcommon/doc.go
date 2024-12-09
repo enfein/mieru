@@ -1,4 +1,4 @@
-// Copyright (C) 2023  mieru authors
+// Copyright (C) 2024  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package version
-
-const (
-	AppVersion = "3.8.4"
-)
+// Package appctlcommon contains selected functions
+// that don't have gRPC dependency. This helps to remove gRPC dependency
+// from API consumers.
+package appctlcommon

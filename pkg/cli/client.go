@@ -34,6 +34,7 @@ import (
 	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/appctl"
+	"github.com/enfein/mieru/v3/pkg/appctl/appctlcommon"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlgrpc"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
@@ -533,7 +534,7 @@ var clientRunFunc = func(s []string) error {
 				return fmt.Errorf(stderror.ParseIPFailed)
 			}
 		}
-		portBindings, err := appctl.FlatPortBindings(serverInfo.GetPortBindings())
+		portBindings, err := appctlcommon.FlatPortBindings(serverInfo.GetPortBindings())
 		if err != nil {
 			return fmt.Errorf(stderror.InvalidPortBindingsErr, err)
 		}

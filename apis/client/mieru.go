@@ -29,7 +29,7 @@ import (
 	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/apis/model"
-	"github.com/enfein/mieru/v3/pkg/appctl"
+	"github.com/enfein/mieru/v3/pkg/appctl/appctlcommon"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
 	"github.com/enfein/mieru/v3/pkg/common"
@@ -37,6 +37,9 @@ import (
 	"github.com/enfein/mieru/v3/pkg/protocol"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
+
+// This package should not depends on github.com/enfein/mieru/v3/pkg/appctl,
+// which introduces gRPC dependency.
 
 // mieruClient is the official implementation of mieru client APIs.
 type mieruClient struct {
@@ -80,7 +83,7 @@ func (mc *mieruClient) Store(config *ClientConfig) error {
 	if mc.running {
 		return ErrStoreClientConfigAfterStart
 	}
-	if err := appctl.ValidateClientConfigSingleProfile(config.Profile); err != nil {
+	if err := appctlcommon.ValidateClientConfigSingleProfile(config.Profile); err != nil {
 		return fmt.Errorf("%w: %s", ErrInvalidConfigConfig, err.Error())
 	}
 	mc.config = config
@@ -168,7 +171,7 @@ func (mc *mieruClient) Start() error {
 				return fmt.Errorf(stderror.ParseIPFailed)
 			}
 		}
-		portBindings, err := appctl.FlatPortBindings(serverInfo.GetPortBindings())
+		portBindings, err := appctlcommon.FlatPortBindings(serverInfo.GetPortBindings())
 		if err != nil {
 			return fmt.Errorf(stderror.InvalidPortBindingsErr, err)
 		}
