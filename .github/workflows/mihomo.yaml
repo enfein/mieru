@@ -1,7 +1,7 @@
 name: 'mihomo test'
 on: [workflow_dispatch]
 jobs:
-  run-test:
+  mihomo-test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -12,6 +12,7 @@ jobs:
       - name: Check out mihomo repository code
         uses: actions/checkout@v4
         with:
+          repository: MetaCubeX/mihomo
           ref: Alpha
           path: mihomo
       - name: Set up Go
