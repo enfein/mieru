@@ -40,6 +40,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const (
+	EnvMieruConfigFile     = "MIERU_CONFIG_FILE"
+	EnvMieruConfigJSONFile = "MIERU_CONFIG_JSON_FILE"
+)
+
 var (
 	// ClientRPCServerStarted is closed when client RPC server is started.
 	ClientRPCServerStarted chan struct{} = make(chan struct{})
@@ -474,12 +479,12 @@ func prepareClientConfigDir() error {
 // If environment variable MIERU_CONFIG_FILE or MIERU_CONFIG_JSON_FILE is specified,
 // those values are returned.
 func clientConfigFilePath() (string, ConfigFileType, error) {
-	if v, found := os.LookupEnv("MIERU_CONFIG_FILE"); found {
+	if v, found := os.LookupEnv(EnvMieruConfigFile); found {
 		cachedClientConfigFilePath = v
 		cachedClientConfigDir = filepath.Dir(v)
 		return cachedClientConfigFilePath, PROTOBUF_CONFIG_FILE_TYPE, nil
 	}
-	if v, found := os.LookupEnv("MIERU_CONFIG_JSON_FILE"); found {
+	if v, found := os.LookupEnv(EnvMieruConfigJSONFile); found {
 		cachedClientConfigFilePath = v
 		cachedClientConfigDir = filepath.Dir(v)
 		return cachedClientConfigFilePath, JSON_CONFIG_FILE_TYPE, nil

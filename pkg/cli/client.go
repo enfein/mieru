@@ -404,14 +404,20 @@ var clientRunFunc = func(s []string) error {
 	log.SetFormatter(&log.DaemonFormatter{})
 	appctl.SetAppStatus(appctlpb.AppStatus_STARTING)
 
-	logFile, err := log.NewClientLogFile()
-	if err == nil {
-		log.SetOutput(logFile)
-		if err = log.RemoveOldClientLogFiles(); err != nil {
-			log.Errorf("remove old client log files failed: %v", err)
-		}
+	if _, found := os.LookupEnv(appctl.EnvMieruConfigFile); found {
+		log.Debugf("log to stdout because environment variable %s is set", appctl.EnvMieruConfigFile)
+	} else if _, found := os.LookupEnv(appctl.EnvMieruConfigJSONFile); found {
+		log.Debugf("log to stdout because environment variable %s is set", appctl.EnvMieruConfigJSONFile)
 	} else {
-		log.Infof("log to stdout due to the following reason: %v", err)
+		logFile, err := log.NewClientLogFile()
+		if err == nil {
+			log.SetOutput(logFile)
+			if err = log.RemoveOldClientLogFiles(); err != nil {
+				log.Errorf("remove old client log files failed: %v", err)
+			}
+		} else {
+			log.Infof("log to stdout because: %v", err)
+		}
 	}
 
 	// Load and verify client config.
