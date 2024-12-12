@@ -28,7 +28,7 @@ mieru 的翻墙原理与 shadowsocks / v2ray 等软件类似，在客户端和�
    - [NekoBox](https://github.com/MatsuriDayo/NekoBoxForAndroid) 并安装 [mieru 插件](https://github.com/enfein/NekoBoxPlugins)。
    - [Exclave](https://github.com/dyhkwong/Exclave) 并安装 [mieru 插件](https://github.com/dyhkwong/Exclave/releases?q=mieru-plugin)。
    - [husi](https://github.com/xchacha20-poly1305/husi) 并安装 [mieru 插件](https://github.com/xchacha20-poly1305/husi/releases?q=plugin-mieru)。
-1. 如果需要全局代理或自定义路由规则等高级功能，可以将 mieru 作为 [Xray](https://github.com/XTLS/Xray-core) 和 [sing-box](https://github.com/SagerNet/sing-box) 等代理平台的后端。
+1. 如果需要全局代理或自定义路由规则等高级功能，可以使用 [mihomo](https://github.com/MetaCubeX/mihomo)。
 
 ## 使用教程
 

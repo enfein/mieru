@@ -30,7 +30,7 @@ For an explanation of the mieru protocol, see [mieru Proxy Protocol](./docs/prot
    - [NekoBox](https://github.com/MatsuriDayo/NekoBoxForAndroid) with [mieru plugin](https://github.com/enfein/NekoBoxPlugins).
    - [Exclave](https://github.com/dyhkwong/Exclave) with [mieru plugin](https://github.com/dyhkwong/Exclave/releases?q=mieru-plugin).
    - [husi](https://github.com/xchacha20-poly1305/husi) with [mieru plugin](https://github.com/xchacha20-poly1305/husi/releases?q=plugin-mieru).
-1. If you need advanced features like global proxy or customized routing rules, you can use mieru as the backend of a proxy platform such as [Xray](https://github.com/XTLS/Xray-core) and [sing-box](https://github.com/SagerNet/sing-box).
+1. If you need advanced features like global proxy or customized routing rules, you can use [mihomo](https://github.com/MetaCubeX/mihomo).
 
 ## User Guide
 
