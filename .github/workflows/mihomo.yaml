@@ -22,6 +22,12 @@ jobs:
       - name: Update mieru reference
         working-directory: mihomo
         run: echo "replace github.com/enfein/mieru/v3 => ../mieru" >> go.mod
+      - name: Run go mod tidy
+        working-directory: mihomo
+        run: go mod tidy
+      - name: Show go mod diff
+        working-directory: mihomo
+        run: git --no-pager diff
       - name: Build mihomo
         working-directory: mihomo
         run: make linux-amd64-compatible
