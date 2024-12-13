@@ -18,8 +18,10 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version-file: mihomo/go.mod
       - name: Update mieru reference
+        working-directory: mihomo
         run: echo "replace github.com/enfein/mieru/v3 => ../mieru" >> go.mod
       - name: Build mihomo
+        working-directory: mihomo
         run: make linux-amd64-compatible

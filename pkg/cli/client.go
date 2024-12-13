@@ -47,6 +47,7 @@ import (
 	"github.com/enfein/mieru/v3/pkg/stderror"
 	"github.com/enfein/mieru/v3/pkg/version/updater"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -472,6 +473,7 @@ var clientRunFunc = func(s []string) error {
 			grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(appctl.MaxRecvMsgSize))
 			appctl.SetClientRPCServerRef(grpcServer)
 			appctlgrpc.RegisterClientLifecycleServiceServer(grpcServer, appctl.NewClientLifecycleService())
+			reflection.Register(grpcServer)
 			close(appctl.ClientRPCServerStarted)
 			log.Infof("mieru client RPC server is running")
 			if err = grpcServer.Serve(rpcListener); err != nil {

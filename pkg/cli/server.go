@@ -41,6 +41,7 @@ import (
 	"github.com/enfein/mieru/v3/pkg/stderror"
 	"github.com/enfein/mieru/v3/pkg/version/updater"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -340,6 +341,7 @@ var serverRunFunc = func(s []string) error {
 		appctl.SetServerRPCServerRef(grpcServer)
 		appctlgrpc.RegisterServerLifecycleServiceServer(grpcServer, appctl.NewServerLifecycleService())
 		appctlgrpc.RegisterServerConfigServiceServer(grpcServer, appctl.NewServerConfigService())
+		reflection.Register(grpcServer)
 		close(appctl.ServerRPCServerStarted)
 		log.Infof("mita server daemon RPC server is running")
 		if err = grpcServer.Serve(rpcListener); err != nil {
