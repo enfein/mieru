@@ -22,7 +22,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func TestURL(t *testing.T) {
+func TestClientConfigWithURL(t *testing.T) {
 	c := &pb.ClientConfig{
 		Profiles: []*pb.ClientProfile{
 			{
@@ -42,6 +42,10 @@ func TestURL(t *testing.T) {
 						},
 					},
 				},
+				Mtu: proto.Int32(1280),
+				Multiplexing: &pb.MultiplexingConfig{
+					Level: pb.MultiplexingLevel_MULTIPLEXING_MIDDLE.Enum(),
+				},
 			},
 		},
 		ActiveProfile: proto.String("default"),
@@ -60,5 +64,116 @@ func TestURL(t *testing.T) {
 	}
 	if !proto.Equal(c, c2) {
 		t.Fatalf("client config is not equal after generating and loading URL:\n%s\n%s", c.String(), c2.String())
+	}
+}
+
+func TestClientProfileWithMultiURLs(t *testing.T) {
+	p := &pb.ClientProfile{
+		ProfileName: proto.String("default"),
+		User: &pb.User{
+			Name:     proto.String("qingguanyidao"),
+			Password: proto.String("tongshangkuanyi"),
+		},
+		Servers: []*pb.ServerEndpoint{
+			{
+				IpAddress: proto.String("2001:db8::1"),
+				PortBindings: []*pb.PortBinding{
+					{
+						Port:     proto.Int32(6666),
+						Protocol: pb.TransportProtocol_TCP.Enum(),
+					},
+					{
+						PortRange: proto.String("8964-8965"),
+						Protocol:  pb.TransportProtocol_UDP.Enum(),
+					},
+				},
+			},
+			{
+				DomainName: proto.String("example.com"),
+				PortBindings: []*pb.PortBinding{
+					{
+						Port:     proto.Int32(9999),
+						Protocol: pb.TransportProtocol_TCP.Enum(),
+					},
+				},
+			},
+		},
+		Mtu: proto.Int32(1280),
+		Multiplexing: &pb.MultiplexingConfig{
+			Level: pb.MultiplexingLevel_MULTIPLEXING_MIDDLE.Enum(),
+		},
+	}
+
+	p0 := &pb.ClientProfile{
+		ProfileName: proto.String("default"),
+		User: &pb.User{
+			Name:     proto.String("qingguanyidao"),
+			Password: proto.String("tongshangkuanyi"),
+		},
+		Servers: []*pb.ServerEndpoint{
+			{
+				IpAddress: proto.String("2001:db8::1"),
+				PortBindings: []*pb.PortBinding{
+					{
+						Port:     proto.Int32(6666),
+						Protocol: pb.TransportProtocol_TCP.Enum(),
+					},
+					{
+						PortRange: proto.String("8964-8965"),
+						Protocol:  pb.TransportProtocol_UDP.Enum(),
+					},
+				},
+			},
+		},
+		Mtu: proto.Int32(1280),
+		Multiplexing: &pb.MultiplexingConfig{
+			Level: pb.MultiplexingLevel_MULTIPLEXING_MIDDLE.Enum(),
+		},
+	}
+
+	p1 := &pb.ClientProfile{
+		ProfileName: proto.String("default"),
+		User: &pb.User{
+			Name:     proto.String("qingguanyidao"),
+			Password: proto.String("tongshangkuanyi"),
+		},
+		Servers: []*pb.ServerEndpoint{
+			{
+				DomainName: proto.String("example.com"),
+				PortBindings: []*pb.PortBinding{
+					{
+						Port:     proto.Int32(9999),
+						Protocol: pb.TransportProtocol_TCP.Enum(),
+					},
+				},
+			},
+		},
+		Mtu: proto.Int32(1280),
+		Multiplexing: &pb.MultiplexingConfig{
+			Level: pb.MultiplexingLevel_MULTIPLEXING_MIDDLE.Enum(),
+		},
+	}
+
+	urls, err := ClientProfileToMultiURLs(p)
+	if err != nil {
+		t.Fatalf("ClientConfigToMultiURLs() failed: %v", err)
+	}
+	if len(urls) != 2 {
+		t.Fatalf("got %d URLs, want 2", len(urls))
+	}
+
+	profile0, err := URLToClientProfile(urls[0])
+	if err != nil {
+		t.Fatalf("URLToClientProfile() failed: %v", err)
+	}
+	if !proto.Equal(profile0, p0) {
+		t.Errorf("profile is not equal after generating and loading URL %q", urls[0])
+	}
+	profile1, err := URLToClientProfile(urls[1])
+	if err != nil {
+		t.Fatalf("URLToClientProfile() failed: %v", err)
+	}
+	if !proto.Equal(profile1, p1) {
+		t.Errorf("profile is not equal after generating and loading URL %q", urls[1])
 	}
 }

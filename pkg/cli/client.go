@@ -248,93 +248,102 @@ var clientHelpFunc = func(s []string) error {
 		entries: []helpCmdEntry{
 			{
 				cmd:  "help",
-				help: "Show mieru client help.",
+				help: []string{"Show mieru client help."},
 			},
 			{
 				cmd:  "start",
-				help: "Start mieru client in background.",
+				help: []string{"Start mieru client in background."},
 			},
 			{
 				cmd:  "stop",
-				help: "Stop mieru client.",
+				help: []string{"Stop mieru client."},
 			},
 			{
 				cmd:  "status",
-				help: "Check mieru client status.",
+				help: []string{"Check mieru client status."},
 			},
 			{
 				cmd:  "test [URL]",
-				help: "Test mieru client connection to the Internet via proxy server.",
+				help: []string{"Test mieru client connection to the Internet via proxy server."},
 			},
 			{
 				cmd:  "apply config <FILE>",
-				help: "Apply client configuration from JSON file.",
+				help: []string{"Apply client configuration from JSON file."},
 			},
 			{
 				cmd:  "describe config",
-				help: "Show current client configuration.",
+				help: []string{"Show current client configuration."},
 			},
 			{
 				cmd:  "import config <URL>",
-				help: "Import client configuration from URL.",
+				help: []string{"Import client configuration from URL."},
 			},
 			{
 				cmd:  "export config",
-				help: "Export client configuration as URL.",
+				help: []string{"Export client configuration as URL."},
 			},
 			{
 				cmd:  "delete profile <PROFILE_NAME>",
-				help: "Delete an inactive client configuration profile.",
+				help: []string{"Delete an inactive client configuration profile."},
 			},
 			{
-				cmd:  "delete http proxy",
-				help: "Delete HTTP(S) proxy. Allow socks5 user password authentication to be used.",
+				cmd: "delete http proxy",
+				help: []string{
+					"Delete HTTP(S) proxy.",
+					"Allow socks5 user password authentication to be used.",
+				},
 			},
 			{
-				cmd:  "delete socks5 authentication",
-				help: "Delete socks5 user password authentication. Allow HTTP(S) proxy to be used.",
+				cmd: "delete socks5 authentication",
+				help: []string{
+					"Delete socks5 user password authentication.",
+					"Allow HTTP(S) proxy to be used.",
+				},
 			},
 			{
 				cmd:  "get metrics",
-				help: "Get mieru client metrics.",
+				help: []string{"Get mieru client metrics."},
 			},
 			{
 				cmd:  "get connections",
-				help: "Get mieru client connections.",
+				help: []string{"Get mieru client connections."},
 			},
 			{
 				cmd:  "version",
-				help: "Show mieru client version.",
+				help: []string{"Show mieru client version."},
 			},
 			{
 				cmd:  "check update",
-				help: "Check mieru client update.",
+				help: []string{"Check mieru client update."},
 			},
 		},
 		advanced: []helpCmdEntry{
 			{
-				cmd:  "run",
-				help: "Run mieru client in foreground.",
+				cmd: "run",
+				help: []string{
+					"Run mieru client in foreground.",
+					"Use environment variable MIERU_CONFIG_JSON_FILE to load configuration.",
+				},
 			},
 			{
 				cmd:  "get thread-dump",
-				help: "Get mieru client thread dump.",
+				help: []string{"Get mieru client thread dump."},
 			},
 			{
 				cmd:  "get heap-profile <GZ_FILE>",
-				help: "Get mieru client heap profile and save results to the file.",
+				help: []string{"Get mieru client heap profile and save results to the file."},
 			},
 			{
 				cmd:  "get memory-statistics",
-				help: "Get mieru client memory statistics.",
+				help: []string{"Get mieru client memory statistics."},
 			},
 			{
 				cmd:  "profile cpu start <GZ_FILE>",
-				help: "Start mieru client CPU profile and save results to the file.",
+				help: []string{"Start mieru client CPU profile and save results to the file."},
 			},
 			{
 				cmd:  "profile cpu stop",
-				help: "Stop mieru client CPU profile.",
+				help: []string{"Stop mieru client CPU profile."},
 			},
 		},
 	}

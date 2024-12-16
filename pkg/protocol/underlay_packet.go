@@ -179,25 +179,7 @@ func (u *PacketUnderlay) RunEventLoop(ctx context.Context) error {
 		case <-u.done:
 			return nil
 		case <-u.idleSessionTicker.C:
-			// Close idle sessions.
-			u.sessionMap.Range(func(k, v any) bool {
-				session := v.(*Session)
-				select {
-				case <-session.closedChan:
-					log.Debugf("Found closed %v", session)
-					if err := u.RemoveSession(session); err != nil {
-						log.Debugf("%v RemoveSession() failed: %v", u, err)
-					}
-				default:
-				}
-				if time.Since(session.lastRXTime) > idleSessionTimeout {
-					log.Debugf("Found idle %v", session)
-					if err := u.RemoveSession(session); err != nil {
-						log.Debugf("%v RemoveSession() failed: %v", u, err)
-					}
-				}
-				return true
-			})
+			u.closeIdleSessions()
 		default:
 		}
 		seg, addr, err := u.readOneSegment()
@@ -439,7 +421,8 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 			}
 		}
 		if len(decryptedMeta) != MetadataLength {
-			return nil, nil, fmt.Errorf("decrypted metadata size %d is unexpected", len(decryptedMeta))
+			log.Debugf("decrypted metadata size %d is unexpected", len(decryptedMeta))
+			continue
 		}
 
 		// Read payload and construct segment.
@@ -491,8 +474,14 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 				seg.block = blockCipher
 			}
 			return seg, addr, nil
+		} else {
+			if u.isClient {
+				return nil, nil, fmt.Errorf("unable to handle protocol %d", p)
+			} else {
+				log.Debugf("%v unable to handle protocol %d", u, p)
+				continue
+			}
 		}
-		return nil, nil, fmt.Errorf("unable to handle protocol %d", p)
 	}
 }
 
@@ -713,4 +702,25 @@ func (u *PacketUnderlay) writeOneSegment(seg *segment, addr net.Addr) error {
 		return stderror.ErrInvalidArgument
 	}
 	return nil
+}
+
+func (u *PacketUnderlay) closeIdleSessions() {
+	u.sessionMap.Range(func(k, v any) bool {
+		session := v.(*Session)
+		select {
+		case <-session.closedChan:
+			log.Debugf("Found closed %v", session)
+			if err := u.RemoveSession(session); err != nil {
+				log.Debugf("%v RemoveSession() failed: %v", u, err)
+			}
+		default:
+		}
+		if time.Since(session.lastRXTime) > idleSessionTimeout {
+			log.Debugf("Found idle %v", session)
+			if err := u.RemoveSession(session); err != nil {
+				log.Debugf("%v RemoveSession() failed: %v", u, err)
+			}
+		}
+		return true
+	})
 }

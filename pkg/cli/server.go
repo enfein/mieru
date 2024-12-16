@@ -200,77 +200,80 @@ var serverHelpFunc = func(s []string) error {
 		entries: []helpCmdEntry{
 			{
 				cmd:  "help",
-				help: "Show mita server help.",
+				help: []string{"Show mita server help."},
 			},
 			{
 				cmd:  "start",
-				help: "Start mita server proxy service.",
+				help: []string{"Start mita server proxy service."},
 			},
 			{
 				cmd:  "stop",
-				help: "Stop mita server proxy service.",
+				help: []string{"Stop mita server proxy service."},
 			},
 			{
 				cmd:  "reload",
-				help: "Reload mita server configuration without stopping proxy service.",
+				help: []string{"Reload mita server configuration without stopping proxy service."},
 			},
 			{
 				cmd:  "status",
-				help: "Check mita server proxy service status.",
+				help: []string{"Check mita server proxy service status."},
 			},
 			{
 				cmd:  "apply config <FILE>",
-				help: "Apply server configuration from JSON file.",
+				help: []string{"Apply server configuration from JSON file."},
 			},
 			{
 				cmd:  "describe config",
-				help: "Show current server configuration.",
+				help: []string{"Show current server configuration."},
 			},
 			{
 				cmd:  "delete user <USER_NAME>",
-				help: "Delete a user from server configuration.",
+				help: []string{"Delete a user from server configuration."},
 			},
 			{
 				cmd:  "get metrics",
-				help: "Get mita server metrics.",
+				help: []string{"Get mita server metrics."},
 			},
 			{
 				cmd:  "get connections",
-				help: "Get mita server connections.",
+				help: []string{"Get mita server connections."},
 			},
 			{
 				cmd:  "version",
-				help: "Show mita server version.",
+				help: []string{"Show mita server version."},
 			},
 			{
 				cmd:  "check update",
-				help: "Check mita server update.",
+				help: []string{"Check mita server update."},
 			},
 		},
 		advanced: []helpCmdEntry{
 			{
-				cmd:  "run",
-				help: "Run mita server in foreground.",
+				cmd: "run",
+				help: []string{
+					"Run mita server in foreground.",
+					"Use environment variable MITA_CONFIG_JSON_FILE to load configuration.",
+				},
 			},
 			{
 				cmd:  "get thread-dump",
-				help: "Get mita server thread dump.",
+				help: []string{"Get mita server thread dump."},
 			},
 			{
 				cmd:  "get heap-profile <GZ_FILE>",
-				help: "Get mita server heap profile and save results to the file.",
+				help: []string{"Get mita server heap profile and save results to the file."},
 			},
 			{
 				cmd:  "get memory-statistics",
-				help: "Get mita server memory statistics.",
+				help: []string{"Get mita server memory statistics."},
 			},
 			{
 				cmd:  "profile cpu start <GZ_FILE>",
-				help: "Start mita server CPU profile and save results to the file.",
+				help: []string{"Start mita server CPU profile and save results to the file."},
 			},
 			{
 				cmd:  "profile cpu stop",
-				help: "Stop mita server CPU profile.",
+				help: []string{"Stop mita server CPU profile."},
 			},
 		},
 	}

@@ -25,7 +25,7 @@ type helpFormatter struct {
 
 type helpCmdEntry struct {
 	cmd  string
-	help string
+	help []string
 }
 
 func (m helpFormatter) print() {
@@ -37,7 +37,9 @@ func (m helpFormatter) print() {
 		log.Infof("Commands:")
 		for _, entry := range m.entries {
 			log.Infof("  %s", entry.cmd)
-			log.Infof("        %s", entry.help)
+			for _, line := range entry.help {
+				log.Infof("        %s", line)
+			}
 			log.Infof("")
 		}
 	}
@@ -45,7 +47,9 @@ func (m helpFormatter) print() {
 		log.Infof("Commands for developers and experienced users:")
 		for _, entry := range m.advanced {
 			log.Infof("  %s", entry.cmd)
-			log.Infof("        %s", entry.help)
+			for _, line := range entry.help {
+				log.Infof("        %s", line)
+			}
 			log.Infof("")
 		}
 	}
