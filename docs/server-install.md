@@ -8,32 +8,32 @@ Before installation and configuration, connect to the server via SSH and then ex
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.8.4/mita_3.8.4_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.9.0/mita_3.9.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.8.4/mita_3.8.4_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.9.0/mita_3.9.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.8.4/mita-3.8.4-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.9.0/mita-3.9.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.8.4/mita-3.8.4-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.9.0/mita-3.9.0-1.aarch64.rpm
 ```
 
 ## Install mita package
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_3.8.4_amd64.deb
+sudo dpkg -i mita_3.9.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_3.8.4_arm64.deb
+sudo dpkg -i mita_3.9.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-3.8.4-1.x86_64.rpm
+sudo rpm -Uvh --force mita-3.9.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-3.8.4-1.aarch64.rpm
+sudo rpm -Uvh --force mita-3.9.0-1.aarch64.rpm
 ```
 
 Those instructions can also be used to upgrade the version of mita software package.
