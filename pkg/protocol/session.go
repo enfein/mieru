@@ -430,15 +430,22 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 	seqBeforeWrite, _ := s.sendQueue.MinSeq()
 
 	// Determine number of fragments to write.
-	// Return if there is no enough space in send queue.
 	nFragment := 1
 	fragmentSize := MaxFragmentSize(s.mtu, s.conn.TransportProtocol())
 	if len(b) > fragmentSize {
 		nFragment = (len(b)-1)/fragmentSize + 1
 	}
-	if s.sendQueue.Remaining() <= nFragment { // leave one slot in case it is needed
-		time.Sleep(tickInterval) // add back pressure
-		return 0, nil
+	for s.sendQueue.Remaining() < nFragment {
+		select {
+		case <-s.closedChan:
+			return 0, io.EOF
+		case <-s.outputErr:
+			return 0, io.ErrClosedPipe
+		case <-timeC:
+			return 0, stderror.ErrTimeout
+		default:
+		}
+		time.Sleep(tickInterval) // add back pressure if queue is full
 	}
 
 	s.oLock.Lock()
