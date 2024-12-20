@@ -435,7 +435,7 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 	if len(b) > fragmentSize {
 		nFragment = (len(b)-1)/fragmentSize + 1
 	}
-	for s.sendQueue.Remaining() < nFragment {
+	for s.sendQueue.Remaining() <= nFragment { // reserve one slot for Close()
 		select {
 		case <-s.closedChan:
 			return 0, io.EOF

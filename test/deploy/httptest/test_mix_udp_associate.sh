@@ -48,6 +48,8 @@ sleep 1
 sleep 1
 ./mieru delete socks5 authentication
 sleep 1
+./mieru export config simple
+sleep 1
 ./mieru export config > client.url.txt
 rm ~/.config/mieru/client.conf.pb
 echo "mieru client config before import:"

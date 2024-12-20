@@ -219,8 +219,8 @@ var serverHelpFunc = func(s []string) error {
 				help: []string{"Check mita server proxy service status."},
 			},
 			{
-				cmd:  "apply config <FILE>",
-				help: []string{"Apply server configuration from JSON file."},
+				cmd:  "apply config <JSON_FILE>",
+				help: []string{"Apply server configuration from a file."},
 			},
 			{
 				cmd:  "describe config",

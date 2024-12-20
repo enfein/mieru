@@ -63,13 +63,13 @@ func ClientProfileToMultiURLs(profile *pb.ClientProfile) (urls []string, err err
 		return nil, fmt.Errorf("user name in profile %s is empty", profileName)
 	}
 	if !isSafeURLString(userName) {
-		return nil, fmt.Errorf("user name %q in profile %s can't be safely encoded to URL. Only allow A-Z, a-z, 0-9, underscore _, and hyphen -", userName, profileName)
+		return nil, fmt.Errorf(`user name %q in profile %s can't be safely encoded to URL. Only allow "A-Z", "a-z", "0-9", underscore "_", and hyphen "-"`, userName, profileName)
 	}
 	if password == "" {
 		return nil, fmt.Errorf("password in profile %s is empty", profileName)
 	}
 	if !isSafeURLString(password) {
-		return nil, fmt.Errorf("password %q in profile %s can't be safely encoded to URL. Only allow A-Z, a-z, 0-9, underscore _, and hyphen -", password, profileName)
+		return nil, fmt.Errorf(`password %q in profile %s can't be safely encoded to URL. Only allow "A-Z", "a-z", "0-9", underscore "_", and hyphen "-"`, password, profileName)
 	}
 	if len(servers) == 0 {
 		return nil, fmt.Errorf("profile %s has no server", profileName)

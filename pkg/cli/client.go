@@ -135,6 +135,13 @@ func RegisterClientCommands() {
 		clientImportConfigFunc,
 	)
 	RegisterCallback(
+		[]string{"", "export", "config", "simple"},
+		func(s []string) error {
+			return unexpectedArgsError(s, 4)
+		},
+		clientExportConfigSimpleFunc,
+	)
+	RegisterCallback(
 		[]string{"", "export", "config"},
 		func(s []string) error {
 			return unexpectedArgsError(s, 3)
@@ -267,8 +274,8 @@ var clientHelpFunc = func(s []string) error {
 				help: []string{"Test mieru client connection to the Internet via proxy server."},
 			},
 			{
-				cmd:  "apply config <FILE>",
-				help: []string{"Apply client configuration from JSON file."},
+				cmd:  "apply config <JSON_FILE>",
+				help: []string{"Apply client configuration from a file."},
 			},
 			{
 				cmd:  "describe config",
@@ -276,11 +283,15 @@ var clientHelpFunc = func(s []string) error {
 			},
 			{
 				cmd:  "import config <URL>",
-				help: []string{"Import client configuration from URL."},
+				help: []string{"Import client configuration from a URL."},
+			},
+			{
+				cmd:  "export config simple",
+				help: []string{"Export client configuration as URLs in simple format."},
 			},
 			{
 				cmd:  "export config",
-				help: []string{"Export client configuration as URL."},
+				help: []string{"Export client configuration as a URL."},
 			},
 			{
 				cmd:  "delete profile <PROFILE_NAME>",
@@ -738,8 +749,7 @@ var clientTestFunc = func(s []string) error {
 }
 
 var clientApplyConfigFunc = func(s []string) error {
-	_, err := appctl.LoadClientConfig()
-	if err == stderror.ErrFileNotExist {
+	if _, err := appctl.LoadClientConfig(); err == stderror.ErrFileNotExist {
 		if err = appctl.StoreClientConfig(&appctlpb.ClientConfig{}); err != nil {
 			return fmt.Errorf(stderror.StoreClientConfigFailedErr, err)
 		}
@@ -748,8 +758,7 @@ var clientApplyConfigFunc = func(s []string) error {
 }
 
 var clientDescribeConfigFunc = func(s []string) error {
-	_, err := appctl.LoadClientConfig()
-	if err == stderror.ErrFileNotExist {
+	if _, err := appctl.LoadClientConfig(); err == stderror.ErrFileNotExist {
 		if err = appctl.StoreClientConfig(&appctlpb.ClientConfig{}); err != nil {
 			return fmt.Errorf(stderror.StoreClientConfigFailedErr, err)
 		}
@@ -763,8 +772,7 @@ var clientDescribeConfigFunc = func(s []string) error {
 }
 
 var clientImportConfigFunc = func(s []string) error {
-	_, err := appctl.LoadClientConfig()
-	if err == stderror.ErrFileNotExist {
+	if _, err := appctl.LoadClientConfig(); err == stderror.ErrFileNotExist {
 		if err = appctl.StoreClientConfig(&appctlpb.ClientConfig{}); err != nil {
 			return fmt.Errorf(stderror.StoreClientConfigFailedErr, err)
 		}
@@ -772,11 +780,35 @@ var clientImportConfigFunc = func(s []string) error {
 	return appctl.ApplyURLClientConfig(s[3])
 }
 
+var clientExportConfigSimpleFunc = func(s []string) error {
+	config, err := appctl.LoadClientConfig()
+	if err != nil {
+		if err == stderror.ErrFileNotExist {
+			return fmt.Errorf(stderror.ClientConfigNotExist)
+		} else {
+			return fmt.Errorf(stderror.GetClientConfigFailedErr, err)
+		}
+	}
+	for _, profile := range config.GetProfiles() {
+		urls, err := appctl.ClientProfileToMultiURLs(profile)
+		if err != nil {
+			log.Errorf("%v", err)
+		} else {
+			for _, url := range urls {
+				log.Infof("%s", url)
+			}
+		}
+	}
+	return nil
+}
+
 var clientExportConfigFunc = func(s []string) error {
 	_, err := appctl.LoadClientConfig()
-	if err == stderror.ErrFileNotExist {
-		if err = appctl.StoreClientConfig(&appctlpb.ClientConfig{}); err != nil {
-			return fmt.Errorf(stderror.StoreClientConfigFailedErr, err)
+	if err != nil {
+		if err == stderror.ErrFileNotExist {
+			return fmt.Errorf(stderror.ClientConfigNotExist)
+		} else {
+			return fmt.Errorf(stderror.GetClientConfigFailedErr, err)
 		}
 	}
 	out, err := appctl.GetURLClientConfig()
