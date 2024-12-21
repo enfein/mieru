@@ -91,7 +91,7 @@ mieru describe config
 mieru start
 ```
 
-如果输出显示 `mieru client is started, listening to 127.0.0.1:xxxx`，表示 mieru 客户端已经开始运行。
+如果输出显示 `mieru client is started, listening to xxxxx`，表示 mieru 客户端已经在后台开始运行。
 
 mieru 客户端不会与系统一同启动。在重新启动计算机后，需要手动使用 `mieru start` 指令启动客户端。
 

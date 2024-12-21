@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -321,13 +322,26 @@ func ApplyJSONClientConfig(path string) error {
 	return applyClientConfig(c)
 }
 
-// ApplyJSONClientConfig applies user provided client config URL.
+// ApplyURLClientConfig applies user provided client config URL.
 func ApplyURLClientConfig(u string) error {
-	c, err := URLToClientConfig(u)
-	if err != nil {
-		return fmt.Errorf("URLToClientConfig() failed: %w", err)
+	if strings.HasPrefix(u, "mieru://") {
+		c, err := URLToClientConfig(u)
+		if err != nil {
+			return fmt.Errorf("URLToClientConfig() failed: %w", err)
+		}
+		return applyClientConfig(c)
+	} else if strings.HasPrefix(u, "mierus://") {
+		p, err := URLToClientProfile(u)
+		if err != nil {
+			return fmt.Errorf("URLToClientProfile() failed: %w", err)
+		}
+		c := &pb.ClientConfig{
+			Profiles: []*pb.ClientProfile{p},
+		}
+		return applyClientConfig(c)
+	} else {
+		return fmt.Errorf("unrecognized URL scheme. URL must begin with mieru:// or mierus://")
 	}
-	return applyClientConfig(c)
 }
 
 // DeleteClientConfigProfile deletes a profile stored in client config.

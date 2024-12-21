@@ -171,7 +171,10 @@ func URLToClientProfile(s string) (*pb.ClientProfile, error) {
 		server.DomainName = proto.String(u.Hostname())
 	}
 
-	q := u.Query()
+	q, err := url.ParseQuery(u.RawQuery)
+	if err != nil {
+		return nil, fmt.Errorf("url.ParseQuery() failed: %w", err)
+	}
 	if q.Get("profile") == "" {
 		return nil, fmt.Errorf("URL has no profile name")
 	}

@@ -91,7 +91,7 @@ to check the current proxy settings.
 mieru start
 ```
 
-If the output shows `mieru client is started, listening to 127.0.0.1:xxxx`, it means that the mieru client is up and running.
+If the output shows `mieru client is started, listening to xxxxx`, it means that the mieru client is running in the background.
 
 The mieru client will not be started automatically with system boot. After restarting the computer, you need to start the client manually with the `mieru start` command.
 

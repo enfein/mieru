@@ -282,8 +282,12 @@ var clientHelpFunc = func(s []string) error {
 				help: []string{"Show current client configuration."},
 			},
 			{
-				cmd:  "import config <URL>",
-				help: []string{"Import client configuration from a URL."},
+				cmd: "import config <URL>",
+				help: []string{
+					"Import client configuration from a URL.",
+					"The URL can be standard format mieru:// or simple format mierus://.",
+					"Please use quotation marks to wrap the URL, so it can be parsed correctly.",
+				},
 			},
 			{
 				cmd:  "export config simple",
