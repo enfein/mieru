@@ -45,10 +45,11 @@ const (
 	serverRespTimeout        = 10 * time.Second
 	sessionHeartbeatInterval = 5 * time.Second
 
-	earlyRetransmission      = 3 // number of ack to trigger early retransmission
-	earlyRetransmissionLimit = 5 // maximum number of early retransmission attempt
-	txTimeoutBackOff         = 1.25
-	maxBackOffMultiplier     = 20.0
+	earlyRetransmission        = 3    // number of ack to trigger early retransmission
+	earlyRetransmissionLimit   = 2    // maximum number of early retransmission attempt
+	maxRetransmissionBatchSize = 16   // maximum number of segments in a retransmission batch
+	txTimeoutBackOff           = 1.25 // tx timeout back off multiplier
+	maxBackOffMultiplier       = 20.0 // maximum back off multiplier
 )
 
 type sessionState byte
@@ -591,8 +592,13 @@ func (s *Session) runOutputOncePacket() {
 	var bytesInFlight int64
 
 	// Resend segments in sendBuf.
+	//
+	// Iterate all the segments in sendBuf to calculate bytesInFlight,
+	// but only resend first a few segments if needed.
+	//
 	// To avoid deadlock, session can't be closed inside Ascend().
 	s.oLock.Lock()
+	retransmissionCount := 0
 	s.sendBuf.Ascend(func(iter *segment) bool {
 		bytesInFlight += int64(packetOverhead + len(iter.payload))
 		if iter.txCount >= txCountLimit {
@@ -602,7 +608,7 @@ func (s *Session) runOutputOncePacket() {
 			closeSessionReason = err
 			return false
 		}
-		if (iter.ackCount >= earlyRetransmission && iter.txCount <= earlyRetransmissionLimit) || time.Since(iter.txTime) > iter.txTimeout {
+		if retransmissionCount <= maxRetransmissionBatchSize && ((iter.ackCount >= earlyRetransmission && iter.txCount <= earlyRetransmissionLimit) || time.Since(iter.txTime) > iter.txTimeout) {
 			if iter.ackCount >= earlyRetransmission {
 				hasLoss = true
 			} else {
@@ -624,6 +630,7 @@ func (s *Session) runOutputOncePacket() {
 				return false
 			}
 			bytesInFlight += int64(packetOverhead + len(iter.payload))
+			retransmissionCount++
 			return true
 		}
 		return true

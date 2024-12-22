@@ -59,7 +59,7 @@ fi
 sleep 2
 ./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
   -local_proxy_host=192.168.234.1 -local_proxy_port=1080 \
-  -test_case=reuse_conn -print_speed=1 -test_time_sec=60
+  -test_case=reuse_conn -print_speed=1 -test_time_sec=900
 if [ "$?" -ne "0" ]; then
     print_mieru_client_log
     print_mieru_client_thread_dump
