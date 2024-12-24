@@ -179,7 +179,7 @@ func (u *PacketUnderlay) RunEventLoop(ctx context.Context) error {
 		case <-u.done:
 			return nil
 		case <-u.idleSessionTicker.C:
-			u.closeIdleSessions()
+			go u.closeIdleSessions()
 		default:
 		}
 		seg, addr, err := u.readOneSegment()

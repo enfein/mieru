@@ -21,6 +21,7 @@ import (
 	"io"
 	"math"
 	"net"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -93,8 +94,10 @@ type Session struct {
 	closedChan     chan struct{} // indicate the session is closed
 	readDeadline   time.Time     // read deadline
 	writeDeadline  time.Time     // write deadline
-	inputErr       chan error    // input error
-	outputErr      chan error    // output error
+	inputHasErr    atomic.Bool   // input has error
+	inputErr       chan error    // this channel is closed when input has error
+	outputHasErr   atomic.Bool   // output has error
+	outputErr      chan error    // this channel is closed when output has error
 
 	sendQueue *segmentTree  // segments waiting to send
 	sendBuf   *segmentTree  // segments sent but not acknowledged
@@ -145,8 +148,8 @@ func NewSession(id uint32, isClient bool, mtu int, users map[string]*appctlpb.Us
 		closedChan:          make(chan struct{}),
 		readDeadline:        time.Time{},
 		writeDeadline:       time.Time{},
-		inputErr:            make(chan error, 2), // allow nested
-		outputErr:           make(chan error, 2), // allow nested
+		inputErr:            make(chan error),
+		outputErr:           make(chan error),
 		sendQueue:           newSegmentTree(segmentTreeCapacity),
 		sendBuf:             newSegmentTree(segmentTreeCapacity),
 		recvBuf:             newSegmentTree(segmentTreeCapacity),
@@ -360,21 +363,25 @@ func (s *Session) SetWriteDeadline(t time.Time) error {
 func (s *Session) ToSessionInfo() SessionInfo {
 	info := SessionInfo{
 		ID:         fmt.Sprintf("%d", s.id),
-		LocalAddr:  s.LocalAddr().String(),
-		RemoteAddr: s.RemoteAddr().String(),
+		LocalAddr:  "-",
+		RemoteAddr: "-",
 		State:      s.state.String(),
 		RecvQBuf:   fmt.Sprintf("%d+%d", s.recvQueue.Len(), s.recvBuf.Len()),
 		SendQBuf:   fmt.Sprintf("%d+%d", s.sendQueue.Len(), s.sendBuf.Len()),
 		LastSend:   fmt.Sprintf("%v (%d)", time.Since(s.lastTXTime).Truncate(time.Second), s.nextSend-1),
 	}
-	if _, ok := s.conn.(*StreamUnderlay); ok {
-		info.Protocol = "TCP"
-		info.LastRecv = fmt.Sprintf("%v", time.Since(s.lastRXTime).Truncate(time.Second)) // TCP nextRecv is not used
-	} else if _, ok := s.conn.(*PacketUnderlay); ok {
-		info.Protocol = "UDP"
-		info.LastRecv = fmt.Sprintf("%v (%d)", time.Since(s.lastRXTime).Truncate(time.Second), s.nextRecv-1)
-	} else {
-		info.Protocol = "UNKNOWN"
+	if s.conn != nil {
+		info.LocalAddr = s.conn.LocalAddr().String()
+		info.RemoteAddr = s.conn.RemoteAddr().String()
+		if _, ok := s.conn.(*StreamUnderlay); ok {
+			info.Protocol = "TCP"
+			info.LastRecv = fmt.Sprintf("%v", time.Since(s.lastRXTime).Truncate(time.Second)) // TCP nextRecv is not used
+		} else if _, ok := s.conn.(*PacketUnderlay); ok {
+			info.Protocol = "UDP"
+			info.LastRecv = fmt.Sprintf("%v (%d)", time.Since(s.lastRXTime).Truncate(time.Second), s.nextRecv-1)
+		} else {
+			info.Protocol = "UNKNOWN"
+		}
 	}
 	return info
 }
@@ -531,7 +538,9 @@ func (s *Session) runInputLoop(ctx context.Context) error {
 			if err := s.input(seg); err != nil {
 				err = fmt.Errorf("input() failed: %w", err)
 				log.Debugf("%v %v", s, err)
-				s.inputErr <- err
+				if s.inputHasErr.CompareAndSwap(false, true) {
+					close(s.inputErr)
+				}
 				s.closeWithError(err)
 				return err
 			}
@@ -560,13 +569,20 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 		default:
 			err := fmt.Errorf("unsupported transport protocol %v", s.conn.TransportProtocol())
 			log.Debugf("%v %v", s, err)
-			s.outputErr <- err
+			if s.outputHasErr.CompareAndSwap(false, true) {
+				close(s.outputErr)
+			}
 			s.closeWithError(err)
 		}
 	}
 }
 
 func (s *Session) runOutputOnceStream() {
+	if s.outputHasErr.Load() {
+		runtime.Gosched()
+		return
+	}
+
 	s.oLock.Lock()
 	defer s.oLock.Unlock()
 
@@ -578,7 +594,9 @@ func (s *Session) runOutputOnceStream() {
 		if err := s.output(seg, nil); err != nil {
 			err = fmt.Errorf("output() failed: %w", err)
 			log.Debugf("%v %v", s, err)
-			s.outputErr <- err
+			if s.outputHasErr.CompareAndSwap(false, true) {
+				close(s.outputErr)
+			}
 			s.closeWithError(err)
 			break
 		}
@@ -586,6 +604,11 @@ func (s *Session) runOutputOnceStream() {
 }
 
 func (s *Session) runOutputOncePacket() {
+	if s.outputHasErr.Load() {
+		runtime.Gosched()
+		return
+	}
+
 	var closeSessionReason error
 	hasLoss := false
 	hasTimeout := false
@@ -604,7 +627,9 @@ func (s *Session) runOutputOncePacket() {
 		if iter.txCount >= txCountLimit {
 			err := fmt.Errorf("too many retransmission of %v", iter)
 			log.Debugf("%v is unhealthy: %v", s, err)
-			s.outputErr <- err
+			if s.outputHasErr.CompareAndSwap(false, true) {
+				close(s.outputErr)
+			}
 			closeSessionReason = err
 			return false
 		}
@@ -625,7 +650,9 @@ func (s *Session) runOutputOncePacket() {
 			if err := s.output(iter, s.RemoteAddr()); err != nil {
 				err = fmt.Errorf("output() failed: %w", err)
 				log.Debugf("%v %v", s, err)
-				s.outputErr <- err
+				if s.outputHasErr.CompareAndSwap(false, true) {
+					close(s.outputErr)
+				}
 				closeSessionReason = err
 				return false
 			}
@@ -666,7 +693,9 @@ func (s *Session) runOutputOncePacket() {
 				s.oLock.Unlock()
 				err := fmt.Errorf("output() failed: insert %v to send buffer failed", seg)
 				log.Debugf("%v %v", s, err)
-				s.outputErr <- err
+				if s.outputHasErr.CompareAndSwap(false, true) {
+					close(s.outputErr)
+				}
 				s.closeWithError(err)
 				break
 			}
@@ -674,7 +703,9 @@ func (s *Session) runOutputOncePacket() {
 				s.oLock.Unlock()
 				err = fmt.Errorf("output() failed: %w", err)
 				log.Debugf("%v %v", s, err)
-				s.outputErr <- err
+				if s.outputHasErr.CompareAndSwap(false, true) {
+					close(s.outputErr)
+				}
 				s.closeWithError(err)
 				break
 			} else {
@@ -683,7 +714,9 @@ func (s *Session) runOutputOncePacket() {
 					s.oLock.Unlock()
 					err = fmt.Errorf("failed to get sequence number from %v: %w", seg, err)
 					log.Debugf("%v %v", s, err)
-					s.outputErr <- err
+					if s.outputHasErr.CompareAndSwap(false, true) {
+						close(s.outputErr)
+					}
 					s.closeWithError(err)
 					break
 				}
@@ -720,7 +753,9 @@ func (s *Session) runOutputOncePacket() {
 			s.oLock.Unlock()
 			err = fmt.Errorf("output() failed: %w", err)
 			log.Debugf("%v %v", s, err)
-			s.outputErr <- err
+			if s.outputHasErr.CompareAndSwap(false, true) {
+				close(s.outputErr)
+			}
 			s.closeWithError(err)
 		} else {
 			seq, err := ackSeg.Seq()
@@ -728,7 +763,9 @@ func (s *Session) runOutputOncePacket() {
 				s.oLock.Unlock()
 				err = fmt.Errorf("failed to get sequence number from %v: %w", ackSeg, err)
 				log.Debugf("%v %v", s, err)
-				s.outputErr <- err
+				if s.outputHasErr.CompareAndSwap(false, true) {
+					close(s.outputErr)
+				}
 				s.closeWithError(err)
 			} else {
 				s.oLock.Unlock()
