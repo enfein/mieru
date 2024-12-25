@@ -386,7 +386,7 @@ var serverRunFunc = func(s []string) error {
 		if err := metrics.LoadMetricsFromDump(); err == nil {
 			log.Infof("Loaded previous metrics from %s", metricsDumpPath)
 		} else {
-			log.Infof("Failed to load previous metrics: %v", err)
+			log.Infof("Unable to load previous metrics: %v", err)
 		}
 		if err := metrics.EnableMetricsDump(); err != nil {
 			log.Warnf("Failed to enable metrics dump: %v", err)

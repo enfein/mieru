@@ -112,7 +112,7 @@ func LoadMetricsFromDump() error {
 
 	b, err := os.ReadFile(metricsDumpFilePath)
 	if err != nil {
-		return fmt.Errorf("os.ReadFile(%q) failed: %w", metricsDumpFilePath, err)
+		return fmt.Errorf("os.ReadFile() failed: %w", err)
 	}
 	m := &pb.AllMetrics{}
 	if err := proto.Unmarshal(b, m); err != nil {
