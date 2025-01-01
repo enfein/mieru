@@ -151,3 +151,86 @@ mieru 不使用 socks5 用户名和密码进行身份验证。
 **socks5 用户名和密码验证与 HTTP / HTTPS 代理不兼容。** 因为 HTTP / HTTPS 代理不需要用户名和密码验证，根据威胁模型，mieru 禁止在使用 socks5 用户名和密码验证的同时使用 HTTP / HTTPS 代理。
 
 如果需要删除已有的 HTTP / HTTPS 代理配置，请运行 `mieru delete http proxy` 指令。如果想要删除 socks5 用户名和密码验证的设置，请运行 `mieru delete socks5 authentication` 指令。
+
+## 分享客户端的设置
+
+用户可以使用 `mieru export config` 或者 `mieru export config simple` 指令生成 URL 链接，来分享客户端的配置。这些 URL 链接可以使用 `mieru import config <URL>` 指令导入至其他客户端。
+
+### 标准分享链接
+
+使用指令 `mieru export config` 生成一个标准分享链接。例如：
+
+```
+mieru://CpsBCgdkZWZhdWx0ElgKBWJhb3ppEg1tYW5saWFucGVuZmVuGkA0MGFiYWM0MGY1OWRhNTVkYWQ2YTk5ODMxYTUxMTY1MjJmYmM4MGUzODViYjFhYjE0ZGM1MmRiMzY4ZjczOGE0Gi8SCWxvY2FsaG9zdBoFCIo0EAIaDRACGgk5OTk5LTk5OTkaBQjZMhABGgUIoCYQASD4CioCCAQSB2RlZmF1bHQYnUYguAgwBTgA
+```
+
+标准分享链接以 `mieru://` 开始，使用 base64 编码完整的客户端配置。用户可以使用标准分享链接在一台全新的设备上复刻客户端配置。
+
+### 简单分享链接
+
+使用指令 `mieru export config simple` 生成人类可读的简单分享链接。例如：
+
+```
+mierus://baozi:manlianpenfen@1.2.3.4?mtu=1400&multiplexing=MULTIPLEXING_HIGH&port=6666&port=9998-9999&port=6489&port=4896&profile=default&protocol=TCP&protocol=TCP&protocol=UDP&protocol=UDP
+```
+
+简单分享链接的格式如下：
+
+`mierus://用户名:密码@服务器地址?参数列表`
+
+简单分享链接以 `mierus://` 开始，其中 `s` 表示 `simple`。
+
+用户名和密码只能使用大写字母 `A-Z`，小写字母 `a-z`，数字 `0-9`，下划线 `_` 和横杠 `-`，否则将无法生成简单分享链接。
+
+简单分享链接中只有一个服务器地址。如果客户端的设置含有多台服务器，则会生成多个链接。
+
+链接中支持的参数列表如下：
+
+- `profile`
+- `mtu`
+- `multiplexing`
+- `port`
+- `protocol`
+
+其中 `profile` 必须出现一次，`mtu` 以及 `multiplexing` 最多出现一次，`port` 和 `protocol` 可以出现多次，且他们出现的次数必须相同，以便将同一位置上的 `port` 和 `protocol` 联系起来。另外 `port` 也可以用来指定一段连续的端口。
+
+上面的简单分享链接等同于如下的客户端配置片段：
+
+```json
+{
+    "profileName":  "default",
+    "user":  {
+        "name":  "baozi",
+        "password":  "manlianpenfen"
+    },
+    "servers":  [
+        {
+            "ipAddress":  "1.2.3.4",
+            "portBindings":  [
+                {
+                    "port":  6666,
+                    "protocol":  "TCP"
+                },
+                {
+                    "protocol":  "TCP",
+                    "portRange":  "9998-9999"
+                },
+                {
+                    "port":  6489,
+                    "protocol":  "UDP"
+                },
+                {
+                    "port":  4896,
+                    "protocol":  "UDP"
+                }
+            ]
+        }
+    ],
+    "mtu":  1400,
+    "multiplexing":  {
+        "level":  "MULTIPLEXING_HIGH"
+    }
+}
+```
+
+注意，简单分享链接不含有 `socks5Port` 等必要的客户端配置。因此，在全新的设备上导入简单分享链接会失败。

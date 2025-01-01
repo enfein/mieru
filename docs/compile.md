@@ -32,13 +32,13 @@ The `make` command will only generate the officially supported executables. If y
 
 ```sh
 # Compile the mita server software, which runs on a Linux system with Loongson processor
-env GOOS=linux GOARCH=loong64 CGO_ENABLED=0 go build -ldflags="-s -w" -o mita cmd/mita/mita.go
+env GOOS=linux GOARCH=loong64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o mita cmd/mita/mita.go
 
 # Compile the mieru client software, which runs on a FreeBSD system with x86_64 processor
-env GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o mieru cmd/mieru/mieru.go
+env GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o mieru cmd/mieru/mieru.go
 
 # Compile the mieru client software, which runs on an OpenWRT system with MIPS processor
-env GOOS=linux GOARCH=mips CGO_ENABLED=0 go build -ldflags="-s -w" -o mieru cmd/mieru/mieru.go
+env GOOS=linux GOARCH=mips CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o mieru cmd/mieru/mieru.go
 ```
 
 **Note: The `mita` server software may not run on operating systems other than Linux.**

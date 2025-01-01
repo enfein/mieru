@@ -151,3 +151,86 @@ Applications can choose any user and password in the `socks5Authentication` list
 **socks5 username and password authentication is not compatible with HTTP / HTTPS proxy.** Since HTTP / HTTPS proxy does not require username and password authentication, based on threat model, mieru prohibits the use of HTTP / HTTPS proxy in conjunction with socks5 username and password authentication.
 
 If you need to delete an existing HTTP / HTTPS proxy configuration, please run the `mieru delete http proxy` command. If you want to delete the socks5 username and password authentication settings, please run the `mieru delete socks5 authentication` command.
+
+## Sharing Client Settings
+
+Users can use commands `mieru export config` or `mieru export config simple` to generate URL links to share the client's configuration. These URL links can be imported into other clients using command `mieru import config <URL>`.
+
+### Standard Sharing Link
+
+Use command `mieru export config` to generate a standard sharing link. For example:
+
+```
+mieru://CpsBCgdkZWZhdWx0ElgKBWJhb3ppEg1tYW5saWFucGVuZmVuGkA0MGFiYWM0MGY1OWRhNTVkYWQ2YTk5ODMxYTUxMTY1MjJmYmM4MGUzODViYjFhYjE0ZGM1MmRiMzY4ZjczOGE0Gi8SCWxvY2FsaG9zdBoFCIo0EAIaDRACGgk5OTk5LTk5OTkaBQjZMhABGgUIoCYQASD4CioCCAQSB2RlZmF1bHQYnUYguAgwBTgA
+```
+
+A standard sharing link starts with `mieru://` and uses base64 encoding for the full client configuration. Users can use the standard sharing link to replicate the client configuration on a brand new device.
+
+### Simple Sharing Link
+
+Use command `mieru export config simple` to generate human-readable simple sharing links. For example:
+
+```
+mierus://baozi:manlianpenfen@1.2.3.4?mtu=1400&multiplexing=MULTIPLEXING_HIGH&port=6666&port=9998-9999&port=6489&port=4896&profile=default&protocol=TCP&protocol=TCP&protocol=UDP&protocol=UDP
+```
+
+The format of the simple sharing link is as follows:
+
+`mierus://username:password@server_address?parameter_list`
+
+A simple sharing link starts with `mierus://`, where `s` stands for `simple`.
+
+The username and password can only use uppercase letters `A-Z`, lowercase letters `a-z`, numbers `0-9`, underscores `_`, and hyphens `-`. Otherwise, a simple sharing link cannot be generated.
+
+There is only one server address in a simple sharing link. If the client's configuration contains multiple servers, multiple links will be generated.
+
+The supported parameters are:
+
+- `profile`
+- `mtu`
+- `multiplexing`
+- `port`
+- `protocol`
+
+Among them, `profile` must appear once, `mtu` and `multiplexing` can appear at most once, `port` and `protocol` can appear multiple times, and they must appear the same number of times, such that the `port` and `protocol` at the same position can be associated. Additionally, `port` can also be used to specify a port range.
+
+The simple sharing link above is equivalent to the following client configuration fragment:
+
+```json
+{
+    "profileName":  "default",
+    "user":  {
+        "name":  "baozi",
+        "password":  "manlianpenfen"
+    },
+    "servers":  [
+        {
+            "ipAddress":  "1.2.3.4",
+            "portBindings":  [
+                {
+                    "port":  6666,
+                    "protocol":  "TCP"
+                },
+                {
+                    "protocol":  "TCP",
+                    "portRange":  "9998-9999"
+                },
+                {
+                    "port":  6489,
+                    "protocol":  "UDP"
+                },
+                {
+                    "port":  4896,
+                    "protocol":  "UDP"
+                }
+            ]
+        }
+    ],
+    "mtu":  1400,
+    "multiplexing":  {
+        "level":  "MULTIPLEXING_HIGH"
+    }
+}
+```
+
+Note: a simple sharing link does not contain necessary client configurations such as `socks5Port`. Therefore, importing a simple sharing link on a brand new device will fail.

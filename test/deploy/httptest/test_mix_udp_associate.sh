@@ -52,8 +52,12 @@ sleep 1
 sleep 1
 ./mieru export config > client.url.txt
 rm ~/.config/mieru/client.conf.pb
+sleep 1
 echo "mieru client config before import:"
 ./mieru describe config
+sleep 1
+echo "mieru client config URL:"
+cat client.url.txt
 sleep 1
 ./mieru import config $(cat client.url.txt)
 echo "mieru client config after import:"

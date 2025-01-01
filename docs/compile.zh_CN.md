@@ -32,13 +32,13 @@
 
 ```sh
 # 编译可以在龙芯处理器 Linux 系统上运行的 mita 服务器软件
-env GOOS=linux GOARCH=loong64 CGO_ENABLED=0 go build -ldflags="-s -w" -o mita cmd/mita/mita.go
+env GOOS=linux GOARCH=loong64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o mita cmd/mita/mita.go
 
 # 编译可以在 x86_64 处理器 FreeBSD 系统上运行的 mieru 客户端软件
-env GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o mieru cmd/mieru/mieru.go
+env GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o mieru cmd/mieru/mieru.go
 
 # 编译可以在 MIPS 处理器 OpenWRT 系统上运行的 mieru 客户端软件
-env GOOS=linux GOARCH=mips CGO_ENABLED=0 go build -ldflags="-s -w" -o mieru cmd/mieru/mieru.go
+env GOOS=linux GOARCH=mips CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o mieru cmd/mieru/mieru.go
 ```
 
 **注意，`mita` 服务器软件可能无法在 Linux 之外的操作系统中运行。**
