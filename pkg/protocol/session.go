@@ -21,7 +21,6 @@ import (
 	"io"
 	"math"
 	"net"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -579,7 +578,8 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 
 func (s *Session) runOutputOnceStream() {
 	if s.outputHasErr.Load() {
-		runtime.Gosched()
+		// Can't run output.
+		time.Sleep(tickInterval)
 		return
 	}
 
@@ -605,7 +605,8 @@ func (s *Session) runOutputOnceStream() {
 
 func (s *Session) runOutputOncePacket() {
 	if s.outputHasErr.Load() {
-		runtime.Gosched()
+		// Can't run output.
+		time.Sleep(tickInterval)
 		return
 	}
 
