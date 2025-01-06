@@ -95,8 +95,10 @@ func (s *Server) handleRequest(ctx context.Context, req *Request, conn io.ReadWr
 			} else {
 				return fmt.Errorf(stderror.IPAddressNotFound, dst.FQDN)
 			}
+		} else {
+			log.Debugf("Resolved domain name %s to IP addresses: %v", dst.FQDN, ips)
+			dst.IP = ips[0]
 		}
-		dst.IP = ips[0]
 	}
 
 	// Return error if access local destination is not allowed.

@@ -182,6 +182,13 @@ func RegisterClientCommands() {
 		versionFunc,
 	)
 	RegisterCallback(
+		[]string{"", "describe", "build-info"},
+		func(s []string) error {
+			return unexpectedArgsError(s, 3)
+		},
+		buildInfoFunc,
+	)
+	RegisterCallback(
 		[]string{"", "check", "update"},
 		func(s []string) error {
 			return unexpectedArgsError(s, 3)
@@ -274,8 +281,11 @@ var clientHelpFunc = func(s []string) error {
 				help: []string{"Test mieru client connection to the Internet via proxy server."},
 			},
 			{
-				cmd:  "apply config <JSON_FILE>",
-				help: []string{"Apply client configuration from a file."},
+				cmd: "apply config <JSON_FILE>",
+				help: []string{
+					"Apply client configuration patch from a file.",
+					"It merges the patch with existing client configuration.",
+				},
 			},
 			{
 				cmd:  "describe config",
@@ -339,6 +349,10 @@ var clientHelpFunc = func(s []string) error {
 					"Run mieru client in foreground.",
 					"Use environment variable MIERU_CONFIG_JSON_FILE to load configuration.",
 				},
+			},
+			{
+				cmd:  "describe build-info",
+				help: []string{"Show mieru build info."},
 			},
 			{
 				cmd:  "get thread-dump",

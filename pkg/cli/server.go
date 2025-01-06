@@ -127,6 +127,13 @@ func RegisterServerCommands() {
 		versionFunc,
 	)
 	RegisterCallback(
+		[]string{"", "describe", "build-info"},
+		func(s []string) error {
+			return unexpectedArgsError(s, 3)
+		},
+		buildInfoFunc,
+	)
+	RegisterCallback(
 		[]string{"", "check", "update"},
 		func(s []string) error {
 			return unexpectedArgsError(s, 3)
@@ -219,8 +226,11 @@ var serverHelpFunc = func(s []string) error {
 				help: []string{"Check mita server proxy service status."},
 			},
 			{
-				cmd:  "apply config <JSON_FILE>",
-				help: []string{"Apply server configuration from a file."},
+				cmd: "apply config <JSON_FILE>",
+				help: []string{
+					"Apply server configuration patch from a file.",
+					"It merges the patch with existing server configuration.",
+				},
 			},
 			{
 				cmd:  "describe config",
@@ -254,6 +264,10 @@ var serverHelpFunc = func(s []string) error {
 					"Run mita server in foreground.",
 					"Use environment variable MITA_CONFIG_JSON_FILE to load configuration.",
 				},
+			},
+			{
+				cmd:  "describe build-info",
+				help: []string{"Show mita build info."},
 			},
 			{
 				cmd:  "get thread-dump",

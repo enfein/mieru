@@ -21,6 +21,13 @@
 # Load test library.
 source ./libtest.sh
 
+echo "mita build info:"
+./mita describe build-info
+sleep 1
+echo "mieru build info:"
+./mieru describe build-info
+sleep 1
+
 # Update mieru server with mixed config.
 ./mita apply config server_mix.json
 if [[ "$?" -ne 0 ]]; then

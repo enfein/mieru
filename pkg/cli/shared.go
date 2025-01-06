@@ -16,11 +16,23 @@
 package cli
 
 import (
+	"fmt"
+	"runtime/debug"
+
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/version"
 )
 
-var versionFunc = func(s []string) error {
+var versionFunc = func(_ []string) error {
 	log.Infof(version.AppVersion)
+	return nil
+}
+
+var buildInfoFunc = func(_ []string) error {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return fmt.Errorf("build info is unavailable")
+	}
+	log.Infof(info.String())
 	return nil
 }
