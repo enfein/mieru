@@ -40,6 +40,10 @@ message ServerConfig {
 
     // Egress proxies and rules.
     optional Egress egress = 6;
+
+    // How to resolve IP address when the client send a request
+    // with a domain name.
+    optional DNS dns = 7;
 }
 
 message ServerAdvancedSettings {
@@ -104,4 +108,9 @@ enum EgressAction {
 
     // Do not connect to the destination.
     REJECT = 2;
+}
+
+message DNS {
+    // Pick up IP address from IP version preference.
+    optional DualStack dualStack = 1;
 }

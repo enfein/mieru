@@ -96,8 +96,15 @@ func (s *Server) handleRequest(ctx context.Context, req *Request, conn io.ReadWr
 				return fmt.Errorf(stderror.IPAddressNotFound, dst.FQDN)
 			}
 		} else {
-			log.Debugf("Resolved domain name %s to IP addresses: %v", dst.FQDN, ips)
-			dst.IP = ips[0]
+			dst.IP = common.SelectIPFromList(ips, s.config.DualStackPreference)
+			if dst.IP == nil {
+				DNSResolveErrors.Add(1)
+				if err := sendReply(conn, networkUnreachable, nil); err != nil {
+					return fmt.Errorf("failed to send reply: %w", err)
+				}
+				return fmt.Errorf("resolved domain name %s to IP addresses %v, but no IP address satisfy DNS dual stack preference", dst.FQDN, ips)
+			}
+			log.Debugf("Resolved domain name %s to IP addresses %v, selected IP address %v", dst.FQDN, ips, dst.IP)
 		}
 	}
 

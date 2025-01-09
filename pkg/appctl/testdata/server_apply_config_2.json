@@ -52,5 +52,8 @@
                 "proxyName": "warp"
             }
         ]
+    },
+    "dns": {
+        "dualStack": "PREFER_IPv4"
     }
 }

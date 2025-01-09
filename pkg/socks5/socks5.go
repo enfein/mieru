@@ -46,6 +46,9 @@ type Config struct {
 	// Resolver can be provided to do custom name resolution.
 	Resolver apicommon.DNSResolver
 
+	// Strategy to select IP address from DNS response.
+	DualStackPreference common.DualStackPreference
+
 	// BindIP is used for bind or udp associate
 	BindIP net.IP
 

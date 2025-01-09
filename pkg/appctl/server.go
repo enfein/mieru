@@ -133,8 +133,9 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 		AuthOpts: socks5.Auth{
 			ClientSideAuthentication: true,
 		},
-		EgressController: egress.NewSocks5Controller(config.GetEgress()),
-		HandshakeTimeout: 10 * time.Second,
+		DualStackPreference: common.DualStackPreference(config.GetDns().GetDualStack()),
+		EgressController:    egress.NewSocks5Controller(config.GetEgress()),
+		HandshakeTimeout:    10 * time.Second,
 	}
 	socks5Server, err := socks5.New(socks5Config)
 	if err != nil {
@@ -759,6 +760,12 @@ func mergeServerConfig(dst, src *pb.ServerConfig) error {
 	} else {
 		egress = dst.GetEgress()
 	}
+	var dns *pb.DNS
+	if src.Dns != nil {
+		dns = src.GetDns()
+	} else {
+		dns = dst.GetDns()
+	}
 
 	proto.Reset(dst)
 	dst.PortBindings = portBindings
@@ -767,6 +774,7 @@ func mergeServerConfig(dst, src *pb.ServerConfig) error {
 	dst.LoggingLevel = &loggingLevel
 	dst.Mtu = proto.Int32(mtu)
 	dst.Egress = egress
+	dst.Dns = dns
 	return nil
 }
 

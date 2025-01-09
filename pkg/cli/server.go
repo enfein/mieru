@@ -442,8 +442,9 @@ var serverRunFunc = func(s []string) error {
 			AuthOpts: socks5.Auth{
 				ClientSideAuthentication: true,
 			},
-			EgressController: egress.NewSocks5Controller(config.GetEgress()),
-			HandshakeTimeout: 10 * time.Second,
+			DualStackPreference: common.DualStackPreference(config.GetDns().GetDualStack()),
+			EgressController:    egress.NewSocks5Controller(config.GetEgress()),
+			HandshakeTimeout:    10 * time.Second,
 		}
 		socks5Server, err := socks5.New(socks5Config)
 		if err != nil {

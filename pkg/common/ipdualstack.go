@@ -23,6 +23,19 @@ import (
 	"strings"
 )
 
+// DualStackPreference controls the strategy to pick one IP address
+// from a list of IPs.
+type DualStackPreference int32
+
+// The values below must match with file pkg/appctl/proto/base.proto.
+const (
+	ANY_IP_VERSION DualStackPreference = 0
+	PREFER_IPv4    DualStackPreference = 1
+	PREFER_IPv6    DualStackPreference = 2
+	ONLY_IPv4      DualStackPreference = 3
+	ONLY_IPv6      DualStackPreference = 4
+)
+
 // IsIPDualStack returns true if an IPv6 socket is able to send and receive
 // both IPv4 and IPv6 packets.
 //
@@ -73,6 +86,46 @@ func MaybeDecorateIPv6(addr string) string {
 		return "[" + addr + "]"
 	}
 	return addr
+}
+
+// SelectIPFromList selects an IP address from a list of IP addresses
+// based on the given DualStackPreference.
+func SelectIPFromList(ips []net.IP, strategy DualStackPreference) net.IP {
+	if len(ips) == 0 {
+		return nil
+	}
+
+	var ipv4, ipv6 net.IP
+	for _, ip := range ips {
+		if ip.To4() != nil {
+			if ipv4 == nil {
+				ipv4 = ip
+			}
+		} else {
+			if ipv6 == nil {
+				ipv6 = ip
+			}
+		}
+	}
+
+	switch strategy {
+	case PREFER_IPv4:
+		if ipv4 != nil {
+			return ipv4
+		}
+		return ipv6
+	case PREFER_IPv6:
+		if ipv6 != nil {
+			return ipv6
+		}
+		return ipv4
+	case ONLY_IPv4:
+		return ipv4
+	case ONLY_IPv6:
+		return ipv6
+	default:
+		return ips[0]
+	}
 }
 
 // isIPv6 returns true if the given network address is IPv6.
