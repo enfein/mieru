@@ -29,6 +29,6 @@
     "loggingLevel": "INFO",
     "mtu": 1400,
     "dns": {
-        "dualStack": "PREFER_IPv6"
+        "dualStack": "PREFER_IPv4"
     }
 }
