@@ -52,7 +52,7 @@ enum LoggingLevel {
 }
 
 enum DualStack {
-    ANY_IP_VERSION = 0;
+    USE_FIRST_IP = 0;
     PREFER_IPv4 = 1;
     PREFER_IPv6 = 2;
     ONLY_IPv4 = 3;

@@ -28,7 +28,7 @@ var versionFunc = func(_ []string) error {
 	return nil
 }
 
-var buildInfoFunc = func(_ []string) error {
+var describeBuildFunc = func(_ []string) error {
 	info, ok := debug.ReadBuildInfo()
 	if !ok {
 		return fmt.Errorf("build info is unavailable")

@@ -127,11 +127,11 @@ func RegisterServerCommands() {
 		versionFunc,
 	)
 	RegisterCallback(
-		[]string{"", "describe", "build-info"},
+		[]string{"", "describe", "build"},
 		func(s []string) error {
 			return unexpectedArgsError(s, 3)
 		},
-		buildInfoFunc,
+		describeBuildFunc,
 	)
 	RegisterCallback(
 		[]string{"", "check", "update"},
@@ -266,7 +266,7 @@ var serverHelpFunc = func(s []string) error {
 				},
 			},
 			{
-				cmd:  "describe build-info",
+				cmd:  "describe build",
 				help: []string{"Show mita build info."},
 			},
 			{

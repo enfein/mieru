@@ -8,32 +8,32 @@ Before installation and configuration, connect to the server via SSH and then ex
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.10.0/mita_3.10.0_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.11.0/mita_3.11.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.10.0/mita_3.10.0_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.11.0/mita_3.11.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.10.0/mita-3.10.0-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.11.0/mita-3.11.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.10.0/mita-3.10.0-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.11.0/mita-3.11.0-1.aarch64.rpm
 ```
 
 ## Install mita package
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_3.10.0_amd64.deb
+sudo dpkg -i mita_3.11.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_3.10.0_arm64.deb
+sudo dpkg -i mita_3.11.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-3.10.0-1.x86_64.rpm
+sudo rpm -Uvh --force mita-3.11.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-3.10.0-1.aarch64.rpm
+sudo rpm -Uvh --force mita-3.11.0-1.aarch64.rpm
 ```
 
 Those instructions can also be used to upgrade the version of mita software package.
@@ -73,7 +73,9 @@ Users should call
 mita apply config <FILE>
 ```
 
-to modify the proxy server settings. `<FILE>` is a JSON formatted configuration file. Below is an example of the server configuration file.
+to modify the proxy server settings. `<FILE>` is a JSON formatted configuration file. This configuration file does not need to specify the full proxy server settings. When you run command `mita apply config <FILE>`, the contents of the file will be merged into any existing proxy server settings.
+
+Below is an example of the server configuration file.
 
 ```js
 {
@@ -106,7 +108,7 @@ to modify the proxy server settings. `<FILE>` is a JSON formatted configuration 
 2. The `portBindings` -> `protocol` property can be set to `TCP` or `UDP`.
 3. Fill in the `users` -> `name` property with the user name.
 4. Fill in the `users` -> `password` property with the user's password.
-5. The `mtu` property is the maximum transport layer payload size when using the UDP proxy protocol. The default value is 1400. The minimum value is 1280.
+5. [Optional] The `mtu` property is the maximum transport layer payload size when using the UDP proxy protocol. The default value is 1400. The minimum value is 1280.
 
 In addition to this, mita can listen to several different ports. We recommend using multiple ports in both server and client configurations.
 
@@ -182,28 +184,6 @@ Below is an example to configure a proxy chain.
 
 ```js
 {
-    "portBindings": [
-        {
-            "portRange": "2012-2022",
-            "protocol": "TCP"
-        },
-        {
-            "port": 2027,
-            "protocol": "TCP"
-        }
-    ],
-    "users": [
-        {
-            "name": "ducaiguozei",
-            "password": "xijinping"
-        },
-        {
-            "name": "meiyougongchandang",
-            "password": "caiyouxinzhongguo"
-        }
-    ],
-    "loggingLevel": "INFO",
-    "mtu": 1400,
     "egress": {
         "proxies": [
             {
@@ -241,6 +221,26 @@ Tor browser -> mieru client -> GFW -> mita server -> Tor network -> target websi
 ```
 
 For information on how to configure nested proxy on a Tor browser, please refer to the [Security Guide](./security.md).
+
+### DNS Policy in IPv4 / IPv6 Dual-Stack Network
+
+When a proxy client requests a target website using a domain name instead of an IP address, the proxy server needs to initiate a DNS request. If the proxy server is in an IPv4 / IPv6 dual-stack network, you can adjust the DNS policy using the following configuration:
+
+```js
+{
+    "dns": {
+        "dualStack": "USE_FIRST_IP"
+    }
+}
+```
+
+The `dns` -> `dualStack` attribute supports the following values:
+
+1. `USE_FIRST_IP`: Always use the first IP address returned by the DNS server. This is the default policy.
+2. `PREFER_IPv4`: Prefer to use the first IPv4 address returned by the DNS server. If there is no IPv4 address, use the first IPv6 address.
+3. `PREFER_IPv6`: Prefer to use the first IPv6 address returned by the DNS server. If there is no IPv6 address, use the first IPv4 address.
+4. `ONLY_IPv4`: Force to use the first IPv4 address returned by the DNS server. If there is no IPv4 address, the connection fails.
+5. `ONLY_IPv6`: Force to use the first IPv6 address returned by the DNS server. If there is no IPv6 address, the connection fails.
 
 ### Limiting User Traffic
 

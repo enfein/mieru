@@ -106,7 +106,7 @@ func TestSelectIPFromList(t *testing.T) {
 		{
 			name:     "ipv4 and ipv6, any IP version",
 			ips:      []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("127.0.0.2"), net.ParseIP("::1")},
-			strategy: ANY_IP_VERSION,
+			strategy: USE_FIRST_IP,
 			want:     net.ParseIP("127.0.0.1"),
 		},
 		{
@@ -136,7 +136,7 @@ func TestSelectIPFromList(t *testing.T) {
 		{
 			name:     "ipv6 and ipv4, any IP version",
 			ips:      []net.IP{net.ParseIP("::1"), net.ParseIP("::2"), net.ParseIP("127.0.0.1")},
-			strategy: ANY_IP_VERSION,
+			strategy: USE_FIRST_IP,
 			want:     net.ParseIP("::1"),
 		},
 		{

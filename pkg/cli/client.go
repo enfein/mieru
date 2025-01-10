@@ -182,11 +182,11 @@ func RegisterClientCommands() {
 		versionFunc,
 	)
 	RegisterCallback(
-		[]string{"", "describe", "build-info"},
+		[]string{"", "describe", "build"},
 		func(s []string) error {
 			return unexpectedArgsError(s, 3)
 		},
-		buildInfoFunc,
+		describeBuildFunc,
 	)
 	RegisterCallback(
 		[]string{"", "check", "update"},
@@ -351,7 +351,7 @@ var clientHelpFunc = func(s []string) error {
 				},
 			},
 			{
-				cmd:  "describe build-info",
+				cmd:  "describe build",
 				help: []string{"Show mieru build info."},
 			},
 			{

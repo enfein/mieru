@@ -8,32 +8,32 @@
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.10.0/mita_3.10.0_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.11.0/mita_3.11.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.10.0/mita_3.10.0_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.11.0/mita_3.11.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.10.0/mita-3.10.0-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.11.0/mita-3.11.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.10.0/mita-3.10.0-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.11.0/mita-3.11.0-1.aarch64.rpm
 ```
 
 ## 安装 mita 软件包
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_3.10.0_amd64.deb
+sudo dpkg -i mita_3.11.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_3.10.0_arm64.deb
+sudo dpkg -i mita_3.11.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-3.10.0-1.x86_64.rpm
+sudo rpm -Uvh --force mita-3.11.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-3.10.0-1.aarch64.rpm
+sudo rpm -Uvh --force mita-3.11.0-1.aarch64.rpm
 ```
 
 上述指令也可以用来升级 mita 软件包的版本。
@@ -73,7 +73,9 @@ mieru 代理支持 TCP 和 UDP 两种不同的传输协议。要了解协议之�
 mita apply config <FILE>
 ```
 
-指令来修改代理服务器的设置，这里的 `<FILE>` 是一个 JSON 格式的配置文件。下面是服务器配置文件的一个例子。
+指令来修改代理服务器的设置，这里的 `<FILE>` 是一个 JSON 格式的配置文件。该配置文件不需要指定完整的代理服务器设置。运行指令 `mita apply config <FILE>` 时，文件内容会合并到任何已有的代理服务器设置。
+
+下面是服务器配置文件的一个例子。
 
 ```js
 {
@@ -106,7 +108,7 @@ mita apply config <FILE>
 2. `portBindings` -> `protocol` 属性可以使用 `TCP` 或者 `UDP`。
 3. 在 `users` -> `name` 属性中填写用户名。
 4. 在 `users` -> `password` 属性中填写该用户的密码。
-5. `mtu` 属性是使用 UDP 代理协议时，传输层最大的载荷大小。默认值是 1400，最小值是 1280。
+5. 【可选】`mtu` 属性是使用 UDP 代理协议时，传输层最大的载荷大小。默认值是 1400，最小值是 1280。
 
 除此之外，mita 可以监听多个不同的端口。我们建议在服务器和客户端配置中使用多个端口。
 
@@ -173,37 +175,15 @@ sudo ./tools/enable_tcp_bbr.py
 出站代理功能允许 mieru 与其他代理工具结合构成链式代理。链式代理的网络拓扑结构的一个例子如下图所示：
 
 ```
-mieru 客户端 -> GFW -> mita 服务器 -> cloudflare 代理客户端 -> cloudflare CDN -> 目标网址
+mieru 客户端 -> GFW -> mita 服务器 -> cloudflare 代理客户端 -> cloudflare CDN -> 目标网站
 ```
 
-通过链式代理，目标网址看到的 IP 地址是 cloudflare CDN 的地址，而不是 mita 服务器的地址。
+通过链式代理，目标网站看到的 IP 地址是 cloudflare CDN 的地址，而不是 mita 服务器的地址。
 
 下面是配置链式代理的一个例子。
 
 ```js
 {
-    "portBindings": [
-        {
-            "portRange": "2012-2022",
-            "protocol": "TCP"
-        },
-        {
-            "port": 2027,
-            "protocol": "TCP"
-        }
-    ],
-    "users": [
-        {
-            "name": "ducaiguozei",
-            "password": "xijinping"
-        },
-        {
-            "name": "meiyougongchandang",
-            "password": "caiyouxinzhongguo"
-        }
-    ],
-    "loggingLevel": "INFO",
-    "mtu": 1400,
     "egress": {
         "proxies": [
             {
@@ -237,10 +217,30 @@ mieru 客户端 -> GFW -> mita 服务器 -> cloudflare 代理客户端 -> cloudf
 注意，链式代理和嵌套代理不同。嵌套代理的网络拓扑结构的一个例子如下图所示：
 
 ```
-Tor 浏览器 -> mieru 客户端 -> GFW -> mita 服务器 -> Tor 网络 -> 目标网址
+Tor 浏览器 -> mieru 客户端 -> GFW -> mita 服务器 -> Tor 网络 -> 目标网站
 ```
 
 关于如何在 Tor 浏览器上配置嵌套代理，请参见[翻墙安全指南](./security.zh_CN.md)。
+
+### IPv4 / IPv6 双栈网络中的 DNS 策略
+
+当代理客户端请求的目标网站是域名，而不是 IP 地址时，代理服务器需要发起 DNS 请求。如果代理服务器处于 IPv4 / IPv6 双栈网络中，可以使用下面的配置调整 DNS 策略：
+
+```js
+{
+    "dns": {
+        "dualStack": "USE_FIRST_IP"
+    }
+}
+```
+
+`dns` -> `dualStack` 属性支持的值包括：
+
+1. `USE_FIRST_IP`：永远使用 DNS 服务器返回的第一个 IP 地址。这是默认策略。
+2. `PREFER_IPv4`：优先使用 DNS 服务器返回的第一个 IPv4 地址。如果没有 IPv4 地址，则使用第一个 IPv6 地址。
+3. `PREFER_IPv6`：优先使用 DNS 服务器返回的第一个 IPv6 地址。如果没有 IPv6 地址，则使用第一个 IPv4 地址。
+4. `ONLY_IPv4`：强制使用 DNS 服务器返回的第一个 IPv4 地址。如果没有 IPv4 地址则连接失败。
+5. `ONLY_IPv6`：强制使用 DNS 服务器返回的第一个 IPv6 地址。如果没有 IPv6 地址则连接失败。
 
 ### 限制用户流量
 

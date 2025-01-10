@@ -22,10 +22,10 @@
 source ./libtest.sh
 
 echo "mita build info:"
-./mita describe build-info
+./mita describe build
 sleep 1
 echo "mieru build info:"
-./mieru describe build-info
+./mieru describe build
 sleep 1
 
 # Update mieru server with mixed config.

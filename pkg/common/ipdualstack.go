@@ -29,11 +29,11 @@ type DualStackPreference int32
 
 // The values below must match with file pkg/appctl/proto/base.proto.
 const (
-	ANY_IP_VERSION DualStackPreference = 0
-	PREFER_IPv4    DualStackPreference = 1
-	PREFER_IPv6    DualStackPreference = 2
-	ONLY_IPv4      DualStackPreference = 3
-	ONLY_IPv6      DualStackPreference = 4
+	USE_FIRST_IP DualStackPreference = 0
+	PREFER_IPv4  DualStackPreference = 1
+	PREFER_IPv6  DualStackPreference = 2
+	ONLY_IPv4    DualStackPreference = 3
+	ONLY_IPv6    DualStackPreference = 4
 )
 
 // IsIPDualStack returns true if an IPv6 socket is able to send and receive

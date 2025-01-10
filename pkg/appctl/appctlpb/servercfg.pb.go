@@ -550,7 +550,7 @@ func (x *DNS) GetDualStack() DualStack {
 	if x != nil && x.DualStack != nil {
 		return *x.DualStack
 	}
-	return DualStack_ANY_IP_VERSION
+	return DualStack_USE_FIRST_IP
 }
 
 var File_servercfg_proto protoreflect.FileDescriptor
