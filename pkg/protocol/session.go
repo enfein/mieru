@@ -584,11 +584,10 @@ func (s *Session) runOutputOnceStream() {
 	}
 
 	s.oLock.Lock()
-	defer s.oLock.Unlock()
-
 	for {
 		seg, ok := s.sendQueue.DeleteMin()
 		if !ok {
+			s.oLock.Unlock()
 			break
 		}
 		if err := s.output(seg, nil); err != nil {
@@ -597,6 +596,7 @@ func (s *Session) runOutputOnceStream() {
 			if s.outputHasErr.CompareAndSwap(false, true) {
 				close(s.outputErr)
 			}
+			s.oLock.Unlock() // s.oLock can be acquired by s.closeWithError().
 			s.closeWithError(err)
 			break
 		}
