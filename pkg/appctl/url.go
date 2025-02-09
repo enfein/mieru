@@ -31,7 +31,7 @@ import (
 )
 
 var (
-	safeURLRegExp = regexp.MustCompile(`^[0-9A-Za-z_-]+$`)
+	safeURLRegExp = regexp.MustCompile(`^[0-9A-Za-z_!\$&'\(\)\*\+,;=\.\~-]+$`)
 )
 
 // ClientConfigToURL creates a URL to share the client configuration.
