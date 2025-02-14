@@ -15,9 +15,17 @@
 
 package metrics
 
-import "testing"
+import (
+	"encoding/json"
+	"fmt"
+	"testing"
+)
 
 func TestMarshalJSON(t *testing.T) {
+	RegisterMetric(fmt.Sprintf(UserMetricGroupFormat, "red"), UserMetricDownloadBytes, COUNTER_TIME_SERIES)
+	RegisterMetric(fmt.Sprintf(UserMetricGroupFormat, "red"), UserMetricUploadBytes, COUNTER_TIME_SERIES)
+	RegisterMetric(fmt.Sprintf(UserMetricGroupFormat, "blue"), UserMetricDownloadBytes, COUNTER_TIME_SERIES)
+	RegisterMetric(fmt.Sprintf(UserMetricGroupFormat, "blue"), UserMetricUploadBytes, COUNTER_TIME_SERIES)
 	list := MetricGroupList{}
 	metricMap.Range(func(k, v any) bool {
 		group := v.(*MetricGroup)
@@ -32,5 +40,8 @@ func TestMarshalJSON(t *testing.T) {
 	}
 	if len(s) == 0 {
 		t.Errorf("MarshalJSON() returns empty response")
+	}
+	if !json.Valid(s) {
+		t.Errorf("MarshalJSON() returns invalid JSON: %s", string(s))
 	}
 }

@@ -133,11 +133,7 @@ func (l MetricGroupList) Swap(i, j int) {
 func (l MetricGroupList) MarshalJSON() ([]byte, error) {
 	sort.Sort(l)
 
-	var sb strings.Builder
-	sb.WriteString("{")
-	for i := 0; i < l.Len(); i++ {
-		g := l[i]
-		fmt.Fprintf(&sb, `"%s": {`, g.name)
+	marshalGroup := func(sb *strings.Builder, g *MetricGroup) {
 		metrics := make(map[string]int64)
 		names := make([]string, 0)
 		g.metrics.Range(func(k, v any) bool {
@@ -149,14 +145,48 @@ func (l MetricGroupList) MarshalJSON() ([]byte, error) {
 		sort.Strings(names)
 		for j := 0; j < len(names); j++ {
 			name := names[j]
-			fmt.Fprintf(&sb, `"%s": %d`, name, metrics[name])
+			fmt.Fprintf(sb, `"%s": %d`, name, metrics[name])
 			if j != len(names)-1 {
-				sb.WriteString(", ")
+				sb.WriteString(",")
 			}
 		}
-		sb.WriteString("}") // end of metric group
-		if i != l.Len()-1 {
-			sb.WriteString(", ")
+	}
+
+	processingUserMetrics := false
+	var sb strings.Builder
+	sb.WriteString("{") // begin of metric group list
+	for i := 0; i < l.Len(); i++ {
+		g := l[i]
+		if !strings.HasPrefix(g.name, userMetricGroupPrefix) {
+			// non user metrics
+			fmt.Fprintf(&sb, `"%s": {`, g.name)
+			marshalGroup(&sb, g)
+			sb.WriteString("}")
+			if i != l.Len()-1 {
+				sb.WriteString(",")
+			}
+		} else {
+			// user metrics
+			if !processingUserMetrics {
+				processingUserMetrics = true
+				sb.WriteString(`"users": {`) // begin of user metrics section
+			}
+			userName := strings.TrimPrefix(g.name, userMetricGroupPrefix)
+			fmt.Fprintf(&sb, `"%s": {`, userName)
+			marshalGroup(&sb, g)
+			sb.WriteString("}")
+			if i != l.Len()-1 {
+				nextGroup := l[i+1]
+				if strings.HasPrefix(nextGroup.name, userMetricGroupPrefix) {
+					sb.WriteString(",")
+				} else {
+					processingUserMetrics = false
+					sb.WriteString("},") // end of user metrics section
+				}
+			} else {
+				processingUserMetrics = false
+				sb.WriteString("}") // end of user metrics section
+			}
 		}
 	}
 	sb.WriteString("}") // end of metric group list

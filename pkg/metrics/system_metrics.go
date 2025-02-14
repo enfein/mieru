@@ -16,8 +16,11 @@
 package metrics
 
 const (
-	// MetricGroup name format for each user.
-	UserMetricGroupFormat = "user - %s"
+	userMetricGroupPrefix = "user - "
+)
+
+const (
+	UserMetricGroupFormat = userMetricGroupPrefix + "%s"
 
 	UserMetricUploadBytes   = "UploadBytes"
 	UserMetricDownloadBytes = "DownloadBytes"
