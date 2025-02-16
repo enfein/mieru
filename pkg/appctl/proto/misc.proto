@@ -40,6 +40,11 @@ message ThreadDump {
 }
 
 message MemoryStatistics {
-    // JSON dump of memory statistics.
-    optional string json = 1;
+    reserved 1;
+
+    optional uint64 heapBytes = 2;
+    optional uint64 heapObjects = 3;
+    optional uint64 maxHeapBytes = 4;
+    optional uint64 targetHeapBytes = 5;
+    optional uint64 stackBytes = 6;
 }

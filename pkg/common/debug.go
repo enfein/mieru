@@ -1,7 +1,6 @@
 package common
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"runtime"
@@ -94,30 +93,12 @@ func GetHeapProfile(filePath string) error {
 	return nil
 }
 
-// GetMemoryStats returns JSON formatted memory statistics.
-func GetMemoryStats() string {
+// GetMemoryStats runs GC and returns memory statistics.
+func GetMemoryStats() *runtime.MemStats {
 	debugMutex.Lock()
 	defer debugMutex.Unlock()
 	runtime.GC()
 	ms := &runtime.MemStats{}
 	runtime.ReadMemStats(ms)
-	type stats struct {
-		HeapBytes       uint64 `json:"heapBytes"`
-		HeapObjects     uint64 `json:"heapObjects"`
-		MaxHeapBytes    uint64 `json:"maxHeapBytes"`
-		TargetHeapBytes uint64 `json:"targetHeapBytes"`
-		StackBytes      uint64 `json:"stackBytes"`
-	}
-	s := stats{
-		HeapBytes:       ms.HeapAlloc,
-		HeapObjects:     ms.HeapObjects,
-		MaxHeapBytes:    ms.HeapSys,
-		TargetHeapBytes: ms.NextGC,
-		StackBytes:      ms.StackSys,
-	}
-	b, err := json.MarshalIndent(&s, "", "    ")
-	if err != nil {
-		panic(err)
-	}
-	return string(b)
+	return ms
 }

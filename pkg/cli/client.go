@@ -995,7 +995,11 @@ var clientGetMemoryStatisticsFunc = func(s []string) error {
 	if err != nil {
 		return fmt.Errorf(stderror.GetMemoryStatisticsFailedErr, err)
 	}
-	log.Infof("%s", memStats.GetJson())
+	json, err := common.MarshalJSON(memStats)
+	if err != nil {
+		return fmt.Errorf(stderror.GetMemoryStatisticsFailedErr, err)
+	}
+	log.Infof("%s", string(json))
 	return nil
 }
 

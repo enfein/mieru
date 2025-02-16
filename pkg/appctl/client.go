@@ -160,7 +160,7 @@ func (c *clientLifecycleService) GetHeapProfile(ctx context.Context, req *pb.Pro
 }
 
 func (c *clientLifecycleService) GetMemoryStatistics(ctx context.Context, req *pb.Empty) (*pb.MemoryStatistics, error) {
-	return &pb.MemoryStatistics{Json: proto.String(common.GetMemoryStats())}, nil
+	return getMemoryStatistics()
 }
 
 // NewClientLifecycleService creates a new ClientLifecycleService RPC server.
