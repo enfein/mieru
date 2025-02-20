@@ -735,13 +735,11 @@ var serverGetConnectionsFunc = func(s []string) error {
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
-	info, err := client.GetSessionInfo(timedctx, &appctlpb.Empty{})
+	info, err := client.GetSessionInfoList(timedctx, &appctlpb.Empty{})
 	if err != nil {
 		return fmt.Errorf(stderror.GetConnectionsFailedErr, err)
 	}
-	for _, line := range info.GetTable() {
-		log.Infof("%s", line)
-	}
+	printSessionInfoList(info)
 	return nil
 }
 

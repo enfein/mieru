@@ -33,6 +33,8 @@ import (
 	"github.com/enfein/mieru/v3/pkg/mathext"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 	"github.com/enfein/mieru/v3/pkg/stderror"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
@@ -358,29 +360,43 @@ func (s *Session) SetWriteDeadline(t time.Time) error {
 	return nil
 }
 
-// ToSessionInfo creates related SessionInfo structure.
-func (s *Session) ToSessionInfo() SessionInfo {
-	info := SessionInfo{
-		ID:         fmt.Sprintf("%d", s.id),
-		LocalAddr:  "-",
-		RemoteAddr: "-",
-		State:      s.state.String(),
-		RecvQBuf:   fmt.Sprintf("%d+%d", s.recvQueue.Len(), s.recvBuf.Len()),
-		SendQBuf:   fmt.Sprintf("%d+%d", s.sendQueue.Len(), s.sendBuf.Len()),
-		LastSend:   fmt.Sprintf("%v (%d)", time.Since(s.lastTXTime).Truncate(time.Second), s.nextSend-1),
+// ToSessionInfo creates related SessionInfo protobuf object.
+func (s *Session) ToSessionInfo() *appctlpb.SessionInfo {
+	info := &appctlpb.SessionInfo{
+		Id:         proto.String(fmt.Sprintf("%d", s.id)),
+		LocalAddr:  proto.String("-"),
+		RemoteAddr: proto.String("-"),
+		State:      proto.String(s.state.String()),
+		RecvQ:      proto.Uint32(uint32(s.recvQueue.Len())),
+		RecvBuf:    proto.Uint32(uint32(s.recvBuf.Len())),
+		SendQ:      proto.Uint32(uint32(s.sendQueue.Len())),
+		SendBuf:    proto.Uint32(uint32(s.sendBuf.Len())),
 	}
 	if s.conn != nil {
-		info.LocalAddr = s.conn.LocalAddr().String()
-		info.RemoteAddr = s.conn.RemoteAddr().String()
+		info.LocalAddr = proto.String(s.conn.LocalAddr().String())
+		info.RemoteAddr = proto.String(s.conn.RemoteAddr().String())
 		if _, ok := s.conn.(*StreamUnderlay); ok {
-			info.Protocol = "TCP"
-			info.LastRecv = fmt.Sprintf("%v", time.Since(s.lastRXTime).Truncate(time.Second)) // TCP nextRecv is not used
+			info.Protocol = proto.String("TCP")
+			info.LastRecvTime = &timestamppb.Timestamp{
+				Seconds: s.lastRXTime.Unix(),
+				Nanos:   int32(s.lastRXTime.Nanosecond()),
+			}
+			// TCP info.LastRecvSeq is not available.
 		} else if _, ok := s.conn.(*PacketUnderlay); ok {
-			info.Protocol = "UDP"
-			info.LastRecv = fmt.Sprintf("%v (%d)", time.Since(s.lastRXTime).Truncate(time.Second), s.nextRecv-1)
+			info.Protocol = proto.String("UDP")
+			info.LastRecvTime = &timestamppb.Timestamp{
+				Seconds: s.lastRXTime.Unix(),
+				Nanos:   int32(s.lastRXTime.Nanosecond()),
+			}
+			info.LastRecvSeq = proto.Uint32(uint32(mathext.Max(0, int(s.nextRecv)-1)))
 		} else {
-			info.Protocol = "UNKNOWN"
+			info.Protocol = proto.String("UNKNOWN")
 		}
+		info.LastSendTime = &timestamppb.Timestamp{
+			Seconds: s.lastTXTime.Unix(),
+			Nanos:   int32(s.lastTXTime.Nanosecond()),
+		}
+		info.LastSendSeq = proto.Uint32(uint32(mathext.Max(0, int(s.nextSend)-1)))
 	}
 	return info
 }
@@ -1176,17 +1192,4 @@ func (s *Session) checkQuota(userName string) (ok bool, err error) {
 		}
 	}
 	return true, nil
-}
-
-// SessionInfo provides a string representation of a Session.
-type SessionInfo struct {
-	ID         string
-	Protocol   string
-	LocalAddr  string
-	RemoteAddr string
-	State      string
-	RecvQBuf   string
-	SendQBuf   string
-	LastRecv   string
-	LastSend   string
 }

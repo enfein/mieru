@@ -22,6 +22,7 @@ import (
 	"net"
 	"sync"
 
+	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 	"github.com/enfein/mieru/v3/pkg/stderror"
@@ -173,8 +174,8 @@ func (b *baseUnderlay) SessionCount() int {
 	return n
 }
 
-func (b *baseUnderlay) Sessions() []SessionInfo {
-	res := make([]SessionInfo, 0)
+func (b *baseUnderlay) SessionInfos() []*appctlpb.SessionInfo {
+	res := make([]*appctlpb.SessionInfo, 0)
 	b.sessionMap.Range(func(k, v any) bool {
 		s := v.(*Session)
 		res = append(res, s.ToSessionInfo())

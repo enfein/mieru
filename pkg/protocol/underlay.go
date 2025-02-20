@@ -19,6 +19,7 @@ import (
 	"context"
 	"net"
 
+	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 )
@@ -69,7 +70,7 @@ type Underlay interface {
 	SessionCount() int
 
 	// Returns detailed information of all the sessions.
-	Sessions() []SessionInfo
+	SessionInfos() []*appctlpb.SessionInfo
 
 	// Run event loop.
 	// The underlay needs to be closed when this returns.

@@ -17,6 +17,8 @@ syntax = "proto3";
 
 package appctl;
 
+import "google/protobuf/timestamp.proto";
+
 option go_package = "github.com/enfein/mieru/v3/pkg/appctl/appctlpb";
 
 message Metrics {
@@ -30,8 +32,23 @@ message ProfileSavePath {
 }
 
 message SessionInfo {
-    // Table of sessions.
-    repeated string table = 1;
+    optional string id = 1;
+    optional string protocol = 2;
+    optional string localAddr = 3;
+    optional string remoteAddr = 4;
+    optional string state = 5;
+    optional uint32 recvQ = 6;
+    optional uint32 recvBuf = 7;
+    optional uint32 sendQ = 8;
+    optional uint32 sendBuf = 9;
+    optional google.protobuf.Timestamp lastRecvTime = 10;
+    optional uint32 lastRecvSeq = 11;
+    optional google.protobuf.Timestamp lastSendTime = 12;
+    optional uint32 lastSendSeq = 13;
+}
+
+message SessionInfoList {
+    repeated SessionInfo items = 1;
 }
 
 message ThreadDump {

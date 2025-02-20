@@ -933,13 +933,11 @@ var clientGetConnectionsFunc = func(s []string) error {
 		return err
 	}
 
-	info, err := client.GetSessionInfo(ctx, &appctlpb.Empty{})
+	info, err := client.GetSessionInfoList(ctx, &appctlpb.Empty{})
 	if err != nil {
 		return fmt.Errorf(stderror.GetConnectionsFailedErr, err)
 	}
-	for _, line := range info.GetTable() {
-		log.Infof("%s", line)
-	}
+	printSessionInfoList(info)
 	return nil
 }
 

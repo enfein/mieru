@@ -34,7 +34,7 @@ service ClientLifecycleService {
     rpc GetMetrics(Empty) returns (Metrics);
 
     // Get client session information.
-    rpc GetSessionInfo(Empty) returns (SessionInfo);
+    rpc GetSessionInfoList(Empty) returns (SessionInfoList);
 
     // Generate a thread dump of client daemon.
     rpc GetThreadDump(Empty) returns (ThreadDump);
@@ -72,7 +72,7 @@ service ServerLifecycleService {
     rpc GetMetrics(Empty) returns (Metrics);
 
     // Get server session information.
-    rpc GetSessionInfo(Empty) returns (SessionInfo);
+    rpc GetSessionInfoList(Empty) returns (SessionInfoList);
 
     // Generate a thread dump of server daemon.
     rpc GetThreadDump(Empty) returns (ThreadDump);

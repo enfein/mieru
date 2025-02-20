@@ -252,12 +252,12 @@ func (s *serverLifecycleService) GetMetrics(ctx context.Context, req *pb.Empty) 
 	return &pb.Metrics{Json: proto.String(string(b))}, nil
 }
 
-func (s *serverLifecycleService) GetSessionInfo(context.Context, *pb.Empty) (*pb.SessionInfo, error) {
+func (s *serverLifecycleService) GetSessionInfoList(context.Context, *pb.Empty) (*pb.SessionInfoList, error) {
 	mux := serverMuxRef.Load()
 	if mux == nil {
-		return &pb.SessionInfo{}, fmt.Errorf("server multiplexier is unavailable")
+		return &pb.SessionInfoList{}, fmt.Errorf("server multiplexier is unavailable")
 	}
-	return &pb.SessionInfo{Table: mux.ExportSessionInfoTable()}, nil
+	return mux.ExportSessionInfoList(), nil
 }
 
 func (s *serverLifecycleService) GetThreadDump(ctx context.Context, req *pb.Empty) (*pb.ThreadDump, error) {
