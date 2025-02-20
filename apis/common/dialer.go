@@ -20,8 +20,9 @@ import (
 	"net"
 )
 
+// Dial provides methods to establish stream oriented connections.
 type Dialer interface {
 	DialContext(ctx context.Context, network, address string) (net.Conn, error)
 }
 
-var _ Dialer = &net.Dialer{}
+var _ Dialer = (*net.Dialer)(nil)

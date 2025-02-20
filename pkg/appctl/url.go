@@ -30,8 +30,12 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const (
+	safeURLPattern = `^[0-9A-Za-z_!\$&'\(\)\*\+,;=\.\~-]+$`
+)
+
 var (
-	safeURLRegExp = regexp.MustCompile(`^[0-9A-Za-z_!\$&'\(\)\*\+,;=\.\~-]+$`)
+	safeURLRegExp = regexp.MustCompile(safeURLPattern)
 )
 
 // ClientConfigToURL creates a URL to share the client configuration.
@@ -63,13 +67,13 @@ func ClientProfileToMultiURLs(profile *pb.ClientProfile) (urls []string, err err
 		return nil, fmt.Errorf("user name in profile %s is empty", profileName)
 	}
 	if !isSafeURLString(userName) {
-		return nil, fmt.Errorf(`user name %q in profile %s can't be safely encoded to URL. Only allow "A-Z", "a-z", "0-9", underscore "_", and hyphen "-"`, userName, profileName)
+		return nil, fmt.Errorf(`user name %q in profile %s can't be safely encoded to URL. Allowed pattern: %s`, userName, profileName, safeURLPattern)
 	}
 	if password == "" {
 		return nil, fmt.Errorf("password in profile %s is empty", profileName)
 	}
 	if !isSafeURLString(password) {
-		return nil, fmt.Errorf(`password %q in profile %s can't be safely encoded to URL. Only allow "A-Z", "a-z", "0-9", underscore "_", and hyphen "-"`, password, profileName)
+		return nil, fmt.Errorf(`password %q in profile %s can't be safely encoded to URL. Allowed pattern: %s`, password, profileName, safeURLPattern)
 	}
 	if len(servers) == 0 {
 		return nil, fmt.Errorf("profile %s has no server", profileName)

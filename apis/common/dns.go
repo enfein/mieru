@@ -27,8 +27,8 @@ type DNSResolver interface {
 	LookupIP(ctx context.Context, network, host string) ([]net.IP, error)
 }
 
-// Standard library Resolver implements the DNSResolver interface.
-var _ DNSResolver = &net.Resolver{}
+// Standard library net.Resolver implements the DNSResolver interface.
+var _ DNSResolver = (*net.Resolver)(nil)
 
 // NilDNSResolver implements the DNSResolver interface but
 // it is not able to look up IP addresses.
