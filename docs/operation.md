@@ -5,9 +5,9 @@
 You can run `mieru get connections` command on the client to view the current connections between client and server. An example of the command output is as follows.
 
 ```
-Session ID  Protocol  Local       Remote        State        Recv Q+Buf  Send Q+Buf  Last Recv  Last Send
-2187011369  UDP       [::]:59998  1.2.3.4:5678  ESTABLISHED  0+0         0+1         1s         1s
-1466481848  UDP       [::]:59999  1.2.3.4:5678  ESTABLISHED  0+0         0+1         3s         3s
+SessionID   Protocol  Local       Remote             State        RecvQ+Buf  SendQ+Buf  LastRecv  LastSend
+3078661580  UDP       [::]:34453  12.34.123.45:5852  ESTABLISHED  0+0        0+0        0s (31)   0s (28)
+3408448183  UDP       [::]:34453  12.34.123.45:5852  ESTABLISHED  0+0        0+0        3s (22)   3s (21)
 ```
 
 Similarly, you can run `mita get connections` command on the server to view the current connections between the server and all clients.

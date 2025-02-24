@@ -5,9 +5,9 @@
 可以在客户端运行 `mieru get connections` 指令查看当前客户端与服务器之间的连接。该指令输出的一个示例如下。
 
 ```
-Session ID  Protocol  Local       Remote        State        Recv Q+Buf  Send Q+Buf  Last Recv  Last Send
-2187011369  UDP       [::]:59998  1.2.3.4:5678  ESTABLISHED  0+0         0+1         1s         1s
-1466481848  UDP       [::]:59999  1.2.3.4:5678  ESTABLISHED  0+0         0+1         3s         3s
+SessionID   Protocol  Local       Remote             State        RecvQ+Buf  SendQ+Buf  LastRecv  LastSend
+3078661580  UDP       [::]:34453  12.34.123.45:5852  ESTABLISHED  0+0        0+0        0s (31)   0s (28)
+3408448183  UDP       [::]:34453  12.34.123.45:5852  ESTABLISHED  0+0        0+0        3s (22)   3s (21)
 ```
 
 类似的，可以在服务器运行 `mita get connections` 指令查看当前服务器与所有客户端之间的连接。
