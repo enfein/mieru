@@ -19,40 +19,7 @@ import (
 	"bytes"
 	"net"
 	"testing"
-
-	"github.com/enfein/mieru/v3/pkg/testtool"
 )
-
-func TestUDPAssociateTunnelConn(t *testing.T) {
-	in, out := testtool.BufPipe()
-	inConn := WrapUDPAssociateTunnel(in)
-	outConn := WrapUDPAssociateTunnel(out)
-
-	data := []byte{8, 9, 6, 4}
-	n, err := inConn.Write(data)
-	if err != nil {
-		t.Fatalf("Write() failed: %v", err)
-	}
-	if n != 4 {
-		t.Fatalf("Write() returns %d, want %d", n, 4)
-	}
-
-	buf := make([]byte, 16)
-	n, err = outConn.Read(buf)
-	if err != nil {
-		t.Fatalf("Read() failed: %v", err)
-	}
-	if n != 4 {
-		t.Fatalf("Read() returns %d, want %d", n, 4)
-	}
-
-	if err = inConn.Close(); err != nil {
-		t.Errorf("Close() failed: %v", err)
-	}
-	if err = outConn.Close(); err != nil {
-		t.Errorf("Close() failed: %v", err)
-	}
-}
 
 func TestUDPAddrToHeader(t *testing.T) {
 	testcases := []struct {

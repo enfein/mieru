@@ -17,79 +17,8 @@ package socks5
 
 import (
 	"encoding/binary"
-	"io"
 	"net"
-
-	"github.com/enfein/mieru/v3/pkg/stderror"
 )
-
-// UDPAssociateTunnelConn keeps the boundary of UDP packets when transmitted
-// inside the proxy tunnel, which is typically a streaming pipe.
-//
-// Each original UDP packet will be wrapped like this
-//
-//	0x00 + 2 bytes of original length + original content + 0xff
-//
-// the length is encoded with big endian.
-type UDPAssociateTunnelConn struct {
-	io.ReadWriteCloser
-}
-
-func (c *UDPAssociateTunnelConn) Read(b []byte) (n int, err error) {
-	delim := make([]byte, 1)
-	if _, err = io.ReadFull(c.ReadWriteCloser, delim); err != nil {
-		return 0, err
-	}
-	if delim[0] != 0x00 {
-		return 0, stderror.ErrInvalidArgument
-	}
-
-	lengthBytes := make([]byte, 2)
-	if _, err = io.ReadFull(c.ReadWriteCloser, lengthBytes); err != nil {
-		return 0, err
-	}
-	length := int(binary.BigEndian.Uint16(lengthBytes))
-	if length > len(b) {
-		return 0, io.ErrShortBuffer
-	}
-
-	if n, err = io.ReadFull(c.ReadWriteCloser, b[:length]); err != nil {
-		return 0, err
-	}
-
-	if _, err = io.ReadFull(c.ReadWriteCloser, delim); err != nil {
-		return 0, err
-	}
-	if delim[0] != 0xff {
-		return 0, stderror.ErrInvalidArgument
-	}
-	return
-}
-
-func (c *UDPAssociateTunnelConn) Write(b []byte) (int, error) {
-	if len(b) > 65535 {
-		return 0, stderror.ErrOutOfRange
-	}
-	data := make([]byte, 4+len(b))
-	data[0] = 0x00
-	binary.BigEndian.PutUint16(data[1:], uint16(len(b)))
-	copy(data[3:], b)
-	data[3+len(b)] = 0xff
-
-	if _, err := c.ReadWriteCloser.Write(data); err != nil {
-		return 0, err
-	}
-	return len(b), nil
-}
-
-func (c *UDPAssociateTunnelConn) Close() error {
-	return c.ReadWriteCloser.Close()
-}
-
-// WrapUDPAssociateTunnel wraps an existing connection with UDPAssociateTunnelConn.
-func WrapUDPAssociateTunnel(conn io.ReadWriteCloser) *UDPAssociateTunnelConn {
-	return &UDPAssociateTunnelConn{ReadWriteCloser: conn}
-}
 
 // udpAddrToHeader returns a UDP associate header with the given
 // destination address.

@@ -220,7 +220,7 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 			common.ReadAllAndDiscard(conn)
 			conn.Close()
 		}()
-		return BidiCopyUDP(udpAssociateConn, WrapUDPAssociateTunnel(proxyConn))
+		return BidiCopyUDP(udpAssociateConn, apicommon.WrapPacketOverStream(proxyConn))
 	}
 	return common.BidiCopy(conn, proxyConn)
 }

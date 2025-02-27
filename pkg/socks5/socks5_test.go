@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/common"
 )
@@ -212,7 +213,7 @@ func TestSocks5UDPAssociation(t *testing.T) {
 	}
 
 	// Send subsequent UDP association request.
-	wrappedConn := WrapUDPAssociateTunnel(conn)
+	wrappedConn := apicommon.WrapPacketOverStream(conn)
 	req.Reset()
 	req.Write([]byte{0, 0, 0, 1, 127, 0, 0, 1})
 	req.WriteByte(byte(udpListenPort >> 8))
