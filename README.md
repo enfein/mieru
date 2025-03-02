@@ -11,12 +11,6 @@ mieru is a secure, hard to classify, hard to probe, TCP or UDP protocol-based so
 
 The mieru proxy software suite consists of two parts, a client software called mieru, and a proxy server software called mita.
 
-## Protocol
-
-The principle of mieru is similar to shadowsocks / v2ray etc. It creates an encrypted channel between the client and the proxy server outside the firewall. GFW cannot decrypt the encrypted transmission and cannot determine the destination you end up visiting, so it has no choice but to let you go.
-
-For an explanation of the mieru protocol, see [mieru Proxy Protocol](./docs/protocol.md).
-
 ## Features
 
 1. Provides socks5, HTTP, and HTTPS proxy interfaces.
@@ -40,6 +34,12 @@ For an explanation of the mieru protocol, see [mieru Proxy Protocol](./docs/prot
 1. [Maintenance & Troubleshooting](./docs/operation.md)
 1. [Security Guide](./docs/security.md)
 1. [Compilation](./docs/compile.md)
+
+## Protocol
+
+The principle of mieru is similar to shadowsocks / v2ray etc. It creates an encrypted channel between the client and the proxy server outside the firewall. GFW cannot decrypt the encrypted transmission and cannot determine the destination you end up visiting, so it has no choice but to let you go.
+
+For an explanation of the mieru protocol, see [mieru Proxy Protocol](./docs/protocol.md).
 
 ## Share
 
