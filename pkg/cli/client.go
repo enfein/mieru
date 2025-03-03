@@ -682,6 +682,7 @@ var clientRunFunc = func(s []string) error {
 	metrics.EnableLogging()
 
 	appctl.SetAppStatus(appctlpb.AppStatus_RUNNING)
+	log.Debugf("Started proxy after %v", appctl.Elapsed())
 	wg.Wait()
 
 	// Stop CPU profiling, if previously started.

@@ -474,8 +474,10 @@ var serverRunFunc = func(s []string) error {
 		initProxyTasks.Wait()
 		metrics.EnableLogging()
 		appctl.SetAppStatus(appctlpb.AppStatus_RUNNING)
+		log.Debugf("Started proxy after %v", appctl.Elapsed())
 		proxyTasks.Wait()
 	}
+
 	// If fails to validate server configuration, do nothing.
 	// Most likely the server configuration is empty.
 	// It will be set by new RPC calls.

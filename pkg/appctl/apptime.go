@@ -1,4 +1,4 @@
-// Copyright (C) 2021  mieru authors
+// Copyright (C) 2025  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,24 +13,31 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Binary mita is the server of mieru proxy.
-package main
+package appctl
 
 import (
-	"runtime/debug"
-
-	"github.com/enfein/mieru/v3/pkg/appctl"
-	"github.com/enfein/mieru/v3/pkg/cli"
-	"github.com/enfein/mieru/v3/pkg/log"
+	"sync"
+	"time"
 )
 
-func main() {
-	appctl.RecordAppStartTime()
-	appctl.SetAppType(appctl.SERVER_APP)
-	debug.SetGCPercent(90)
-	cli.RegisterServerCommands()
-	err := cli.ParseAndExecute()
-	if err != nil {
-		log.Fatalf("%v", err)
+var (
+	appStartTime     time.Time
+	appStartTimeOnce sync.Once
+)
+
+// RecordAppStartTime record the app start time.
+// This function does nothing after the first use.
+func RecordAppStartTime() {
+	appStartTimeOnce.Do(func() {
+		appStartTime = time.Now()
+	})
+}
+
+// Elapsed returns the how long the app has been started.
+// It panics if the start time is not recorded.
+func Elapsed() time.Duration {
+	if appStartTime.IsZero() {
+		panic("app start time is not recorded")
 	}
+	return time.Since(appStartTime).Truncate(time.Microsecond)
 }
