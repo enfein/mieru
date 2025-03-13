@@ -16,9 +16,17 @@
 package appctl
 
 import (
+	"os"
+
 	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/common"
 )
+
+// EnableAllGRPCLog let gRPC to print all internal logs.
+func EnableAllGRPCLog() {
+	os.Setenv("GRPC_GO_LOG_VERBOSITY_LEVEL", "99")
+	os.Setenv("GRPC_GO_LOG_SEVERITY_LEVEL", "info")
+}
 
 func getMemoryStatistics() (*pb.MemoryStatistics, error) {
 	ms := common.GetMemoryStats()

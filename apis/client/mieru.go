@@ -238,8 +238,8 @@ func (mc *mieruClient) DialContext(ctx context.Context, addr net.Addr) (net.Conn
 	if err := netAddrSpec.From(addr); err != nil {
 		return nil, fmt.Errorf("invalid destination address: %w", err)
 	}
-	if !strings.HasPrefix(netAddrSpec.Network(), "tcp") {
-		return nil, fmt.Errorf("only tcp network is supported")
+	if !strings.HasPrefix(netAddrSpec.Network(), "tcp") && !strings.HasPrefix(netAddrSpec.Network(), "udp") {
+		return nil, fmt.Errorf("unsupported network type %s", netAddrSpec.Network())
 	}
 
 	conn, err := mc.mux.DialContext(ctx)
@@ -251,7 +251,17 @@ func (mc *mieruClient) DialContext(ctx context.Context, addr net.Addr) (net.Conn
 
 func (mc *mieruClient) dialPostHandshake(conn net.Conn, netAddrSpec model.NetAddrSpec) (net.Conn, error) {
 	var req bytes.Buffer
-	req.Write([]byte{constant.Socks5Version, constant.Socks5ConnectCmd, 0})
+	isTCP := strings.HasPrefix(netAddrSpec.Network(), "tcp")
+	isUDP := strings.HasPrefix(netAddrSpec.Network(), "udp")
+
+	if isTCP {
+		req.Write([]byte{constant.Socks5Version, constant.Socks5ConnectCmd, 0})
+	} else if isUDP {
+		req.Write([]byte{constant.Socks5Version, constant.Socks5UDPAssociateCmd, 0})
+	} else {
+		return nil, fmt.Errorf("unsupported network type %s", netAddrSpec.Network())
+	}
+
 	if err := netAddrSpec.WriteToSocks5(&req); err != nil {
 		return nil, err
 	}
@@ -275,5 +285,9 @@ func (mc *mieruClient) dialPostHandshake(conn net.Conn, netAddrSpec model.NetAdd
 	if resp[1] != 0 {
 		return nil, fmt.Errorf("server returned socks5 error code %d", resp[1])
 	}
-	return conn, nil
+
+	if isTCP {
+		return conn, nil
+	}
+	return apicommon.WrapPacketOverStream(conn), nil
 }

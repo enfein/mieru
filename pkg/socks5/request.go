@@ -80,7 +80,7 @@ func (s *Server) newRequest(conn io.Reader) (*Request, error) {
 }
 
 // handleRequest is used for request processing after authentication.
-func (s *Server) handleRequest(ctx context.Context, req *Request, conn io.ReadWriteCloser) error {
+func (s *Server) handleRequest(ctx context.Context, req *Request, conn net.Conn) error {
 	// Resolve the address if we have a FQDN.
 	dst := req.DstAddr
 	if dst.FQDN != "" {
@@ -131,7 +131,7 @@ func (s *Server) handleRequest(ctx context.Context, req *Request, conn io.ReadWr
 }
 
 // handleConnect is used to handle a connect command.
-func (s *Server) handleConnect(ctx context.Context, req *Request, conn io.ReadWriteCloser) error {
+func (s *Server) handleConnect(ctx context.Context, req *Request, conn net.Conn) error {
 	var d net.Dialer
 	target, err := d.DialContext(ctx, "tcp", req.DstAddr.String())
 	if err != nil {
@@ -166,7 +166,7 @@ func (s *Server) handleConnect(ctx context.Context, req *Request, conn io.ReadWr
 }
 
 // handleBind is used to handle a bind command.
-func (s *Server) handleBind(_ context.Context, _ *Request, conn io.ReadWriteCloser) error {
+func (s *Server) handleBind(_ context.Context, _ *Request, conn net.Conn) error {
 	UnsupportedCommandErrors.Add(1)
 	if err := sendReply(conn, commandNotSupported, nil); err != nil {
 		HandshakeErrors.Add(1)
@@ -176,7 +176,7 @@ func (s *Server) handleBind(_ context.Context, _ *Request, conn io.ReadWriteClos
 }
 
 // handleAssociate is used to handle a associate command.
-func (s *Server) handleAssociate(_ context.Context, _ *Request, conn io.ReadWriteCloser) error {
+func (s *Server) handleAssociate(_ context.Context, _ *Request, conn net.Conn) error {
 	// Create a UDP listener on a random port.
 	// All the requests associated to this connection will go through this port.
 	udpListenerAddr, err := apicommon.ResolveUDPAddr(s.config.Resolver, "udp", common.MaybeDecorateIPv6(common.AllIPAddr())+":0")

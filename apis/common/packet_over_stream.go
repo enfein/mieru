@@ -19,6 +19,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"net"
 )
 
 // PacketOverStreamTunnel keeps the boundary of packets when transmitted
@@ -30,12 +31,12 @@ import (
 //
 // the length is encoded with big endian.
 type PacketOverStreamTunnel struct {
-	io.ReadWriteCloser
+	net.Conn
 }
 
 func (c *PacketOverStreamTunnel) Read(b []byte) (n int, err error) {
 	delim := make([]byte, 1)
-	if _, err = io.ReadFull(c.ReadWriteCloser, delim); err != nil {
+	if _, err = io.ReadFull(c.Conn, delim); err != nil {
 		return 0, err
 	}
 	if delim[0] != 0x00 {
@@ -43,7 +44,7 @@ func (c *PacketOverStreamTunnel) Read(b []byte) (n int, err error) {
 	}
 
 	lengthBytes := make([]byte, 2)
-	if _, err = io.ReadFull(c.ReadWriteCloser, lengthBytes); err != nil {
+	if _, err = io.ReadFull(c.Conn, lengthBytes); err != nil {
 		return 0, err
 	}
 	length := int(binary.BigEndian.Uint16(lengthBytes))
@@ -51,11 +52,11 @@ func (c *PacketOverStreamTunnel) Read(b []byte) (n int, err error) {
 		return 0, io.ErrShortBuffer
 	}
 
-	if n, err = io.ReadFull(c.ReadWriteCloser, b[:length]); err != nil {
+	if n, err = io.ReadFull(c.Conn, b[:length]); err != nil {
 		return 0, err
 	}
 
-	if _, err = io.ReadFull(c.ReadWriteCloser, delim); err != nil {
+	if _, err = io.ReadFull(c.Conn, delim); err != nil {
 		return 0, err
 	}
 	if delim[0] != 0xff {
@@ -74,17 +75,17 @@ func (c *PacketOverStreamTunnel) Write(b []byte) (int, error) {
 	copy(data[3:], b)
 	data[3+len(b)] = 0xff
 
-	if _, err := c.ReadWriteCloser.Write(data); err != nil {
+	if _, err := c.Conn.Write(data); err != nil {
 		return 0, err
 	}
 	return len(b), nil
 }
 
 func (c *PacketOverStreamTunnel) Close() error {
-	return c.ReadWriteCloser.Close()
+	return c.Conn.Close()
 }
 
 // WrapPacketOverStream wraps an existing connection with PacketOverStreamTunnel.
-func WrapPacketOverStream(conn io.ReadWriteCloser) *PacketOverStreamTunnel {
-	return &PacketOverStreamTunnel{ReadWriteCloser: conn}
+func WrapPacketOverStream(conn net.Conn) *PacketOverStreamTunnel {
+	return &PacketOverStreamTunnel{Conn: conn}
 }

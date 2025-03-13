@@ -73,6 +73,10 @@ type ClientLifecycleService interface {
 type ClientNetworkService interface {
 	// DialContext returns a new proxy connection to reach the destination.
 	// It uses the dialer in ClientConfig to connect to a proxy server endpoint.
+	//
+	// This is a streaming based proxy connection. If the destination is a packet
+	// endpoint, packets are encapsulated in the streaming connection.
+	//
 	// It returns an error if the client has not been started,
 	// or has been stopped.
 	DialContext(context.Context, net.Addr) (net.Conn, error)
@@ -83,10 +87,12 @@ type ClientConfig struct {
 	Profile *appctlpb.ClientProfile
 
 	// A dialer to connect to proxy server via stream-oriented network connections.
+	//
 	// If this field is not set, a default dialer is used.
 	Dialer apicommon.Dialer
 
 	// If set, the resolver translates proxy server domain name into IP addresses.
+	//
 	// This field is not required, if Dialer is able to do DNS, or proxy server
 	// endpoints are IP addresses rather than domain names.
 	Resolver apicommon.DNSResolver
