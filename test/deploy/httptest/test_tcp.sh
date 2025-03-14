@@ -55,10 +55,6 @@ if [[ "$?" -ne 0 ]]; then
 fi
 ./mieru profile cpu start /test/mieru.tcp.cpu.gz
 
-# Start mieru API client.
-./exampleapiclient -port=1081 -username=baozi -password=manlianpenfen \
-  -server_ip=127.0.0.1 -server_port=8964 -server_protocol=TCP &
-
 # Start testing.
 sleep 2
 echo ">>> socks5 - new connections - TCP <<<"

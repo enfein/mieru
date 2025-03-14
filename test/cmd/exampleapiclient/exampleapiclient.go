@@ -22,12 +22,15 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 
 	"github.com/enfein/mieru/v3/apis/client"
+	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/common"
+	"github.com/enfein/mieru/v3/pkg/socks5"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -37,7 +40,8 @@ var (
 	password       = flag.String("password", "", "mieru password")
 	serverIP       = flag.String("server_ip", "", "IP address of mieru proxy server")
 	serverPort     = flag.Int("server_port", 0, "Port number of mieru proxy server")
-	serverProtocol = flag.String("server_protocol", "", "Transport protocol: TCP or UDP")
+	serverProtocol = flag.String("server_protocol", "TCP", "Transport protocol: TCP or UDP")
+	debug          = flag.Bool("debug", false, "Display debug messages")
 )
 
 func main() {
@@ -109,6 +113,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	fmt.Printf("API client is listening to %v\n", l.Addr())
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -119,6 +124,9 @@ func main() {
 }
 
 func handleOneSocks5Conn(c client.Client, conn net.Conn) {
+	if *debug {
+		fmt.Printf("Handling socks5 request from %v\n", conn.RemoteAddr())
+	}
 	defer conn.Close()
 
 	// Handle socks5 authentication.
@@ -131,11 +139,22 @@ func handleOneSocks5Conn(c client.Client, conn net.Conn) {
 	if _, err := io.ReadFull(conn, socks5Header); err != nil {
 		panic(fmt.Sprintf("Read socks5 header failed: %v", err))
 	}
-	netAddr := model.NetAddrSpec{
-		Net: "tcp",
+	netAddr := model.NetAddrSpec{}
+	var isTCP, isUDP bool
+	if socks5Header[1] == constant.Socks5ConnectCmd {
+		netAddr.Net = "tcp"
+		isTCP = true
+	} else if socks5Header[1] == constant.Socks5UDPAssociateCmd {
+		netAddr.Net = "udp"
+		isUDP = true
+	} else {
+		panic(fmt.Sprintf("Socks5 command %d is invalid", socks5Header[1]))
 	}
 	if err := netAddr.ReadFromSocks5(conn); err != nil {
 		panic(fmt.Sprintf("ReadFromSocks5() failed: %v", err))
+	}
+	if *debug {
+		fmt.Printf("Destination network: %v, address: %v\n", netAddr.Network(), netAddr.String())
 	}
 
 	// Dial to proxy server and do handshake.
@@ -148,18 +167,47 @@ func handleOneSocks5Conn(c client.Client, conn net.Conn) {
 	}
 	defer proxyConn.Close()
 
-	// Send the connect response back to the application.
+	// Send the connect response back to the application
+	// and start bi-direction copy.
 	var resp bytes.Buffer
 	resp.Write([]byte{constant.Socks5Version, 0, 0})
-	if err := netAddr.WriteToSocks5(&resp); err != nil {
-		panic(fmt.Sprintf("WriteToSocks5() failed: %v", err))
-	}
-	if _, err := conn.Write(resp.Bytes()); err != nil {
-		panic(fmt.Sprintf("Write socks5 response failed: %v", err))
-	}
+	if isTCP {
+		// The actual server bound address can't be collected
+		// from the API. Send a fake server bound address back to client.
+		if err := netAddr.WriteToSocks5(&resp); err != nil {
+			panic(fmt.Sprintf("WriteToSocks5() failed: %v", err))
+		}
+		if _, err := conn.Write(resp.Bytes()); err != nil {
+			panic(fmt.Sprintf("Write socks5 response failed: %v", err))
+		}
 
-	// Exchange payload.
-	common.BidiCopy(conn, proxyConn)
+		common.BidiCopy(conn, proxyConn)
+	} else if isUDP {
+		// Create a UDP listener on a random port.
+		udpConn, err := net.ListenUDP("udp", nil)
+		if err != nil {
+			panic(fmt.Sprintf("net.ListenUDP() failed: %v", err))
+		}
+		defer udpConn.Close()
+		_, udpPortStr, err := net.SplitHostPort(udpConn.LocalAddr().String())
+		if err != nil {
+			panic(fmt.Sprintf("net.SplitHostPort() failed: %v", err))
+		}
+		udpPort, err := strconv.Atoi(udpPortStr)
+		if err != nil {
+			panic(fmt.Sprintf("strconv.Atoi() failed: %v", err))
+		}
+		udpBindAddr := model.AddrSpec{IP: net.IP{0, 0, 0, 0}, Port: udpPort}
+		if err := udpBindAddr.WriteToSocks5(&resp); err != nil {
+			panic(fmt.Sprintf("WriteToSocks5() failed: %v", err))
+		}
+		if _, err := conn.Write(resp.Bytes()); err != nil {
+			panic(fmt.Sprintf("Write socks5 response failed: %v", err))
+		}
+
+		tunnel := proxyConn.(*apicommon.PacketOverStreamTunnel)
+		socks5.BidiCopyUDP(udpConn, tunnel)
+	}
 }
 
 func socks5ClientHandshake(conn net.Conn) error {

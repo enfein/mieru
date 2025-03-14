@@ -1,11 +1,11 @@
 {
     "portBindings": [
         {
-            "port": 6666,
+            "portRange": "8964-8964",
             "protocol": "TCP"
         },
         {
-            "portRange": "9999-10000",
+            "port": 9648,
             "protocol": "TCP"
         },
         {

@@ -80,6 +80,7 @@ fi
 
 # Start testing.
 sleep 1
+echo ">>> socks5 UDP associate - TCP and UDP <<<"
 ./socksudpclient -dst_host=127.0.0.1 -dst_port=9090 \
   -local_proxy_host=127.0.0.1 -local_proxy_port=1080 \
   -interval_ms=10 -num_request=100 -num_conn=60
@@ -87,7 +88,20 @@ if [ "$?" -ne "0" ]; then
     print_mieru_client_log
     print_mieru_client_thread_dump
     print_mieru_server_thread_dump
-    echo "Test UDP associate failed."
+    echo "Test UDP associate - TCP and UDP failed."
+    exit 1
+fi
+
+sleep 1
+echo ">>> socks5 UDP associate - TCP with API client <<<"
+./socksudpclient -dst_host=127.0.0.1 -dst_port=9090 \
+  -local_proxy_host=127.0.0.1 -local_proxy_port=1081 \
+  -interval_ms=10 -num_request=100 -num_conn=60
+if [ "$?" -ne "0" ]; then
+    print_mieru_client_log
+    print_mieru_client_thread_dump
+    print_mieru_server_thread_dump
+    echo "Test UDP associate - TCP with API client failed."
     exit 1
 fi
 

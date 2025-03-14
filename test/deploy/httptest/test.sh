@@ -35,6 +35,11 @@ sleep 1
 ./mita run &
 sleep 1
 
+# Start mieru API client.
+./exampleapiclient -port=1081 -username=baozi -password=manlianpenfen \
+  -server_ip=127.0.0.1 -server_port=8964 &
+sleep 1
+
 # Run TCP test.
 echo "========== BEGIN OF TCP TEST =========="
 ./test_tcp.sh
