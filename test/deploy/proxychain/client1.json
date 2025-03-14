@@ -29,6 +29,9 @@
     "activeProfile": "ducaiguozei",
     "rpcPort": 2001,
     "socks5Port": 2000,
+    "advancedSettings": {
+        "noCheckUpdate": true
+    },
     "loggingLevel": "INFO",
     "socks5ListenLAN": false
 }

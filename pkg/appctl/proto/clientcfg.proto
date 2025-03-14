@@ -85,4 +85,7 @@ enum MultiplexingLevel {
     MULTIPLEXING_HIGH = 4;
 }
 
-message ClientAdvancedSettings {}
+message ClientAdvancedSettings {
+    // Do not check update when client is started.
+    optional bool noCheckUpdate = 1;
+}

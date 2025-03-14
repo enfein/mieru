@@ -29,6 +29,9 @@
     "activeProfile": "meiyougongchandang",
     "rpcPort": 4001,
     "socks5Port": 4000,
+    "advancedSettings": {
+        "noCheckUpdate": true
+    },
     "loggingLevel": "INFO",
     "socks5ListenLAN": false,
     "socks5Authentication": [

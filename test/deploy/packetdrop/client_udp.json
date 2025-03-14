@@ -23,6 +23,9 @@
     "activeProfile": "default",
     "rpcPort": 8989,
     "socks5Port": 1080,
+    "advancedSettings": {
+        "noCheckUpdate": true
+    },
     "loggingLevel": "DEBUG",
     "socks5ListenLAN": true
 }

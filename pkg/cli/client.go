@@ -425,7 +425,7 @@ var clientStartFunc = func(s []string) error {
 				log.Infof("mieru client is started, listening to socks5://127.0.0.1:%d", config.GetSocks5Port())
 			}
 
-			if should, _ := clientShouldCheckUpdate(); should {
+			if should, _ := clientShouldCheckUpdate(config); should {
 				msg, _ := clientCheckUpdateAndUpdateHistory(fmt.Sprintf("socks5://127.0.0.1:%d", config.GetSocks5Port()))
 				if msg != updater.UpToDateMessage {
 					log.Infof("")
@@ -1049,7 +1049,11 @@ func newClientLifecycleRPCClient(ctx context.Context) (client appctlgrpc.ClientL
 	return
 }
 
-func clientShouldCheckUpdate() (bool, error) {
+func clientShouldCheckUpdate(config *appctlpb.ClientConfig) (bool, error) {
+	if config.GetAdvancedSettings().GetNoCheckUpdate() {
+		return false, nil
+	}
+
 	historyFile, err := appctl.ClientUpdaterHistoryPath()
 	if err != nil {
 		return false, fmt.Errorf("failed to get client updater history file path")
