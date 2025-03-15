@@ -30,55 +30,69 @@ import (
 //	0x00 + 2 bytes of original length + original packet content + 0xff
 //
 // the length is encoded with big endian.
+//
+// The destination of packets are negotiated separately and can't change.
 type PacketOverStreamTunnel struct {
 	net.Conn
 }
 
-func (c *PacketOverStreamTunnel) Read(b []byte) (n int, err error) {
+var _ net.PacketConn = (*PacketOverStreamTunnel)(nil)
+
+func (c *PacketOverStreamTunnel) Read(p []byte) (n int, err error) {
+	n, _, err = c.ReadFrom(p)
+	return
+}
+
+func (c *PacketOverStreamTunnel) Write(p []byte) (int, error) {
+	return c.WriteTo(p, c.RemoteAddr())
+}
+
+func (c *PacketOverStreamTunnel) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
+	addr = c.RemoteAddr()
 	delim := make([]byte, 1)
 	if _, err = io.ReadFull(c.Conn, delim); err != nil {
-		return 0, err
+		return 0, addr, err
 	}
 	if delim[0] != 0x00 {
-		return 0, fmt.Errorf("packet prefix 0x%x is not 0x00", delim[0])
+		return 0, addr, fmt.Errorf("packet prefix 0x%x is not 0x00", delim[0])
 	}
 
 	lengthBytes := make([]byte, 2)
 	if _, err = io.ReadFull(c.Conn, lengthBytes); err != nil {
-		return 0, err
+		return 0, addr, err
 	}
 	length := int(binary.BigEndian.Uint16(lengthBytes))
-	if length > len(b) {
-		return 0, io.ErrShortBuffer
+	if length > len(p) {
+		return 0, addr, io.ErrShortBuffer
 	}
 
-	if n, err = io.ReadFull(c.Conn, b[:length]); err != nil {
-		return 0, err
+	if n, err = io.ReadFull(c.Conn, p[:length]); err != nil {
+		return 0, addr, err
 	}
 
 	if _, err = io.ReadFull(c.Conn, delim); err != nil {
-		return 0, err
+		return 0, addr, err
 	}
 	if delim[0] != 0xff {
-		return 0, fmt.Errorf("packet suffix 0x%x is not 0xff", delim[0])
+		return 0, addr, fmt.Errorf("packet suffix 0x%x is not 0xff", delim[0])
 	}
 	return
 }
 
-func (c *PacketOverStreamTunnel) Write(b []byte) (int, error) {
-	if len(b) > 65535 {
-		return 0, fmt.Errorf("packet length %d is larger than maximum length 65535", len(b))
+func (c *PacketOverStreamTunnel) WriteTo(p []byte, _ net.Addr) (n int, err error) {
+	if len(p) > 65535 {
+		return 0, fmt.Errorf("packet length %d is larger than maximum length 65535", len(p))
 	}
-	data := make([]byte, 4+len(b))
+	data := make([]byte, 4+len(p))
 	data[0] = 0x00
-	binary.BigEndian.PutUint16(data[1:], uint16(len(b)))
-	copy(data[3:], b)
-	data[3+len(b)] = 0xff
+	binary.BigEndian.PutUint16(data[1:], uint16(len(p)))
+	copy(data[3:], p)
+	data[3+len(p)] = 0xff
 
 	if _, err := c.Conn.Write(data); err != nil {
 		return 0, err
 	}
-	return len(b), nil
+	return len(p), nil
 }
 
 func (c *PacketOverStreamTunnel) Close() error {
