@@ -10,6 +10,7 @@ proxies:
     type: mieru
     server: 127.0.0.1
     port: 8964
+    udp: true
     transport: TCP
     username: baozi
     password: manlianpenfen

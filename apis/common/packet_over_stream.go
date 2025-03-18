@@ -39,47 +39,37 @@ type PacketOverStreamTunnel struct {
 var _ net.PacketConn = (*PacketOverStreamTunnel)(nil)
 
 func (c *PacketOverStreamTunnel) Read(p []byte) (n int, err error) {
-	n, _, err = c.ReadFrom(p)
-	return
-}
-
-func (c *PacketOverStreamTunnel) Write(p []byte) (int, error) {
-	return c.WriteTo(p, c.RemoteAddr())
-}
-
-func (c *PacketOverStreamTunnel) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
-	addr = c.RemoteAddr()
 	delim := make([]byte, 1)
 	if _, err = io.ReadFull(c.Conn, delim); err != nil {
-		return 0, addr, err
+		return 0, err
 	}
 	if delim[0] != 0x00 {
-		return 0, addr, fmt.Errorf("packet prefix 0x%x is not 0x00", delim[0])
+		return 0, fmt.Errorf("packet prefix 0x%x is not 0x00", delim[0])
 	}
 
 	lengthBytes := make([]byte, 2)
 	if _, err = io.ReadFull(c.Conn, lengthBytes); err != nil {
-		return 0, addr, err
+		return 0, err
 	}
 	length := int(binary.BigEndian.Uint16(lengthBytes))
 	if length > len(p) {
-		return 0, addr, io.ErrShortBuffer
+		return 0, io.ErrShortBuffer
 	}
 
 	if n, err = io.ReadFull(c.Conn, p[:length]); err != nil {
-		return 0, addr, err
+		return 0, err
 	}
 
 	if _, err = io.ReadFull(c.Conn, delim); err != nil {
-		return 0, addr, err
+		return 0, err
 	}
 	if delim[0] != 0xff {
-		return 0, addr, fmt.Errorf("packet suffix 0x%x is not 0xff", delim[0])
+		return 0, fmt.Errorf("packet suffix 0x%x is not 0xff", delim[0])
 	}
 	return
 }
 
-func (c *PacketOverStreamTunnel) WriteTo(p []byte, _ net.Addr) (n int, err error) {
+func (c *PacketOverStreamTunnel) Write(p []byte) (int, error) {
 	if len(p) > 65535 {
 		return 0, fmt.Errorf("packet length %d is larger than maximum length 65535", len(p))
 	}
@@ -93,6 +83,16 @@ func (c *PacketOverStreamTunnel) WriteTo(p []byte, _ net.Addr) (n int, err error
 		return 0, err
 	}
 	return len(p), nil
+}
+
+func (c *PacketOverStreamTunnel) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
+	addr = c.RemoteAddr()
+	n, err = c.Read(p)
+	return
+}
+
+func (c *PacketOverStreamTunnel) WriteTo(p []byte, _ net.Addr) (n int, err error) {
+	return c.Write(p)
 }
 
 func (c *PacketOverStreamTunnel) Close() error {
