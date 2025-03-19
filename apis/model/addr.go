@@ -135,7 +135,7 @@ func (n NetAddrSpec) Network() string {
 	return n.Net
 }
 
-// From modifies the NetAddrSpec object with the given network address.
+// From sets the NetAddrSpec object with the given network address.
 func (n *NetAddrSpec) From(addr net.Addr) error {
 	if nas, ok := addr.(NetAddrSpec); ok {
 		n.AddrSpec = nas.AddrSpec

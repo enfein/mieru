@@ -213,7 +213,7 @@ func TestSocks5UDPAssociation(t *testing.T) {
 	}
 
 	// Send subsequent UDP association request.
-	wrappedConn := apicommon.WrapPacketOverStream(conn)
+	wrappedConn := apicommon.NewPacketOverStreamTunnel(conn)
 	req.Reset()
 	req.Write([]byte{0, 0, 0, 1, 127, 0, 0, 1})
 	req.WriteByte(byte(udpListenPort >> 8))

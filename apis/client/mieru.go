@@ -289,5 +289,5 @@ func (mc *mieruClient) dialPostHandshake(conn net.Conn, netAddrSpec model.NetAdd
 	if isTCP {
 		return conn, nil
 	}
-	return apicommon.WrapPacketOverStream(conn), nil
+	return apicommon.NewPacketOverStreamTunnel(conn), nil
 }

@@ -210,7 +210,7 @@ func (s *Server) handleAssociate(_ context.Context, _ *Request, conn net.Conn) e
 		return fmt.Errorf("failed to send reply: %w", err)
 	}
 
-	conn = apicommon.WrapPacketOverStream(conn)
+	conn = apicommon.NewPacketOverStreamTunnel(conn)
 	var udpErr atomic.Value
 
 	// addrMap maps the UDPAddr in string to the bytes in UDP associate header.

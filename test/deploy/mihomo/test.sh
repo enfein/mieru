@@ -27,6 +27,10 @@ source ./libtest.sh
 ./httpserver &
 sleep 2
 
+# Start UDP server.
+./udpserver -port=9090 &
+sleep 1
+
 # Start mieru server daemon.
 ./mita run &
 sleep 1

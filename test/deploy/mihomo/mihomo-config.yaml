@@ -6,13 +6,13 @@ log-level: warning
 mixed-port: 1080
 mode: rule
 proxies:
-  - name: mieru-tcp
+  - name: mieru
     type: mieru
     server: 127.0.0.1
     port: 8964
-    udp: true
     transport: TCP
+    udp: true
     username: baozi
     password: manlianpenfen
 rules:
-  - MATCH,mieru-tcp
+  - MATCH,mieru

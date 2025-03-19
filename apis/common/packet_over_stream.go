@@ -31,7 +31,7 @@ import (
 //
 // the length is encoded with big endian.
 //
-// The destination of packets are negotiated separately and can't change.
+// The destination of packets are negotiated separately.
 type PacketOverStreamTunnel struct {
 	net.Conn
 }
@@ -99,7 +99,8 @@ func (c *PacketOverStreamTunnel) Close() error {
 	return c.Conn.Close()
 }
 
-// WrapPacketOverStream wraps an existing connection with PacketOverStreamTunnel.
-func WrapPacketOverStream(conn net.Conn) *PacketOverStreamTunnel {
+// NewPacketOverStreamTunnel creates a PacketOverStreamTunnel on top of
+// an existing stream oriented network connection.
+func NewPacketOverStreamTunnel(conn net.Conn) *PacketOverStreamTunnel {
 	return &PacketOverStreamTunnel{Conn: conn}
 }
