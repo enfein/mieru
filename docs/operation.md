@@ -172,6 +172,18 @@ MIERU_CONFIG_JSON_FILE=/etc/mieru_client_config.json mieru run
 
 At this point, the logs of the mieru client will be printed directly to the terminal. Press Ctrl+C to exit.
 
+## Disable Client Automatic Check Update
+
+When you start the mieru client, it will automatically check for updates every few days. If you want to turn off automatic check update, add the following client configuration:
+
+```json
+{
+    "advancedSettings": {
+        "noCheckUpdate": true
+    }
+}
+```
+
 ## Reset Server Metrics
 
 Server metrics are stored in the `/var/lib/mita/metrics.pb` file. Even if the server is restarted, you can read the accumulated metrics using the `mita get metrics` command. If you want to reset the metrics, you can run the following command:

@@ -205,7 +205,7 @@ func handleOneSocks5Conn(c client.Client, conn net.Conn) {
 			panic(fmt.Sprintf("Write socks5 response failed: %v", err))
 		}
 
-		tunnel := proxyConn.(*apicommon.PacketOverStreamTunnel)
+		tunnel := apicommon.NewPacketOverStreamTunnel(proxyConn)
 		socks5.BidiCopyUDP(udpConn, tunnel)
 	}
 }

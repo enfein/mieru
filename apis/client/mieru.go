@@ -286,8 +286,5 @@ func (mc *mieruClient) dialPostHandshake(conn net.Conn, netAddrSpec model.NetAdd
 		return nil, fmt.Errorf("server returned socks5 error code %d", resp[1])
 	}
 
-	if isTCP {
-		return conn, nil
-	}
-	return apicommon.NewPacketOverStreamTunnel(conn), nil
+	return conn, nil
 }

@@ -172,6 +172,18 @@ MIERU_CONFIG_JSON_FILE=/etc/mieru_client_config.json mieru run
 
 此时，mieru 客户端的日志会直接打印至终端。按下 Ctrl+C 退出。
 
+## 关闭客户端自动检查更新
+
+启动 mieru 客户端时，每隔几天，会自动检查更新。如果想关闭自动检查更新，请添加如下的客户端配置：
+
+```json
+{
+    "advancedSettings": {
+        "noCheckUpdate": true
+    }
+}
+```
+
 ## 重置服务器指标
 
 服务器指标存储在文件 `/var/lib/mita/metrics.pb` 中。即便服务器重启，也可以通过 `mita get metrics` 指令读取累积的指标。如果想重置指标，可以运行下面的命令：
