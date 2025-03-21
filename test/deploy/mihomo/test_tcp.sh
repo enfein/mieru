@@ -75,16 +75,16 @@ if [ "$?" -ne "0" ]; then
     exit 1
 fi
 
-# sleep 1
-# echo ">>> socks5 UDP associate - TCP <<<"
-# ./socksudpclient -dst_host=127.0.0.1 -dst_port=9090 \
-#   -local_proxy_host=127.0.0.1 -local_proxy_port=1080 \
-#   -interval_ms=10 -num_request=100 -num_conn=60
-# if [ "$?" -ne "0" ]; then
-#     print_mieru_server_thread_dump
-#     echo "TCP - test socks5 udp_associate failed."
-#     exit 1
-# fi
+sleep 1
+echo ">>> socks5 UDP associate - TCP <<<"
+./socksudpclient -dst_host=127.0.0.1 -dst_port=9090 \
+  -local_proxy_host=127.0.0.1 -local_proxy_port=1080 \
+  -interval_ms=10 -num_request=100 -num_conn=60
+if [ "$?" -ne "0" ]; then
+    print_mieru_server_thread_dump
+    echo "TCP - test socks5 udp_associate failed."
+    exit 1
+fi
 
 # Print metrics and memory statistics.
 print_mieru_server_metrics
