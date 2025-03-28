@@ -26,5 +26,8 @@
                 "outbound": "mieru-out"
             }
         ]
+    },
+    "log": {
+        "level": "warn"
     }
 }
