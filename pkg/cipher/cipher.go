@@ -32,10 +32,12 @@ const (
 
 type AEADType uint8
 
+// The AEADType values need to match the definitions in protobuf.
 const (
-	AES256GCM AEADType = iota
-	ChaCha20Poly1305
-	XChaCha20Poly1305
+	XChaCha20Poly1305 AEADType = iota + 1
+	AES128GCM
+	AES256GCM
+	ChaCha20Poly1305 // TODO: remove this
 )
 
 var (
@@ -56,8 +58,8 @@ type AEADBlockCipher struct {
 // newAESGCMBlockCipher creates a new AES-GCM cipher with the supplied key.
 func newAESGCMBlockCipher(key []byte) (*AEADBlockCipher, error) {
 	keyLen := len(key)
-	if keyLen != 16 && keyLen != 24 && keyLen != 32 {
-		return nil, fmt.Errorf("AES key length is %d, want 16 or 24 or 32", keyLen)
+	if keyLen != 16 && keyLen != 32 {
+		return nil, fmt.Errorf("AES key length is %d bytes, want 16 bytes or 32 bytes", keyLen)
 	}
 
 	block, err := aes.NewCipher(key)
@@ -70,20 +72,27 @@ func newAESGCMBlockCipher(key []byte) (*AEADBlockCipher, error) {
 		return nil, fmt.Errorf("cipher.NewGCM() failed: %w", err)
 	}
 
-	return &AEADBlockCipher{
+	c := &AEADBlockCipher{
 		aead:                aead,
-		aeadType:            AES256GCM,
 		enableImplicitNonce: false,
 		key:                 key,
 		implicitNonce:       nil,
-	}, nil
+	}
+	if keyLen == 16 {
+		c.aeadType = AES128GCM
+	} else if keyLen == 32 {
+		c.aeadType = AES256GCM
+	} else {
+		panic(fmt.Sprintf("invalid AES key length: %d bytes", keyLen))
+	}
+	return c, nil
 }
 
 // newChaCha20Poly1305BlockCipher creates a new ChaCha20-Poly1305 cipher with the supplied key.
 func newChaCha20Poly1305BlockCipher(key []byte) (*AEADBlockCipher, error) {
 	keyLen := len(key)
 	if keyLen != 32 {
-		return nil, fmt.Errorf("ChaCha20-Poly1305 key length is %d, want 32", keyLen)
+		return nil, fmt.Errorf("ChaCha20-Poly1305 key length is %d bytes, want 32 bytes", keyLen)
 	}
 
 	aead, err := chacha20poly1305.New(key)
@@ -104,7 +113,7 @@ func newChaCha20Poly1305BlockCipher(key []byte) (*AEADBlockCipher, error) {
 func newXChaCha20Poly1305BlockCipher(key []byte) (*AEADBlockCipher, error) {
 	keyLen := len(key)
 	if keyLen != 32 {
-		return nil, fmt.Errorf("XChaCha20-Poly1305 key length is %d, want 32", keyLen)
+		return nil, fmt.Errorf("XChaCha20-Poly1305 key length is %d bytes, want 32 bytes", keyLen)
 	}
 
 	aead, err := chacha20poly1305.NewX(key)
@@ -175,8 +184,8 @@ func (c *AEADBlockCipher) EncryptWithNonce(plaintext, nonce []byte) ([]byte, err
 	if c.enableImplicitNonce {
 		return nil, fmt.Errorf("EncryptWithNonce() is not supported when implicit nonce is enabled")
 	}
-	if len(nonce) != DefaultNonceSize {
-		return nil, fmt.Errorf("want nonce size %d, got %d", DefaultNonceSize, len(nonce))
+	if len(nonce) != c.NonceSize() {
+		return nil, fmt.Errorf("want nonce size %d, got %d", c.NonceSize(), len(nonce))
 	}
 	return c.aead.Seal(nil, nonce, plaintext, nil), nil
 }
@@ -218,8 +227,8 @@ func (c *AEADBlockCipher) DecryptWithNonce(ciphertext, nonce []byte) ([]byte, er
 	if c.enableImplicitNonce {
 		return nil, fmt.Errorf("EncryptWithNonce() is not supported when implicit nonce is enabled")
 	}
-	if len(nonce) != DefaultNonceSize {
-		return nil, fmt.Errorf("want nonce size %d, got %d", DefaultNonceSize, len(nonce))
+	if len(nonce) != c.NonceSize() {
+		return nil, fmt.Errorf("want nonce size %d, got %d", c.NonceSize(), len(nonce))
 	}
 	plaintext, err := c.aead.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
@@ -234,7 +243,7 @@ func (c *AEADBlockCipher) Clone() BlockCipher {
 
 	var newCipher *AEADBlockCipher
 	var err error
-	if c.aeadType == AES256GCM {
+	if c.aeadType == AES128GCM || c.aeadType == AES256GCM {
 		newCipher, err = newAESGCMBlockCipher(c.key)
 	} else if c.aeadType == ChaCha20Poly1305 {
 		newCipher, err = newChaCha20Poly1305BlockCipher(c.key)

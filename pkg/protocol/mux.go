@@ -87,7 +87,7 @@ func NewMux(isClinet bool) *Mux {
 		done:      make(chan struct{}),
 		cleaner:   time.NewTicker(idleUnderlayTickerInterval),
 	}
-	mux.ctx, mux.ctxCancelFunc = context.WithCancel(context.TODO())
+	mux.ctx, mux.ctxCancelFunc = context.WithCancel(context.Background())
 
 	// Run maintenance tasks in the background.
 	go func() {

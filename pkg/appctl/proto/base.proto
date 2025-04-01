@@ -91,6 +91,13 @@ enum TransportProtocol {
     TCP = 2;
 }
 
+enum Cipher {
+    CIPHER_DEFAULT = 0;
+    CIPHER_XCHACHA20_POLY1305 = 1;
+    CIPHER_AES_128_GCM = 2;
+    CIPHER_AES_256_GCM = 3;
+}
+
 message User {
 
     // User name is also the ID of user.
@@ -108,6 +115,9 @@ message User {
     // User quotas.
     // This has no effect at the client side.
     repeated Quota quotas = 4;
+
+    // Encryption and decryption algorithm.
+    optional Cipher cipher = 5;
 }
 
 message Quota {
