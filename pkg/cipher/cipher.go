@@ -32,12 +32,11 @@ const (
 
 type AEADType uint8
 
-// The AEADType values need to match the definitions in protobuf.
 const (
-	XChaCha20Poly1305 AEADType = iota + 1
-	AES128GCM
+	AES128GCM AEADType = iota + 1
 	AES256GCM
-	ChaCha20Poly1305 // TODO: remove this
+	ChaCha20Poly1305
+	XChaCha20Poly1305
 )
 
 var (

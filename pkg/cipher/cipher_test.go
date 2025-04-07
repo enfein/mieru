@@ -253,8 +253,8 @@ func TestAEADBlockCipherNewNonce(t *testing.T) {
 	}
 }
 
-func BenchmarkAESGCMStateless(b *testing.B) {
-	key, data := benchmarkGenKeyAndData(b)
+func BenchmarkAES128GCMStateless(b *testing.B) {
+	key, data := benchmarkGenKeyAndData(b, 16)
 	block, err := newAESGCMBlockCipher(key)
 	if err != nil {
 		b.Fatalf("newAESGCMBlockCipher() failed: %v", err)
@@ -263,8 +263,29 @@ func BenchmarkAESGCMStateless(b *testing.B) {
 	benchmarkEncryptDecryptStateless(b, block, data)
 }
 
-func BenchmarkAESGCMStateful(b *testing.B) {
-	key, data := benchmarkGenKeyAndData(b)
+func BenchmarkAES128GCMStateful(b *testing.B) {
+	key, data := benchmarkGenKeyAndData(b, 16)
+	block, err := newAESGCMBlockCipher(key)
+	if err != nil {
+		b.Fatalf("newAESGCMBlockCipher() failed: %v", err)
+	}
+	block.SetImplicitNonceMode(true)
+	block2 := block.Clone().(*AEADBlockCipher)
+	benchmarkEncryptDecryptStateful(b, block, block2, data)
+}
+
+func BenchmarkAES256GCMStateless(b *testing.B) {
+	key, data := benchmarkGenKeyAndData(b, 32)
+	block, err := newAESGCMBlockCipher(key)
+	if err != nil {
+		b.Fatalf("newAESGCMBlockCipher() failed: %v", err)
+	}
+	block.SetImplicitNonceMode(false)
+	benchmarkEncryptDecryptStateless(b, block, data)
+}
+
+func BenchmarkAES256GCMStateful(b *testing.B) {
+	key, data := benchmarkGenKeyAndData(b, 32)
 	block, err := newAESGCMBlockCipher(key)
 	if err != nil {
 		b.Fatalf("newAESGCMBlockCipher() failed: %v", err)
@@ -275,7 +296,7 @@ func BenchmarkAESGCMStateful(b *testing.B) {
 }
 
 func BenchmarkChaCha20Poly1305Stateless(b *testing.B) {
-	key, data := benchmarkGenKeyAndData(b)
+	key, data := benchmarkGenKeyAndData(b, 32)
 	block, err := newChaCha20Poly1305BlockCipher(key)
 	if err != nil {
 		b.Fatalf("newChaCha20Poly1305BlockCipher() failed: %v", err)
@@ -285,7 +306,7 @@ func BenchmarkChaCha20Poly1305Stateless(b *testing.B) {
 }
 
 func BenchmarkChaCha20Poly1305Stateful(b *testing.B) {
-	key, data := benchmarkGenKeyAndData(b)
+	key, data := benchmarkGenKeyAndData(b, 32)
 	block, err := newChaCha20Poly1305BlockCipher(key)
 	if err != nil {
 		b.Fatalf("newChaCha20Poly1305BlockCipher() failed: %v", err)
@@ -296,7 +317,7 @@ func BenchmarkChaCha20Poly1305Stateful(b *testing.B) {
 }
 
 func BenchmarkXChaCha20Poly1305Stateless(b *testing.B) {
-	key, data := benchmarkGenKeyAndData(b)
+	key, data := benchmarkGenKeyAndData(b, 32)
 	block, err := newXChaCha20Poly1305BlockCipher(key)
 	if err != nil {
 		b.Fatalf("newXChaCha20Poly1305BlockCipher() failed: %v", err)
@@ -306,7 +327,7 @@ func BenchmarkXChaCha20Poly1305Stateless(b *testing.B) {
 }
 
 func BenchmarkXChaCha20Poly1305Stateful(b *testing.B) {
-	key, data := benchmarkGenKeyAndData(b)
+	key, data := benchmarkGenKeyAndData(b, 32)
 	block, err := newXChaCha20Poly1305BlockCipher(key)
 	if err != nil {
 		b.Fatalf("newXChaCha20Poly1305BlockCipher() failed: %v", err)
@@ -344,9 +365,9 @@ func benchmarkEncryptDecryptStateful(b *testing.B, sendBlock, recvBlock BlockCip
 	}
 }
 
-func benchmarkGenKeyAndData(b *testing.B) (key, data []byte) {
+func benchmarkGenKeyAndData(b *testing.B, keyLen int) (key, data []byte) {
 	b.Helper()
-	key = make([]byte, 32)
+	key = make([]byte, keyLen)
 	data = make([]byte, 1500)
 	if _, err := crand.Read(key); err != nil {
 		b.Fatalf("Generate key failed.")

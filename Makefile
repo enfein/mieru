@@ -32,7 +32,7 @@ PROJECT_NAME=$(shell basename "${ROOT}")
 # - pkg/version/current.go
 #
 # Use `tools/bump_version.sh` script to change all those files at one shot.
-VERSION="3.13.0"
+VERSION="3.13.1"
 
 # Build binaries and installation packages.
 .PHONY: build
@@ -72,22 +72,7 @@ vendor:
 
 # Build Android clients.
 .PHONY: client-android
-client-android: client-android-amd64 client-android-arm64
-
-# Build Android amd64 client.
-.PHONY: client-android-amd64
-client-android-amd64:
-	if [ ! -z $$(command -v gcc) ]; then\
-		mkdir -p release/android/amd64;\
-		env GOOS=android GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/android/amd64/mieru cmd/mieru/mieru.go;\
-		cd release/android/amd64;\
-		sha256sum mieru > mieru_${VERSION}_android_amd64.sha256.txt;\
-		tar -zcvf mieru_${VERSION}_android_amd64.tar.gz mieru;\
-		sha256sum mieru_${VERSION}_android_amd64.tar.gz > mieru_${VERSION}_android_amd64.tar.gz.sha256.txt;\
-		cd "${ROOT}";\
-		mv release/android/amd64/mieru_${VERSION}_android_amd64.tar.gz release/;\
-		mv release/android/amd64/mieru_${VERSION}_android_amd64.tar.gz.sha256.txt release/;\
-	fi
+client-android: client-android-arm64
 
 # Build Android arm64 client.
 .PHONY: client-android-arm64
