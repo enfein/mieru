@@ -30,7 +30,7 @@ const (
 	rollUpToSecond       = 2 * time.Second
 	rollUpSecondToMinute = 120 * time.Second
 	rollUpMinuteToHour   = 120 * time.Minute
-	rollUpHourToDay      = 48 * time.Hour
+	rollUpHourToDay      = 8 * 24 * time.Hour // provide accurate hourly data for at least 7 days
 )
 
 // Counter holds a named int64 value that can't decrease.
