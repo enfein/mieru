@@ -17,13 +17,27 @@ syntax = "proto3";
 
 package appctl;
 
-import "google/protobuf/timestamp.proto";
+import "appctl/proto/base.proto";
+import "appctl/proto/google/protobuf/timestamp.proto";
+import "metrics/proto/metrics.proto";
 
 option go_package = "github.com/enfein/mieru/v3/pkg/appctl/appctlpb";
 
 message Metrics {
     // JSON dump of metrics.
     optional string json = 1;
+}
+
+message UserWithMetrics {
+    // User information.
+    optional User user = 1;
+
+    // User runtime information.
+    repeated metrics.Metric metrics = 2;
+}
+
+message UserWithMetricsList {
+    repeated UserWithMetrics items = 1;
 }
 
 message ProfileSavePath {

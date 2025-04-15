@@ -17,7 +17,7 @@ syntax = "proto3";
 
 package appctl;
 
-import "base.proto";
+import "appctl/proto/base.proto";
 
 option go_package = "github.com/enfein/mieru/v3/pkg/appctl/appctlpb";
 

@@ -398,7 +398,7 @@ protobuf:
 		chmod 755 "${ROOT}/tools/build/protoc-gen-go-grpc";\
 	fi
 
-	PATH=${PATH}:"${ROOT}/tools/build" ${ROOT}/tools/build/protoc -I="${ROOT}/pkg/appctl/proto" \
+	PATH=${PATH}:"${ROOT}/tools/build" ${ROOT}/tools/build/protoc -I="${ROOT}/pkg" \
 		--go_out="${ROOT}/pkg/appctl" --go_opt=module="github.com/enfein/mieru/v3/pkg/appctl" \
 		--go-grpc_out="${ROOT}/pkg/appctl" --go-grpc_opt=module="github.com/enfein/mieru/v3/pkg/appctl" \
 		--proto_path="${ROOT}/pkg" \
@@ -408,12 +408,12 @@ protobuf:
 		"${ROOT}/pkg/appctl/proto/rpc.proto" \
 		"${ROOT}/pkg/appctl/proto/servercfg.proto"
 
-	PATH=${PATH}:"${ROOT}/tools/build" ${ROOT}/tools/build/protoc -I="${ROOT}/pkg/metrics/proto" \
+	PATH=${PATH}:"${ROOT}/tools/build" ${ROOT}/tools/build/protoc -I="${ROOT}/pkg" \
 		--go_out="${ROOT}/pkg/metrics" --go_opt=module="github.com/enfein/mieru/v3/pkg/metrics" \
 		--proto_path="${ROOT}/pkg" \
 		"${ROOT}/pkg/metrics/proto/metrics.proto"
 
-	PATH=${PATH}:"${ROOT}/tools/build" ${ROOT}/tools/build/protoc -I="${ROOT}/pkg/version/updater/proto" \
+	PATH=${PATH}:"${ROOT}/tools/build" ${ROOT}/tools/build/protoc -I="${ROOT}/pkg" \
 		--go_out="${ROOT}/pkg/version/updater" --go_opt=module="github.com/enfein/mieru/v3/pkg/version/updater" \
 		--proto_path="${ROOT}/pkg" \
 		"${ROOT}/pkg/version/updater/proto/history.proto"

@@ -17,7 +17,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.3.0
 // - protoc             v4.22.3
-// source: rpc.proto
+// source: appctl/proto/rpc.proto
 
 package appctlgrpc
 
@@ -436,7 +436,7 @@ var ClientLifecycleService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "rpc.proto",
+	Metadata: "appctl/proto/rpc.proto",
 }
 
 const (
@@ -447,6 +447,7 @@ const (
 	ServerLifecycleService_Exit_FullMethodName                = "/appctl.ServerLifecycleService/Exit"
 	ServerLifecycleService_GetMetrics_FullMethodName          = "/appctl.ServerLifecycleService/GetMetrics"
 	ServerLifecycleService_GetSessionInfoList_FullMethodName  = "/appctl.ServerLifecycleService/GetSessionInfoList"
+	ServerLifecycleService_GetUsers_FullMethodName            = "/appctl.ServerLifecycleService/GetUsers"
 	ServerLifecycleService_GetThreadDump_FullMethodName       = "/appctl.ServerLifecycleService/GetThreadDump"
 	ServerLifecycleService_StartCPUProfile_FullMethodName     = "/appctl.ServerLifecycleService/StartCPUProfile"
 	ServerLifecycleService_StopCPUProfile_FullMethodName      = "/appctl.ServerLifecycleService/StopCPUProfile"
@@ -472,6 +473,8 @@ type ServerLifecycleServiceClient interface {
 	GetMetrics(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Metrics, error)
 	// Get server session information.
 	GetSessionInfoList(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.SessionInfoList, error)
+	// Get users setting and runtime information.
+	GetUsers(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.UserWithMetricsList, error)
 	// Generate a thread dump of server daemon.
 	GetThreadDump(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.ThreadDump, error)
 	// Start CPU profiling.
@@ -555,6 +558,15 @@ func (c *serverLifecycleServiceClient) GetSessionInfoList(ctx context.Context, i
 	return out, nil
 }
 
+func (c *serverLifecycleServiceClient) GetUsers(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.UserWithMetricsList, error) {
+	out := new(appctlpb.UserWithMetricsList)
+	err := c.cc.Invoke(ctx, ServerLifecycleService_GetUsers_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *serverLifecycleServiceClient) GetThreadDump(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.ThreadDump, error) {
 	out := new(appctlpb.ThreadDump)
 	err := c.cc.Invoke(ctx, ServerLifecycleService_GetThreadDump_FullMethodName, in, out, opts...)
@@ -618,6 +630,8 @@ type ServerLifecycleServiceServer interface {
 	GetMetrics(context.Context, *appctlpb.Empty) (*appctlpb.Metrics, error)
 	// Get server session information.
 	GetSessionInfoList(context.Context, *appctlpb.Empty) (*appctlpb.SessionInfoList, error)
+	// Get users setting and runtime information.
+	GetUsers(context.Context, *appctlpb.Empty) (*appctlpb.UserWithMetricsList, error)
 	// Generate a thread dump of server daemon.
 	GetThreadDump(context.Context, *appctlpb.Empty) (*appctlpb.ThreadDump, error)
 	// Start CPU profiling.
@@ -655,6 +669,9 @@ func (UnimplementedServerLifecycleServiceServer) GetMetrics(context.Context, *ap
 }
 func (UnimplementedServerLifecycleServiceServer) GetSessionInfoList(context.Context, *appctlpb.Empty) (*appctlpb.SessionInfoList, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSessionInfoList not implemented")
+}
+func (UnimplementedServerLifecycleServiceServer) GetUsers(context.Context, *appctlpb.Empty) (*appctlpb.UserWithMetricsList, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetUsers not implemented")
 }
 func (UnimplementedServerLifecycleServiceServer) GetThreadDump(context.Context, *appctlpb.Empty) (*appctlpb.ThreadDump, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetThreadDump not implemented")
@@ -811,6 +828,24 @@ func _ServerLifecycleService_GetSessionInfoList_Handler(srv interface{}, ctx con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ServerLifecycleService_GetUsers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(appctlpb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerLifecycleServiceServer).GetUsers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerLifecycleService_GetUsers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerLifecycleServiceServer).GetUsers(ctx, req.(*appctlpb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ServerLifecycleService_GetThreadDump_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(appctlpb.Empty)
 	if err := dec(in); err != nil {
@@ -937,6 +972,10 @@ var ServerLifecycleService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ServerLifecycleService_GetSessionInfoList_Handler,
 		},
 		{
+			MethodName: "GetUsers",
+			Handler:    _ServerLifecycleService_GetUsers_Handler,
+		},
+		{
 			MethodName: "GetThreadDump",
 			Handler:    _ServerLifecycleService_GetThreadDump_Handler,
 		},
@@ -958,7 +997,7 @@ var ServerLifecycleService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "rpc.proto",
+	Metadata: "appctl/proto/rpc.proto",
 }
 
 const (
@@ -1089,5 +1128,5 @@ var ServerConfigService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "rpc.proto",
+	Metadata: "appctl/proto/rpc.proto",
 }

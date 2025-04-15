@@ -260,6 +260,10 @@ func (s *serverLifecycleService) GetSessionInfoList(context.Context, *pb.Empty) 
 	return mux.ExportSessionInfoList(), nil
 }
 
+func (s *serverLifecycleService) GetUsers(context.Context, *pb.Empty) (*pb.UserWithMetricsList, error) {
+	return &pb.UserWithMetricsList{}, nil
+}
+
 func (s *serverLifecycleService) GetThreadDump(ctx context.Context, req *pb.Empty) (*pb.ThreadDump, error) {
 	return &pb.ThreadDump{ThreadDump: proto.String(common.GetAllStackTrace())}, nil
 }

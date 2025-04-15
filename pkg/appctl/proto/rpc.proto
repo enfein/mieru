@@ -17,9 +17,9 @@ syntax = "proto3";
 
 package appctl;
 
-import "base.proto";
-import "misc.proto";
-import "servercfg.proto";
+import "appctl/proto/base.proto";
+import "appctl/proto/misc.proto";
+import "appctl/proto/servercfg.proto";
 
 option go_package = "github.com/enfein/mieru/v3/pkg/appctl/appctlgrpc";
 
@@ -73,6 +73,9 @@ service ServerLifecycleService {
 
     // Get server session information.
     rpc GetSessionInfoList(Empty) returns (SessionInfoList);
+
+    // Get users setting and runtime information.
+    rpc GetUsers(Empty) returns (UserWithMetricsList);
 
     // Generate a thread dump of server daemon.
     rpc GetThreadDump(Empty) returns (ThreadDump);
