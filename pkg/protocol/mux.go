@@ -397,7 +397,7 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 		}
 		log.Infof("Mux is listening to endpoint %s %s", network, laddr)
 
-		// Close the rawListener if the master context is cancelled.
+		// Close the rawListener if the master context is canceled.
 		// This can break the forever loop below.
 		go func(ctx context.Context, l *net.TCPListener) {
 			<-ctx.Done()

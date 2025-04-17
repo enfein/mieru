@@ -8,4 +8,4 @@ linters:
 
 linters-settings:
   misspell:
-    locale: en-US
+    locale: US
