@@ -175,9 +175,7 @@ func DumpMetricsNow() error {
 		pbMetrics := make([]*pb.Metric, 0)
 		group.metrics.Range(func(k, v any) bool {
 			metric := v.(Metric)
-			pbMetric := &pb.Metric{}
-			toMetricPB(pbMetric, metric)
-			pbMetrics = append(pbMetrics, pbMetric)
+			pbMetrics = append(pbMetrics, ToMetricPB(metric))
 			return true
 		})
 		pbGroup.Metrics = pbMetrics
@@ -193,6 +191,31 @@ func DumpMetricsNow() error {
 		return fmt.Errorf("os.WriteFile(%q) failed: %w", metricsDumpFilePath, err)
 	}
 	return nil
+}
+
+// ToMetricPB creates a protobuf representation of a metric.
+func ToMetricPB(src Metric) *pb.Metric {
+	dst := &pb.Metric{}
+	dst.Name = proto.String(src.Name())
+	switch src.Type() {
+	case COUNTER:
+		dst.Type = pb.MetricType_COUNTER.Enum()
+	case COUNTER_TIME_SERIES:
+		dst.Type = pb.MetricType_COUNTER_TIME_SERIES.Enum()
+	case GAUGE:
+		dst.Type = pb.MetricType_GAUGE.Enum()
+	default:
+		dst.Type = pb.MetricType_UNSPECIFIED.Enum()
+	}
+	dst.Value = proto.Int64(src.Load())
+	if src.Type() == COUNTER_TIME_SERIES {
+		counter := src.(*Counter)
+		counter.mu.Lock()
+		dst.History = make([]*pb.History, len(counter.history))
+		copy(dst.History, counter.history)
+		counter.mu.Unlock()
+	}
+	return dst
 }
 
 // LogMetricsNow writes the current metrics to log.
@@ -239,27 +262,5 @@ func fromMetricPB(dst *Counter, src *pb.Metric) {
 		delta := mathext.Max(0, src.GetValue()-dst.Load())
 		dst.Add(delta)
 		dst.history = src.GetHistory()
-	}
-}
-
-func toMetricPB(dst *pb.Metric, src Metric) {
-	dst.Name = proto.String(src.Name())
-	switch src.Type() {
-	case COUNTER:
-		dst.Type = pb.MetricType_COUNTER.Enum()
-	case COUNTER_TIME_SERIES:
-		dst.Type = pb.MetricType_COUNTER_TIME_SERIES.Enum()
-	case GAUGE:
-		dst.Type = pb.MetricType_GAUGE.Enum()
-	default:
-		dst.Type = pb.MetricType_UNSPECIFIED.Enum()
-	}
-	dst.Value = proto.Int64(src.Load())
-	if src.Type() == COUNTER_TIME_SERIES {
-		counter := src.(*Counter)
-		counter.mu.Lock()
-		dst.History = make([]*pb.History, len(counter.history))
-		copy(dst.History, counter.history)
-		counter.mu.Unlock()
 	}
 }

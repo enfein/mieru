@@ -510,7 +510,7 @@ var clientRunFunc = func(s []string) error {
 			}
 			grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(appctl.MaxRecvMsgSize))
 			appctl.SetClientRPCServerRef(grpcServer)
-			appctlgrpc.RegisterClientLifecycleServiceServer(grpcServer, appctl.NewClientLifecycleService())
+			appctlgrpc.RegisterClientManagementServiceServer(grpcServer, appctl.NewClientManagementService())
 			reflection.Register(grpcServer)
 			close(appctl.ClientRPCServerStarted)
 			log.Infof("mieru client RPC server is running")
@@ -695,7 +695,7 @@ var clientRunFunc = func(s []string) error {
 var clientStopFunc = func(s []string) error {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
-	client, running, err := newClientLifecycleRPCClient(ctx)
+	client, running, err := newClientManagementRPCClient(ctx)
 	if !running {
 		log.Infof(stderror.ClientNotRunning)
 		return nil
@@ -889,7 +889,7 @@ var clientCheckUpdateFunc = func(s []string) error {
 		if err == nil {
 			socks5ProxyURI = fmt.Sprintf("socks5://127.0.0.1:%d", config.GetSocks5Port())
 		}
-		// Otherwise, sliently drop the error.
+		// Otherwise, silently drop the error.
 	}
 
 	msg, err := clientCheckUpdateAndUpdateHistory(socks5ProxyURI)
@@ -907,7 +907,7 @@ var clientCheckUpdateFunc = func(s []string) error {
 var clientGetMetricsFunc = func(s []string) error {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
-	client, running, err := newClientLifecycleRPCClient(ctx)
+	client, running, err := newClientManagementRPCClient(ctx)
 	if !running {
 		return fmt.Errorf(stderror.ClientNotRunning)
 	}
@@ -926,7 +926,7 @@ var clientGetMetricsFunc = func(s []string) error {
 var clientGetConnectionsFunc = func(s []string) error {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
-	client, running, err := newClientLifecycleRPCClient(ctx)
+	client, running, err := newClientManagementRPCClient(ctx)
 	if !running {
 		return fmt.Errorf(stderror.ClientNotRunning)
 	}
@@ -945,7 +945,7 @@ var clientGetConnectionsFunc = func(s []string) error {
 var clientGetThreadDumpFunc = func(s []string) error {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
-	client, running, err := newClientLifecycleRPCClient(ctx)
+	client, running, err := newClientManagementRPCClient(ctx)
 	if !running {
 		return fmt.Errorf(stderror.ClientNotRunning)
 	}
@@ -964,7 +964,7 @@ var clientGetThreadDumpFunc = func(s []string) error {
 var clientGetHeapProfileFunc = func(s []string) error {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
-	client, running, err := newClientLifecycleRPCClient(ctx)
+	client, running, err := newClientManagementRPCClient(ctx)
 	if !running {
 		return fmt.Errorf(stderror.ClientNotRunning)
 	}
@@ -982,7 +982,7 @@ var clientGetHeapProfileFunc = func(s []string) error {
 var clientGetMemoryStatisticsFunc = func(s []string) error {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
-	client, running, err := newClientLifecycleRPCClient(ctx)
+	client, running, err := newClientManagementRPCClient(ctx)
 	if !running {
 		return fmt.Errorf(stderror.ClientNotRunning)
 	}
@@ -1005,7 +1005,7 @@ var clientGetMemoryStatisticsFunc = func(s []string) error {
 var clientStartCPUProfileFunc = func(s []string) error {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
-	client, running, err := newClientLifecycleRPCClient(ctx)
+	client, running, err := newClientManagementRPCClient(ctx)
 	if !running {
 		return fmt.Errorf(stderror.ClientNotRunning)
 	}
@@ -1023,7 +1023,7 @@ var clientStartCPUProfileFunc = func(s []string) error {
 var clientStopCPUProfileFunc = func(s []string) error {
 	ctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
-	client, running, err := newClientLifecycleRPCClient(ctx)
+	client, running, err := newClientManagementRPCClient(ctx)
 	if !running {
 		return fmt.Errorf(stderror.ClientNotRunning)
 	}
@@ -1035,16 +1035,16 @@ var clientStopCPUProfileFunc = func(s []string) error {
 	return nil
 }
 
-// newClientLifecycleRPCClient returns a new client lifecycle RPC client.
+// newClientManagementRPCClient returns a new client management RPC client.
 // No RPC client is returned if mieru is not running.
-func newClientLifecycleRPCClient(ctx context.Context) (client appctlgrpc.ClientLifecycleServiceClient, running bool, err error) {
+func newClientManagementRPCClient(ctx context.Context) (client appctlgrpc.ClientManagementServiceClient, running bool, err error) {
 	if err := appctl.IsClientDaemonRunning(ctx); err != nil {
 		return nil, false, nil
 	}
 	running = true
-	client, err = appctl.NewClientLifecycleRPCClient()
+	client, err = appctl.NewClientManagementRPCClient()
 	if err != nil {
-		return nil, true, fmt.Errorf(stderror.CreateClientLifecycleRPCClientFailedErr, err)
+		return nil, true, fmt.Errorf(stderror.CreateClientManagementRPCClientFailedErr, err)
 	}
 	return
 }

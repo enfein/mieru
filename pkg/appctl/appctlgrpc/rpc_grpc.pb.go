@@ -35,21 +35,21 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	ClientLifecycleService_GetStatus_FullMethodName           = "/appctl.ClientLifecycleService/GetStatus"
-	ClientLifecycleService_Exit_FullMethodName                = "/appctl.ClientLifecycleService/Exit"
-	ClientLifecycleService_GetMetrics_FullMethodName          = "/appctl.ClientLifecycleService/GetMetrics"
-	ClientLifecycleService_GetSessionInfoList_FullMethodName  = "/appctl.ClientLifecycleService/GetSessionInfoList"
-	ClientLifecycleService_GetThreadDump_FullMethodName       = "/appctl.ClientLifecycleService/GetThreadDump"
-	ClientLifecycleService_StartCPUProfile_FullMethodName     = "/appctl.ClientLifecycleService/StartCPUProfile"
-	ClientLifecycleService_StopCPUProfile_FullMethodName      = "/appctl.ClientLifecycleService/StopCPUProfile"
-	ClientLifecycleService_GetHeapProfile_FullMethodName      = "/appctl.ClientLifecycleService/GetHeapProfile"
-	ClientLifecycleService_GetMemoryStatistics_FullMethodName = "/appctl.ClientLifecycleService/GetMemoryStatistics"
+	ClientManagementService_GetStatus_FullMethodName           = "/appctl.ClientManagementService/GetStatus"
+	ClientManagementService_Exit_FullMethodName                = "/appctl.ClientManagementService/Exit"
+	ClientManagementService_GetMetrics_FullMethodName          = "/appctl.ClientManagementService/GetMetrics"
+	ClientManagementService_GetSessionInfoList_FullMethodName  = "/appctl.ClientManagementService/GetSessionInfoList"
+	ClientManagementService_GetThreadDump_FullMethodName       = "/appctl.ClientManagementService/GetThreadDump"
+	ClientManagementService_StartCPUProfile_FullMethodName     = "/appctl.ClientManagementService/StartCPUProfile"
+	ClientManagementService_StopCPUProfile_FullMethodName      = "/appctl.ClientManagementService/StopCPUProfile"
+	ClientManagementService_GetHeapProfile_FullMethodName      = "/appctl.ClientManagementService/GetHeapProfile"
+	ClientManagementService_GetMemoryStatistics_FullMethodName = "/appctl.ClientManagementService/GetMemoryStatistics"
 )
 
-// ClientLifecycleServiceClient is the client API for ClientLifecycleService service.
+// ClientManagementServiceClient is the client API for ClientManagementService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type ClientLifecycleServiceClient interface {
+type ClientManagementServiceClient interface {
 	// Fetch client application status.
 	GetStatus(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.AppStatusMsg, error)
 	// Quit client daemon.
@@ -70,99 +70,99 @@ type ClientLifecycleServiceClient interface {
 	GetMemoryStatistics(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.MemoryStatistics, error)
 }
 
-type clientLifecycleServiceClient struct {
+type clientManagementServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewClientLifecycleServiceClient(cc grpc.ClientConnInterface) ClientLifecycleServiceClient {
-	return &clientLifecycleServiceClient{cc}
+func NewClientManagementServiceClient(cc grpc.ClientConnInterface) ClientManagementServiceClient {
+	return &clientManagementServiceClient{cc}
 }
 
-func (c *clientLifecycleServiceClient) GetStatus(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.AppStatusMsg, error) {
+func (c *clientManagementServiceClient) GetStatus(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.AppStatusMsg, error) {
 	out := new(appctlpb.AppStatusMsg)
-	err := c.cc.Invoke(ctx, ClientLifecycleService_GetStatus_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, ClientManagementService_GetStatus_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *clientLifecycleServiceClient) Exit(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
+func (c *clientManagementServiceClient) Exit(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
 	out := new(appctlpb.Empty)
-	err := c.cc.Invoke(ctx, ClientLifecycleService_Exit_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, ClientManagementService_Exit_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *clientLifecycleServiceClient) GetMetrics(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Metrics, error) {
+func (c *clientManagementServiceClient) GetMetrics(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Metrics, error) {
 	out := new(appctlpb.Metrics)
-	err := c.cc.Invoke(ctx, ClientLifecycleService_GetMetrics_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, ClientManagementService_GetMetrics_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *clientLifecycleServiceClient) GetSessionInfoList(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.SessionInfoList, error) {
+func (c *clientManagementServiceClient) GetSessionInfoList(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.SessionInfoList, error) {
 	out := new(appctlpb.SessionInfoList)
-	err := c.cc.Invoke(ctx, ClientLifecycleService_GetSessionInfoList_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, ClientManagementService_GetSessionInfoList_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *clientLifecycleServiceClient) GetThreadDump(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.ThreadDump, error) {
+func (c *clientManagementServiceClient) GetThreadDump(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.ThreadDump, error) {
 	out := new(appctlpb.ThreadDump)
-	err := c.cc.Invoke(ctx, ClientLifecycleService_GetThreadDump_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, ClientManagementService_GetThreadDump_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *clientLifecycleServiceClient) StartCPUProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
+func (c *clientManagementServiceClient) StartCPUProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
 	out := new(appctlpb.Empty)
-	err := c.cc.Invoke(ctx, ClientLifecycleService_StartCPUProfile_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, ClientManagementService_StartCPUProfile_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *clientLifecycleServiceClient) StopCPUProfile(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
+func (c *clientManagementServiceClient) StopCPUProfile(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
 	out := new(appctlpb.Empty)
-	err := c.cc.Invoke(ctx, ClientLifecycleService_StopCPUProfile_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, ClientManagementService_StopCPUProfile_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *clientLifecycleServiceClient) GetHeapProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
+func (c *clientManagementServiceClient) GetHeapProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
 	out := new(appctlpb.Empty)
-	err := c.cc.Invoke(ctx, ClientLifecycleService_GetHeapProfile_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, ClientManagementService_GetHeapProfile_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *clientLifecycleServiceClient) GetMemoryStatistics(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.MemoryStatistics, error) {
+func (c *clientManagementServiceClient) GetMemoryStatistics(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.MemoryStatistics, error) {
 	out := new(appctlpb.MemoryStatistics)
-	err := c.cc.Invoke(ctx, ClientLifecycleService_GetMemoryStatistics_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, ClientManagementService_GetMemoryStatistics_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// ClientLifecycleServiceServer is the server API for ClientLifecycleService service.
-// All implementations must embed UnimplementedClientLifecycleServiceServer
+// ClientManagementServiceServer is the server API for ClientManagementService service.
+// All implementations must embed UnimplementedClientManagementServiceServer
 // for forward compatibility
-type ClientLifecycleServiceServer interface {
+type ClientManagementServiceServer interface {
 	// Fetch client application status.
 	GetStatus(context.Context, *appctlpb.Empty) (*appctlpb.AppStatusMsg, error)
 	// Quit client daemon.
@@ -181,258 +181,258 @@ type ClientLifecycleServiceServer interface {
 	GetHeapProfile(context.Context, *appctlpb.ProfileSavePath) (*appctlpb.Empty, error)
 	// Get memory statistics of client daemon.
 	GetMemoryStatistics(context.Context, *appctlpb.Empty) (*appctlpb.MemoryStatistics, error)
-	mustEmbedUnimplementedClientLifecycleServiceServer()
+	mustEmbedUnimplementedClientManagementServiceServer()
 }
 
-// UnimplementedClientLifecycleServiceServer must be embedded to have forward compatible implementations.
-type UnimplementedClientLifecycleServiceServer struct {
+// UnimplementedClientManagementServiceServer must be embedded to have forward compatible implementations.
+type UnimplementedClientManagementServiceServer struct {
 }
 
-func (UnimplementedClientLifecycleServiceServer) GetStatus(context.Context, *appctlpb.Empty) (*appctlpb.AppStatusMsg, error) {
+func (UnimplementedClientManagementServiceServer) GetStatus(context.Context, *appctlpb.Empty) (*appctlpb.AppStatusMsg, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStatus not implemented")
 }
-func (UnimplementedClientLifecycleServiceServer) Exit(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error) {
+func (UnimplementedClientManagementServiceServer) Exit(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Exit not implemented")
 }
-func (UnimplementedClientLifecycleServiceServer) GetMetrics(context.Context, *appctlpb.Empty) (*appctlpb.Metrics, error) {
+func (UnimplementedClientManagementServiceServer) GetMetrics(context.Context, *appctlpb.Empty) (*appctlpb.Metrics, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMetrics not implemented")
 }
-func (UnimplementedClientLifecycleServiceServer) GetSessionInfoList(context.Context, *appctlpb.Empty) (*appctlpb.SessionInfoList, error) {
+func (UnimplementedClientManagementServiceServer) GetSessionInfoList(context.Context, *appctlpb.Empty) (*appctlpb.SessionInfoList, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSessionInfoList not implemented")
 }
-func (UnimplementedClientLifecycleServiceServer) GetThreadDump(context.Context, *appctlpb.Empty) (*appctlpb.ThreadDump, error) {
+func (UnimplementedClientManagementServiceServer) GetThreadDump(context.Context, *appctlpb.Empty) (*appctlpb.ThreadDump, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetThreadDump not implemented")
 }
-func (UnimplementedClientLifecycleServiceServer) StartCPUProfile(context.Context, *appctlpb.ProfileSavePath) (*appctlpb.Empty, error) {
+func (UnimplementedClientManagementServiceServer) StartCPUProfile(context.Context, *appctlpb.ProfileSavePath) (*appctlpb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartCPUProfile not implemented")
 }
-func (UnimplementedClientLifecycleServiceServer) StopCPUProfile(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error) {
+func (UnimplementedClientManagementServiceServer) StopCPUProfile(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StopCPUProfile not implemented")
 }
-func (UnimplementedClientLifecycleServiceServer) GetHeapProfile(context.Context, *appctlpb.ProfileSavePath) (*appctlpb.Empty, error) {
+func (UnimplementedClientManagementServiceServer) GetHeapProfile(context.Context, *appctlpb.ProfileSavePath) (*appctlpb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetHeapProfile not implemented")
 }
-func (UnimplementedClientLifecycleServiceServer) GetMemoryStatistics(context.Context, *appctlpb.Empty) (*appctlpb.MemoryStatistics, error) {
+func (UnimplementedClientManagementServiceServer) GetMemoryStatistics(context.Context, *appctlpb.Empty) (*appctlpb.MemoryStatistics, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMemoryStatistics not implemented")
 }
-func (UnimplementedClientLifecycleServiceServer) mustEmbedUnimplementedClientLifecycleServiceServer() {
+func (UnimplementedClientManagementServiceServer) mustEmbedUnimplementedClientManagementServiceServer() {
 }
 
-// UnsafeClientLifecycleServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to ClientLifecycleServiceServer will
+// UnsafeClientManagementServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ClientManagementServiceServer will
 // result in compilation errors.
-type UnsafeClientLifecycleServiceServer interface {
-	mustEmbedUnimplementedClientLifecycleServiceServer()
+type UnsafeClientManagementServiceServer interface {
+	mustEmbedUnimplementedClientManagementServiceServer()
 }
 
-func RegisterClientLifecycleServiceServer(s grpc.ServiceRegistrar, srv ClientLifecycleServiceServer) {
-	s.RegisterService(&ClientLifecycleService_ServiceDesc, srv)
+func RegisterClientManagementServiceServer(s grpc.ServiceRegistrar, srv ClientManagementServiceServer) {
+	s.RegisterService(&ClientManagementService_ServiceDesc, srv)
 }
 
-func _ClientLifecycleService_GetStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ClientManagementService_GetStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(appctlpb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ClientLifecycleServiceServer).GetStatus(ctx, in)
+		return srv.(ClientManagementServiceServer).GetStatus(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ClientLifecycleService_GetStatus_FullMethodName,
+		FullMethod: ClientManagementService_GetStatus_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ClientLifecycleServiceServer).GetStatus(ctx, req.(*appctlpb.Empty))
+		return srv.(ClientManagementServiceServer).GetStatus(ctx, req.(*appctlpb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ClientLifecycleService_Exit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ClientManagementService_Exit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(appctlpb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ClientLifecycleServiceServer).Exit(ctx, in)
+		return srv.(ClientManagementServiceServer).Exit(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ClientLifecycleService_Exit_FullMethodName,
+		FullMethod: ClientManagementService_Exit_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ClientLifecycleServiceServer).Exit(ctx, req.(*appctlpb.Empty))
+		return srv.(ClientManagementServiceServer).Exit(ctx, req.(*appctlpb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ClientLifecycleService_GetMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ClientManagementService_GetMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(appctlpb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ClientLifecycleServiceServer).GetMetrics(ctx, in)
+		return srv.(ClientManagementServiceServer).GetMetrics(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ClientLifecycleService_GetMetrics_FullMethodName,
+		FullMethod: ClientManagementService_GetMetrics_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ClientLifecycleServiceServer).GetMetrics(ctx, req.(*appctlpb.Empty))
+		return srv.(ClientManagementServiceServer).GetMetrics(ctx, req.(*appctlpb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ClientLifecycleService_GetSessionInfoList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ClientManagementService_GetSessionInfoList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(appctlpb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ClientLifecycleServiceServer).GetSessionInfoList(ctx, in)
+		return srv.(ClientManagementServiceServer).GetSessionInfoList(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ClientLifecycleService_GetSessionInfoList_FullMethodName,
+		FullMethod: ClientManagementService_GetSessionInfoList_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ClientLifecycleServiceServer).GetSessionInfoList(ctx, req.(*appctlpb.Empty))
+		return srv.(ClientManagementServiceServer).GetSessionInfoList(ctx, req.(*appctlpb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ClientLifecycleService_GetThreadDump_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ClientManagementService_GetThreadDump_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(appctlpb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ClientLifecycleServiceServer).GetThreadDump(ctx, in)
+		return srv.(ClientManagementServiceServer).GetThreadDump(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ClientLifecycleService_GetThreadDump_FullMethodName,
+		FullMethod: ClientManagementService_GetThreadDump_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ClientLifecycleServiceServer).GetThreadDump(ctx, req.(*appctlpb.Empty))
+		return srv.(ClientManagementServiceServer).GetThreadDump(ctx, req.(*appctlpb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ClientLifecycleService_StartCPUProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ClientManagementService_StartCPUProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(appctlpb.ProfileSavePath)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ClientLifecycleServiceServer).StartCPUProfile(ctx, in)
+		return srv.(ClientManagementServiceServer).StartCPUProfile(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ClientLifecycleService_StartCPUProfile_FullMethodName,
+		FullMethod: ClientManagementService_StartCPUProfile_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ClientLifecycleServiceServer).StartCPUProfile(ctx, req.(*appctlpb.ProfileSavePath))
+		return srv.(ClientManagementServiceServer).StartCPUProfile(ctx, req.(*appctlpb.ProfileSavePath))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ClientLifecycleService_StopCPUProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ClientManagementService_StopCPUProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(appctlpb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ClientLifecycleServiceServer).StopCPUProfile(ctx, in)
+		return srv.(ClientManagementServiceServer).StopCPUProfile(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ClientLifecycleService_StopCPUProfile_FullMethodName,
+		FullMethod: ClientManagementService_StopCPUProfile_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ClientLifecycleServiceServer).StopCPUProfile(ctx, req.(*appctlpb.Empty))
+		return srv.(ClientManagementServiceServer).StopCPUProfile(ctx, req.(*appctlpb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ClientLifecycleService_GetHeapProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ClientManagementService_GetHeapProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(appctlpb.ProfileSavePath)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ClientLifecycleServiceServer).GetHeapProfile(ctx, in)
+		return srv.(ClientManagementServiceServer).GetHeapProfile(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ClientLifecycleService_GetHeapProfile_FullMethodName,
+		FullMethod: ClientManagementService_GetHeapProfile_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ClientLifecycleServiceServer).GetHeapProfile(ctx, req.(*appctlpb.ProfileSavePath))
+		return srv.(ClientManagementServiceServer).GetHeapProfile(ctx, req.(*appctlpb.ProfileSavePath))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ClientLifecycleService_GetMemoryStatistics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ClientManagementService_GetMemoryStatistics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(appctlpb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ClientLifecycleServiceServer).GetMemoryStatistics(ctx, in)
+		return srv.(ClientManagementServiceServer).GetMemoryStatistics(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ClientLifecycleService_GetMemoryStatistics_FullMethodName,
+		FullMethod: ClientManagementService_GetMemoryStatistics_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ClientLifecycleServiceServer).GetMemoryStatistics(ctx, req.(*appctlpb.Empty))
+		return srv.(ClientManagementServiceServer).GetMemoryStatistics(ctx, req.(*appctlpb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// ClientLifecycleService_ServiceDesc is the grpc.ServiceDesc for ClientLifecycleService service.
+// ClientManagementService_ServiceDesc is the grpc.ServiceDesc for ClientManagementService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var ClientLifecycleService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "appctl.ClientLifecycleService",
-	HandlerType: (*ClientLifecycleServiceServer)(nil),
+var ClientManagementService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "appctl.ClientManagementService",
+	HandlerType: (*ClientManagementServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "GetStatus",
-			Handler:    _ClientLifecycleService_GetStatus_Handler,
+			Handler:    _ClientManagementService_GetStatus_Handler,
 		},
 		{
 			MethodName: "Exit",
-			Handler:    _ClientLifecycleService_Exit_Handler,
+			Handler:    _ClientManagementService_Exit_Handler,
 		},
 		{
 			MethodName: "GetMetrics",
-			Handler:    _ClientLifecycleService_GetMetrics_Handler,
+			Handler:    _ClientManagementService_GetMetrics_Handler,
 		},
 		{
 			MethodName: "GetSessionInfoList",
-			Handler:    _ClientLifecycleService_GetSessionInfoList_Handler,
+			Handler:    _ClientManagementService_GetSessionInfoList_Handler,
 		},
 		{
 			MethodName: "GetThreadDump",
-			Handler:    _ClientLifecycleService_GetThreadDump_Handler,
+			Handler:    _ClientManagementService_GetThreadDump_Handler,
 		},
 		{
 			MethodName: "StartCPUProfile",
-			Handler:    _ClientLifecycleService_StartCPUProfile_Handler,
+			Handler:    _ClientManagementService_StartCPUProfile_Handler,
 		},
 		{
 			MethodName: "StopCPUProfile",
-			Handler:    _ClientLifecycleService_StopCPUProfile_Handler,
+			Handler:    _ClientManagementService_StopCPUProfile_Handler,
 		},
 		{
 			MethodName: "GetHeapProfile",
-			Handler:    _ClientLifecycleService_GetHeapProfile_Handler,
+			Handler:    _ClientManagementService_GetHeapProfile_Handler,
 		},
 		{
 			MethodName: "GetMemoryStatistics",
-			Handler:    _ClientLifecycleService_GetMemoryStatistics_Handler,
+			Handler:    _ClientManagementService_GetMemoryStatistics_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -440,31 +440,37 @@ var ClientLifecycleService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	ServerLifecycleService_GetStatus_FullMethodName           = "/appctl.ServerLifecycleService/GetStatus"
-	ServerLifecycleService_Start_FullMethodName               = "/appctl.ServerLifecycleService/Start"
-	ServerLifecycleService_Stop_FullMethodName                = "/appctl.ServerLifecycleService/Stop"
-	ServerLifecycleService_Reload_FullMethodName              = "/appctl.ServerLifecycleService/Reload"
-	ServerLifecycleService_Exit_FullMethodName                = "/appctl.ServerLifecycleService/Exit"
-	ServerLifecycleService_GetMetrics_FullMethodName          = "/appctl.ServerLifecycleService/GetMetrics"
-	ServerLifecycleService_GetSessionInfoList_FullMethodName  = "/appctl.ServerLifecycleService/GetSessionInfoList"
-	ServerLifecycleService_GetUsers_FullMethodName            = "/appctl.ServerLifecycleService/GetUsers"
-	ServerLifecycleService_GetThreadDump_FullMethodName       = "/appctl.ServerLifecycleService/GetThreadDump"
-	ServerLifecycleService_StartCPUProfile_FullMethodName     = "/appctl.ServerLifecycleService/StartCPUProfile"
-	ServerLifecycleService_StopCPUProfile_FullMethodName      = "/appctl.ServerLifecycleService/StopCPUProfile"
-	ServerLifecycleService_GetHeapProfile_FullMethodName      = "/appctl.ServerLifecycleService/GetHeapProfile"
-	ServerLifecycleService_GetMemoryStatistics_FullMethodName = "/appctl.ServerLifecycleService/GetMemoryStatistics"
+	ServerManagementService_GetStatus_FullMethodName           = "/appctl.ServerManagementService/GetStatus"
+	ServerManagementService_Start_FullMethodName               = "/appctl.ServerManagementService/Start"
+	ServerManagementService_Stop_FullMethodName                = "/appctl.ServerManagementService/Stop"
+	ServerManagementService_GetConfig_FullMethodName           = "/appctl.ServerManagementService/GetConfig"
+	ServerManagementService_SetConfig_FullMethodName           = "/appctl.ServerManagementService/SetConfig"
+	ServerManagementService_Reload_FullMethodName              = "/appctl.ServerManagementService/Reload"
+	ServerManagementService_Exit_FullMethodName                = "/appctl.ServerManagementService/Exit"
+	ServerManagementService_GetMetrics_FullMethodName          = "/appctl.ServerManagementService/GetMetrics"
+	ServerManagementService_GetSessionInfoList_FullMethodName  = "/appctl.ServerManagementService/GetSessionInfoList"
+	ServerManagementService_GetUsers_FullMethodName            = "/appctl.ServerManagementService/GetUsers"
+	ServerManagementService_GetThreadDump_FullMethodName       = "/appctl.ServerManagementService/GetThreadDump"
+	ServerManagementService_StartCPUProfile_FullMethodName     = "/appctl.ServerManagementService/StartCPUProfile"
+	ServerManagementService_StopCPUProfile_FullMethodName      = "/appctl.ServerManagementService/StopCPUProfile"
+	ServerManagementService_GetHeapProfile_FullMethodName      = "/appctl.ServerManagementService/GetHeapProfile"
+	ServerManagementService_GetMemoryStatistics_FullMethodName = "/appctl.ServerManagementService/GetMemoryStatistics"
 )
 
-// ServerLifecycleServiceClient is the client API for ServerLifecycleService service.
+// ServerManagementServiceClient is the client API for ServerManagementService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type ServerLifecycleServiceClient interface {
+type ServerManagementServiceClient interface {
 	// Fetch server application status.
 	GetStatus(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.AppStatusMsg, error)
 	// Start proxy in server application.
 	Start(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error)
 	// Stop proxy in server application.
 	Stop(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error)
+	// Fetch the server config.
+	GetConfig(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.ServerConfig, error)
+	// Update server config.
+	SetConfig(ctx context.Context, in *appctlpb.ServerConfig, opts ...grpc.CallOption) (*appctlpb.ServerConfig, error)
 	// Reload server configuration.
 	Reload(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error)
 	// Quit server daemon.
@@ -487,141 +493,163 @@ type ServerLifecycleServiceClient interface {
 	GetMemoryStatistics(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.MemoryStatistics, error)
 }
 
-type serverLifecycleServiceClient struct {
+type serverManagementServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewServerLifecycleServiceClient(cc grpc.ClientConnInterface) ServerLifecycleServiceClient {
-	return &serverLifecycleServiceClient{cc}
+func NewServerManagementServiceClient(cc grpc.ClientConnInterface) ServerManagementServiceClient {
+	return &serverManagementServiceClient{cc}
 }
 
-func (c *serverLifecycleServiceClient) GetStatus(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.AppStatusMsg, error) {
+func (c *serverManagementServiceClient) GetStatus(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.AppStatusMsg, error) {
 	out := new(appctlpb.AppStatusMsg)
-	err := c.cc.Invoke(ctx, ServerLifecycleService_GetStatus_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, ServerManagementService_GetStatus_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *serverLifecycleServiceClient) Start(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
+func (c *serverManagementServiceClient) Start(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
 	out := new(appctlpb.Empty)
-	err := c.cc.Invoke(ctx, ServerLifecycleService_Start_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, ServerManagementService_Start_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *serverLifecycleServiceClient) Stop(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
+func (c *serverManagementServiceClient) Stop(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
 	out := new(appctlpb.Empty)
-	err := c.cc.Invoke(ctx, ServerLifecycleService_Stop_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, ServerManagementService_Stop_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *serverLifecycleServiceClient) Reload(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
+func (c *serverManagementServiceClient) GetConfig(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.ServerConfig, error) {
+	out := new(appctlpb.ServerConfig)
+	err := c.cc.Invoke(ctx, ServerManagementService_GetConfig_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *serverManagementServiceClient) SetConfig(ctx context.Context, in *appctlpb.ServerConfig, opts ...grpc.CallOption) (*appctlpb.ServerConfig, error) {
+	out := new(appctlpb.ServerConfig)
+	err := c.cc.Invoke(ctx, ServerManagementService_SetConfig_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *serverManagementServiceClient) Reload(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
 	out := new(appctlpb.Empty)
-	err := c.cc.Invoke(ctx, ServerLifecycleService_Reload_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, ServerManagementService_Reload_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *serverLifecycleServiceClient) Exit(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
+func (c *serverManagementServiceClient) Exit(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
 	out := new(appctlpb.Empty)
-	err := c.cc.Invoke(ctx, ServerLifecycleService_Exit_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, ServerManagementService_Exit_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *serverLifecycleServiceClient) GetMetrics(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Metrics, error) {
+func (c *serverManagementServiceClient) GetMetrics(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Metrics, error) {
 	out := new(appctlpb.Metrics)
-	err := c.cc.Invoke(ctx, ServerLifecycleService_GetMetrics_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, ServerManagementService_GetMetrics_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *serverLifecycleServiceClient) GetSessionInfoList(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.SessionInfoList, error) {
+func (c *serverManagementServiceClient) GetSessionInfoList(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.SessionInfoList, error) {
 	out := new(appctlpb.SessionInfoList)
-	err := c.cc.Invoke(ctx, ServerLifecycleService_GetSessionInfoList_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, ServerManagementService_GetSessionInfoList_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *serverLifecycleServiceClient) GetUsers(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.UserWithMetricsList, error) {
+func (c *serverManagementServiceClient) GetUsers(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.UserWithMetricsList, error) {
 	out := new(appctlpb.UserWithMetricsList)
-	err := c.cc.Invoke(ctx, ServerLifecycleService_GetUsers_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, ServerManagementService_GetUsers_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *serverLifecycleServiceClient) GetThreadDump(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.ThreadDump, error) {
+func (c *serverManagementServiceClient) GetThreadDump(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.ThreadDump, error) {
 	out := new(appctlpb.ThreadDump)
-	err := c.cc.Invoke(ctx, ServerLifecycleService_GetThreadDump_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, ServerManagementService_GetThreadDump_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *serverLifecycleServiceClient) StartCPUProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
+func (c *serverManagementServiceClient) StartCPUProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
 	out := new(appctlpb.Empty)
-	err := c.cc.Invoke(ctx, ServerLifecycleService_StartCPUProfile_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, ServerManagementService_StartCPUProfile_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *serverLifecycleServiceClient) StopCPUProfile(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
+func (c *serverManagementServiceClient) StopCPUProfile(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
 	out := new(appctlpb.Empty)
-	err := c.cc.Invoke(ctx, ServerLifecycleService_StopCPUProfile_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, ServerManagementService_StopCPUProfile_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *serverLifecycleServiceClient) GetHeapProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
+func (c *serverManagementServiceClient) GetHeapProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
 	out := new(appctlpb.Empty)
-	err := c.cc.Invoke(ctx, ServerLifecycleService_GetHeapProfile_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, ServerManagementService_GetHeapProfile_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *serverLifecycleServiceClient) GetMemoryStatistics(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.MemoryStatistics, error) {
+func (c *serverManagementServiceClient) GetMemoryStatistics(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.MemoryStatistics, error) {
 	out := new(appctlpb.MemoryStatistics)
-	err := c.cc.Invoke(ctx, ServerLifecycleService_GetMemoryStatistics_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, ServerManagementService_GetMemoryStatistics_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// ServerLifecycleServiceServer is the server API for ServerLifecycleService service.
-// All implementations must embed UnimplementedServerLifecycleServiceServer
+// ServerManagementServiceServer is the server API for ServerManagementService service.
+// All implementations must embed UnimplementedServerManagementServiceServer
 // for forward compatibility
-type ServerLifecycleServiceServer interface {
+type ServerManagementServiceServer interface {
 	// Fetch server application status.
 	GetStatus(context.Context, *appctlpb.Empty) (*appctlpb.AppStatusMsg, error)
 	// Start proxy in server application.
 	Start(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error)
 	// Stop proxy in server application.
 	Stop(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error)
+	// Fetch the server config.
+	GetConfig(context.Context, *appctlpb.Empty) (*appctlpb.ServerConfig, error)
+	// Update server config.
+	SetConfig(context.Context, *appctlpb.ServerConfig) (*appctlpb.ServerConfig, error)
 	// Reload server configuration.
 	Reload(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error)
 	// Quit server daemon.
@@ -642,489 +670,408 @@ type ServerLifecycleServiceServer interface {
 	GetHeapProfile(context.Context, *appctlpb.ProfileSavePath) (*appctlpb.Empty, error)
 	// Get memory statistics of server daemon.
 	GetMemoryStatistics(context.Context, *appctlpb.Empty) (*appctlpb.MemoryStatistics, error)
-	mustEmbedUnimplementedServerLifecycleServiceServer()
+	mustEmbedUnimplementedServerManagementServiceServer()
 }
 
-// UnimplementedServerLifecycleServiceServer must be embedded to have forward compatible implementations.
-type UnimplementedServerLifecycleServiceServer struct {
+// UnimplementedServerManagementServiceServer must be embedded to have forward compatible implementations.
+type UnimplementedServerManagementServiceServer struct {
 }
 
-func (UnimplementedServerLifecycleServiceServer) GetStatus(context.Context, *appctlpb.Empty) (*appctlpb.AppStatusMsg, error) {
+func (UnimplementedServerManagementServiceServer) GetStatus(context.Context, *appctlpb.Empty) (*appctlpb.AppStatusMsg, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStatus not implemented")
 }
-func (UnimplementedServerLifecycleServiceServer) Start(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error) {
+func (UnimplementedServerManagementServiceServer) Start(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Start not implemented")
 }
-func (UnimplementedServerLifecycleServiceServer) Stop(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error) {
+func (UnimplementedServerManagementServiceServer) Stop(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Stop not implemented")
 }
-func (UnimplementedServerLifecycleServiceServer) Reload(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Reload not implemented")
-}
-func (UnimplementedServerLifecycleServiceServer) Exit(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Exit not implemented")
-}
-func (UnimplementedServerLifecycleServiceServer) GetMetrics(context.Context, *appctlpb.Empty) (*appctlpb.Metrics, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetMetrics not implemented")
-}
-func (UnimplementedServerLifecycleServiceServer) GetSessionInfoList(context.Context, *appctlpb.Empty) (*appctlpb.SessionInfoList, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetSessionInfoList not implemented")
-}
-func (UnimplementedServerLifecycleServiceServer) GetUsers(context.Context, *appctlpb.Empty) (*appctlpb.UserWithMetricsList, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetUsers not implemented")
-}
-func (UnimplementedServerLifecycleServiceServer) GetThreadDump(context.Context, *appctlpb.Empty) (*appctlpb.ThreadDump, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetThreadDump not implemented")
-}
-func (UnimplementedServerLifecycleServiceServer) StartCPUProfile(context.Context, *appctlpb.ProfileSavePath) (*appctlpb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method StartCPUProfile not implemented")
-}
-func (UnimplementedServerLifecycleServiceServer) StopCPUProfile(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method StopCPUProfile not implemented")
-}
-func (UnimplementedServerLifecycleServiceServer) GetHeapProfile(context.Context, *appctlpb.ProfileSavePath) (*appctlpb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetHeapProfile not implemented")
-}
-func (UnimplementedServerLifecycleServiceServer) GetMemoryStatistics(context.Context, *appctlpb.Empty) (*appctlpb.MemoryStatistics, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetMemoryStatistics not implemented")
-}
-func (UnimplementedServerLifecycleServiceServer) mustEmbedUnimplementedServerLifecycleServiceServer() {
-}
-
-// UnsafeServerLifecycleServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to ServerLifecycleServiceServer will
-// result in compilation errors.
-type UnsafeServerLifecycleServiceServer interface {
-	mustEmbedUnimplementedServerLifecycleServiceServer()
-}
-
-func RegisterServerLifecycleServiceServer(s grpc.ServiceRegistrar, srv ServerLifecycleServiceServer) {
-	s.RegisterService(&ServerLifecycleService_ServiceDesc, srv)
-}
-
-func _ServerLifecycleService_GetStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ServerLifecycleServiceServer).GetStatus(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ServerLifecycleService_GetStatus_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerLifecycleServiceServer).GetStatus(ctx, req.(*appctlpb.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ServerLifecycleService_Start_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ServerLifecycleServiceServer).Start(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ServerLifecycleService_Start_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerLifecycleServiceServer).Start(ctx, req.(*appctlpb.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ServerLifecycleService_Stop_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ServerLifecycleServiceServer).Stop(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ServerLifecycleService_Stop_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerLifecycleServiceServer).Stop(ctx, req.(*appctlpb.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ServerLifecycleService_Reload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ServerLifecycleServiceServer).Reload(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ServerLifecycleService_Reload_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerLifecycleServiceServer).Reload(ctx, req.(*appctlpb.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ServerLifecycleService_Exit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ServerLifecycleServiceServer).Exit(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ServerLifecycleService_Exit_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerLifecycleServiceServer).Exit(ctx, req.(*appctlpb.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ServerLifecycleService_GetMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ServerLifecycleServiceServer).GetMetrics(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ServerLifecycleService_GetMetrics_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerLifecycleServiceServer).GetMetrics(ctx, req.(*appctlpb.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ServerLifecycleService_GetSessionInfoList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ServerLifecycleServiceServer).GetSessionInfoList(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ServerLifecycleService_GetSessionInfoList_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerLifecycleServiceServer).GetSessionInfoList(ctx, req.(*appctlpb.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ServerLifecycleService_GetUsers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ServerLifecycleServiceServer).GetUsers(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ServerLifecycleService_GetUsers_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerLifecycleServiceServer).GetUsers(ctx, req.(*appctlpb.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ServerLifecycleService_GetThreadDump_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ServerLifecycleServiceServer).GetThreadDump(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ServerLifecycleService_GetThreadDump_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerLifecycleServiceServer).GetThreadDump(ctx, req.(*appctlpb.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ServerLifecycleService_StartCPUProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.ProfileSavePath)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ServerLifecycleServiceServer).StartCPUProfile(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ServerLifecycleService_StartCPUProfile_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerLifecycleServiceServer).StartCPUProfile(ctx, req.(*appctlpb.ProfileSavePath))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ServerLifecycleService_StopCPUProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ServerLifecycleServiceServer).StopCPUProfile(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ServerLifecycleService_StopCPUProfile_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerLifecycleServiceServer).StopCPUProfile(ctx, req.(*appctlpb.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ServerLifecycleService_GetHeapProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.ProfileSavePath)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ServerLifecycleServiceServer).GetHeapProfile(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ServerLifecycleService_GetHeapProfile_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerLifecycleServiceServer).GetHeapProfile(ctx, req.(*appctlpb.ProfileSavePath))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ServerLifecycleService_GetMemoryStatistics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ServerLifecycleServiceServer).GetMemoryStatistics(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ServerLifecycleService_GetMemoryStatistics_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerLifecycleServiceServer).GetMemoryStatistics(ctx, req.(*appctlpb.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-// ServerLifecycleService_ServiceDesc is the grpc.ServiceDesc for ServerLifecycleService service.
-// It's only intended for direct use with grpc.RegisterService,
-// and not to be introspected or modified (even as a copy)
-var ServerLifecycleService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "appctl.ServerLifecycleService",
-	HandlerType: (*ServerLifecycleServiceServer)(nil),
-	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "GetStatus",
-			Handler:    _ServerLifecycleService_GetStatus_Handler,
-		},
-		{
-			MethodName: "Start",
-			Handler:    _ServerLifecycleService_Start_Handler,
-		},
-		{
-			MethodName: "Stop",
-			Handler:    _ServerLifecycleService_Stop_Handler,
-		},
-		{
-			MethodName: "Reload",
-			Handler:    _ServerLifecycleService_Reload_Handler,
-		},
-		{
-			MethodName: "Exit",
-			Handler:    _ServerLifecycleService_Exit_Handler,
-		},
-		{
-			MethodName: "GetMetrics",
-			Handler:    _ServerLifecycleService_GetMetrics_Handler,
-		},
-		{
-			MethodName: "GetSessionInfoList",
-			Handler:    _ServerLifecycleService_GetSessionInfoList_Handler,
-		},
-		{
-			MethodName: "GetUsers",
-			Handler:    _ServerLifecycleService_GetUsers_Handler,
-		},
-		{
-			MethodName: "GetThreadDump",
-			Handler:    _ServerLifecycleService_GetThreadDump_Handler,
-		},
-		{
-			MethodName: "StartCPUProfile",
-			Handler:    _ServerLifecycleService_StartCPUProfile_Handler,
-		},
-		{
-			MethodName: "StopCPUProfile",
-			Handler:    _ServerLifecycleService_StopCPUProfile_Handler,
-		},
-		{
-			MethodName: "GetHeapProfile",
-			Handler:    _ServerLifecycleService_GetHeapProfile_Handler,
-		},
-		{
-			MethodName: "GetMemoryStatistics",
-			Handler:    _ServerLifecycleService_GetMemoryStatistics_Handler,
-		},
-	},
-	Streams:  []grpc.StreamDesc{},
-	Metadata: "appctl/proto/rpc.proto",
-}
-
-const (
-	ServerConfigService_GetConfig_FullMethodName = "/appctl.ServerConfigService/GetConfig"
-	ServerConfigService_SetConfig_FullMethodName = "/appctl.ServerConfigService/SetConfig"
-)
-
-// ServerConfigServiceClient is the client API for ServerConfigService service.
-//
-// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type ServerConfigServiceClient interface {
-	// Fetch the server config.
-	GetConfig(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.ServerConfig, error)
-	// Update server config.
-	SetConfig(ctx context.Context, in *appctlpb.ServerConfig, opts ...grpc.CallOption) (*appctlpb.ServerConfig, error)
-}
-
-type serverConfigServiceClient struct {
-	cc grpc.ClientConnInterface
-}
-
-func NewServerConfigServiceClient(cc grpc.ClientConnInterface) ServerConfigServiceClient {
-	return &serverConfigServiceClient{cc}
-}
-
-func (c *serverConfigServiceClient) GetConfig(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.ServerConfig, error) {
-	out := new(appctlpb.ServerConfig)
-	err := c.cc.Invoke(ctx, ServerConfigService_GetConfig_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *serverConfigServiceClient) SetConfig(ctx context.Context, in *appctlpb.ServerConfig, opts ...grpc.CallOption) (*appctlpb.ServerConfig, error) {
-	out := new(appctlpb.ServerConfig)
-	err := c.cc.Invoke(ctx, ServerConfigService_SetConfig_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// ServerConfigServiceServer is the server API for ServerConfigService service.
-// All implementations must embed UnimplementedServerConfigServiceServer
-// for forward compatibility
-type ServerConfigServiceServer interface {
-	// Fetch the server config.
-	GetConfig(context.Context, *appctlpb.Empty) (*appctlpb.ServerConfig, error)
-	// Update server config.
-	SetConfig(context.Context, *appctlpb.ServerConfig) (*appctlpb.ServerConfig, error)
-	mustEmbedUnimplementedServerConfigServiceServer()
-}
-
-// UnimplementedServerConfigServiceServer must be embedded to have forward compatible implementations.
-type UnimplementedServerConfigServiceServer struct {
-}
-
-func (UnimplementedServerConfigServiceServer) GetConfig(context.Context, *appctlpb.Empty) (*appctlpb.ServerConfig, error) {
+func (UnimplementedServerManagementServiceServer) GetConfig(context.Context, *appctlpb.Empty) (*appctlpb.ServerConfig, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetConfig not implemented")
 }
-func (UnimplementedServerConfigServiceServer) SetConfig(context.Context, *appctlpb.ServerConfig) (*appctlpb.ServerConfig, error) {
+func (UnimplementedServerManagementServiceServer) SetConfig(context.Context, *appctlpb.ServerConfig) (*appctlpb.ServerConfig, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetConfig not implemented")
 }
-func (UnimplementedServerConfigServiceServer) mustEmbedUnimplementedServerConfigServiceServer() {}
+func (UnimplementedServerManagementServiceServer) Reload(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Reload not implemented")
+}
+func (UnimplementedServerManagementServiceServer) Exit(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Exit not implemented")
+}
+func (UnimplementedServerManagementServiceServer) GetMetrics(context.Context, *appctlpb.Empty) (*appctlpb.Metrics, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetMetrics not implemented")
+}
+func (UnimplementedServerManagementServiceServer) GetSessionInfoList(context.Context, *appctlpb.Empty) (*appctlpb.SessionInfoList, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSessionInfoList not implemented")
+}
+func (UnimplementedServerManagementServiceServer) GetUsers(context.Context, *appctlpb.Empty) (*appctlpb.UserWithMetricsList, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetUsers not implemented")
+}
+func (UnimplementedServerManagementServiceServer) GetThreadDump(context.Context, *appctlpb.Empty) (*appctlpb.ThreadDump, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetThreadDump not implemented")
+}
+func (UnimplementedServerManagementServiceServer) StartCPUProfile(context.Context, *appctlpb.ProfileSavePath) (*appctlpb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StartCPUProfile not implemented")
+}
+func (UnimplementedServerManagementServiceServer) StopCPUProfile(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StopCPUProfile not implemented")
+}
+func (UnimplementedServerManagementServiceServer) GetHeapProfile(context.Context, *appctlpb.ProfileSavePath) (*appctlpb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetHeapProfile not implemented")
+}
+func (UnimplementedServerManagementServiceServer) GetMemoryStatistics(context.Context, *appctlpb.Empty) (*appctlpb.MemoryStatistics, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetMemoryStatistics not implemented")
+}
+func (UnimplementedServerManagementServiceServer) mustEmbedUnimplementedServerManagementServiceServer() {
+}
 
-// UnsafeServerConfigServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to ServerConfigServiceServer will
+// UnsafeServerManagementServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ServerManagementServiceServer will
 // result in compilation errors.
-type UnsafeServerConfigServiceServer interface {
-	mustEmbedUnimplementedServerConfigServiceServer()
+type UnsafeServerManagementServiceServer interface {
+	mustEmbedUnimplementedServerManagementServiceServer()
 }
 
-func RegisterServerConfigServiceServer(s grpc.ServiceRegistrar, srv ServerConfigServiceServer) {
-	s.RegisterService(&ServerConfigService_ServiceDesc, srv)
+func RegisterServerManagementServiceServer(s grpc.ServiceRegistrar, srv ServerManagementServiceServer) {
+	s.RegisterService(&ServerManagementService_ServiceDesc, srv)
 }
 
-func _ServerConfigService_GetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ServerManagementService_GetStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(appctlpb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ServerConfigServiceServer).GetConfig(ctx, in)
+		return srv.(ServerManagementServiceServer).GetStatus(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ServerConfigService_GetConfig_FullMethodName,
+		FullMethod: ServerManagementService_GetStatus_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerConfigServiceServer).GetConfig(ctx, req.(*appctlpb.Empty))
+		return srv.(ServerManagementServiceServer).GetStatus(ctx, req.(*appctlpb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ServerConfigService_SetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ServerManagementService_Start_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(appctlpb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerManagementServiceServer).Start(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerManagementService_Start_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerManagementServiceServer).Start(ctx, req.(*appctlpb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ServerManagementService_Stop_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(appctlpb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerManagementServiceServer).Stop(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerManagementService_Stop_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerManagementServiceServer).Stop(ctx, req.(*appctlpb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ServerManagementService_GetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(appctlpb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerManagementServiceServer).GetConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerManagementService_GetConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerManagementServiceServer).GetConfig(ctx, req.(*appctlpb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ServerManagementService_SetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(appctlpb.ServerConfig)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ServerConfigServiceServer).SetConfig(ctx, in)
+		return srv.(ServerManagementServiceServer).SetConfig(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ServerConfigService_SetConfig_FullMethodName,
+		FullMethod: ServerManagementService_SetConfig_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerConfigServiceServer).SetConfig(ctx, req.(*appctlpb.ServerConfig))
+		return srv.(ServerManagementServiceServer).SetConfig(ctx, req.(*appctlpb.ServerConfig))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// ServerConfigService_ServiceDesc is the grpc.ServiceDesc for ServerConfigService service.
+func _ServerManagementService_Reload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(appctlpb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerManagementServiceServer).Reload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerManagementService_Reload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerManagementServiceServer).Reload(ctx, req.(*appctlpb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ServerManagementService_Exit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(appctlpb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerManagementServiceServer).Exit(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerManagementService_Exit_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerManagementServiceServer).Exit(ctx, req.(*appctlpb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ServerManagementService_GetMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(appctlpb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerManagementServiceServer).GetMetrics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerManagementService_GetMetrics_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerManagementServiceServer).GetMetrics(ctx, req.(*appctlpb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ServerManagementService_GetSessionInfoList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(appctlpb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerManagementServiceServer).GetSessionInfoList(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerManagementService_GetSessionInfoList_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerManagementServiceServer).GetSessionInfoList(ctx, req.(*appctlpb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ServerManagementService_GetUsers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(appctlpb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerManagementServiceServer).GetUsers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerManagementService_GetUsers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerManagementServiceServer).GetUsers(ctx, req.(*appctlpb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ServerManagementService_GetThreadDump_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(appctlpb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerManagementServiceServer).GetThreadDump(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerManagementService_GetThreadDump_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerManagementServiceServer).GetThreadDump(ctx, req.(*appctlpb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ServerManagementService_StartCPUProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(appctlpb.ProfileSavePath)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerManagementServiceServer).StartCPUProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerManagementService_StartCPUProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerManagementServiceServer).StartCPUProfile(ctx, req.(*appctlpb.ProfileSavePath))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ServerManagementService_StopCPUProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(appctlpb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerManagementServiceServer).StopCPUProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerManagementService_StopCPUProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerManagementServiceServer).StopCPUProfile(ctx, req.(*appctlpb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ServerManagementService_GetHeapProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(appctlpb.ProfileSavePath)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerManagementServiceServer).GetHeapProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerManagementService_GetHeapProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerManagementServiceServer).GetHeapProfile(ctx, req.(*appctlpb.ProfileSavePath))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ServerManagementService_GetMemoryStatistics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(appctlpb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerManagementServiceServer).GetMemoryStatistics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerManagementService_GetMemoryStatistics_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerManagementServiceServer).GetMemoryStatistics(ctx, req.(*appctlpb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// ServerManagementService_ServiceDesc is the grpc.ServiceDesc for ServerManagementService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var ServerConfigService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "appctl.ServerConfigService",
-	HandlerType: (*ServerConfigServiceServer)(nil),
+var ServerManagementService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "appctl.ServerManagementService",
+	HandlerType: (*ServerManagementServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
+			MethodName: "GetStatus",
+			Handler:    _ServerManagementService_GetStatus_Handler,
+		},
+		{
+			MethodName: "Start",
+			Handler:    _ServerManagementService_Start_Handler,
+		},
+		{
+			MethodName: "Stop",
+			Handler:    _ServerManagementService_Stop_Handler,
+		},
+		{
 			MethodName: "GetConfig",
-			Handler:    _ServerConfigService_GetConfig_Handler,
+			Handler:    _ServerManagementService_GetConfig_Handler,
 		},
 		{
 			MethodName: "SetConfig",
-			Handler:    _ServerConfigService_SetConfig_Handler,
+			Handler:    _ServerManagementService_SetConfig_Handler,
+		},
+		{
+			MethodName: "Reload",
+			Handler:    _ServerManagementService_Reload_Handler,
+		},
+		{
+			MethodName: "Exit",
+			Handler:    _ServerManagementService_Exit_Handler,
+		},
+		{
+			MethodName: "GetMetrics",
+			Handler:    _ServerManagementService_GetMetrics_Handler,
+		},
+		{
+			MethodName: "GetSessionInfoList",
+			Handler:    _ServerManagementService_GetSessionInfoList_Handler,
+		},
+		{
+			MethodName: "GetUsers",
+			Handler:    _ServerManagementService_GetUsers_Handler,
+		},
+		{
+			MethodName: "GetThreadDump",
+			Handler:    _ServerManagementService_GetThreadDump_Handler,
+		},
+		{
+			MethodName: "StartCPUProfile",
+			Handler:    _ServerManagementService_StartCPUProfile_Handler,
+		},
+		{
+			MethodName: "StopCPUProfile",
+			Handler:    _ServerManagementService_StopCPUProfile_Handler,
+		},
+		{
+			MethodName: "GetHeapProfile",
+			Handler:    _ServerManagementService_GetHeapProfile_Handler,
+		},
+		{
+			MethodName: "GetMemoryStatistics",
+			Handler:    _ServerManagementService_GetMemoryStatistics_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

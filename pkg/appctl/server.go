@@ -84,19 +84,19 @@ func ServerUDS() string {
 	return cachedServerUDS
 }
 
-// serverLifecycleService implements ServerLifecycleService defined in lifecycle.proto.
-type serverLifecycleService struct {
-	appctlgrpc.UnimplementedServerLifecycleServiceServer
+// serverManagementService implements ServerManagementService defined in rpc.proto.
+type serverManagementService struct {
+	appctlgrpc.UnimplementedServerManagementServiceServer
 }
 
-func (s *serverLifecycleService) GetStatus(ctx context.Context, req *pb.Empty) (*pb.AppStatusMsg, error) {
+func (s *serverManagementService) GetStatus(ctx context.Context, req *pb.Empty) (*pb.AppStatusMsg, error) {
 	status := GetAppStatus()
 	log.Infof("return app status %s back to RPC caller", status.String())
 	return &pb.AppStatusMsg{Status: &status}, nil
 }
 
-func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
-	log.Infof("received start request from RPC caller")
+func (s *serverManagementService) Start(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
+	log.Infof("received Start request from RPC caller")
 	config, err := LoadServerConfig()
 	if err != nil {
 		return &pb.Empty{}, fmt.Errorf("LoadServerConfig() failed: %w", err)
@@ -162,13 +162,13 @@ func (s *serverLifecycleService) Start(ctx context.Context, req *pb.Empty) (*pb.
 	initProxyTasks.Wait()
 	metrics.EnableLogging()
 	SetAppStatus(pb.AppStatus_RUNNING)
-	log.Infof("completed start request from RPC caller")
+	log.Infof("completed Start request from RPC caller")
 	return &pb.Empty{}, nil
 }
 
-func (s *serverLifecycleService) Stop(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
+func (s *serverManagementService) Stop(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
 	SetAppStatus(pb.AppStatus_STOPPING)
-	log.Infof("received stop request from RPC caller")
+	log.Infof("received Stop request from RPC caller")
 	if socks5ServerRef.Load() != nil {
 		log.Infof("stopping socks5 server")
 		if err := socks5ServerRef.Load().Close(); err != nil {
@@ -179,12 +179,31 @@ func (s *serverLifecycleService) Stop(ctx context.Context, req *pb.Empty) (*pb.E
 		log.Infof("active socks5 servers not found")
 	}
 	SetAppStatus(pb.AppStatus_IDLE)
-	log.Infof("completed stop request from RPC caller")
+	log.Infof("completed Stop request from RPC caller")
 	return &pb.Empty{}, nil
 }
 
-func (s *serverLifecycleService) Reload(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
-	log.Infof("received start request from RPC caller")
+func (s *serverManagementService) GetConfig(ctx context.Context, req *pb.Empty) (*pb.ServerConfig, error) {
+	config, err := LoadServerConfig()
+	if err != nil {
+		return &pb.ServerConfig{}, fmt.Errorf("LoadServerConfig() failed: %w", err)
+	}
+	return config, nil
+}
+
+func (s *serverManagementService) SetConfig(ctx context.Context, req *pb.ServerConfig) (*pb.ServerConfig, error) {
+	if err := StoreServerConfig(req); err != nil {
+		return &pb.ServerConfig{}, fmt.Errorf("StoreServerConfig() failed: %w", err)
+	}
+	config, err := LoadServerConfig()
+	if err != nil {
+		return &pb.ServerConfig{}, fmt.Errorf("LoadServerConfig() failed: %w", err)
+	}
+	return config, nil
+}
+
+func (s *serverManagementService) Reload(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
+	log.Infof("received Reload request from RPC caller")
 	config, err := LoadServerConfig()
 	if err != nil {
 		return &pb.Empty{}, fmt.Errorf("LoadServerConfig() failed: %w", err)
@@ -216,12 +235,13 @@ func (s *serverLifecycleService) Reload(ctx context.Context, req *pb.Empty) (*pb
 		// Adjust users.
 		mux.SetServerUsers(UserListToMap(config.GetUsers()))
 	}
+	log.Infof("completed Reload request from RPC caller")
 	return &pb.Empty{}, nil
 }
 
-func (s *serverLifecycleService) Exit(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
+func (s *serverManagementService) Exit(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
 	SetAppStatus(pb.AppStatus_STOPPING)
-	log.Infof("received exit request from RPC caller")
+	log.Infof("received Exit request from RPC caller")
 	if socks5ServerRef.Load() != nil {
 		log.Infof("stopping socks5 server")
 		if err := socks5ServerRef.Load().Close(); err != nil {
@@ -240,11 +260,11 @@ func (s *serverLifecycleService) Exit(ctx context.Context, req *pb.Empty) (*pb.E
 	} else {
 		log.Infof("RPC server reference not found")
 	}
-	log.Infof("completed exit request from RPC caller")
+	log.Infof("completed Exit request from RPC caller")
 	return &pb.Empty{}, nil
 }
 
-func (s *serverLifecycleService) GetMetrics(ctx context.Context, req *pb.Empty) (*pb.Metrics, error) {
+func (s *serverManagementService) GetMetrics(ctx context.Context, req *pb.Empty) (*pb.Metrics, error) {
 	b, err := metrics.GetMetricsAsJSON()
 	if err != nil {
 		return &pb.Metrics{}, err
@@ -252,7 +272,7 @@ func (s *serverLifecycleService) GetMetrics(ctx context.Context, req *pb.Empty) 
 	return &pb.Metrics{Json: proto.String(string(b))}, nil
 }
 
-func (s *serverLifecycleService) GetSessionInfoList(context.Context, *pb.Empty) (*pb.SessionInfoList, error) {
+func (s *serverManagementService) GetSessionInfoList(context.Context, *pb.Empty) (*pb.SessionInfoList, error) {
 	mux := serverMuxRef.Load()
 	if mux == nil {
 		return &pb.SessionInfoList{}, fmt.Errorf("server multiplexier is unavailable")
@@ -260,98 +280,74 @@ func (s *serverLifecycleService) GetSessionInfoList(context.Context, *pb.Empty) 
 	return mux.ExportSessionInfoList(), nil
 }
 
-func (s *serverLifecycleService) GetUsers(context.Context, *pb.Empty) (*pb.UserWithMetricsList, error) {
-	return &pb.UserWithMetricsList{}, nil
+func (s *serverManagementService) GetUsers(context.Context, *pb.Empty) (*pb.UserWithMetricsList, error) {
+	config, err := LoadServerConfig()
+	if err != nil {
+		return &pb.UserWithMetricsList{}, fmt.Errorf("LoadServerConfig() failed: %w", err)
+	}
+	var items []*pb.UserWithMetrics
+	for _, user := range config.GetUsers() {
+		item := &pb.UserWithMetrics{
+			User: user,
+		}
+		userMetrics := metrics.GetMetricsForUser(user.GetName())
+		for _, um := range userMetrics {
+			item.Metrics = append(item.Metrics, metrics.ToMetricPB(um))
+		}
+		items = append(items, item)
+	}
+	return &pb.UserWithMetricsList{Items: items}, nil
 }
 
-func (s *serverLifecycleService) GetThreadDump(ctx context.Context, req *pb.Empty) (*pb.ThreadDump, error) {
+func (s *serverManagementService) GetThreadDump(ctx context.Context, req *pb.Empty) (*pb.ThreadDump, error) {
 	return &pb.ThreadDump{ThreadDump: proto.String(common.GetAllStackTrace())}, nil
 }
 
-func (s *serverLifecycleService) StartCPUProfile(ctx context.Context, req *pb.ProfileSavePath) (*pb.Empty, error) {
+func (s *serverManagementService) StartCPUProfile(ctx context.Context, req *pb.ProfileSavePath) (*pb.Empty, error) {
 	err := common.StartCPUProfile(req.GetFilePath())
 	return &pb.Empty{}, err
 }
 
-func (s *serverLifecycleService) StopCPUProfile(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
+func (s *serverManagementService) StopCPUProfile(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
 	common.StopCPUProfile()
 	return &pb.Empty{}, nil
 }
 
-func (s *serverLifecycleService) GetHeapProfile(ctx context.Context, req *pb.ProfileSavePath) (*pb.Empty, error) {
+func (s *serverManagementService) GetHeapProfile(ctx context.Context, req *pb.ProfileSavePath) (*pb.Empty, error) {
 	err := common.GetHeapProfile(req.GetFilePath())
 	return &pb.Empty{}, err
 }
 
-func (s *serverLifecycleService) GetMemoryStatistics(ctx context.Context, req *pb.Empty) (*pb.MemoryStatistics, error) {
+func (s *serverManagementService) GetMemoryStatistics(ctx context.Context, req *pb.Empty) (*pb.MemoryStatistics, error) {
 	return getMemoryStatistics()
 }
 
-// NewServerLifecycleService creates a new ServerLifecycleService RPC server.
-func NewServerLifecycleService() *serverLifecycleService {
-	return &serverLifecycleService{}
+// NewServerManagementService creates a new ServerManagementService RPC server.
+func NewServerManagementService() *serverManagementService {
+	return &serverManagementService{}
 }
 
-// NewServerLifecycleRPCClient creates a new ServerLifecycleService RPC client.
-func NewServerLifecycleRPCClient() (appctlgrpc.ServerLifecycleServiceClient, error) {
+// NewServerManagementRPCClient creates a new ServerManagementService RPC client.
+func NewServerManagementRPCClient() (appctlgrpc.ServerManagementServiceClient, error) {
 	rpcAddr := "unix://" + ServerUDS()
 	conn, err := grpc.NewClient(rpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(MaxRecvMsgSize)))
 	if err != nil {
 		return nil, fmt.Errorf("grpc.NewClient() failed: %w", err)
 	}
-	return appctlgrpc.NewServerLifecycleServiceClient(conn), nil
+	return appctlgrpc.NewServerManagementServiceClient(conn), nil
 }
 
-// serverConfigService implements ServerConfigService defined in servercfg.proto.
-type serverConfigService struct {
-	appctlgrpc.UnimplementedServerConfigServiceServer
-}
-
-func (s *serverConfigService) GetConfig(ctx context.Context, req *pb.Empty) (*pb.ServerConfig, error) {
-	config, err := LoadServerConfig()
-	if err != nil {
-		return &pb.ServerConfig{}, fmt.Errorf("LoadServerConfig() failed: %w", err)
-	}
-	return config, nil
-}
-
-func (s *serverConfigService) SetConfig(ctx context.Context, req *pb.ServerConfig) (*pb.ServerConfig, error) {
-	if err := StoreServerConfig(req); err != nil {
-		return &pb.ServerConfig{}, fmt.Errorf("StoreServerConfig() failed: %w", err)
-	}
-	config, err := LoadServerConfig()
-	if err != nil {
-		return &pb.ServerConfig{}, fmt.Errorf("LoadServerConfig() failed: %w", err)
-	}
-	return config, nil
-}
-
-// NewServerConfigService creates a new ServerConfigService RPC server.
-func NewServerConfigService() *serverConfigService {
-	return &serverConfigService{}
-}
-
-// NewServerConfigRPCClient creates a new ServerConfigService RPC client.
-func NewServerConfigRPCClient() (appctlgrpc.ServerConfigServiceClient, error) {
-	rpcAddr := "unix://" + ServerUDS()
-	conn, err := grpc.NewClient(rpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(MaxRecvMsgSize)))
-	if err != nil {
-		return nil, fmt.Errorf("grpc.NewClient() failed: %w", err)
-	}
-	return appctlgrpc.NewServerConfigServiceClient(conn), nil
-}
-
-// GetServerStatusWithRPC gets server application status via ServerLifecycleService.GetStatus() RPC.
+// GetServerStatusWithRPC gets server application status via ServerManagementService.GetStatus() RPC.
 func GetServerStatusWithRPC(ctx context.Context) (*pb.AppStatusMsg, error) {
-	client, err := NewServerLifecycleRPCClient()
+	client, err := NewServerManagementRPCClient()
 	if err != nil {
-		return nil, fmt.Errorf("NewServerLifecycleRPCClient() failed: %w", err)
+		return nil, fmt.Errorf("NewServerManagementRPCClient() failed: %w", err)
 	}
 	timedctx, cancelFunc := context.WithTimeout(ctx, RPCTimeout)
 	defer cancelFunc()
 	status, err := client.GetStatus(timedctx, &pb.Empty{})
 	if err != nil {
-		return nil, fmt.Errorf("ServerLifecycleService.GetStatus() failed: %w", err)
+		return nil, fmt.Errorf("ServerManagementService.GetStatus() failed: %w", err)
 	}
 	return status, nil
 }

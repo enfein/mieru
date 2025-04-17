@@ -1,0 +1,11 @@
+run:
+  timeout: 5m
+
+linters:
+  disable-all: true
+  enable:
+  - misspell
+
+linters-settings:
+  misspell:
+    locale: en-US

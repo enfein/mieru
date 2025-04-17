@@ -312,9 +312,9 @@ var serverStartFunc = func(s []string) error {
 	}
 
 	// Start server proxy.
-	client, err := appctl.NewServerLifecycleRPCClient()
+	client, err := appctl.NewServerManagementRPCClient()
 	if err != nil {
-		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
+		return fmt.Errorf(stderror.CreateServerManagementRPCClientFailedErr, err)
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
@@ -356,8 +356,7 @@ var serverRunFunc = func(s []string) error {
 		}
 		grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(appctl.MaxRecvMsgSize))
 		appctl.SetServerRPCServerRef(grpcServer)
-		appctlgrpc.RegisterServerLifecycleServiceServer(grpcServer, appctl.NewServerLifecycleService())
-		appctlgrpc.RegisterServerConfigServiceServer(grpcServer, appctl.NewServerConfigService())
+		appctlgrpc.RegisterServerManagementServiceServer(grpcServer, appctl.NewServerManagementService())
 		reflection.Register(grpcServer)
 		close(appctl.ServerRPCServerStarted)
 		log.Infof("mita server daemon RPC server is running")
@@ -507,9 +506,9 @@ var serverStopFunc = func(s []string) error {
 	}
 
 	// Stop server proxy.
-	client, err := appctl.NewServerLifecycleRPCClient()
+	client, err := appctl.NewServerManagementRPCClient()
 	if err != nil {
-		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
+		return fmt.Errorf(stderror.CreateServerManagementRPCClientFailedErr, err)
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
@@ -532,9 +531,9 @@ var serverReloadFunc = func(s []string) error {
 		return fmt.Errorf(stderror.ServerNotRunningErr, err)
 	}
 
-	client, err := appctl.NewServerLifecycleRPCClient()
+	client, err := appctl.NewServerManagementRPCClient()
 	if err != nil {
-		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
+		return fmt.Errorf(stderror.CreateServerManagementRPCClientFailedErr, err)
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
@@ -597,9 +596,9 @@ var serverApplyConfigFunc = func(s []string) error {
 		return fmt.Errorf(stderror.ValidateServerConfigPatchFailedErr, err)
 	}
 
-	client, err := appctl.NewServerConfigRPCClient()
+	client, err := appctl.NewServerManagementRPCClient()
 	if err != nil {
-		return fmt.Errorf(stderror.CreateServerConfigRPCClientFailedErr, err)
+		return fmt.Errorf(stderror.CreateServerManagementRPCClientFailedErr, err)
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
@@ -622,9 +621,9 @@ var serverDescribeConfigFunc = func(s []string) error {
 		return fmt.Errorf(stderror.ServerNotRunningErr, err)
 	}
 
-	client, err := appctl.NewServerConfigRPCClient()
+	client, err := appctl.NewServerManagementRPCClient()
 	if err != nil {
-		return fmt.Errorf(stderror.CreateServerConfigRPCClientFailedErr, err)
+		return fmt.Errorf(stderror.CreateServerManagementRPCClientFailedErr, err)
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
@@ -652,9 +651,9 @@ var serverDeleteUserFunc = func(s []string) error {
 		return fmt.Errorf(stderror.ServerNotRunningErr, err)
 	}
 
-	client, err := appctl.NewServerConfigRPCClient()
+	client, err := appctl.NewServerManagementRPCClient()
 	if err != nil {
-		return fmt.Errorf(stderror.CreateServerConfigRPCClientFailedErr, err)
+		return fmt.Errorf(stderror.CreateServerManagementRPCClientFailedErr, err)
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
@@ -705,9 +704,9 @@ var serverGetMetricsFunc = func(s []string) error {
 		return fmt.Errorf(stderror.ServerNotRunningErr, err)
 	}
 
-	client, err := appctl.NewServerLifecycleRPCClient()
+	client, err := appctl.NewServerManagementRPCClient()
 	if err != nil {
-		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
+		return fmt.Errorf(stderror.CreateServerManagementRPCClientFailedErr, err)
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
@@ -731,9 +730,9 @@ var serverGetConnectionsFunc = func(s []string) error {
 		return fmt.Errorf(stderror.ServerNotRunningErr, err)
 	}
 
-	client, err := appctl.NewServerLifecycleRPCClient()
+	client, err := appctl.NewServerManagementRPCClient()
 	if err != nil {
-		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
+		return fmt.Errorf(stderror.CreateServerManagementRPCClientFailedErr, err)
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
@@ -754,9 +753,9 @@ var serverGetThreadDumpFunc = func(s []string) error {
 		return fmt.Errorf(stderror.ServerNotRunningErr, err)
 	}
 
-	client, err := appctl.NewServerLifecycleRPCClient()
+	client, err := appctl.NewServerManagementRPCClient()
 	if err != nil {
-		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
+		return fmt.Errorf(stderror.CreateServerManagementRPCClientFailedErr, err)
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
@@ -777,9 +776,9 @@ var serverGetHeapProfileFunc = func(s []string) error {
 		return fmt.Errorf(stderror.ServerNotRunningErr, err)
 	}
 
-	client, err := appctl.NewServerLifecycleRPCClient()
+	client, err := appctl.NewServerManagementRPCClient()
 	if err != nil {
-		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
+		return fmt.Errorf(stderror.CreateServerManagementRPCClientFailedErr, err)
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
@@ -799,9 +798,9 @@ var serverGetMemoryStatisticsFunc = func(s []string) error {
 		return fmt.Errorf(stderror.ServerNotRunningErr, err)
 	}
 
-	client, err := appctl.NewServerLifecycleRPCClient()
+	client, err := appctl.NewServerManagementRPCClient()
 	if err != nil {
-		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
+		return fmt.Errorf(stderror.CreateServerManagementRPCClientFailedErr, err)
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
@@ -826,9 +825,9 @@ var serverStartCPUProfileFunc = func(s []string) error {
 		return fmt.Errorf(stderror.ServerNotRunningErr, err)
 	}
 
-	client, err := appctl.NewServerLifecycleRPCClient()
+	client, err := appctl.NewServerManagementRPCClient()
 	if err != nil {
-		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
+		return fmt.Errorf(stderror.CreateServerManagementRPCClientFailedErr, err)
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
@@ -848,9 +847,9 @@ var serverStopCPUProfileFunc = func(s []string) error {
 		return fmt.Errorf(stderror.ServerNotRunningErr, err)
 	}
 
-	client, err := appctl.NewServerLifecycleRPCClient()
+	client, err := appctl.NewServerManagementRPCClient()
 	if err != nil {
-		return fmt.Errorf(stderror.CreateServerLifecycleRPCClientFailedErr, err)
+		return fmt.Errorf(stderror.CreateServerManagementRPCClientFailedErr, err)
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()

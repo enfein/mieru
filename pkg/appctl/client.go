@@ -90,20 +90,20 @@ func SetClientMuxRef(mux *protocol.Mux) {
 	clientMuxRef.Store(mux)
 }
 
-// clientLifecycleService implements ClientLifecycleService defined in lifecycle.proto.
-type clientLifecycleService struct {
-	appctlgrpc.UnimplementedClientLifecycleServiceServer
+// clientManagementService implements ClientManagementService defined in rpc.proto.
+type clientManagementService struct {
+	appctlgrpc.UnimplementedClientManagementServiceServer
 }
 
-func (c *clientLifecycleService) GetStatus(ctx context.Context, req *pb.Empty) (*pb.AppStatusMsg, error) {
+func (c *clientManagementService) GetStatus(ctx context.Context, req *pb.Empty) (*pb.AppStatusMsg, error) {
 	status := GetAppStatus()
 	log.Infof("return app status %s back to RPC caller", status.String())
 	return &pb.AppStatusMsg{Status: &status}, nil
 }
 
-func (c *clientLifecycleService) Exit(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
+func (c *clientManagementService) Exit(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
 	SetAppStatus(pb.AppStatus_STOPPING)
-	log.Infof("received exit request from RPC caller")
+	log.Infof("received Exit request from RPC caller")
 	socks5Server := clientSocks5ServerRef.Load()
 	if socks5Server != nil {
 		log.Infof("stopping socks5 server")
@@ -120,11 +120,11 @@ func (c *clientLifecycleService) Exit(ctx context.Context, req *pb.Empty) (*pb.E
 	} else {
 		log.Infof("RPC server reference not found")
 	}
-	log.Infof("completed exit request from RPC caller")
+	log.Infof("completed Exit request from RPC caller")
 	return &pb.Empty{}, nil
 }
 
-func (c *clientLifecycleService) GetMetrics(ctx context.Context, req *pb.Empty) (*pb.Metrics, error) {
+func (c *clientManagementService) GetMetrics(ctx context.Context, req *pb.Empty) (*pb.Metrics, error) {
 	b, err := metrics.GetMetricsAsJSON()
 	if err != nil {
 		return &pb.Metrics{}, err
@@ -132,7 +132,7 @@ func (c *clientLifecycleService) GetMetrics(ctx context.Context, req *pb.Empty) 
 	return &pb.Metrics{Json: proto.String(string(b))}, nil
 }
 
-func (c *clientLifecycleService) GetSessionInfoList(context.Context, *pb.Empty) (*pb.SessionInfoList, error) {
+func (c *clientManagementService) GetSessionInfoList(context.Context, *pb.Empty) (*pb.SessionInfoList, error) {
 	mux := clientMuxRef.Load()
 	if mux == nil {
 		return &pb.SessionInfoList{}, fmt.Errorf("client multiplexier is unavailable")
@@ -140,37 +140,37 @@ func (c *clientLifecycleService) GetSessionInfoList(context.Context, *pb.Empty) 
 	return mux.ExportSessionInfoList(), nil
 }
 
-func (c *clientLifecycleService) GetThreadDump(ctx context.Context, req *pb.Empty) (*pb.ThreadDump, error) {
+func (c *clientManagementService) GetThreadDump(ctx context.Context, req *pb.Empty) (*pb.ThreadDump, error) {
 	return &pb.ThreadDump{ThreadDump: proto.String(common.GetAllStackTrace())}, nil
 }
 
-func (c *clientLifecycleService) StartCPUProfile(ctx context.Context, req *pb.ProfileSavePath) (*pb.Empty, error) {
+func (c *clientManagementService) StartCPUProfile(ctx context.Context, req *pb.ProfileSavePath) (*pb.Empty, error) {
 	err := common.StartCPUProfile(req.GetFilePath())
 	return &pb.Empty{}, err
 }
 
-func (c *clientLifecycleService) StopCPUProfile(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
+func (c *clientManagementService) StopCPUProfile(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
 	common.StopCPUProfile()
 	return &pb.Empty{}, nil
 }
 
-func (c *clientLifecycleService) GetHeapProfile(ctx context.Context, req *pb.ProfileSavePath) (*pb.Empty, error) {
+func (c *clientManagementService) GetHeapProfile(ctx context.Context, req *pb.ProfileSavePath) (*pb.Empty, error) {
 	err := common.GetHeapProfile(req.GetFilePath())
 	return &pb.Empty{}, err
 }
 
-func (c *clientLifecycleService) GetMemoryStatistics(ctx context.Context, req *pb.Empty) (*pb.MemoryStatistics, error) {
+func (c *clientManagementService) GetMemoryStatistics(ctx context.Context, req *pb.Empty) (*pb.MemoryStatistics, error) {
 	return getMemoryStatistics()
 }
 
-// NewClientLifecycleService creates a new ClientLifecycleService RPC server.
-func NewClientLifecycleService() *clientLifecycleService {
-	return &clientLifecycleService{}
+// NewClientManagementService creates a new ClientManagementService RPC server.
+func NewClientManagementService() *clientManagementService {
+	return &clientManagementService{}
 }
 
-// NewClientLifecycleRPCClient creates a new ClientLifecycleService RPC client.
+// NewClientManagementRPCClient creates a new ClientManagementService RPC client.
 // It loads client config to find the server address.
-func NewClientLifecycleRPCClient() (appctlgrpc.ClientLifecycleServiceClient, error) {
+func NewClientManagementRPCClient() (appctlgrpc.ClientManagementServiceClient, error) {
 	config, err := LoadClientConfig()
 	if err != nil {
 		return nil, fmt.Errorf("LoadClientConfig() failed: %w", err)
@@ -182,20 +182,20 @@ func NewClientLifecycleRPCClient() (appctlgrpc.ClientLifecycleServiceClient, err
 		return nil, fmt.Errorf("RPC port number %d is invalid", config.GetRpcPort())
 	}
 	rpcAddr := "localhost:" + strconv.Itoa(int(config.GetRpcPort()))
-	return newClientLifecycleRPCClient(rpcAddr)
+	return newClientManagementRPCClient(rpcAddr)
 }
 
 // IsClientDaemonRunning detects if client daemon is running by using
-// ClientLifecycleService.GetStatus() RPC.
+// ClientManagementService.GetStatus() RPC.
 func IsClientDaemonRunning(ctx context.Context) error {
-	client, err := NewClientLifecycleRPCClient()
+	client, err := NewClientManagementRPCClient()
 	if err != nil {
-		return fmt.Errorf("NewClientLifecycleRPCClient() failed: %w", err)
+		return fmt.Errorf("NewClientManagementRPCClient() failed: %w", err)
 	}
 	timedctx, cancelFunc := context.WithTimeout(ctx, RPCTimeout)
 	defer cancelFunc()
 	if _, err = client.GetStatus(timedctx, &pb.Empty{}); err != nil {
-		return fmt.Errorf("ClientLifecycleService.GetStatus() failed: %w", err)
+		return fmt.Errorf("ClientManagementService.GetStatus() failed: %w", err)
 	}
 	return nil
 }
@@ -466,14 +466,14 @@ func ClientUpdaterHistoryPath() (string, error) {
 	return filepath.Join(cachedClientConfigDir, "client.updater.pb"), nil
 }
 
-// newClientLifecycleRPCClient creates a new ClientLifecycleService RPC client
+// newClientManagementRPCClient creates a new ClientManagementService RPC client
 // and connects to the given server address.
-func newClientLifecycleRPCClient(serverAddr string) (appctlgrpc.ClientLifecycleServiceClient, error) {
+func newClientManagementRPCClient(serverAddr string) (appctlgrpc.ClientManagementServiceClient, error) {
 	conn, err := grpc.NewClient(serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(MaxRecvMsgSize)))
 	if err != nil {
 		return nil, fmt.Errorf("grpc.NewClient() failed: %w", err)
 	}
-	return appctlgrpc.NewClientLifecycleServiceClient(conn), nil
+	return appctlgrpc.NewClientManagementServiceClient(conn), nil
 }
 
 // prepareClientConfigDir creates the client config directory if needed.

@@ -23,7 +23,7 @@ import "appctl/proto/servercfg.proto";
 
 option go_package = "github.com/enfein/mieru/v3/pkg/appctl/appctlgrpc";
 
-service ClientLifecycleService {
+service ClientManagementService {
     // Fetch client application status.
     rpc GetStatus(Empty) returns (AppStatusMsg);
 
@@ -52,7 +52,7 @@ service ClientLifecycleService {
     rpc GetMemoryStatistics(Empty) returns (MemoryStatistics);
 }
 
-service ServerLifecycleService {
+service ServerManagementService {
     // Fetch server application status.
     rpc GetStatus(Empty) returns (AppStatusMsg);
 
@@ -61,6 +61,12 @@ service ServerLifecycleService {
 
     // Stop proxy in server application.
     rpc Stop(Empty) returns (Empty);
+
+    // Fetch the server config.
+    rpc GetConfig(Empty) returns (ServerConfig);
+
+    // Update server config.
+    rpc SetConfig(ServerConfig) returns (ServerConfig);
 
     // Reload server configuration.
     rpc Reload(Empty) returns (Empty);
@@ -91,12 +97,4 @@ service ServerLifecycleService {
 
     // Get memory statistics of server daemon.
     rpc GetMemoryStatistics(Empty) returns (MemoryStatistics);
-}
-
-service ServerConfigService {
-    // Fetch the server config.
-    rpc GetConfig(Empty) returns (ServerConfig);
-
-    // Update server config.
-    rpc SetConfig(ServerConfig) returns (ServerConfig);
 }

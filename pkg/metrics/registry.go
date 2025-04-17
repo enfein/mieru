@@ -57,6 +57,16 @@ func GetMetricGroupByName(groupName string) *MetricGroup {
 	return group.(*MetricGroup)
 }
 
+// GetMetricsForUser returns all metrics related to the user.
+func GetMetricsForUser(userName string) []Metric {
+	groupName := fmt.Sprintf(UserMetricGroupFormat, userName)
+	group := GetMetricGroupByName(groupName)
+	if group == nil {
+		return nil
+	}
+	return group.GetAll()
+}
+
 // GetMetricsAsJSON returns a JSON representation of all the metrics.
 func GetMetricsAsJSON() ([]byte, error) {
 	list := MetricGroupList{}

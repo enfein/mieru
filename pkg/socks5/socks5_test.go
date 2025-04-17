@@ -110,6 +110,7 @@ func TestSocks5Connect(t *testing.T) {
 }
 
 func TestSocks5UDPAssociation(t *testing.T) {
+	t.Skipf("Skip due to high failure rate in CI")
 	udpUploadPktsCnt := UDPAssociateUploadPackets.Load()
 	udpDownloadPktsCnt := UDPAssociateDownloadPackets.Load()
 

@@ -70,6 +70,16 @@ func (g *MetricGroup) GetMetric(name string) (Metric, bool) {
 	return v.(Metric), true
 }
 
+// GetAll returns all metrics from the metric group.
+func (g *MetricGroup) GetAll() []Metric {
+	var l []Metric
+	g.metrics.Range(func(_, v any) bool {
+		l = append(l, v.(Metric))
+		return true
+	})
+	return l
+}
+
 // IsLoggingEnabled returns if logging is enabled in this MetricGroup.
 func (g *MetricGroup) IsLoggingEnabled() bool {
 	return g.enableLogging.Load()
