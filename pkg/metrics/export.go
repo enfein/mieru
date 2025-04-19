@@ -130,7 +130,7 @@ func LoadMetricsFromDump() error {
 					metricName := pbMetric.GetName()
 					if metric, ok := group.GetMetric(metricName); ok {
 						if counter, ok := metric.(*Counter); ok {
-							fromMetricPB(counter, pbMetric)
+							loadCounterFromMetricPB(counter, pbMetric)
 						}
 					}
 				}
@@ -218,6 +218,22 @@ func ToMetricPB(src Metric) *pb.Metric {
 	return dst
 }
 
+// NewCounterFromMetricPB creates a counter metric from the protobuf.
+func NewCounterFromMetricPB(src *pb.Metric) (*Counter, error) {
+	if src.GetType() != pb.MetricType_COUNTER && src.GetType() != pb.MetricType_COUNTER_TIME_SERIES {
+		return nil, fmt.Errorf("type %v can't be converted to Counter", src.GetType().String())
+	}
+
+	c := &Counter{
+		name: src.GetName(),
+	}
+	if src.GetType() == pb.MetricType_COUNTER_TIME_SERIES {
+		c.timeSeries = true
+	}
+	loadCounterFromMetricPB(c, src)
+	return c, nil
+}
+
 // LogMetricsNow writes the current metrics to log.
 // This function can be called when (periodic) logging is disabled.
 func LogMetricsNow() {
@@ -252,7 +268,7 @@ func logMetricsLoop() {
 	}
 }
 
-func fromMetricPB(dst *Counter, src *pb.Metric) {
+func loadCounterFromMetricPB(dst *Counter, src *pb.Metric) {
 	// Verify the name and type matches.
 	if src.GetName() != dst.Name() {
 		return

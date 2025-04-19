@@ -53,15 +53,6 @@ func printSessionInfoList(info *appctlpb.SessionInfoList) {
 		"LastRecv",
 		"LastSend",
 	}
-	idLen := len(header[0])
-	protocolLen := len(header[1])
-	localAddrLen := len(header[2])
-	remoteAddrLen := len(header[3])
-	stateLen := len(header[4])
-	recvQBufLen := len(header[5])
-	sendQBufLen := len(header[6])
-	lastRecvLen := len(header[7])
-	lastSendLen := len(header[8])
 
 	// Map the SessionInfo object to fields, and record the length of the fields.
 	table := make([][]string, 0)
@@ -70,20 +61,12 @@ func printSessionInfoList(info *appctlpb.SessionInfoList) {
 		row := make([]string, 9)
 
 		row[0] = si.GetId()
-		idLen = mathext.Max(idLen, len(row[0]))
 		row[1] = si.GetProtocol()
-		protocolLen = mathext.Max(protocolLen, len(row[1]))
 		row[2] = si.GetLocalAddr()
-		localAddrLen = mathext.Max(localAddrLen, len(row[2]))
 		row[3] = si.GetRemoteAddr()
-		remoteAddrLen = mathext.Max(remoteAddrLen, len(row[3]))
 		row[4] = si.GetState()
-		stateLen = mathext.Max(stateLen, len(row[4]))
-
 		row[5] = fmt.Sprintf("%d+%d", si.GetRecvQ(), si.GetRecvBuf())
-		recvQBufLen = mathext.Max(recvQBufLen, len(row[5]))
 		row[6] = fmt.Sprintf("%d+%d", si.GetSendQ(), si.GetSendBuf())
-		sendQBufLen = mathext.Max(sendQBufLen, len(row[6]))
 
 		lastRecvTime := time.Unix(si.LastRecvTime.GetSeconds(), int64(si.LastRecvTime.GetNanos()))
 		if si.GetProtocol() == "TCP" {
@@ -91,27 +74,46 @@ func printSessionInfoList(info *appctlpb.SessionInfoList) {
 		} else {
 			row[7] = fmt.Sprintf("%v (%d)", time.Since(lastRecvTime).Truncate(time.Second), si.GetLastRecvSeq())
 		}
-		lastRecvLen = mathext.Max(lastRecvLen, len(row[7]))
 		lastSendTime := time.Unix(si.LastSendTime.GetSeconds(), int64(si.LastSendTime.GetNanos()))
 		row[8] = fmt.Sprintf("%v (%d)", time.Since(lastSendTime).Truncate(time.Second), si.GetLastSendSeq())
-		lastSendLen = mathext.Max(lastSendLen, len(row[8]))
 
 		table = append(table, row)
 	}
 
-	// Pad the length of each row and print.
-	delim := "  "
+	printTable(table, "  ")
+}
+
+func printTable(table [][]string, delim string) {
+	nRow := len(table)
+	if nRow == 0 {
+		return
+	}
+	nCol := len(table[0])
+	if nCol == 0 {
+		return
+	}
+
+	// Verify each row has the same number of columns.
 	for _, row := range table {
-		rowWithPadding := make([]string, 9)
-		rowWithPadding[0] = fmt.Sprintf("%-"+fmt.Sprintf("%d", idLen)+"s", row[0])
-		rowWithPadding[1] = fmt.Sprintf("%-"+fmt.Sprintf("%d", protocolLen)+"s", row[1])
-		rowWithPadding[2] = fmt.Sprintf("%-"+fmt.Sprintf("%d", localAddrLen)+"s", row[2])
-		rowWithPadding[3] = fmt.Sprintf("%-"+fmt.Sprintf("%d", remoteAddrLen)+"s", row[3])
-		rowWithPadding[4] = fmt.Sprintf("%-"+fmt.Sprintf("%d", stateLen)+"s", row[4])
-		rowWithPadding[5] = fmt.Sprintf("%-"+fmt.Sprintf("%d", recvQBufLen)+"s", row[5])
-		rowWithPadding[6] = fmt.Sprintf("%-"+fmt.Sprintf("%d", sendQBufLen)+"s", row[6])
-		rowWithPadding[7] = fmt.Sprintf("%-"+fmt.Sprintf("%d", lastRecvLen)+"s", row[7])
-		rowWithPadding[8] = fmt.Sprintf("%-"+fmt.Sprintf("%d", lastSendLen)+"s", row[8])
+		if len(row) != nCol {
+			panic(fmt.Sprintf("when print table, row %v has %d columns, expect %d", row, len(row), nCol))
+		}
+	}
+
+	// Calculate the length that should occupy by each column.
+	lens := make([]int, nCol)
+	for _, row := range table {
+		for j, field := range row {
+			lens[j] = mathext.Max(lens[j], len(field))
+		}
+	}
+
+	// Print the table with padding.
+	for _, row := range table {
+		rowWithPadding := make([]string, nCol)
+		for j := range row {
+			rowWithPadding[j] = fmt.Sprintf("%-"+fmt.Sprintf("%d", lens[j])+"s", row[j])
+		}
 		log.Infof("%s", strings.Join(rowWithPadding, delim))
 	}
 }

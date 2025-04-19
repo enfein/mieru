@@ -21,6 +21,9 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	pb "github.com/enfein/mieru/v3/pkg/metrics/metricspb"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestEnableAndDisableLogging(t *testing.T) {
@@ -56,5 +59,27 @@ func TestMetricsDump(t *testing.T) {
 	}
 	if err := LoadMetricsFromDump(); err != nil {
 		t.Fatalf("LoadMetricsFromDump(): %v", err)
+	}
+}
+
+func TestMetricPBConvertion(t *testing.T) {
+	p := &pb.Metric{
+		Name:  proto.String("counter"),
+		Type:  pb.MetricType_COUNTER_TIME_SERIES.Enum(),
+		Value: proto.Int64(100),
+		History: []*pb.History{
+			{
+				TimeUnixMilli: proto.Int64(time.Now().UnixMilli()),
+				Delta:         proto.Int64(100),
+			},
+		},
+	}
+	c, err := NewCounterFromMetricPB(p)
+	if err != nil {
+		t.Fatalf("NewCounterFromMetricPB() failed: %v", err)
+	}
+	p2 := ToMetricPB(c)
+	if !proto.Equal(p, p2) {
+		t.Errorf("metric protobuf doesn't match")
 	}
 }

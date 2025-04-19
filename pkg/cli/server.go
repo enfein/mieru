@@ -155,6 +155,20 @@ func RegisterServerCommands() {
 		serverGetConnectionsFunc,
 	)
 	RegisterCallback(
+		[]string{"", "get", "users"},
+		func(s []string) error {
+			return unexpectedArgsError(s, 3)
+		},
+		serverGetUsersFunc,
+	)
+	RegisterCallback(
+		[]string{"", "get", "quotas"},
+		func(s []string) error {
+			return unexpectedArgsError(s, 3)
+		},
+		serverGetQuotasFunc,
+	)
+	RegisterCallback(
 		[]string{"", "get", "thread-dump"},
 		func(s []string) error {
 			return unexpectedArgsError(s, 3)
@@ -247,6 +261,14 @@ var serverHelpFunc = func(s []string) error {
 			{
 				cmd:  "get connections",
 				help: []string{"Get mita server connections."},
+			},
+			{
+				cmd:  "get users",
+				help: []string{"Get mita server registered users."},
+			},
+			{
+				cmd:  "get quotas",
+				help: []string{"Get mita server user quotas."},
 			},
 			{
 				cmd:  "version",
@@ -741,6 +763,162 @@ var serverGetConnectionsFunc = func(s []string) error {
 		return fmt.Errorf(stderror.GetConnectionsFailedErr, err)
 	}
 	printSessionInfoList(info)
+	return nil
+}
+
+var serverGetUsersFunc = func(_ []string) error {
+	appStatus, err := appctl.GetServerStatusWithRPC(context.Background())
+	if err != nil {
+		if stderror.IsConnRefused(err) {
+			return fmt.Errorf(stderror.ServerNotRunningWithCommand)
+		}
+		return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
+	}
+	if err := appctl.IsServerDaemonRunning(appStatus); err != nil {
+		return fmt.Errorf(stderror.ServerNotRunningErr, err)
+	}
+
+	client, err := appctl.NewServerManagementRPCClient()
+	if err != nil {
+		return fmt.Errorf(stderror.CreateServerManagementRPCClientFailedErr, err)
+	}
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
+	defer cancelFunc()
+	userWithMetricsList, err := client.GetUsers(timedctx, &appctlpb.Empty{})
+	if err != nil {
+		return fmt.Errorf(stderror.GetUsersFailedErr, err)
+	}
+
+	header := []string{
+		"User",
+		"LastActive",
+		"1DayDownload",
+		"1DayUpload",
+		"30DaysDownload",
+		"30DaysUpload",
+	}
+	table := make([][]string, 0)
+	table = append(table, header)
+	for _, userWithMetrics := range userWithMetricsList.GetItems() {
+		row := make([]string, 6)
+		row[0] = userWithMetrics.GetUser().GetName()
+
+		// Collect download and upload metrics of this user.
+		var down, up *metrics.Counter
+		var err error
+		for _, metric := range userWithMetrics.GetMetrics() {
+			switch metric.GetName() {
+			case metrics.UserMetricDownloadBytes:
+				down, err = metrics.NewCounterFromMetricPB(metric)
+				if err != nil {
+					return fmt.Errorf("metrics.NewCounterFromMetricPB() failed: %w", err)
+				}
+			case metrics.UserMetricUploadBytes:
+				up, err = metrics.NewCounterFromMetricPB(metric)
+				if err != nil {
+					return fmt.Errorf("metrics.NewCounterFromMetricPB() failed: %w", err)
+				}
+			}
+		}
+
+		var lastDownloadTime, lastUploadTime time.Time
+		if down != nil {
+			lastDownloadTime = down.LastUpdateTime()
+			row[2] = common.ByteCountIEC(down.DeltaBetween(time.Now().Add(-24*time.Hour), time.Now()))
+			row[4] = common.ByteCountIEC(down.DeltaBetween(time.Now().Add(-720*time.Hour), time.Now()))
+		} else {
+			row[2] = "-"
+			row[4] = "-"
+		}
+		if up != nil {
+			lastUploadTime = up.LastUpdateTime()
+			row[3] = common.ByteCountIEC(up.DeltaBetween(time.Now().Add(-24*time.Hour), time.Now()))
+			row[5] = common.ByteCountIEC(up.DeltaBetween(time.Now().Add(-720*time.Hour), time.Now()))
+		} else {
+			row[3] = "-"
+			row[5] = "-"
+		}
+		if lastDownloadTime.IsZero() && lastUploadTime.IsZero() {
+			row[1] = "-"
+		} else if lastDownloadTime.After(lastUploadTime) {
+			row[1] = lastDownloadTime.Format(time.RFC3339)
+		} else {
+			row[1] = lastUploadTime.Format(time.RFC3339)
+		}
+
+		table = append(table, row)
+	}
+	printTable(table, "  ")
+	return nil
+}
+
+var serverGetQuotasFunc = func(_ []string) error {
+	appStatus, err := appctl.GetServerStatusWithRPC(context.Background())
+	if err != nil {
+		if stderror.IsConnRefused(err) {
+			return fmt.Errorf(stderror.ServerNotRunningWithCommand)
+		}
+		return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
+	}
+	if err := appctl.IsServerDaemonRunning(appStatus); err != nil {
+		return fmt.Errorf(stderror.ServerNotRunningErr, err)
+	}
+
+	client, err := appctl.NewServerManagementRPCClient()
+	if err != nil {
+		return fmt.Errorf(stderror.CreateServerManagementRPCClientFailedErr, err)
+	}
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
+	defer cancelFunc()
+	userWithMetricsList, err := client.GetUsers(timedctx, &appctlpb.Empty{})
+	if err != nil {
+		return fmt.Errorf(stderror.GetUsersFailedErr, err)
+	}
+
+	header := []string{
+		"User",
+		"Days",
+		"Limit",
+		"Usage",
+	}
+	table := make([][]string, 0)
+	table = append(table, header)
+	for _, userWithMetrics := range userWithMetricsList.GetItems() {
+		if len(userWithMetrics.GetUser().GetQuotas()) == 0 {
+			continue
+		}
+
+		// Collect download and upload metrics of this user.
+		var down, up *metrics.Counter
+		var err error
+		for _, metric := range userWithMetrics.GetMetrics() {
+			switch metric.GetName() {
+			case metrics.UserMetricDownloadBytes:
+				down, err = metrics.NewCounterFromMetricPB(metric)
+				if err != nil {
+					return fmt.Errorf("metrics.NewCounterFromMetricPB() failed: %w", err)
+				}
+			case metrics.UserMetricUploadBytes:
+				up, err = metrics.NewCounterFromMetricPB(metric)
+				if err != nil {
+					return fmt.Errorf("metrics.NewCounterFromMetricPB() failed: %w", err)
+				}
+			}
+		}
+		if down == nil || up == nil {
+			continue
+		}
+
+		for _, quota := range userWithMetrics.GetUser().GetQuotas() {
+			row := make([]string, 4)
+			row[0] = userWithMetrics.GetUser().GetName()
+			row[1] = strconv.Itoa(int(quota.GetDays()))
+			row[2] = common.ByteCountIEC(int64(quota.GetMegabytes()) * 1048576)
+			row[3] = common.ByteCountIEC(down.DeltaBetween(time.Now().Add(-24*time.Duration(quota.GetDays())*time.Hour), time.Now()) + up.DeltaBetween(time.Now().Add(-24*time.Duration(quota.GetDays())*time.Hour), time.Now()))
+			table = append(table, row)
+		}
+	}
+	printTable(table, "  ")
 	return nil
 }
 

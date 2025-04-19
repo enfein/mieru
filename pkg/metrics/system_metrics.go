@@ -22,8 +22,8 @@ const (
 const (
 	UserMetricGroupFormat = userMetricGroupPrefix + "%s"
 
-	UserMetricUploadBytes   = "UploadBytes"
 	UserMetricDownloadBytes = "DownloadBytes"
+	UserMetricUploadBytes   = "UploadBytes"
 )
 
 var (
@@ -39,11 +39,11 @@ var (
 	// Current number of established connections.
 	CurrEstablished = RegisterMetric("connections", "CurrEstablished", GAUGE)
 
-	// Number of bytes from client to server.
-	UploadBytes = RegisterMetric("traffic", "UploadBytes", COUNTER)
-
 	// Number of bytes from server to client.
 	DownloadBytes = RegisterMetric("traffic", "DownloadBytes", COUNTER)
+
+	// Number of bytes from client to server.
+	UploadBytes = RegisterMetric("traffic", "UploadBytes", COUNTER)
 
 	// Number of padding bytes send to proxy connections.
 	OutputPaddingBytes = RegisterMetric("traffic", "OutputPaddingBytes", COUNTER)

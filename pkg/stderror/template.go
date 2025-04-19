@@ -35,6 +35,7 @@ const (
 	GetServerConfigFailedErr                 = "get mita server config failed: %w"
 	GetServerStatusFailedErr                 = "get mita server status failed: %w"
 	GetThreadDumpFailedErr                   = "get thread dump failed: %w"
+	GetUsersFailedErr                        = "get users failed: %w"
 	InvalidPortBindingsErr                   = "invalid port bindings: %w"
 	InvalidTransportProtocol                 = "invalid transport protocol"
 	IPAddressNotFound                        = "IP address not found from domain name %q"

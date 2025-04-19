@@ -69,6 +69,10 @@ func TestCounter(t *testing.T) {
 			t.Errorf("DeltaBetween() = %v, want %v", value, tc.value)
 		}
 	}
+	lastUpdateTime := time.Date(2022, time.January, 1, 0, 0, 0, 0, time.UTC)
+	if c.LastUpdateTime().Unix() != lastUpdateTime.Unix() {
+		t.Errorf("LastUpdateTime() = %v, want %v", c.LastUpdateTime(), lastUpdateTime)
+	}
 }
 
 func TestRollUp(t *testing.T) {

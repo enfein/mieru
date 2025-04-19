@@ -100,7 +100,7 @@ func (f *DaemonFormatter) Format(entry *Entry) ([]byte, error) {
 		var value string
 		switch {
 		case key == FieldKeyTime:
-			value = entry.Time.Format(time.RFC3339)
+			value = entry.Time.Format(defaultTimestampFormat)
 		case key == FieldKeyLevel:
 			value = strings.ToUpper(entry.Level.String())
 		case key == FieldKeyMsg:

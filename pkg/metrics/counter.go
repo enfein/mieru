@@ -110,6 +110,24 @@ func (c *Counter) DeltaBetween(t1, t2 time.Time) int64 {
 	return sum
 }
 
+// LastUpdateTime returns the last time when the history is updated.
+func (c *Counter) LastUpdateTime() time.Time {
+	if !c.timeSeries {
+		panic(fmt.Sprintf("%s is not a time series Counter", c.name))
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.op++
+
+	if len(c.history) == 0 {
+		return time.Time{}
+	}
+	if c.history[len(c.history)-1].TimeUnixMilli == nil {
+		return time.Time{}
+	}
+	return time.UnixMilli(*c.history[len(c.history)-1].TimeUnixMilli)
+}
+
 func (c *Counter) addWithTime(delta int64, time time.Time) int64 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -118,6 +136,7 @@ func (c *Counter) addWithTime(delta int64, time time.Time) int64 {
 	if delta == 0 {
 		return c.value
 	}
+
 	c.value += delta
 	if c.timeSeries {
 		if c.history == nil {

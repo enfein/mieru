@@ -353,6 +353,7 @@ func GetServerStatusWithRPC(ctx context.Context) (*pb.AppStatusMsg, error) {
 }
 
 // IsServerDaemonRunning returns nil if app status shows server daemon is running.
+// It returns nil even if the proxy function is not running.
 func IsServerDaemonRunning(appStatus *pb.AppStatusMsg) error {
 	if appStatus == nil {
 		return fmt.Errorf("AppStatusMsg is nil")

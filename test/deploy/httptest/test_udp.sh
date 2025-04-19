@@ -116,6 +116,8 @@ fi
 ./mita get heap-profile /test/mita.udp.heap.gz
 
 # Print metrics and memory statistics.
+./mita get users
+sleep 1
 print_mieru_client_metrics
 sleep 1
 print_mieru_server_metrics
