@@ -182,8 +182,6 @@ mierus://baozi:manlianpenfen@1.2.3.4?mtu=1400&multiplexing=MULTIPLEXING_HIGH&por
 
 简单分享链接以 `mierus://` 开始，其中 `s` 表示 `simple`。
 
-用户名和密码不允许使用某些特殊字符。如果使用了不允许的字符，则无法生成简单分享链接。
-
 简单分享链接中只有一个服务器地址。如果客户端的设置含有多台服务器，则会生成多个链接。
 
 链接中支持的参数列表如下：

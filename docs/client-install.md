@@ -182,8 +182,6 @@ The format of the simple sharing link is as follows:
 
 A simple sharing link starts with `mierus://`, where `s` stands for `simple`.
 
-Some special characters are not allowed in username or password. In case a character is not allowed, the simple sharing link cannot be generated.
-
 There is only one server address in a simple sharing link. If the client's configuration contains multiple servers, multiple links will be generated.
 
 The supported parameters are:

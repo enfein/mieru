@@ -28,8 +28,8 @@ func TestClientConfigWithURL(t *testing.T) {
 			{
 				ProfileName: proto.String("default"),
 				User: &pb.User{
-					Name:     proto.String("abcABC123_!$&'()*+,;=.~-"),
-					Password: proto.String("defDEF456_!$&'()*+,;=.~-"),
+					Name:     proto.String("abcABC123:<>[]{}|_ !$&'()*+,;=.~-"),
+					Password: proto.String("defDEF456:<>[]{}|_ !$&'()*+,;=.~-"),
 				},
 				Servers: []*pb.ServerEndpoint{
 					{
@@ -71,8 +71,8 @@ func TestClientProfileWithMultiURLs(t *testing.T) {
 	p := &pb.ClientProfile{
 		ProfileName: proto.String("default"),
 		User: &pb.User{
-			Name:     proto.String("abcABC123_!$&'()*+,;=.~-"),
-			Password: proto.String("defDEF456_!$&'()*+,;=.~-"),
+			Name:     proto.String("abcABC123:<>[]{}|_ !$&'()*+,;=.~-"),
+			Password: proto.String("defDEF456:<>[]{}|_ !$&'()*+,;=.~-"),
 		},
 		Servers: []*pb.ServerEndpoint{
 			{
@@ -107,8 +107,8 @@ func TestClientProfileWithMultiURLs(t *testing.T) {
 	p0 := &pb.ClientProfile{
 		ProfileName: proto.String("default"),
 		User: &pb.User{
-			Name:     proto.String("abcABC123_!$&'()*+,;=.~-"),
-			Password: proto.String("defDEF456_!$&'()*+,;=.~-"),
+			Name:     proto.String("abcABC123:<>[]{}|_ !$&'()*+,;=.~-"),
+			Password: proto.String("defDEF456:<>[]{}|_ !$&'()*+,;=.~-"),
 		},
 		Servers: []*pb.ServerEndpoint{
 			{
@@ -134,8 +134,8 @@ func TestClientProfileWithMultiURLs(t *testing.T) {
 	p1 := &pb.ClientProfile{
 		ProfileName: proto.String("default"),
 		User: &pb.User{
-			Name:     proto.String("abcABC123_!$&'()*+,;=.~-"),
-			Password: proto.String("defDEF456_!$&'()*+,;=.~-"),
+			Name:     proto.String("abcABC123:<>[]{}|_ !$&'()*+,;=.~-"),
+			Password: proto.String("defDEF456:<>[]{}|_ !$&'()*+,;=.~-"),
 		},
 		Servers: []*pb.ServerEndpoint{
 			{
@@ -175,58 +175,5 @@ func TestClientProfileWithMultiURLs(t *testing.T) {
 	}
 	if !proto.Equal(profile1, p1) {
 		t.Errorf("profile is not equal after generating and loading URL %q", urls[1])
-	}
-}
-
-func TestIsSafeURLString(t *testing.T) {
-	testCases := []struct {
-		input  string
-		isSafe bool
-	}{
-		{input: "abc", isSafe: true},
-		{input: "ABC", isSafe: true},
-		{input: "123", isSafe: true},
-		{input: "_", isSafe: true},
-		{input: "!", isSafe: true},
-		{input: "$", isSafe: true},
-		{input: "&", isSafe: true},
-		{input: "'", isSafe: true},
-		{input: "(", isSafe: true},
-		{input: ")", isSafe: true},
-		{input: "*", isSafe: true},
-		{input: "+", isSafe: true},
-		{input: ",", isSafe: true},
-		{input: ";", isSafe: true},
-		{input: "=", isSafe: true},
-		{input: ".", isSafe: true},
-		{input: "~", isSafe: true},
-		{input: "-", isSafe: true},
-		{input: "abcABC123_!$&'()*+,;=.~-", isSafe: true},
-		{input: " ", isSafe: false},
-		{input: "\"", isSafe: false},
-		{input: "#", isSafe: false},
-		{input: "%", isSafe: false},
-		{input: "/", isSafe: false},
-		{input: "\\", isSafe: false},
-		{input: ":", isSafe: false},
-		{input: "<", isSafe: false},
-		{input: ">", isSafe: false},
-		{input: "?", isSafe: false},
-		{input: "@", isSafe: false},
-		{input: "[", isSafe: false},
-		{input: "]", isSafe: false},
-		{input: "^", isSafe: false},
-		{input: "`", isSafe: false},
-		{input: "{", isSafe: false},
-		{input: "|", isSafe: false},
-		{input: "}", isSafe: false},
-		{input: "abc 123", isSafe: false},
-	}
-
-	for _, tc := range testCases {
-		actual := isSafeURLString(tc.input)
-		if actual != tc.isSafe {
-			t.Errorf("isSafeURLString(%q) = %v, want %v", tc.input, actual, tc.isSafe)
-		}
 	}
 }

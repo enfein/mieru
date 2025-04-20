@@ -26,63 +26,105 @@ from typing import Any, List
 
 
 def main() -> None:
-    check_platform()
-    check_version()
-    check_permission()
-    print(detect_package_system())
-    print(detect_cpu_arch())
+    sys_info = SysInfo()
 
 
-def detect_package_system() -> str:
-    if is_deb():
-        return 'deb'
-    if is_rpm():
-        return 'rpm'
-    else:
+class SysInfo:
+
+    def __init__(self) -> None:
+        self.check_python_version()
+        self.check_platform()
+        self.check_permission()
+
+        self._package_system = self.detect_package_system()
+        if self._package_system == '':
+            print_exit('Failed to detect system package manager. Supported: deb, rpm.')
+        self._cpu_arch = self.detect_cpu_arch()
+        if self._cpu_arch == '':
+            print_exit('Failed to detect CPU architecture. Supported: amd64, arm64.')
+
+        self._is_mita_installed = self.is_mita_installed()
+        self._installed_mita_version = ''
+        self._is_mita_config_applied = False
+        if self._is_mita_installed:
+            result = run_command(['mita', 'version'], check=True)
+            self._installed_mita_version = result.stdout.strip()
+            if os.path.exists('/etc/mita/server.conf.pb') and \
+                    os.stat('/etc/mita/server.conf.pb').st_size > 0:
+                self._is_mita_config_applied = True
+
+        self._latest_mita_version = '' # lazy evaluate
+
+
+    def check_python_version(self) -> None:
+        if sys.version_info < (3, 8, 0):
+            print_exit('Python version must be 3.8.0 or higher.')
+
+
+    def check_platform(self) -> None:
+        if not sys.platform.startswith('linux'):
+            print_exit('You can only run this program on Linux.')
+
+
+    def check_permission(self) -> None:
+        uid = os.getuid()
+        if uid != 0:
+            print_exit('Only root user can run this program.')
+
+
+    def detect_package_system(self) -> str:
+        if self.is_deb():
+            return 'deb'
+        elif self.is_rpm():
+            return 'rpm'
+        else:
+            return ''
+
+
+    def is_deb(self) -> bool:
+        '''
+        Return true if system uses deb package.
+        '''
+        result = run_command(['dpkg', '-l'])
+        return result.returncode == 0 and len(result.stdout.splitlines()) > 1
+
+
+    def is_rpm(self) -> bool:
+        '''
+        Return true if system uses rpm package.
+        '''
+        result = run_command(['rpm', '-qa'])
+        return result.returncode == 0 and len(result.stdout.splitlines()) > 1
+
+
+    def is_mita_installed(self) -> bool:
+        '''
+        Return true if mita deb or rpm package is installed.
+        '''
+        if self.is_deb():
+            result = run_command(['dpkg', '-l'])
+            for l in result.stdout.splitlines():
+                if "mita" in l:
+                    return True
+        elif self.is_rpm():
+            result = run_command(['rpm', '-qa'])
+            for l in result.stdout.splitlines():
+                if "mita" in l:
+                    return True
+        else:
+            return False
+
+
+    def detect_cpu_arch(self) -> str:
+        machine = platform.machine()
+        if machine == 'x86_64' or machine == 'AMD64':
+            return 'amd64'
+        elif machine == 'aarch64' or machine == 'arm64':
+            return 'arm64'
         return ''
 
 
-def is_deb() -> bool:
-    '''
-    Return true if system uses deb package.
-    '''
-    result = run_command(['dpkg', '-l'], timeout=15)
-    return result.returncode == 0 and len(result.stdout.splitlines()) > 1
-
-
-def is_rpm() -> bool:
-    '''
-    Return true if system uses rpm package.
-    '''
-    result = run_command(['rpm', '-qa'], timeout=15)
-    return result.returncode == 0 and len(result.stdout.splitlines()) > 1
-
-
-def detect_cpu_arch() -> str:
-    if is_amd64():
-        return 'amd64'
-    if is_arm64():
-        return 'arm64'
-    return ''
-
-
-def is_amd64() -> bool:
-    '''
-    Return true if the CPU architecture is amd64.
-    '''
-    machine = platform.machine()
-    return machine == 'x86_64' or machine == 'AMD64'
-
-
-def is_arm64() -> bool:
-    '''
-    Return true if the CPU architecture is arm64.
-    '''
-    machine = platform.machine()
-    return machine == 'aarch64' or machine == 'arm64'
-
-
-def run_command(args: List[str], input=None, timeout=None, check=False):
+def run_command(args: List[str], input=None, timeout=10, check=False):
     '''
     Run the command and return a subprocess.CompletedProcess instance.
     '''
@@ -99,22 +141,6 @@ def run_command(args: List[str], input=None, timeout=None, check=False):
     except subprocess.CalledProcessError as cpe:
         print_exit(f'Command {cpe.cmd} returned code {cpe.returncode}. Output: {cpe.output}')
     return result
-
-
-def check_platform() -> None:
-    if not sys.platform.startswith('linux'):
-        print_exit('You can only run this program on Linux.')
-
-
-def check_version() -> None:
-    if sys.version_info < (3, 8, 0):
-        print_exit('Python version must be 3.8.0 or higher.')
-
-
-def check_permission() -> None:
-    uid = os.getuid()
-    if uid != 0:
-        print_exit('Only root user can run this program.')
 
 
 def print_exit(*values: Any) -> None:
