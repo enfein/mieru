@@ -59,6 +59,8 @@ sleep 2
 
 # Start mieru server daemon.
 mkdir -p /etc/mita
+mkdir -p /var/lib/mita
+mkdir -p /var/run/mita
 export MITA_INSECURE_UDS=1
 ip netns exec sim ./mita run &
 sleep 1

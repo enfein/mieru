@@ -29,6 +29,8 @@ fi
 
 # Start mieru server daemon.
 mkdir -p /etc/mita
+mkdir -p /var/lib/mita
+mkdir -p /var/run/mita
 export MITA_INSECURE_UDS=1
 ./mita run &
 sleep 1
