@@ -41,7 +41,8 @@ def main() -> None:
     sys_info = SysInfo()
 
     if not sys_info.is_mita_installed:
-        install_prompt = '''[install mita]
+        install_prompt = '''
+[install mita]
 mita proxy server is not installed.
 Type "y" to install mita proxy server.
 Type any other character to exit.
@@ -60,7 +61,8 @@ Type any other character to exit.
         # fallthrough
 
     if sys_info.is_mita_installed and sys_info.installed_mita_version.is_less_than(sys_info.latest_mita_version):
-        update_prompt = f'''[update mita]
+        update_prompt = f'''
+[update mita]
 mita proxy server {sys_info.installed_mita_version} is installed.
 A new version {sys_info.latest_mita_version} is available.
 Type "y" to update mita proxy server.
@@ -77,10 +79,11 @@ Type any other character to exit.
         sys_info.is_mita_installed = sys_info.detect_mita_installed()
         sys_info.is_mita_systemd_active = sys_info.detect_mita_systemd_active()
         sys_info.installed_mita_version = sys_info.detect_mita_version()
-        # fallthrough
+        return # exit after update is successful, assume it is already configured
 
     if not sys_info.is_mita_config_applied:
-        configure_prompt = '''[configure mita server]
+        configure_prompt = '''
+[configure mita server]
 mita proxy server is installed but not configured.
 Type "y" to configure mita proxy server.
 Type any other character to exit.
@@ -90,7 +93,8 @@ Type any other character to exit.
         if configure != 'y':
             return
         configurer = Configurer()
-        add_op_user_prompt = '''[configure mita server][add operation user]
+        add_op_user_prompt = '''
+[configure mita server][add operation user]
 Type a Linux user name to add the user to "mita" group,
 such that the user can invoke mita command.
 Otherwise, only root user can invoke mita command.
@@ -100,11 +104,14 @@ Press Enter to skip (default).
         if op_user != "":
             if configurer.add_operation_user(op_user):
                 print(f'Added {op_user} to mita group.')
+            else:
+                print(f'Failed to add {op_user} to mita group.')
         configurer.configure_server(sys_info)
         if not configurer.restart_mita():
             print_exit(f'Failed to restart mita proxy server.')
         sys_info.is_mita_config_applied = True
-        build_client_prompt = '''[configure mieru client]
+        build_client_prompt = '''
+[configure mieru client]
 Type "y" to generate mieru proxy client configuration.
 Type any other character to exit.
 (default is "y")
@@ -116,7 +123,8 @@ Type any other character to exit.
         return # exit after configuration is successful
 
     if sys_info.is_mita_installed:
-        uninstall_prompt = '''[uninstall mita]
+        uninstall_prompt = '''
+[uninstall mita]
 mita proxy server is installed.
 Type "y" to uninstall mita proxy server.
 Type any other character to exit.
@@ -188,6 +196,10 @@ class SysInfo:
         '''
         Return true if system uses deb package.
         '''
+        try:
+            subprocess.run(['dpkg', '--version'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except FileNotFoundError:
+            return False
         result = run_command(['dpkg', '-l'])
         return result.returncode == 0 and len(result.stdout.splitlines()) > 1
 
@@ -196,6 +208,10 @@ class SysInfo:
         '''
         Return true if system uses rpm package.
         '''
+        try:
+            subprocess.run(['rpm', '--version'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except FileNotFoundError:
+            return False
         result = run_command(['rpm', '-qa'])
         return result.returncode == 0 and len(result.stdout.splitlines()) > 1
 
@@ -493,6 +509,7 @@ class Configurer:
 >>> '''
             confirm, valid = check_input(prompt=confirm_prompt, validator=match_preset_validator(['y', 'n']), default='y')
             if not valid:
+                self._server_config = ServerConfig()
                 print(f'Invalid input: {confirm} is an invalid option. Discarded the server configuration.')
                 continue
             if confirm == 'y':
@@ -502,6 +519,7 @@ class Configurer:
                     return
                 print_exit('Apply server configuration is not successful.')
             else:
+                self._server_config = ServerConfig()
                 print('Discarded the server configuration.')
                 continue
 
@@ -519,7 +537,8 @@ class Configurer:
                 print(f'Failed to retrieve external IP address: {e}')
                 time.sleep(1)
                 continue
-            socks5_port_prompt = '''[configure mieru client][configure socks5 listening port]
+            socks5_port_prompt = '''
+[configure mieru client][configure socks5 listening port]
 Type a single port number to listen to socks5 requests.
 (default is "1080")
 >>> '''
@@ -527,7 +546,8 @@ Type a single port number to listen to socks5 requests.
             if not valid:
                 print(f'Invalid input: {socks5_port} is an invalid port number')
                 continue
-            http_port_prompt = '''[configure mieru client][configure HTTP proxy listening port]
+            http_port_prompt = '''
+[configure mieru client][configure HTTP proxy listening port]
 Type a single port number to listen to HTTP and HTTPS requests.
 (default is "8080")
 >>> '''
@@ -535,7 +555,8 @@ Type a single port number to listen to HTTP and HTTPS requests.
             if not valid:
                 print(f'Invalid input: {http_port} is an invalid port number')
                 continue
-            rpc_port_prompt = '''[configure mieru client][configure management listening port]
+            rpc_port_prompt = '''
+[configure mieru client][configure management listening port]
 Type a single port number to listen to management RPC requests.
 (default is randonly select a number from 2000 to 8000)
 >>> '''
@@ -562,7 +583,7 @@ Type a single port number to listen to management RPC requests.
             print('')
             print(self._client_config.to_json())
             print('')
-            ntf = tempfile.NamedTemporaryFile(mode='w+', delete=False, prefix='mieru', suffix='.json')
+            ntf = tempfile.NamedTemporaryFile(mode='w+', delete=False, prefix='mieru_', suffix='.json')
             try:
                 ntf.write(self._client_config.to_json())
                 ntf.flush()
@@ -586,7 +607,8 @@ Type a single port number to listen to management RPC requests.
 
 
     def configure_users(self) -> bool:
-        op_prompt = '''[configure mita server][configure proxy user]
+        op_prompt = '''
+[configure mita server][configure proxy user]
 Type a number to select from the options below.
 (1): automatically generate user name and password (default)
 (2): manually type user name and password
@@ -619,7 +641,8 @@ Type a number to select from the options below.
 
 
     def configure_port_bindings(self) -> bool:
-        protocol_prompt = '''[configure mita server][configure protocol and ports]
+        protocol_prompt = '''
+[configure mita server][configure protocol and ports]
 Type the proxy protocol to use. Support "TCP" and "UDP".
 >>> '''
         protocol, valid = check_input(prompt=protocol_prompt, validator=match_preset_validator(['TCP', 'UDP']))
@@ -670,7 +693,7 @@ Minimum value is 1. Maximum value is 65535.
         Apply the server configuration.
         If successful, return the JSON file path that stores the server configuration.
         '''
-        ntf = tempfile.NamedTemporaryFile(mode='w+', delete=False, prefix='mita', suffix='.json')
+        ntf = tempfile.NamedTemporaryFile(mode='w+', delete=False, prefix='mita_', suffix='.json')
         try:
             ntf.write(self._server_config.to_json())
             ntf.flush()

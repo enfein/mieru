@@ -144,6 +144,21 @@ mieru stop
 mieru start
 ```
 
+## 查看用户网络流量
+
+可以在服务器运行 `mita get users` 和 `mita get quotas` 指令，查看每个用户最近的活跃时间和消耗的网络流量。
+
+```
+$ mita get users
+User  LastActive            1DayDownload  1DayUpload  30DaysDownload  30DaysUpload
+abcd  2025-04-23T01:02:03Z  19.4MiB       1.8MiB      19.4MiB         1.8MiB
+
+$ mita get quotas
+User  Days  Limit    Usage
+abcd  1     10.0GiB  21.2MiB
+abcd  10    40.0GiB  21.2MiB
+```
+
 ## 环境变量
 
 如有必要，用户可以使用环境变量控制服务器和客户端的行为。
@@ -153,8 +168,8 @@ mieru start
 - `MIERU_CONFIG_JSON_FILE` 从这个路径加载 JSON 格式的客户端配置文件。
 - `MIERU_CONFIG_FILE` 从这个路径加载 protocol buffer 格式的客户端配置文件。
 - `MITA_LOG_NO_TIMESTAMP` 这个值非空时，服务器日志不打印时间戳。因为 journald 已经提供了时间戳，我们默认开启这项设置，以避免打印重复的时间戳。
-- `MITA_UDS_PATH` 使用这个路径创建服务器 UNIX domain socket 文件。默认的路径是 `/var/run/mita.sock`。
-- `MITA_INSECURE_UDS` 这个值非空时，不强制修改服务器 UNIX domain socket 文件 `/var/run/mita.sock` 的用户和访问权限。这个设置可以用于某些非常受限（例如不能创建新用户）的系统中。
+- `MITA_UDS_PATH` 使用这个路径创建服务器 UNIX domain socket 文件。默认的路径是 `/var/run/mita/mita.sock`。
+- `MITA_INSECURE_UDS` 这个值非空时，不强制修改服务器 UNIX domain socket 文件 `/var/run/mita/mita.sock` 的用户和访问权限。这个设置可以用于某些非常受限（例如不能创建新用户）的系统中。
 
 ## 在前台运行客户端
 
@@ -186,7 +201,7 @@ MIERU_CONFIG_JSON_FILE=/etc/mieru_client_config.json mieru run
 
 ## 重置服务器指标
 
-服务器指标存储在文件 `/var/lib/mita/metrics.pb` 中。即便服务器重启，也可以通过 `mita get metrics` 指令读取累积的指标。如果想重置指标，可以运行下面的命令：
+服务器指标存储在文件 `/var/lib/mita/metrics.pb` 中。即便服务器重启，也可以通过 `mita get metrics`，`mita get users` 和 `mita get quotas` 指令读取累积的指标。如果想重置指标，可以运行下面的命令：
 
 ```sh
 sudo systemctl stop mita && sudo rm -f /var/lib/mita/metrics.pb && sudo systemctl start mita

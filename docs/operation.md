@@ -144,6 +144,21 @@ mieru stop
 mieru start
 ```
 
+## View User Network Traffic
+
+You can run the commands `mita get users` and `mita get quotas` on the server to check each user's most recent active time and the amount of network traffic used.
+
+```
+$ mita get users
+User  LastActive            1DayDownload  1DayUpload  30DaysDownload  30DaysUpload
+abcd  2025-04-23T01:02:03Z  19.4MiB       1.8MiB      19.4MiB         1.8MiB
+
+$ mita get quotas
+User  Days  Limit    Usage
+abcd  1     10.0GiB  21.2MiB
+abcd  10    40.0GiB  21.2MiB
+```
+
 ## Environment Variables
 
 If necessary, you can use environment variables to control the behavior of the server and the client.
@@ -153,8 +168,8 @@ If necessary, you can use environment variables to control the behavior of the s
 - `MIERU_CONFIG_JSON_FILE` loads the JSON client configuration file from this path.
 - `MIERU_CONFIG_FILE` loads the protocol buffer client configuration file from this path.
 - If `MITA_LOG_NO_TIMESTAMP` is not empty, the server log does not print timestamps. Since journald already provides timestamps, we enable this by default to avoid printing duplicate timestamps.
-- `MITA_UDS_PATH` creates the server UNIX domain socket file using this path. The default path is `/var/run/mita.sock`.
-- If `MITA_INSECURE_UDS` is not empty, do not enforce the user and access rights to the server UNIX domain socket file `/var/run/mita.sock`. This setting can be used on systems that are very restricted (e.g., cannot create new users).
+- `MITA_UDS_PATH` creates the server UNIX domain socket file using this path. The default path is `/var/run/mita/mita.sock`.
+- If `MITA_INSECURE_UDS` is not empty, do not enforce the user and access rights to the server UNIX domain socket file `/var/run/mita/mita.sock`. This setting can be used on systems that are very restricted (e.g., cannot create new users).
 
 ## Running Client in the Foreground
 
@@ -186,7 +201,7 @@ When you start the mieru client, it will automatically check for updates every f
 
 ## Reset Server Metrics
 
-Server metrics are stored in the `/var/lib/mita/metrics.pb` file. Even if the server is restarted, you can read the accumulated metrics using the `mita get metrics` command. If you want to reset the metrics, you can run the following command:
+Server metrics are stored in the `/var/lib/mita/metrics.pb` file. Even if the server is restarted, you can read the accumulated metrics using the `mita get metrics`, `mita get users` and `mita get quotas` commands. If you want to reset the metrics, you can run the following command:
 
 ```sh
 sudo systemctl stop mita && sudo rm -f /var/lib/mita/metrics.pb && sudo systemctl start mita

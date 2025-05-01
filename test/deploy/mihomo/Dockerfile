@@ -28,6 +28,15 @@ COPY mihomo mita httpserver sockshttpclient socksudpclient udpserver \
     test/deploy/mihomo/test.sh /test/
 
 # Create mita user and server config directory.
-RUN /usr/sbin/useradd --no-create-home --user-group mita && mkdir -p /etc/mita
+RUN /usr/sbin/useradd --no-create-home --user-group mita && \
+    mkdir -p /etc/mita && \
+    chown -R mita:mita /etc/mita && \
+    chmod 775 /etc/mita && \
+    mkdir -p /var/lib/mita && \
+    chown -R mita:mita /var/lib/mita && \
+    chmod 775 /var/lib/mita && \
+    mkdir -p /var/run/mita && \
+    chown -R mita:mita /var/run/mita && \
+    chmod 775 /var/run/mita
 
 CMD ["/test/test.sh"]

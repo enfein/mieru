@@ -48,7 +48,7 @@ var (
 
 	cachedServerConfigDir      string = "/etc/mita"
 	cachedServerConfigFilePath string = "/etc/mita/server.conf.pb"
-	cachedServerUDS            string = "/var/run/mita.sock"
+	cachedServerUDS            string = "/var/run/mita/mita.sock"
 
 	// serverIOLock is required to load server config and store server config.
 	serverIOLock sync.Mutex

@@ -65,7 +65,7 @@ func (h *History) StoreTo(filePath string) error {
 	if err != nil {
 		return fmt.Errorf("proto.Marshal() failed: %w", err)
 	}
-	if err := os.WriteFile(filePath, b, 0664); err != nil {
+	if err := os.WriteFile(filePath, b, 0660); err != nil {
 		return fmt.Errorf("os.WriteFile() failed: %w", err)
 	}
 	return nil

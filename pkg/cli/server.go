@@ -1035,15 +1035,15 @@ var serverStopCPUProfileFunc = func(s []string) error {
 	return nil
 }
 
-// Update server unix domain socket permission to 770, belongs to root:mita.
+// Update server unix domain socket permission to 770, belongs to mita:mita.
 func updateServerUDSPermission() error {
-	rootUidStr, err := getUid("root")
+	mitaUidStr, err := getUid("mita")
 	if err != nil {
-		return fmt.Errorf("getUid(%q) failed: %w", "root", err)
+		return fmt.Errorf("getUid(%q) failed: %w", "mita", err)
 	}
-	rootUid, err := strconv.Atoi(rootUidStr)
+	mitaUid, err := strconv.Atoi(mitaUidStr)
 	if err != nil {
-		return fmt.Errorf("convert root UID with strconv.Atoi(%q) failed: %w", rootUidStr, err)
+		return fmt.Errorf("convert mita UID with strconv.Atoi(%q) failed: %w", mitaUidStr, err)
 	}
 	mitaGidStr, err := getGid("mita")
 	if err != nil {
@@ -1053,7 +1053,7 @@ func updateServerUDSPermission() error {
 	if err != nil {
 		return fmt.Errorf("convert mita UID with strconv.Atoi(%q) failed: %w", mitaGidStr, err)
 	}
-	if err = os.Chown(appctl.ServerUDS(), rootUid, mitaGid); err != nil {
+	if err = os.Chown(appctl.ServerUDS(), mitaUid, mitaGid); err != nil {
 		return fmt.Errorf("os.Chown(%q) failed: %w", appctl.ServerUDS(), err)
 	}
 	if err = os.Chmod(appctl.ServerUDS(), 0770); err != nil {

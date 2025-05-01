@@ -7,8 +7,14 @@ StartLimitIntervalSec=60
 
 [Service]
 Type=exec
+User=mita
+Group=mita
+AmbientCapabilities=CAP_NET_BIND_SERVICE
 Environment="MITA_CONFIG_JSON_FILE=/etc/mita_server_config.json"
 Environment="MITA_LOG_NO_TIMESTAMP=true"
+ExecStartPre=+/usr/bin/mkdir -p /var/run/mita
+ExecStartPre=+/usr/bin/chown -R mita:mita /var/run/mita
+ExecStartPre=+/usr/bin/chmod 775 /var/run/mita
 ExecStart=/usr/bin/mita run
 Nice=-10
 Restart=on-failure

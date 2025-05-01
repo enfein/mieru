@@ -54,8 +54,16 @@ fi
 
 set -e
 
+# Create directories.
 mkdir -p /etc/mita
+chown -R mita:mita /etc/mita
 chmod 775 /etc/mita
+mkdir -p /var/lib/mita
+chown -R mita:mita /var/lib/mita
+chmod 775 /var/lib/mita
+mkdir -p /var/run/mita
+chown -R mita:mita /var/run/mita
+chmod 775 /var/run/mita
 
 systemctl daemon-reload
 
