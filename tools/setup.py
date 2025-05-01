@@ -16,10 +16,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+'''
+This program helps user install, update, configure and uninstall
+mita proxy server.
+'''
+
 
 import json
 import os
 import platform
+import random
 import re
 import secrets
 import subprocess
@@ -74,7 +80,7 @@ Type any other character to exit.
         # fallthrough
 
     if not sys_info.is_mita_config_applied:
-        configure_prompt = '''[configure mita]
+        configure_prompt = '''[configure mita server]
 mita proxy server is installed but not configured.
 Type "y" to configure mita proxy server.
 Type any other character to exit.
@@ -84,7 +90,7 @@ Type any other character to exit.
         if configure != 'y':
             return
         configurer = Configurer()
-        add_op_user_prompt = '''[configure mita][add operation user]
+        add_op_user_prompt = '''[configure mita server][add operation user]
 Type a Linux user name to add the user to "mita" group,
 such that the user can invoke mita command.
 Otherwise, only root user can invoke mita command.
@@ -94,10 +100,19 @@ Press Enter to skip (default).
         if op_user != "":
             if configurer.add_operation_user(op_user):
                 print(f'Added {op_user} to mita group.')
-        configurer.configure(sys_info)
+        configurer.configure_server(sys_info)
         if not configurer.restart_mita():
             print_exit(f'Failed to restart mita proxy server.')
         sys_info.is_mita_config_applied = True
+        build_client_prompt = '''[configure mieru client]
+Type "y" to generate mieru proxy client configuration.
+Type any other character to exit.
+(default is "y")
+>>> '''
+        build_client, _ = check_input(prompt=build_client_prompt, validator=any_validator(), default='y')
+        if build_client != 'y':
+            return
+        configurer.build_client_configuration()
         return # exit after configuration is successful
 
     if sys_info.is_mita_installed:
@@ -301,7 +316,7 @@ class ServerConfig:
         return self.config['portBindings']
 
 
-    def add_user(self, name: str, password: str) -> None:
+    def set_user(self, name: str, password: str) -> None:
         self.config['users'].append({
             'name': name,
             'password': password,
@@ -320,6 +335,59 @@ class ServerConfig:
             'portRange': port_range,
             'protocol': protocol,
         })
+
+
+    def to_json(self) -> str:
+        return json.dumps(self.config, indent=4)
+
+
+class ClientConfig:
+
+    def __init__(self):
+        self.config = {
+            'profiles': [{
+                'profileName': 'default',
+                'user': {},
+                'servers': [{
+                    'ipAddress': '',
+                    'portBindings': [{}],
+                }]
+            }],
+            'activeProfile': 'default',
+            'rpcPort': 0,
+            'socks5Port': 0,
+            'loggingLevel': 'INFO',
+            'httpProxyPort': 0,
+        }
+
+
+    def set_user(self, name: str, password: str) -> None:
+        self.config['profiles'][0]['user']['name'] = name
+        self.config['profiles'][0]['user']['password'] = password
+
+
+    def set_ip_port(self, ip: str, port: int, protocol: str) -> None:
+        self.config['profiles'][0]['servers'][0]['ipAddress'] = ip
+        self.config['profiles'][0]['servers'][0]['portBindings'][0]['port'] = port
+        self.config['profiles'][0]['servers'][0]['portBindings'][0]['protocol'] = protocol
+
+
+    def set_ip_port_range(self, ip: str, port_range: str, protocol: str) -> None:
+        self.config['profiles'][0]['servers'][0]['ipAddress'] = ip
+        self.config['profiles'][0]['servers'][0]['portBindings'][0]['portRange'] = port_range
+        self.config['profiles'][0]['servers'][0]['portBindings'][0]['protocol'] = protocol
+
+
+    def set_rpc_port(self, port: int) -> None:
+        self.config['rpcPort'] = port
+
+
+    def set_socks5_port(self, port: int) -> None:
+        self.config['socks5Port'] = port
+
+
+    def set_http_proxy_port(self, port: int) -> None:
+        self.config['httpProxyPort'] = port
 
 
     def to_json(self) -> str:
@@ -376,6 +444,7 @@ class Configurer:
 
     def __init__(self):
         self._server_config = ServerConfig()
+        self._client_config = ClientConfig()
 
 
     def add_operation_user(self, user: str) -> bool:
@@ -383,14 +452,15 @@ class Configurer:
         Add user to mita group.
         Return true if it is successful.
         '''
-        return run_command(['usermod', '-a', '-G', 'mita', user], print_args=True, print_stdout=True).returncode == 0
+        return run_command(['usermod', '-a', '-G', 'mita', user],
+                           print_args=True, print_stdout=True).returncode == 0
 
 
     def generate_random_str(self, length=8) -> str:
         return secrets.token_urlsafe(length)[:length]
 
 
-    def configure(self, sys_info: SysInfo) -> None:
+    def configure_server(self, sys_info: SysInfo) -> None:
         '''
         Interactively configure mita server.
         '''
@@ -416,7 +486,7 @@ class Configurer:
             # Let user to confirm the server configuration.
             print('The following server configuration will be applied:')
             print('')
-            self.describe_config()
+            self.describe_server_config()
             print('')
             confirm_prompt = '''Type "y" or "n" to apply or discard the server configuration.
 (default is "y")
@@ -426,7 +496,7 @@ class Configurer:
                 print(f'Invalid input: {confirm} is an invalid option. Discarded the server configuration.')
                 continue
             if confirm == 'y':
-                config_path = self.apply_config()
+                config_path = self.apply_server_config()
                 if config_path != '':
                     print(f'Server configuration file is stored at {config_path}')
                     return
@@ -434,6 +504,75 @@ class Configurer:
             else:
                 print('Discarded the server configuration.')
                 continue
+
+
+    def build_client_configuration(self) -> None:
+        '''
+        Assume server configuration is available,
+        Interactively build mieru client configuration.
+        '''
+        while True:
+            try:
+                external_ip = urllib.request.urlopen('https://checkip.amazonaws.com').read().decode('utf8').strip()
+                print(f'Your external IP address is: {external_ip}')
+            except Exception as e:
+                print(f'Failed to retrieve external IP address: {e}')
+                time.sleep(1)
+                continue
+            socks5_port_prompt = '''[configure mieru client][configure socks5 listening port]
+Type a single port number to listen to socks5 requests.
+(default is "1080")
+>>> '''
+            socks5_port, valid = check_input(prompt=socks5_port_prompt, validator=port_validator(), default='1080')
+            if not valid:
+                print(f'Invalid input: {socks5_port} is an invalid port number')
+                continue
+            http_port_prompt = '''[configure mieru client][configure HTTP proxy listening port]
+Type a single port number to listen to HTTP and HTTPS requests.
+(default is "8080")
+>>> '''
+            http_port, valid = check_input(prompt=http_port_prompt, validator=port_validator(), default='8080')
+            if not valid:
+                print(f'Invalid input: {http_port} is an invalid port number')
+                continue
+            rpc_port_prompt = '''[configure mieru client][configure management listening port]
+Type a single port number to listen to management RPC requests.
+(default is randonly select a number from 2000 to 8000)
+>>> '''
+            rpc_port_default = str(random.randint(2000, 8000))
+            rpc_port, valid = check_input(prompt=rpc_port_prompt, validator=port_validator(), default=rpc_port_default)
+            if not valid:
+                print(f'Invalid input: {rpc_port} is an invalid port number')
+                continue
+            self._client_config.set_user(self._server_config.users()[0]['name'], self._server_config.users()[0]['password'])
+            if 'port' in self._server_config.port_bindings()[0]:
+                self._client_config.set_ip_port(external_ip,
+                                                int(self._server_config.port_bindings()[0]['port']),
+                                                self._server_config.port_bindings()[0]['protocol'])
+            elif 'portRange' in self._server_config.port_bindings()[0]:
+                self._client_config.set_ip_port_range(external_ip,
+                                                      self._server_config.port_bindings()[0]['portRange'],
+                                                      self._server_config.port_bindings()[0]['protocol'])
+            else:
+                print_exit(f'Found invalid server configuration port bindings.')
+            self._client_config.set_rpc_port(int(rpc_port))
+            self._client_config.set_socks5_port(int(socks5_port))
+            self._client_config.set_http_proxy_port(int(http_port))
+            print('The following client configuration is generated:')
+            print('')
+            print(self._client_config.to_json())
+            print('')
+            ntf = tempfile.NamedTemporaryFile(mode='w+', delete=False, prefix='mieru', suffix='.json')
+            try:
+                ntf.write(self._client_config.to_json())
+                ntf.flush()
+            except Exception as e:
+                print(f'Failed to save client configuration to {ntf.name}: {e}')
+                return ''
+            finally:
+                ntf.close()
+            print(f'Client configuration file is stored at {ntf.name}')
+            return
 
 
     def restart_mita(self) -> bool:
@@ -447,7 +586,7 @@ class Configurer:
 
 
     def configure_users(self) -> bool:
-        op_prompt = '''[configure mita][configure proxy user]
+        op_prompt = '''[configure mita server][configure proxy user]
 Type a number to select from the options below.
 (1): automatically generate user name and password (default)
 (2): manually type user name and password
@@ -457,7 +596,7 @@ Type a number to select from the options below.
             print(f'Invalid input: {op} is an invalid option')
             return False
         if op == '1':
-            self._server_config.add_user(self.generate_random_str(), self.generate_random_str())
+            self._server_config.set_user(self.generate_random_str(), self.generate_random_str())
             return True
         elif op == '2':
             user_prompt = '''Type a user name
@@ -472,7 +611,7 @@ Type a number to select from the options below.
             if not valid:
                 print('Invalid input: password is empty')
                 return False
-            self._server_config.add_user(u, p)
+            self._server_config.set_user(u, p)
             return True
         else:
             print(f'{op} is an invalid option')
@@ -480,7 +619,7 @@ Type a number to select from the options below.
 
 
     def configure_port_bindings(self) -> bool:
-        protocol_prompt = '''[configure mita][configure protocol and ports]
+        protocol_prompt = '''[configure mita server][configure protocol and ports]
 Type the proxy protocol to use. Support "TCP" and "UDP".
 >>> '''
         protocol, valid = check_input(prompt=protocol_prompt, validator=match_preset_validator(['TCP', 'UDP']))
@@ -496,7 +635,8 @@ Type the proxy protocol to use. Support "TCP" and "UDP".
             print(f'Invalid input: {op} is an invalid option')
             return False
         if op == '1':
-            port_prompt = '''Type a single port number like "9000". Minimum value is 1. Maximum value is 65535.
+            port_prompt = '''Type a single port number like "9000".
+Minimum value is 1. Maximum value is 65535.
 >>> '''
             port, valid = check_input(prompt=port_prompt, validator=port_validator())
             if not valid:
@@ -518,14 +658,14 @@ Type the proxy protocol to use. Support "TCP" and "UDP".
             return False
 
 
-    def describe_config(self) -> None:
+    def describe_server_config(self) -> None:
         '''
         Print the server configuration.
         '''
         print(self._server_config.to_json())
 
 
-    def apply_config(self) -> str:
+    def apply_server_config(self) -> str:
         '''
         Apply the server configuration.
         If successful, return the JSON file path that stores the server configuration.
