@@ -19,12 +19,20 @@ The mieru proxy software suite consists of two parts, a client software called m
 1. Utilizes random padding and replay attack detection to prevent GFW from detecting the mieru service.
 1. Supports multiple users sharing a single proxy server.
 1. Supports both IPv4 and IPv6.
-1. The server software supports socks5 outbound (proxy chain).
-1. The client software supports Windows, Mac OS, Linux and Android. Android clients include
-   - [NekoBox](https://github.com/MatsuriDayo/NekoBoxForAndroid) with [mieru plugin](https://github.com/enfein/NekoBoxPlugins).
-   - [Exclave](https://github.com/dyhkwong/Exclave) with [mieru plugin](https://github.com/dyhkwong/Exclave/releases?q=mieru-plugin).
-   - [husi](https://github.com/xchacha20-poly1305/husi) with [mieru plugin](https://github.com/xchacha20-poly1305/husi/releases?q=plugin-mieru).
-1. If you need advanced features like global proxy or customized routing rules, you can use [mihomo](https://github.com/MetaCubeX/mihomo).
+
+## Third Party Clients
+
+- Desktop (Windows, MacOS, Linux)
+  - [Clash Verge Rev](https://www.clashverge.dev/)
+  - [Mihomo Party](https://mihomo.party/)
+- Android
+  - [ClashMetaForAndroid](https://github.com/MetaCubeX/ClashMetaForAndroid)
+  - [ClashMi](https://clashmi.app/)
+  - [Exclave](https://github.com/dyhkwong/Exclave) with [mieru plugin](https://github.com/dyhkwong/Exclave/releases?q=mieru-plugin)
+  - [husi](https://github.com/xchacha20-poly1305/husi) with [mieru plugin](https://github.com/xchacha20-poly1305/husi/releases?q=plugin-mieru)
+  - [NekoBoxForAndroid](https://github.com/MatsuriDayo/NekoBoxForAndroid) with [mieru plugin](https://github.com/enfein/NekoBoxPlugins)
+- iOS
+  - [ClashMi](https://clashmi.app/)
 
 ## User Guide
 

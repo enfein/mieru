@@ -17,12 +17,20 @@ mieru 代理软件由称为 mieru【見える】的客户端软件和称为 mita
 1. 使用随机填充与重放攻击检测阻止 GFW 探测 mieru 服务。
 1. 支持多个用户共享代理服务器。
 1. 支持 IPv4 和 IPv6。
-1. 服务器软件支持 socks5 出站（链式代理）。
-1. 客户端软件支持 Windows, Mac OS, Linux 和 Android 系统。Android 客户端包括
-   - [NekoBox](https://github.com/MatsuriDayo/NekoBoxForAndroid) 并安装 [mieru 插件](https://github.com/enfein/NekoBoxPlugins)。
-   - [Exclave](https://github.com/dyhkwong/Exclave) 并安装 [mieru 插件](https://github.com/dyhkwong/Exclave/releases?q=mieru-plugin)。
-   - [husi](https://github.com/xchacha20-poly1305/husi) 并安装 [mieru 插件](https://github.com/xchacha20-poly1305/husi/releases?q=plugin-mieru)。
-1. 如果需要全局代理或自定义路由规则等高级功能，可以使用 [mihomo](https://github.com/MetaCubeX/mihomo)。
+
+## 第三方客户端
+
+- 桌面 (Windows, MacOS, Linux)
+  - [Clash Verge Rev](https://www.clashverge.dev/)
+  - [Mihomo Party](https://mihomo.party/)
+- 安卓
+  - [ClashMetaForAndroid](https://github.com/MetaCubeX/ClashMetaForAndroid)
+  - [ClashMi](https://clashmi.app/)
+  - [Exclave](https://github.com/dyhkwong/Exclave) with [mieru plugin](https://github.com/dyhkwong/Exclave/releases?q=mieru-plugin)
+  - [husi](https://github.com/xchacha20-poly1305/husi) with [mieru plugin](https://github.com/xchacha20-poly1305/husi/releases?q=plugin-mieru)
+  - [NekoBoxForAndroid](https://github.com/MatsuriDayo/NekoBoxForAndroid) with [mieru plugin](https://github.com/enfein/NekoBoxPlugins)
+- iOS
+  - [ClashMi](https://clashmi.app/)
 
 ## 使用教程
 
