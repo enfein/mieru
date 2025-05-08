@@ -2,38 +2,48 @@
 
 The proxy server software mita needs to run on Linux. We provide both debian and RPM installers for installing mita on Debian / Ubuntu and Fedora / CentOS / Red Hat Enterprise Linux series distributions.
 
-Before installation and configuration, connect to the server via SSH and then execute the following commands.
+## Use installation script
+
+Follow the installation script and complete the server installation and configuration.
+
+```sh
+curl -fSsLO https://raw.githubusercontent.com/enfein/mieru/refs/heads/main/tools/setup.py
+chmod +x setup.py
+sudo python3 setup.py
+```
+
+Or you can manually install and configure proxy server using the steps below.
 
 ## Download mita installation package
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.14.1/mita_3.14.1_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.15.0/mita_3.15.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.14.1/mita_3.14.1_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.15.0/mita_3.15.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.14.1/mita-3.14.1-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.15.0/mita-3.15.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.14.1/mita-3.14.1-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.15.0/mita-3.15.0-1.aarch64.rpm
 ```
 
 ## Install mita package
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_3.14.1_amd64.deb
+sudo dpkg -i mita_3.15.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_3.14.1_arm64.deb
+sudo dpkg -i mita_3.15.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-3.14.1-1.x86_64.rpm
+sudo rpm -Uvh --force mita-3.15.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-3.14.1-1.aarch64.rpm
+sudo rpm -Uvh --force mita-3.15.0-1.aarch64.rpm
 ```
 
 Those instructions can also be used to upgrade the version of mita software package.

@@ -2,38 +2,48 @@
 
 代理服务器软件 mita 需要运行在 Linux 系统中。我们提供了 debian 和 RPM 安装包，便于用户在 Debian / Ubuntu 和 Fedora / CentOS / Red Hat Enterprise Linux 系列发行版中安装 mita。
 
-在安装和配置开始之前，先通过 SSH 连接到服务器，再执行下面的指令。
+## 使用安装脚本
+
+遵循安装脚本并完成服务器的安装和配置。
+
+```sh
+curl -fSsLO https://raw.githubusercontent.com/enfein/mieru/refs/heads/main/tools/setup.py
+chmod +x setup.py
+sudo python3 setup.py
+```
+
+或者，你也可以使用以下步骤手动安装并配置代理服务器。
 
 ## 下载 mita 安装包
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.14.1/mita_3.14.1_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.15.0/mita_3.15.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.14.1/mita_3.14.1_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.15.0/mita_3.15.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.14.1/mita-3.14.1-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.15.0/mita-3.15.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.14.1/mita-3.14.1-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.15.0/mita-3.15.0-1.aarch64.rpm
 ```
 
 ## 安装 mita 软件包
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_3.14.1_amd64.deb
+sudo dpkg -i mita_3.15.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_3.14.1_arm64.deb
+sudo dpkg -i mita_3.15.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-3.14.1-1.x86_64.rpm
+sudo rpm -Uvh --force mita-3.15.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-3.14.1-1.aarch64.rpm
+sudo rpm -Uvh --force mita-3.15.0-1.aarch64.rpm
 ```
 
 上述指令也可以用来升级 mita 软件包的版本。

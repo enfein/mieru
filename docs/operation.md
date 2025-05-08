@@ -151,12 +151,12 @@ You can run the commands `mita get users` and `mita get quotas` on the server to
 ```
 $ mita get users
 User  LastActive            1DayDownload  1DayUpload  30DaysDownload  30DaysUpload
-abcd  2025-04-23T01:02:03Z  19.4MiB       1.8MiB      19.4MiB         1.8MiB
+abcd  2025-04-23T01:02:03Z  938.1MiB      12.9MiB     4.0GiB          31.8MiB
 
 $ mita get quotas
 User  Days  Limit    Usage
-abcd  1     10.0GiB  21.2MiB
-abcd  10    40.0GiB  21.2MiB
+abcd  1     10.0GiB  951.1MiB
+abcd  7     40.0GiB  4.0GiB
 ```
 
 ## Environment Variables
