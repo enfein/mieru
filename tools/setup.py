@@ -58,6 +58,8 @@ Type any other character to exit.
         sys_info.is_mita_installed = sys_info.detect_mita_installed()
         sys_info.is_mita_systemd_active = sys_info.detect_mita_systemd_active()
         sys_info.installed_mita_version = sys_info.detect_mita_version()
+        if sys_info.is_mita_config_applied:
+            return
         # fallthrough
 
     if sys_info.is_mita_installed and sys_info.installed_mita_version.is_less_than(sys_info.latest_mita_version):
@@ -154,12 +156,12 @@ class SysInfo:
         self.is_mita_installed = self.detect_mita_installed()
         self.is_mita_systemd_active = self.detect_mita_systemd_active()
         self.installed_mita_version = None
-        self.is_mita_config_applied = False
         if self.is_mita_installed:
             self.installed_mita_version = self.detect_mita_version()
-            if os.path.exists('/etc/mita/server.conf.pb') and \
-                    os.stat('/etc/mita/server.conf.pb').st_size > 0:
-                self.is_mita_config_applied = True
+        self.is_mita_config_applied = False
+        if os.path.exists('/etc/mita/server.conf.pb') and \
+                os.stat('/etc/mita/server.conf.pb').st_size > 0:
+            self.is_mita_config_applied = True
         self.latest_mita_version = None
         latest_mita_version_str = self.query_latest_mita_version()
         version2 = Version()
@@ -220,6 +222,10 @@ class SysInfo:
         '''
         Return true if mita deb or rpm package is installed.
         '''
+        try:
+            subprocess.run(['mita', 'version'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except FileNotFoundError:
+            return False
         if self.is_deb():
             result = run_command(['dpkg', '-l'])
             for l in result.stdout.splitlines():
