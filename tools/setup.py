@@ -22,6 +22,7 @@ mita proxy server.
 '''
 
 
+import argparse
 import json
 import os
 import platform
@@ -37,7 +38,19 @@ import urllib.request
 from typing import Any, Callable, List, Tuple
 
 
+# Language constants.
+ZH = 'zh'
+
+_lang = ''
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--lang', type=str, default='en', help='language')
+    args = parser.parse_args()
+    global _lang
+    _lang = args.lang
+
     sys_info = SysInfo()
 
     if not sys_info.is_mita_installed:
