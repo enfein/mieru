@@ -9,7 +9,7 @@
 ```sh
 curl -fSsLO https://raw.githubusercontent.com/enfein/mieru/refs/heads/main/tools/setup.py
 chmod +x setup.py
-sudo python3 setup.py
+sudo python3 setup.py --lang=zh
 ```
 
 或者，你也可以使用以下步骤手动安装并配置代理服务器。

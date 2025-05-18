@@ -61,6 +61,14 @@ Type "y" to install mita proxy server.
 Type any other character to exit.
 (default is "y")
 >>> '''
+        if _lang == ZH:
+            install_prompt = '''
+[安装 mita]
+尚未安装 mita 代理服务器软件。
+输入 "y" 开始安装 mita 代理服务器软件。
+输入其他任意字符退出。
+(默认值是 "y")
+>>> '''
         install, _ = check_input(prompt=install_prompt, validator=any_validator(), default='y')
         if install != 'y':
             return
@@ -84,6 +92,15 @@ Type "y" to update mita proxy server.
 Type any other character to exit.
 (default is "y")
 >>> '''
+        if _lang == ZH:
+            update_prompt = f'''
+[更新 mita]
+已安装的 mita 代理服务器软件版本是 {sys_info.installed_mita_version} 。
+最新版本是 {sys_info.latest_mita_version} 。
+输入 "y" 开始更新 mita 代理服务器软件。
+输入其他任意字符退出。
+(默认值是 "y")
+>>> '''
         update, _ = check_input(prompt=update_prompt, validator=any_validator(), default='y')
         if update != 'y':
             return
@@ -104,32 +121,64 @@ Type "y" to configure mita proxy server.
 Type any other character to exit.
 (default is "y")
 >>> '''
+        if _lang == ZH:
+            configure_prompt = '''
+[配置 mita 代理服务器]
+mita 代理服务器已经安装但尚未配置。
+输入 "y" 开始配置 mita 代理服务器。
+输入其他任意字符退出。
+(默认值是 "y")
+>>> '''
         configure, _ = check_input(prompt=configure_prompt, validator=any_validator(), default='y')
         if configure != 'y':
             return
         configurer = Configurer()
         add_op_user_prompt = '''
-[configure mita server][add operation user]
+[configure mita server][add Linux operation user]
 Type a Linux user name to add the user to "mita" group,
 such that the user can invoke mita command.
 Otherwise, only root user can invoke mita command.
 Press Enter to skip (default).
 >>> '''
+        if _lang == ZH:
+            add_op_user_prompt = '''
+[配置 mita 代理服务器][添加 Linux 操作用户]
+输入一个 Linux 用户名，将其添加至 "mita" 用户组，
+该用户将可以调用 mita 指令。
+否则，只有 root 用户可以调用 mita 指令。
+输入回车跳过这个步骤(默认)。
+>>> '''
         op_user, _ = check_input(prompt=add_op_user_prompt, validator=any_validator())
         if op_user != "":
             if configurer.add_operation_user(op_user):
-                print(f'Added {op_user} to mita group.')
+                if _lang == ZH:
+                    print(f'已添加 {op_user} 至 mita 用户组。')
+                else:
+                    print(f'Added {op_user} to mita group.')
             else:
-                print(f'Failed to add {op_user} to mita group.')
+                if _lang == ZH:
+                    print(f'添加 {op_user} 至 mita 用户组失败。')
+                else:
+                    print(f'Failed to add {op_user} to mita group.')
         configurer.configure_server(sys_info)
         if not configurer.restart_mita():
-            print_exit(f'Failed to restart mita proxy server.')
+            if _lang == ZH:
+                print_exit('重新启动 mita 代理服务失败。')
+            else:
+                print_exit('Failed to restart mita proxy server.')
         sys_info.is_mita_config_applied = True
         build_client_prompt = '''
 [configure mieru client]
 Type "y" to generate mieru proxy client configuration.
 Type any other character to exit.
 (default is "y")
+>>> '''
+        if _lang == ZH:
+            build_client_prompt = '''
+[配置 mieru 客户端]
+输入 "y" 生成 mieru 代理客户端的配置。
+输入其他任意字符退出。
+(默认值是 "y")
 >>> '''
         build_client, _ = check_input(prompt=build_client_prompt, validator=any_validator(), default='y')
         if build_client != 'y':
@@ -141,9 +190,17 @@ Type any other character to exit.
         uninstall_prompt = '''
 [uninstall mita]
 mita proxy server is installed.
-Type "y" to uninstall mita proxy server.
+Type "y" to uninstall mita proxy server and delete configuration.
 Type any other character to exit.
 (default is "n")
+>>> '''
+        if _lang == ZH:
+            uninstall_prompt = '''
+[卸载 mita]
+已经安装 mita 代理服务器。
+输入 "y" 卸载 mita 代理服务器并删除配置。
+输入其他任意字符退出。
+(默认值是 "n")
 >>> '''
         uninstall, _ = check_input(prompt=uninstall_prompt, validator=any_validator(), default='n')
         if uninstall != 'y':
@@ -161,10 +218,16 @@ class SysInfo:
 
         self.package_manager = self.detect_package_manager()
         if self.package_manager == '':
-            print_exit('Failed to detect system package manager. Supported: deb, rpm.')
+            if _lang == ZH:
+                print_exit('检测系统包管理器失败。支持 deb 和 rpm。')
+            else:
+                print_exit('Failed to detect system package manager. Supported: deb, rpm.')
         self.cpu_arch = self.detect_cpu_arch()
         if self.cpu_arch == '':
-            print_exit('Failed to detect CPU architecture. Supported: amd64, arm64.')
+            if _lang == ZH:
+                print_exit('检测 CPU 架构失败。支持 amd64 和 arm64。')
+            else:
+                print_exit('Failed to detect CPU architecture. Supported: amd64, arm64.')
 
         self.is_mita_installed = self.detect_mita_installed()
         self.is_mita_systemd_active = self.detect_mita_systemd_active()
@@ -184,18 +247,27 @@ class SysInfo:
 
     def check_python_version(self) -> None:
         if sys.version_info < (3, 8, 0):
-            print_exit('Python version must be 3.8.0 or higher.')
+            if _lang == ZH:
+                print_exit('Python 版本必须为 3.8.0 或更高。')
+            else:
+                print_exit('Python version must be 3.8.0 or higher.')
 
 
     def check_platform(self) -> None:
         if not sys.platform.startswith('linux'):
-            print_exit('You can only run this program on Linux.')
+            if _lang == ZH:
+                print_exit('只能在 Linux 系统中运行此程序。')
+            else:
+                print_exit('You can only run this program on Linux.')
 
 
     def check_permission(self) -> None:
         uid = os.getuid()
         if uid != 0:
-            print_exit('Only root user can run this program.')
+            if _lang == ZH:
+                print_exit('只有 root 用户可以运行此程序。')
+            else:
+                print_exit('Only root user can run this program.')
 
 
     def detect_package_manager(self) -> str:
@@ -285,7 +357,10 @@ class SysInfo:
             j = json.loads(body.decode('utf-8'))
             return j['tag_name'].strip('v')
         except Exception as e:
-            print_exit(f'Failed to query latest mita version: {e}')
+            if _lang == ZH:
+                print_exit(f'查询最新的 mita 版本失败：{e}')
+            else:
+                print_exit(f'Failed to query latest mita version: {e}')
 
 
 class Version:
@@ -437,7 +512,10 @@ class Installer:
         Return the path of downloaded file.
         '''
         if sys_info.latest_mita_version == None:
-            print_exit('Latest mita version is unknown.')
+            if _lang == ZH:
+                print_exit('获取 mita 的最新版本失败。')
+            else:
+                print_exit('Latest mita version is unknown.')
         ver = sys_info.latest_mita_version
         download_url = ''
         if sys_info.package_manager == 'deb' and sys_info.cpu_arch == 'amd64':
@@ -449,14 +527,26 @@ class Installer:
         elif sys_info.package_manager == 'rpm' and sys_info.cpu_arch == 'arm64':
             download_url = f'https://github.com/enfein/mieru/releases/download/v{ver}/mita-{ver}-1.aarch64.rpm'
         else:
-            print_exit(f'Failed to determine download URL based on package manager {sys_info.package_manager} and CPU architecture {sys_info.cpu_arch}')
+            if _lang == ZH:
+                print_exit(f'从包管理器 {sys_info.package_manager} 和 CPU 架构 {sys_info.cpu_arch} 无法决定下载链接。')
+            else:
+                print_exit(f'Failed to determine download URL based on package manager {sys_info.package_manager} and CPU architecture {sys_info.cpu_arch}.')
         filename = os.path.join('/tmp', download_url.split('/')[-1])
         try:
-            print(f'Downloading from {download_url}')
+            if _lang == ZH:
+                print(f'正在下载 {download_url}')
+            else:
+                print(f'Downloading from {download_url}')
             urllib.request.urlretrieve(download_url, filename)
-            print(f'Downloaded to {filename}')
+            if _lang == ZH:
+                print(f'下载文件存储在 {filename}')
+            else:
+                print(f'Downloaded to {filename}')
         except urllib.error.URLError as e:
-            print_exit(f'Failed to download {download_url}: {e}')
+            if _lang == ZH:
+                print_exit(f'下载 {download_url} 失败：{e}')
+            else:
+                print_exit(f'Failed to download {download_url}: {e}')
         return filename
 
 
@@ -466,13 +556,22 @@ class Installer:
         if ext == 'deb':
             run_command(args=['dpkg', '-i', package_path],
                         timeout=60, check=True, print_args=True, print_stdout=True)
-            print(f'Installed {package_path}')
+            if _lang == ZH:
+                print(f'已安装 {package_path}')
+            else:
+                print(f'Installed {package_path}')
         elif ext == 'rpm':
             run_command(args=['rpm', '-Uvh', '--force', package_path],
                         timeout=60, check=True, print_args=True, print_stdout=True)
-            print(f'Installed {package_path}')
+            if _lang == ZH:
+                print(f'已安装 {package_path}')
+            else:
+                print(f'Installed {package_path}')
         else:
-            print_exit(f'Unable to install {basename}: it is not a deb or a rpm package.')
+            if _lang == ZH:
+                print_exit(f'无法安装 {basename}：它不是 deb 或 rpm 安装包。')
+            else:
+                print_exit(f'Unable to install {basename}: it is not a deb or a rpm package.')
 
 
 class Configurer:
@@ -502,44 +601,75 @@ class Configurer:
         # Refresh the latest information and check pre-condition.
         sys_info.is_mita_installed = sys_info.detect_mita_installed()
         if not sys_info.is_mita_installed:
-            print_exit('mita proxy server is not installed.')
+            if _lang == ZH:
+                print_exit('mita 代理服务器软件尚未安装。')
+            else:
+                print_exit('mita proxy server is not installed.')
         sys_info.is_mita_systemd_active = sys_info.detect_mita_systemd_active()
         if not sys_info.is_mita_systemd_active:
-            print_exit('mita systemd service is not active.')
+            if _lang == ZH:
+                print_exit('mita systemd 服务尚未运行。')
+            else:
+                print_exit('mita systemd service is not active.')
 
         while True:
             # Let user to set server configuration.
             if len(self._server_config.users()) == 0:
                 if not self.configure_users():
-                    print('configure user is not successful')
+                    if _lang == ZH:
+                        print('配置用户失败。')
+                    else:
+                        print('Configure user is not successful.')
                     continue
             if len(self._server_config.port_bindings()) == 0:
                 if not self.configure_port_bindings():
-                    print('configure protocol and ports is not successful')
+                    if _lang == ZH:
+                        print('配置协议和端口失败。')
+                    else:
+                        print('Configure protocol and ports is not successful.')
                     continue
 
             # Let user to confirm the server configuration.
-            print('The following server configuration will be applied:')
+            if _lang == ZH:
+                print('即将应用下面的代理服务器配置：')
+            else:
+                print('The following server configuration will be applied:')
             print('')
             self.describe_server_config()
             print('')
             confirm_prompt = '''Type "y" or "n" to apply or discard the server configuration.
 (default is "y")
 >>> '''
+            if _lang == ZH:
+                confirm_prompt = '''输入 "y" 确定，输入 "n" 取消。
+(默认值是 "y")
+>>> '''
             confirm, valid = check_input(prompt=confirm_prompt, validator=match_preset_validator(['y', 'n']), default='y')
             if not valid:
                 self._server_config = ServerConfig()
-                print(f'Invalid input: {confirm} is an invalid option. Discarded the server configuration.')
+                if _lang == ZH:
+                    print(f'输入 {confirm} 是非法选项。已丢弃代理服务器配置。')
+                else:
+                    print(f'Invalid input: {confirm} is an invalid option. Discarded the server configuration.')
                 continue
             if confirm == 'y':
                 config_path = self.apply_server_config()
                 if config_path != '':
-                    print(f'Server configuration file is stored at {config_path}')
+                    if _lang == ZH:
+                        print(f'代理服务器配置文件存储在 {config_path}')
+                    else:
+                        print(f'Server configuration file is stored at {config_path}')
                     return
-                print_exit('Apply server configuration is not successful.')
+                if _lang == ZH:
+                    print_exit('应用代理服务器配置失败。')
+                else:
+                    print_exit('Apply server configuration is not successful.')
             else:
                 self._server_config = ServerConfig()
-                print('Discarded the server configuration.')
+                if _lang == ZH:
+                    print('已丢弃代理服务器配置。')
+                else:
+                    print('Discarded the server configuration.')
                 continue
 
 
@@ -551,9 +681,15 @@ class Configurer:
         while True:
             try:
                 external_ip = urllib.request.urlopen('https://checkip.amazonaws.com').read().decode('utf8').strip()
-                print(f'Your external IP address is: {external_ip}')
+                if _lang == ZH:
+                    print(f'服务器的公网 IP 地址是 {external_ip}')
+                else:
+                    print(f'Server\'s public IP address is: {external_ip}')
             except Exception as e:
-                print(f'Failed to retrieve external IP address: {e}')
+                if _lang == ZH:
+                    print(f'获取服务器的公网 IP 地址失败：{e}')
+                else:
+                    print(f'Failed to retrieve server\'s public IP address: {e}')
                 time.sleep(1)
                 continue
             socks5_port_prompt = '''
@@ -561,28 +697,55 @@ class Configurer:
 Type a single port number to listen to socks5 requests.
 (default is "1080")
 >>> '''
+            if _lang == ZH:
+                socks5_port_prompt = '''
+[配置 mieru 客户端][配置 socks5 监听端口]
+输入一个端口号用于监听 socks5 请求。
+(默认值是 "1080")
+>>> '''
             socks5_port, valid = check_input(prompt=socks5_port_prompt, validator=port_validator(), default='1080')
             if not valid:
-                print(f'Invalid input: {socks5_port} is an invalid port number')
+                if _lang == ZH:
+                    print(f'输入 {socks5_port} 是非法的端口号。')
+                else:
+                    print(f'Invalid input: {socks5_port} is an invalid port number.')
                 continue
             http_port_prompt = '''
 [configure mieru client][configure HTTP proxy listening port]
-Type a single port number to listen to HTTP and HTTPS requests.
+Type a single port number to listen to HTTP and HTTPS proxy requests.
 (default is "8080")
+>>> '''
+            if _lang == ZH:
+                http_port_prompt = '''
+[配置 mieru 客户端][配置 HTTP 代理监听端口]
+输入一个端口号用于监听 HTTP 和 HTTPS 代理请求。
+(默认值是 "8080")
 >>> '''
             http_port, valid = check_input(prompt=http_port_prompt, validator=port_validator(), default='8080')
             if not valid:
-                print(f'Invalid input: {http_port} is an invalid port number')
+                if _lang == ZH:
+                    print(f'输入 {http_port} 是非法的端口号。')
+                else:
+                    print(f'Invalid input: {http_port} is an invalid port number.')
                 continue
             rpc_port_prompt = '''
 [configure mieru client][configure management listening port]
 Type a single port number to listen to management RPC requests.
 (default is randonly select a number from 2000 to 8000)
 >>> '''
+            if _lang == ZH:
+                rpc_port_prompt = '''
+[配置 mieru 客户端][配置管理监听端口]
+输入一个端口号用于监听管理 RPC 请求。
+(默认值是从 2000 到 8000 随机选取一个数字)
+>>> '''
             rpc_port_default = str(random.randint(2000, 8000))
             rpc_port, valid = check_input(prompt=rpc_port_prompt, validator=port_validator(), default=rpc_port_default)
             if not valid:
-                print(f'Invalid input: {rpc_port} is an invalid port number')
+                if _lang == ZH:
+                    print(f'输入 {rpc_port} 是非法的端口号。')
+                else:
+                    print(f'Invalid input: {rpc_port} is an invalid port number.')
                 continue
             self._client_config.set_user(self._server_config.users()[0]['name'], self._server_config.users()[0]['password'])
             if 'port' in self._server_config.port_bindings()[0]:
@@ -594,11 +757,17 @@ Type a single port number to listen to management RPC requests.
                                                       self._server_config.port_bindings()[0]['portRange'],
                                                       self._server_config.port_bindings()[0]['protocol'])
             else:
-                print_exit(f'Found invalid server configuration port bindings.')
+                if _lang == ZH:
+                    print_exit('代理服务器的端口绑定设置是非法的。')
+                else:
+                    print_exit('Found invalid server configuration port bindings.')
             self._client_config.set_rpc_port(int(rpc_port))
             self._client_config.set_socks5_port(int(socks5_port))
             self._client_config.set_http_proxy_port(int(http_port))
-            print('The following client configuration is generated:')
+            if _lang == ZH:
+                print('生成了下面的客户端配置：')
+            else:
+                print('The following client configuration is generated:')
             print('')
             print(self._client_config.to_json())
             print('')
@@ -607,11 +776,17 @@ Type a single port number to listen to management RPC requests.
                 ntf.write(self._client_config.to_json())
                 ntf.flush()
             except Exception as e:
-                print(f'Failed to save client configuration to {ntf.name}: {e}')
+                if _lang == ZH:
+                    print(f'存储客户端配置至 {ntf.name} 失败：{e}')
+                else:
+                    print(f'Failed to save client configuration to {ntf.name}: {e}')
                 return ''
             finally:
                 ntf.close()
-            print(f'Client configuration file is stored at {ntf.name}')
+            if _lang == ZH:
+                print(f'客户端配置文件存储在 {ntf.name}')
+            else:
+                print(f'Client configuration file is stored at {ntf.name}')
             return
 
 
@@ -628,13 +803,23 @@ Type a single port number to listen to management RPC requests.
     def configure_users(self) -> bool:
         op_prompt = '''
 [configure mita server][configure proxy user]
-Type a number to select from the options below.
+Type number "1" or "2" to select from the options below.
 (1): automatically generate user name and password (default)
 (2): manually type user name and password
 >>> '''
+        if _lang == ZH:
+            op_prompt = '''
+[配置 mita 代理服务器][配置代理用户]
+输入数字 "1" 或 "2" 选择下面的选项。
+(1): 自动生成用户名和密码 (默认值)
+(2): 手动输入用户名和密码
+>>> '''
         op, valid = check_input(prompt=op_prompt, validator=match_preset_validator(['1', '2']), default='1')
         if not valid:
-            print(f'Invalid input: {op} is an invalid option')
+            if _lang == ZH:
+                print(f'输入 {op} 是非法的选项。')
+            else:
+                print(f'Invalid input: {op} is an invalid option.')
             return False
         if op == '1':
             self._server_config.set_user(self.generate_random_str(), self.generate_random_str())
@@ -642,20 +827,35 @@ Type a number to select from the options below.
         elif op == '2':
             user_prompt = '''Type a user name
 >>> '''
+            if _lang == ZH:
+                user_prompt = '''输入用户名
+>>> '''
             u, valid = check_input(prompt=user_prompt, validator=not_empty_validator())
             if not valid:
-                print('Invalid input: user name is empty')
+                if _lang == ZH:
+                    print('输入的用户名为空值。')
+                else:
+                    print('Invalid input: user name is empty.')
                 return False
             pass_prompt = '''Type a password
 >>> '''
+            if _lang == ZH:
+                pass_prompt = '''输入密码
+>>> '''
             p, valid = check_input(prompt=pass_prompt, validator=not_empty_validator())
             if not valid:
-                print('Invalid input: password is empty')
+                if _lang == ZH:
+                    print('输入的密码为空值。')
+                else:
+                    print('Invalid input: password is empty.')
                 return False
             self._server_config.set_user(u, p)
             return True
         else:
-            print(f'{op} is an invalid option')
+            if _lang == ZH:
+                print(f'{op} 是非法的选项。')
+            else:
+                print(f'{op} is an invalid option.')
             return False
 
 
@@ -664,39 +864,71 @@ Type a number to select from the options below.
 [configure mita server][configure protocol and ports]
 Type the proxy protocol to use. Support "TCP" and "UDP".
 >>> '''
+        if _lang == ZH:
+            protocol_prompt = '''
+[配置 mita 代理服务器][配置协议和端口]
+输入代理协议。支持 "TCP" 和 "UDP"。
+>>> '''
         protocol, valid = check_input(prompt=protocol_prompt, validator=match_preset_validator(['TCP', 'UDP']))
         if not valid:
-            print(f'Invalid input: {protocol} is an invalid protocol')
+            if _lang == ZH:
+                print(f'输入 {protocol} 是非法的协议。')
+            else:
+                print(f'Invalid input: {protocol} is an invalid protocol.')
             return False
-        op_prompt = '''Type a number to select from the options below.
+        op_prompt = '''Type number "1" or "2" to select from the options below.
 (1): add a single listening port like "9000" (default)
 (2): add a listening port range like "9000-9010"
 >>> '''
+        if _lang == ZH:
+            op_prompt = '''输入数字 "1" 或 "2" 选择下面的选项。
+(1): 添加一个端口号，例如 "9000" (默认值)
+(2): 添加一个端口段，例如 "9000-9010"
+>>> '''
         op, valid = check_input(prompt=op_prompt, validator=match_preset_validator(['1', '2']), default='1')
         if not valid:
-            print(f'Invalid input: {op} is an invalid option')
+            if _lang == ZH:
+                print(f'输入 {op} 是非法的选项。')
+            else:
+                print(f'Invalid input: {op} is an invalid option.')
             return False
         if op == '1':
-            port_prompt = '''Type a single port number like "9000".
+            port_prompt = '''Type a single port number.
 Minimum value is 1. Maximum value is 65535.
+>>> '''
+            if _lang == ZH:
+                port_prompt = '''输入一个端口号。
+最小值为 1。最大值为 65535。
 >>> '''
             port, valid = check_input(prompt=port_prompt, validator=port_validator())
             if not valid:
-                print(f'Invalid input: {port} is an invalid port number')
+                if _lang == ZH:
+                    print(f'输入 {port} 是非法的端口号。')
+                else:
+                    print(f'Invalid input: {port} is an invalid port number.')
                 return False
             self._server_config.add_port(int(port), protocol)
             return True
         elif op == '2':
             port_range_prompt = '''Type a port range like "9000-9010". No space character.
 >>> '''
+            if _lang == ZH:
+                port_range_prompt = '''输入一个端口段，例如 "9000-9010"。请勿使用空格分隔。
+>>> '''
             port_range, valid = check_input(prompt=port_range_prompt, validator=port_range_validator())
             if not valid:
-                print(f'Invalid input: {port_range} is an invalid port range')
+                if _lang == ZH:
+                    print(f'输入 {port_range} 是非法的端口段。')
+                else:
+                    print(f'Invalid input: {port_range} is an invalid port range.')
                 return False
             self._server_config.add_port_range(port_range, protocol)
             return True
         else:
-            print(f'{op} is an invalid option')
+            if _lang == ZH:
+                print(f'{op} 是非法的选项。')
+            else:
+                print(f'{op} is an invalid option.')
             return False
 
 
@@ -717,7 +949,10 @@ Minimum value is 1. Maximum value is 65535.
             ntf.write(self._server_config.to_json())
             ntf.flush()
         except Exception as e:
-            print(f'Failed to save server configuration to {ntf.name}: {e}')
+            if _lang == ZH:
+                print(f'存储代理服务器配置至 {ntf.name} 失败：{e}')
+            else:
+                print(f'Failed to save server configuration to {ntf.name}: {e}')
             return ''
         finally:
             ntf.close()
@@ -743,7 +978,10 @@ class Uninstaller:
             run_command(['systemctl', 'daemon-reload'], timeout=30, print_args=True)
             run_command(['userdel', 'mita'], print_args=True, print_stdout=True)
             run_command(['groupdel', 'mita'], print_args=True, print_stdout=True)
-            print('mita proxy server is uninstalled')
+            if _lang == ZH:
+                print('成功卸载了 mita 代理服务器软件。')
+            else:
+                print('mita proxy server is uninstalled.')
         elif sys_info.package_manager == 'rpm':
             run_command(['systemctl', 'stop', 'mita'], print_args=True)
             run_command(['rpm', '-e', 'mita'], timeout=30, print_args=True, print_stdout=True)
@@ -757,9 +995,15 @@ class Uninstaller:
             run_command(['systemctl', 'daemon-reload'], timeout=30, print_args=True)
             run_command(['userdel', 'mita'], print_args=True, print_stdout=True)
             run_command(['groupdel', 'mita'], print_args=True, print_stdout=True)
-            print('mita proxy server is uninstalled')
+            if _lang == ZH:
+                print('成功卸载了 mita 代理服务器软件。')
+            else:
+                print('mita proxy server is uninstalled.')
         else:
-            print_exit('Failed to uninstall mita: failed to detect system package manager')
+            if _lang == ZH:
+                print_exit('卸载 mita 代理服务器软件失败：未能成功检测系统包管理器。')
+            else:
+                print_exit('Failed to uninstall mita: failed to detect system package manager.')
 
 
 def run_command(args: List[str], input=None, timeout=10, check=False, print_args=False, print_stdout=False):
@@ -768,7 +1012,10 @@ def run_command(args: List[str], input=None, timeout=10, check=False, print_args
     '''
     try:
         if print_args:
-            print(f'Running command {args}')
+            if _lang == ZH:
+                print(f'运行指令 {args}')
+            else:
+                print(f'Running command {args}')
         result = subprocess.run(args,
                                 input=input,
                                 stdout=subprocess.PIPE,
@@ -777,9 +1024,15 @@ def run_command(args: List[str], input=None, timeout=10, check=False, print_args
                                 check=check,
                                 text=True)
     except subprocess.TimeoutExpired as te:
-        print_exit(f'Command {te.cmd} timed out after {te.timeout} seconds. Output: {te.output}')
+        if _lang == ZH:
+            print_exit(f'指令 {te.cmd} 运行 {te.timeout} 秒后超时。输出：{te.output}')
+        else:
+            print_exit(f'Command {te.cmd} timed out after {te.timeout} seconds. Output: {te.output}')
     except subprocess.CalledProcessError as cpe:
-        print_exit(f'Command {cpe.cmd} returned code {cpe.returncode}. Output: {cpe.output}')
+        if _lang == ZH:
+            print_exit(f'指令 {cpe.cmd} 的返回值为 {cpe.returncode}。输出：{cpe.output}')
+        else:
+            print_exit(f'Command {cpe.cmd} returned code {cpe.returncode}. Output: {cpe.output}')
     finally:
         if print_stdout and result.stdout:
             print(result.stdout)
@@ -846,7 +1099,10 @@ def print_exit(*values: Any) -> None:
     '''
     Print and exit with a non-zero value.
     '''
-    print("[ERROR]", *values)
+    if _lang == ZH:
+        print('[错误]', *values)
+    else:
+        print('[ERROR]', *values)
     sys.exit(1)
 
 
