@@ -863,13 +863,15 @@ Type number "1" or "2" to select from the options below.
         protocol_prompt = '''
 [configure mita server][configure protocol and ports]
 Type the proxy protocol to use. Support "TCP" and "UDP".
+(default is "TCP")
 >>> '''
         if _lang == ZH:
             protocol_prompt = '''
 [配置 mita 代理服务器][配置协议和端口]
 输入代理协议。支持 "TCP" 和 "UDP"。
+(默认值是 "TCP")
 >>> '''
-        protocol, valid = check_input(prompt=protocol_prompt, validator=match_preset_validator(['TCP', 'UDP']))
+        protocol, valid = check_input(prompt=protocol_prompt, validator=match_preset_validator(['TCP', 'UDP']), default='TCP')
         if not valid:
             if _lang == ZH:
                 print(f'输入 {protocol} 是非法的协议。')
