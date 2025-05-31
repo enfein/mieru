@@ -26,6 +26,10 @@ import sys
 
 
 def enable_tcp_bbr() -> None:
+    if sys.version_info < (3, 8, 0):
+        print_exit('Python version must be 3.8.0 or higher.')
+        return
+
     if not sys.platform.startswith('linux'):
         print_exit('You can only run this program on Linux.')
         return

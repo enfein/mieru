@@ -33,7 +33,6 @@ import (
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
 	"github.com/enfein/mieru/v3/pkg/common"
-	"github.com/enfein/mieru/v3/pkg/egress"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 	"github.com/enfein/mieru/v3/pkg/protocol"
@@ -464,8 +463,9 @@ var serverRunFunc = func(s []string) error {
 				ClientSideAuthentication: true,
 			},
 			DualStackPreference: common.DualStackPreference(config.GetDns().GetDualStack()),
-			EgressController:    egress.NewSocks5Controller(config.GetEgress()),
+			Egress:              config.GetEgress(),
 			HandshakeTimeout:    10 * time.Second,
+			Users:               appctl.UserListToMap(config.GetUsers()),
 		}
 		socks5Server, err := socks5.New(socks5Config)
 		if err != nil {

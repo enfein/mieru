@@ -66,7 +66,7 @@ Please use a text editor to modify the following fields.
 3. In the `profiles` -> `servers` -> `ipAddress` property, fill in the public address of the proxy server. Both IPv4 and IPv6 addresses are supported.
 4. [Optional] If you have registered a domain name for the proxy server, please fill in the domain name in `profiles` -> `servers` -> `domainName`. Otherwise, do not modify this property.
 5. Fill in `profiles` -> `servers` -> `portBindings` -> `port` with the TCP or UDP port number that mita is listening to. The port number must be the same as the one set in the proxy server. If you want to listen to a range of consecutive port numbers, you can also use the `portRange` property instead.
-6. [Optional] Specify a value between 1280 and 1400 for the `profiles` -> `mtu` property. The default value is 1400. This value can be different from the setting in the proxy server.
+6. [Optional] Specify a value between 1280 and 1400 for the `profiles` -> `mtu` property. The default value is 1400. This value must be the same as proxy server.
 7. [Optional] If you want to adjust the frequency of multiplexing, you can set a value for the `profiles` -> `multiplexing` -> `level` property. The values you can use here include `MULTIPLEXING_OFF`, `MULTIPLEXING_LOW`, `MULTIPLEXING_MIDDLE`, and `MULTIPLEXING_HIGH`. `MULTIPLEXING_OFF` will disable multiplexing, and the default value is `MULTIPLEXING_LOW`.
 8. Please specify a value between 1025 and 65535 for the `rpcPort` property.
 9. Please specify a value between 1025 and 65535 for the `socks5Port` property. This port cannot be the same as `rpcPort`.

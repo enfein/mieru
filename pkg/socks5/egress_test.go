@@ -1,4 +1,4 @@
-// Copyright (C) 2023  mieru authors
+// Copyright (C) 2025  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package egress_test
+package socks5
 
 import (
 	crand "crypto/rand"
@@ -40,8 +40,12 @@ var (
 	}
 )
 
-func TestNoRule(t *testing.T) {
-	controller := egress.NewSocks5Controller(&appctlpb.Egress{})
+func TestNoEgressRule(t *testing.T) {
+	controller := &Server{
+		config: &Config{
+			Egress: &appctlpb.Egress{},
+		},
+	}
 	var action egress.Action
 	action = controller.FindAction(inputIPv4)
 	if action.Action != appctlpb.EgressAction_DIRECT || action.Proxy != nil {
@@ -57,25 +61,29 @@ func TestNoRule(t *testing.T) {
 	}
 }
 
-func TestRule(t *testing.T) {
-	controller := egress.NewSocks5Controller(&appctlpb.Egress{
-		Proxies: []*appctlpb.EgressProxy{
-			{
-				Name:     proto.String("wrap"),
-				Protocol: appctlpb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL.Enum(),
-				Host:     proto.String("127.0.0.1"),
-				Port:     proto.Int32(6789),
+func TestEgressRule(t *testing.T) {
+	controller := &Server{
+		config: &Config{
+			Egress: &appctlpb.Egress{
+				Proxies: []*appctlpb.EgressProxy{
+					{
+						Name:     proto.String("wrap"),
+						Protocol: appctlpb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL.Enum(),
+						Host:     proto.String("127.0.0.1"),
+						Port:     proto.Int32(6789),
+					},
+				},
+				Rules: []*appctlpb.EgressRule{
+					{
+						IpRanges:    []string{"*"},
+						DomainNames: []string{"*"},
+						Action:      appctlpb.EgressAction_PROXY.Enum(),
+						ProxyName:   proto.String("wrap"),
+					},
+				},
 			},
 		},
-		Rules: []*appctlpb.EgressRule{
-			{
-				IpRanges:    []string{"*"},
-				DomainNames: []string{"*"},
-				Action:      appctlpb.EgressAction_PROXY.Enum(),
-				ProxyName:   proto.String("wrap"),
-			},
-		},
-	})
+	}
 	var action egress.Action
 	action = controller.FindAction(inputIPv4)
 	if action.Action != appctlpb.EgressAction_PROXY || action.Proxy == nil {

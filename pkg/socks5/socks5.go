@@ -40,18 +40,6 @@ type Config struct {
 	// Mieru proxy multiplexer.
 	ProxyMux *protocol.Mux
 
-	// Egress controller.
-	EgressController egress.Controller
-
-	// Resolver can be provided to do custom name resolution.
-	Resolver apicommon.DNSResolver
-
-	// Strategy to select IP address from DNS response.
-	DualStackPreference common.DualStackPreference
-
-	// BindIP is used for bind or udp associate
-	BindIP net.IP
-
 	// Authentication options.
 	AuthOpts Auth
 
@@ -61,6 +49,20 @@ type Config struct {
 
 	// Use mieru proxy to carry socks5 traffic.
 	UseProxy bool
+
+	// Resolver can be provided to do custom name resolution.
+	Resolver apicommon.DNSResolver
+
+	// ---- server only fields ----
+
+	// Proxy users.
+	Users map[string]*appctlpb.User
+
+	// Egress configuration.
+	Egress *appctlpb.Egress
+
+	// Strategy to select IP address from DNS response.
+	DualStackPreference common.DualStackPreference
 
 	// Allow using socks5 to access resources served in localhost.
 	AllowLocalDestination bool
@@ -82,26 +84,23 @@ func New(conf *Config) (*Server, error) {
 		return nil, fmt.Errorf("ProxyMux must be set when proxy is enabled")
 	}
 
-	// Ensure we have a egress controller.
-	if conf.EgressController == nil {
-		conf.EgressController = egress.AlwaysDirectController{}
-	}
+	// Ensure HandshakeTimeout is not negative.
+	conf.HandshakeTimeout = mathext.Max(conf.HandshakeTimeout, 0)
 
 	// Ensure we have a DNS resolver.
 	if conf.Resolver == nil {
 		conf.Resolver = &net.Resolver{}
 	}
 
-	// Provide a default bind IP.
-	if conf.BindIP == nil {
-		conf.BindIP = net.ParseIP(common.AllIPAddr())
-		if conf.BindIP == nil {
-			return nil, fmt.Errorf("set socks5 bind IP failed")
-		}
+	// Ensure Users is not nil.
+	if conf.Users == nil {
+		conf.Users = make(map[string]*appctlpb.User)
 	}
 
-	// Ensure HandshakeTimeout is not negative.
-	conf.HandshakeTimeout = mathext.Max(conf.HandshakeTimeout, 0)
+	// Ensure EgressConfig is not nil.
+	if conf.Egress == nil {
+		conf.Egress = &appctlpb.Egress{}
+	}
 
 	return &Server{
 		config:      conf,
@@ -243,7 +242,7 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 		return fmt.Errorf("failed to read destination address: %w", err)
 	}
 
-	action := s.config.EgressController.FindAction(egress.Input{
+	action := s.FindAction(egress.Input{
 		Protocol: appctlpb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL,
 		Data:     request.Raw,
 	})

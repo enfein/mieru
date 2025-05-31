@@ -172,10 +172,12 @@ mita stop
 
 mieru 的 UDP 传输协议已经使用了 BBR 算法。
 
-在项目根目录下，我们提供了脚本 `tools/enable_tcp_bbr.py`，允许用户在 Linux 系统中让 TCP 传输协议使用 BBR 算法。
+运行以下脚本在 Linux 系统中让 TCP 传输协议使用 BBR 算法。
 
 ```sh
-sudo ./tools/enable_tcp_bbr.py
+curl -fSsLO https://raw.githubusercontent.com/enfein/mieru/refs/heads/main/tools/enable_tcp_bbr.py
+chmod +x enable_tcp_bbr.py
+sudo python3 enable_tcp_bbr.py
 ```
 
 上述脚本可以在服务器和客户端中使用。

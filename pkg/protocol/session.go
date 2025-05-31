@@ -25,6 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
 	"github.com/enfein/mieru/v3/pkg/common"
@@ -82,13 +83,15 @@ type Session struct {
 	conn  Underlay                           // underlay connection
 	block atomic.Pointer[cipher.BlockCipher] // cipher to decrypt data
 
-	id         uint32                    // session ID number
-	isClient   bool                      // if this session is owned by client
-	mtu        int                       // L2 maxinum transmission unit
-	remoteAddr net.Addr                  // specify remote network address, used by UDP
-	state      sessionState              // session state
-	status     statusCode                // session status
-	users      map[string]*appctlpb.User // all registered users
+	id         uint32       // session ID number
+	isClient   bool         // if this session is owned by client
+	mtu        int          // L2 maxinum transmission unit
+	remoteAddr net.Addr     // specify remote network address, used by UDP
+	state      sessionState // session state
+	status     statusCode   // session status
+
+	users    map[string]*appctlpb.User // all registered users, only used by server
+	userName string                    // user that owns this session, only used by server
 
 	ready          chan struct{} // indicate the session is ready to use
 	closeRequested atomic.Bool   // the session is being closed or has been closed
@@ -128,8 +131,13 @@ type Session struct {
 	sLock sync.Mutex // serialize the state transition
 }
 
-// Session must implement net.Conn interface.
-var _ net.Conn = &Session{}
+var (
+	// Session implements net.Conn interface.
+	_ net.Conn = (*Session)(nil)
+
+	// Session implements apicommon.UserContext interface.
+	_ apicommon.UserContext = (*Session)(nil)
+)
 
 // NewSession creates a new session.
 func NewSession(id uint32, isClient bool, mtu int, users map[string]*appctlpb.User) *Session {
@@ -358,6 +366,12 @@ func (s *Session) SetReadDeadline(t time.Time) error {
 func (s *Session) SetWriteDeadline(t time.Time) error {
 	s.writeDeadline = t
 	return nil
+}
+
+// UserName returns the user that owns this session,
+// only if this is a server session.
+func (s *Session) UserName() string {
+	return s.userName
 }
 
 // ToSessionInfo creates related SessionInfo protobuf object.
@@ -926,20 +940,21 @@ func (s *Session) inputData(seg *segment) error {
 			// Server needs to send open session response.
 			// Check user quota if we can identify the user.
 			s.oLock.Lock()
-			var userName string
-			if seg.block != nil && seg.block.BlockContext().UserName != "" {
-				userName = seg.block.BlockContext().UserName
-			} else if s.block.Load() != nil && (*s.block.Load()).BlockContext().UserName != "" {
-				userName = (*s.block.Load()).BlockContext().UserName
+			if s.userName == "" {
+				if seg.block != nil && seg.block.BlockContext().UserName != "" {
+					s.userName = seg.block.BlockContext().UserName
+				} else if s.block.Load() != nil && (*s.block.Load()).BlockContext().UserName != "" {
+					s.userName = (*s.block.Load()).BlockContext().UserName
+				}
 			}
-			if userName != "" {
-				quotaOK, err := s.checkQuota(userName)
+			if s.userName != "" {
+				quotaOK, err := s.checkQuota(s.userName)
 				if err != nil {
 					log.Debugf("%v checkQuota() failed: %v", s, err)
 				}
 				if !quotaOK {
 					s.status = statusQuotaExhausted
-					log.Debugf("Closing %v because user %s used all the quota", s, userName)
+					log.Debugf("Closing %v because user %s used all the quota", s, s.userName)
 					s.oLock.Unlock()
 					s.Close()
 					return nil

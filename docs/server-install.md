@@ -172,10 +172,12 @@ After starting the proxy service, proceed to [Client Installation & Configuratio
 
 mieru's UDP transmission protocol already uses the BBR algorithm.
 
-Under the project root directory, we provide a script `tools/enable_tcp_bbr.py`, which allows users to enable BBR algorithm on TCP transmission protocol on Linux.
+Run the following script to use BBR algorithm on TCP transmission protocol on Linux.
 
 ```sh
-sudo ./tools/enable_tcp_bbr.py
+curl -fSsLO https://raw.githubusercontent.com/enfein/mieru/refs/heads/main/tools/enable_tcp_bbr.py
+chmod +x enable_tcp_bbr.py
+sudo python3 enable_tcp_bbr.py
 ```
 
 That script can be used on both server side and client side.

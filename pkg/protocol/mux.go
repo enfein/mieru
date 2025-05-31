@@ -59,12 +59,12 @@ type Mux struct {
 	mu            sync.Mutex
 	cleaner       *time.Ticker
 
-	// ---- client fields ----
+	// ---- client only fields ----
 	username        string
 	password        []byte
 	multiplexFactor int
 
-	// ---- server fields ----
+	// ---- server only fields ----
 	users map[string]*appctlpb.User
 }
 

@@ -31,7 +31,6 @@ import (
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlgrpc"
 	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/common"
-	"github.com/enfein/mieru/v3/pkg/egress"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 	"github.com/enfein/mieru/v3/pkg/protocol"
@@ -134,8 +133,9 @@ func (s *serverManagementService) Start(ctx context.Context, req *pb.Empty) (*pb
 			ClientSideAuthentication: true,
 		},
 		DualStackPreference: common.DualStackPreference(config.GetDns().GetDualStack()),
-		EgressController:    egress.NewSocks5Controller(config.GetEgress()),
+		Egress:              config.GetEgress(),
 		HandshakeTimeout:    10 * time.Second,
+		Users:               UserListToMap(config.GetUsers()),
 	}
 	socks5Server, err := socks5.New(socks5Config)
 	if err != nil {
