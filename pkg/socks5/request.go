@@ -533,7 +533,7 @@ func isLocalhostDst(req *Request) bool {
 	if req == nil || req.DstAddr == nil {
 		return false
 	}
-	if req.DstAddr.FQDN == "localhost" || req.DstAddr.IP.IsLoopback() {
+	if req.DstAddr.FQDN == "localhost" || req.DstAddr.FQDN == "ip6-localhost" || req.DstAddr.FQDN == "ip6-loopback" || req.DstAddr.IP.IsLoopback() {
 		return true
 	}
 	return false

@@ -49,6 +49,8 @@ message ServerConfig {
 message ServerAdvancedSettings {
     // Allow using socks5 to access resources served in localhost.
     // This option should be set to false unless required due to testing purpose.
+    // This field has been deprecated and will be removed.
+    // Instead, use allowPrivateIP and allowLoopbackIP in User configuration.
     optional bool allowLocalDestination = 1;
 }
 

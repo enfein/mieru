@@ -106,8 +106,16 @@ message User {
     optional string hashedPassword = 3;
 
     // User quotas.
-    // This has no effect at the client side.
+    // This field has no effect at the client side.
     repeated Quota quotas = 4;
+
+    // Allow user to use private IP as the destination.
+    // This field has no effect at the client side.
+    optional bool allowPrivateIP = 5;
+
+    // Allow user to use loopback IP as the destination.
+    // This field has no effect at the client side.
+    optional bool allowLoopbackIP = 6;
 }
 
 message Quota {
