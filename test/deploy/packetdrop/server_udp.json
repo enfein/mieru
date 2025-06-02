@@ -8,12 +8,10 @@
     "users": [
         {
             "name": "shilishanlu",
-            "password": "buhuanjian"
+            "password": "buhuanjian",
+            "allowLoopbackIP": true
         }
     ],
-    "advancedSettings": {
-        "allowLocalDestination": true
-    },
     "loggingLevel": "DEBUG",
     "mtu": 1400
 }

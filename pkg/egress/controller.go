@@ -15,11 +15,16 @@
 
 package egress
 
-import "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
+import (
+	"context"
+
+	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
+)
 
 type Input struct {
 	Protocol appctlpb.ProxyProtocol
 	Data     []byte
+	Env      map[string]string // additional out-of-band information
 }
 
 type Action struct {
@@ -29,7 +34,7 @@ type Action struct {
 
 type Controller interface {
 	// FindAction returns the action to do based on the input data.
-	FindAction(in Input) Action
+	FindAction(ctx context.Context, in Input) Action
 }
 
 // AlwaysDirectController always returns DIRECT action.
@@ -39,7 +44,7 @@ var (
 	_ Controller = AlwaysDirectController{}
 )
 
-func (c AlwaysDirectController) FindAction(in Input) Action {
+func (c AlwaysDirectController) FindAction(_ context.Context, _ Input) Action {
 	return Action{
 		Action: appctlpb.EgressAction_DIRECT,
 	}

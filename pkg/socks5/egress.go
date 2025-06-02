@@ -16,6 +16,10 @@
 package socks5
 
 import (
+	"context"
+	"net"
+
+	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/egress"
 	"github.com/enfein/mieru/v3/pkg/log"
@@ -26,7 +30,7 @@ var (
 	_ egress.Controller = (*Server)(nil)
 )
 
-func (s *Server) FindAction(in egress.Input) egress.Action {
+func (s *Server) FindAction(ctx context.Context, in egress.Input) egress.Action {
 	// DIRECT is used for all invalid inputs, such that they are handled by
 	// the subsequent logic.
 	if in.Protocol != appctlpb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL {
@@ -35,40 +39,113 @@ func (s *Server) FindAction(in egress.Input) egress.Action {
 			Action: appctlpb.EgressAction_DIRECT,
 		}
 	}
-	// The request's VER must be 0x05 and CMD must be 0x01 (CONNECT).
-	// CMD 0x03 (UDP ASSOCIATE) is not supported at the moment.
 	if len(in.Data) < 4 {
 		log.Debugf("socks5 egress controller: input %v is too short", in.Data)
 		return egress.Action{
 			Action: appctlpb.EgressAction_DIRECT,
 		}
 	}
-	if in.Data[0] != 0x05 {
+	if in.Data[0] != constant.Socks5Version {
 		log.Debugf("socks5 egress controller: input %v is not socks5 protocol", in.Data)
 		return egress.Action{
 			Action: appctlpb.EgressAction_DIRECT,
 		}
-	} else if in.Data[1] == 0x01 {
-		isIP := in.Data[3] == 0x01 || in.Data[3] == 0x04
-		isDomainName := in.Data[3] == 0x03
-		for _, rule := range s.config.Egress.GetRules() {
-			if (isIP && len(rule.GetIpRanges()) > 0 && rule.GetIpRanges()[0] == "*") || (isDomainName && len(rule.GetDomainNames()) > 0 && rule.GetDomainNames()[0] == "*") {
-				for _, proxy := range s.config.Egress.GetProxies() {
-					if proxy.GetName() == rule.GetProxyName() {
-						return egress.Action{
-							Action: rule.GetAction(),
-							Proxy:  proxy,
-						}
+	} else if in.Data[1] == constant.Socks5ConnectCmd || in.Data[1] == constant.Socks5UDPAssociateCmd {
+		// 1. Check if the request should be rejected because the destination is
+		// private or loopback IP.
+		action := s.rejectPrivateAndLoopbackIPAction(ctx, in)
+		if action.Action == appctlpb.EgressAction_REJECT {
+			return action
+		}
+		// 2. Check if the request should be forwarded to another proxy.
+		action = s.forwardToProxyAction(ctx, in)
+		if action.Action == appctlpb.EgressAction_PROXY {
+			return action
+		}
+	}
+	return egress.Action{
+		Action: appctlpb.EgressAction_DIRECT,
+	}
+}
+
+func (s *Server) rejectPrivateAndLoopbackIPAction(ctx context.Context, in egress.Input) egress.Action {
+	var ip net.IP
+	if in.Data[3] == constant.Socks5IPv4Address {
+		ip = net.IP(in.Data[4:8])
+	} else if in.Data[3] == constant.Socks5IPv6Address {
+		ip = net.IP(in.Data[4:20])
+	} else if in.Data[3] == constant.Socks5FQDNAddress {
+		domainNameLength := int(in.Data[4])
+		domainName := string(in.Data[5 : 5+domainNameLength])
+		ips, err := s.config.Resolver.LookupIP(ctx, "ip", domainName)
+		if err != nil || len(ips) == 0 {
+			// Allow the connection here.
+			// The correct error is returned when server is processing the request.
+			return egress.Action{
+				Action: appctlpb.EgressAction_DIRECT,
+			}
+		}
+		ip = ips[0]
+	}
+
+	if !ip.IsPrivate() && !ip.IsLoopback() {
+		return egress.Action{
+			Action: appctlpb.EgressAction_DIRECT,
+		}
+	}
+
+	// For testing propose, allow bypassing the user check below.
+	if ip.IsLoopback() && s.config.AllowLoopbackDestination {
+		return egress.Action{
+			Action: appctlpb.EgressAction_DIRECT,
+		}
+	}
+
+	// Load user information.
+	userName, ok := in.Env["user"]
+	if !ok || userName == "" {
+		// User name is unknown.
+		return egress.Action{
+			Action: appctlpb.EgressAction_REJECT,
+		}
+	}
+	user, ok := s.config.Users[userName]
+	if !ok {
+		// User is not registered.
+		return egress.Action{
+			Action: appctlpb.EgressAction_REJECT,
+		}
+	}
+	if ip.IsPrivate() && user.GetAllowPrivateIP() {
+		return egress.Action{
+			Action: appctlpb.EgressAction_DIRECT,
+		}
+	} else if ip.IsLoopback() && user.GetAllowLoopbackIP() {
+		return egress.Action{
+			Action: appctlpb.EgressAction_DIRECT,
+		}
+	}
+	return egress.Action{
+		Action: appctlpb.EgressAction_REJECT,
+	}
+}
+
+func (s *Server) forwardToProxyAction(_ context.Context, in egress.Input) egress.Action {
+	isIP := in.Data[3] == constant.Socks5IPv4Address || in.Data[3] == constant.Socks5IPv6Address
+	isDomainName := in.Data[3] == constant.Socks5FQDNAddress
+	for _, rule := range s.config.Egress.GetRules() {
+		if (isIP && len(rule.GetIpRanges()) > 0 && rule.GetIpRanges()[0] == "*") || (isDomainName && len(rule.GetDomainNames()) > 0 && rule.GetDomainNames()[0] == "*") {
+			for _, proxy := range s.config.Egress.GetProxies() {
+				if proxy.GetName() == rule.GetProxyName() {
+					return egress.Action{
+						Action: rule.GetAction(),
+						Proxy:  proxy,
 					}
 				}
 			}
 		}
-		return egress.Action{
-			Action: appctlpb.EgressAction_DIRECT,
-		}
-	} else {
-		return egress.Action{
-			Action: appctlpb.EgressAction_DIRECT,
-		}
+	}
+	return egress.Action{
+		Action: appctlpb.EgressAction_DIRECT,
 	}
 }

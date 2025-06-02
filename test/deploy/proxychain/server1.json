@@ -12,12 +12,10 @@
     "users": [
         {
             "name": "ducaiguozei",
-            "password": "xijinping"
+            "password": "xijinping",
+            "allowLoopbackIP": true
         }
     ],
-    "advancedSettings": {
-        "allowLocalDestination": true
-    },
     "loggingLevel": "INFO",
     "egress": {
         "proxies": [

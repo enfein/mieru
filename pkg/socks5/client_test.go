@@ -17,7 +17,7 @@ import (
 
 func newTestSocksServer(port int) {
 	conf := &Config{
-		AllowLocalDestination: true,
+		AllowLoopbackDestination: true,
 	}
 	srv, err := New(conf)
 	if err != nil {

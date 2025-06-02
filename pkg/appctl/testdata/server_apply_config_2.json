@@ -30,7 +30,8 @@
                     "days": 30,
                     "megabytes": 2000
                 }
-            ]
+            ],
+            "allowLoopbackIP": true
         }
     ],
     "loggingLevel": "INFO",

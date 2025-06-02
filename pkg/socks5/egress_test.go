@@ -16,10 +16,13 @@
 package socks5
 
 import (
+	"context"
 	crand "crypto/rand"
 	mrand "math/rand"
 	"testing"
 
+	apicommon "github.com/enfein/mieru/v3/apis/common"
+	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/egress"
 	"google.golang.org/protobuf/proto"
@@ -29,6 +32,16 @@ var (
 	inputIPv4 = egress.Input{
 		Protocol: appctlpb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL,
 		Data:     []byte{5, 1, 0, 1, 1, 2, 3, 4, 5, 6},
+	}
+	inputPrivateIPv4 = egress.Input{
+		Protocol: appctlpb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL,
+		Data:     []byte{5, 1, 0, 1, 192, 168, 0, 1, 1, 187},
+		Env:      map[string]string{"user": "xijinping"},
+	}
+	inputLoopbackIPv4 = egress.Input{
+		Protocol: appctlpb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL,
+		Data:     []byte{5, 1, 0, 1, 127, 0, 0, 1, 1, 187},
+		Env:      map[string]string{"user": "xijinping"},
 	}
 	inputIPv6 = egress.Input{
 		Protocol: appctlpb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL,
@@ -43,21 +56,46 @@ var (
 func TestNoEgressRule(t *testing.T) {
 	controller := &Server{
 		config: &Config{
-			Egress: &appctlpb.Egress{},
+			Egress:   &appctlpb.Egress{},
+			Resolver: apicommon.NilDNSResolver{},
 		},
 	}
 	var action egress.Action
-	action = controller.FindAction(inputIPv4)
+	action = controller.FindAction(context.Background(), inputIPv4)
 	if action.Action != appctlpb.EgressAction_DIRECT || action.Proxy != nil {
 		t.Errorf("got unexpected action for IPv4 input")
 	}
-	action = controller.FindAction(inputIPv6)
+	action = controller.FindAction(context.Background(), inputIPv6)
 	if action.Action != appctlpb.EgressAction_DIRECT || action.Proxy != nil {
 		t.Errorf("got unexpected action for IPv6 input")
 	}
-	action = controller.FindAction(inputDomainName)
+	action = controller.FindAction(context.Background(), inputDomainName)
 	if action.Action != appctlpb.EgressAction_DIRECT || action.Proxy != nil {
 		t.Errorf("got unexpected action for domain name input")
+	}
+	action = controller.FindAction(context.Background(), inputPrivateIPv4)
+	if action.Action != appctlpb.EgressAction_REJECT || action.Proxy != nil {
+		t.Errorf("got unexpected action for private IPv4 input")
+	}
+	action = controller.FindAction(context.Background(), inputLoopbackIPv4)
+	if action.Action != appctlpb.EgressAction_REJECT || action.Proxy != nil {
+		t.Errorf("got unexpected action for loopback IPv4 input")
+	}
+
+	controller.config.Users = map[string]*appctlpb.User{
+		"xijinping": {
+			Name:            proto.String("xijinping"),
+			AllowPrivateIP:  proto.Bool(true),
+			AllowLoopbackIP: proto.Bool(true),
+		},
+	}
+	action = controller.FindAction(context.Background(), inputPrivateIPv4)
+	if action.Action != appctlpb.EgressAction_DIRECT || action.Proxy != nil {
+		t.Errorf("got unexpected action for private IPv4 input")
+	}
+	action = controller.FindAction(context.Background(), inputLoopbackIPv4)
+	if action.Action != appctlpb.EgressAction_DIRECT || action.Proxy != nil {
+		t.Errorf("got unexpected action for loopback IPv4 input")
 	}
 }
 
@@ -82,18 +120,19 @@ func TestEgressRule(t *testing.T) {
 					},
 				},
 			},
+			Resolver: apicommon.NilDNSResolver{},
 		},
 	}
 	var action egress.Action
-	action = controller.FindAction(inputIPv4)
+	action = controller.FindAction(context.Background(), inputIPv4)
 	if action.Action != appctlpb.EgressAction_PROXY || action.Proxy == nil {
 		t.Errorf("got unexpected action for IPv4 input")
 	}
-	action = controller.FindAction(inputIPv6)
+	action = controller.FindAction(context.Background(), inputIPv6)
 	if action.Action != appctlpb.EgressAction_PROXY || action.Proxy == nil {
 		t.Errorf("got unexpected action for IPv6 input")
 	}
-	action = controller.FindAction(inputDomainName)
+	action = controller.FindAction(context.Background(), inputDomainName)
 	if action.Action != appctlpb.EgressAction_PROXY || action.Proxy == nil {
 		t.Errorf("got unexpected action for domain name input")
 	}
@@ -105,11 +144,11 @@ func TestEgressRule(t *testing.T) {
 		if _, err := crand.Read(b); err != nil {
 			t.Fatalf("Read() failed: %v", err)
 		}
-		if len(b) >= 2 && b[0] == 0x05 && (b[1] == 0x01 || b[1] == 0x03) {
+		if len(b) >= 2 && b[0] == constant.Socks5Version && (b[1] == constant.Socks5ConnectCmd || b[1] == constant.Socks5UDPAssociateCmd) {
 			continue
 		}
 		input.Data = b
-		action = controller.FindAction(input)
+		action = controller.FindAction(context.Background(), input)
 		if action.Action != appctlpb.EgressAction_DIRECT || action.Proxy != nil {
 			t.Errorf("got unexpected action for random input %v", b)
 		}

@@ -78,6 +78,11 @@ type hierarchyConn struct {
 	mu            sync.Mutex
 }
 
+var (
+	_ HierarchyConn = (*hierarchyConn)(nil)
+	_ UserContext   = (*hierarchyConn)(nil)
+)
+
 func (h *hierarchyConn) Close() error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -96,6 +101,15 @@ func (h *hierarchyConn) AddSubConnection(conn net.Conn) {
 		h.subConnetions = make([]HierarchyConn, 0)
 	}
 	h.subConnetions = append(h.subConnetions, WrapHierarchyConn(conn))
+}
+
+func (h *hierarchyConn) UserName() string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if userCtx, ok := h.Conn.(UserContext); ok {
+		return userCtx.UserName()
+	}
+	return ""
 }
 
 // WrapHierarchyConn wraps an existing connection with HierarchyConn.

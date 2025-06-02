@@ -20,11 +20,9 @@
     "users": [
         {
             "name": "baozi",
-            "password": "manlianpenfen"
+            "password": "manlianpenfen",
+            "allowLoopbackIP": true
         }
     ],
-    "advancedSettings": {
-        "allowLocalDestination": true
-    },
     "loggingLevel": "INFO"
 }

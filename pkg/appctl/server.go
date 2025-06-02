@@ -128,7 +128,6 @@ func (s *serverManagementService) Start(ctx context.Context, req *pb.Empty) (*pb
 
 	// Create the egress socks5 server.
 	socks5Config := &socks5.Config{
-		AllowLocalDestination: config.GetAdvancedSettings().GetAllowLocalDestination(),
 		AuthOpts: socks5.Auth{
 			ClientSideAuthentication: true,
 		},

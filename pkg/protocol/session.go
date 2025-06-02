@@ -25,7 +25,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
 	"github.com/enfein/mieru/v3/pkg/common"
@@ -135,8 +134,8 @@ var (
 	// Session implements net.Conn interface.
 	_ net.Conn = (*Session)(nil)
 
-	// Session implements apicommon.UserContext interface.
-	_ apicommon.UserContext = (*Session)(nil)
+	// Session implements common.UserContext interface.
+	_ common.UserContext = (*Session)(nil)
 )
 
 // NewSession creates a new session.
@@ -840,6 +839,9 @@ func (s *Session) input(seg *segment) error {
 		}
 
 		s.block.Store(&seg.block)
+		if s.userName == "" && seg.block.BlockContext().UserName != "" {
+			s.userName = seg.block.BlockContext().UserName
+		}
 
 		// Register server per user metrics.
 		if !s.isClient {
@@ -940,13 +942,6 @@ func (s *Session) inputData(seg *segment) error {
 			// Server needs to send open session response.
 			// Check user quota if we can identify the user.
 			s.oLock.Lock()
-			if s.userName == "" {
-				if seg.block != nil && seg.block.BlockContext().UserName != "" {
-					s.userName = seg.block.BlockContext().UserName
-				} else if s.block.Load() != nil && (*s.block.Load()).BlockContext().UserName != "" {
-					s.userName = (*s.block.Load()).BlockContext().UserName
-				}
-			}
 			if s.userName != "" {
 				quotaOK, err := s.checkQuota(s.userName)
 				if err != nil {

@@ -28,6 +28,7 @@ var (
 	HostUnreachableErrors    = metrics.RegisterMetric("socks5", "HostUnreachableErrors", metrics.COUNTER)
 	ConnectionRefusedErrors  = metrics.RegisterMetric("socks5", "ConnectionRefusedErrors", metrics.COUNTER)
 	UDPAssociateErrors       = metrics.RegisterMetric("socks5", "UDPAssociateErrors", metrics.COUNTER)
+	RejectByRules            = metrics.RegisterMetric("socks5", "RejectByRules", metrics.COUNTER)
 
 	UDPAssociateUploadBytes     = metrics.RegisterMetric("socks5 UDP associate", "UploadBytes", metrics.COUNTER)
 	UDPAssociateDownloadBytes   = metrics.RegisterMetric("socks5 UDP associate", "DownloadBytes", metrics.COUNTER)
@@ -64,8 +65,9 @@ type Config struct {
 	// Strategy to select IP address from DNS response.
 	DualStackPreference common.DualStackPreference
 
-	// Allow using socks5 to access resources served in localhost.
-	AllowLocalDestination bool
+	// Allow using socks5 to access resources served from loopback address.
+	// This is for testing purpose.
+	AllowLoopbackDestination bool
 }
 
 // Server is responsible for accepting connections and handling
@@ -231,21 +233,36 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 		}
 	}
 
+	ctx := context.Background()
 	request, err := s.newRequest(conn)
 	if err != nil {
 		HandshakeErrors.Add(1)
 		if errors.Is(err, model.ErrUnrecognizedAddrType) {
 			if err := sendReply(conn, addrTypeNotSupported, nil); err != nil {
-				return fmt.Errorf("failed to send reply: %w", err)
+				return fmt.Errorf("failed to send reply for addrTypeNotSupported error: %w", err)
 			}
 		}
 		return fmt.Errorf("failed to read destination address: %w", err)
 	}
 
-	action := s.FindAction(egress.Input{
+	egressInput := egress.Input{
 		Protocol: appctlpb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL,
 		Data:     request.Raw,
-	})
+	}
+	if userCtx, ok := conn.(common.UserContext); ok {
+		userName := userCtx.UserName()
+		if userName == "" {
+			log.Debugf("Failed to determine user name from the connection")
+		} else {
+			log.Debugf("User %q initiated the connection", userName)
+			egressInput.Env = map[string]string{
+				"user": userName,
+			}
+		}
+	} else {
+		log.Errorf("%T doesn't implement common.UserContext interface", conn)
+	}
+	action := s.FindAction(ctx, egressInput)
 	if action.Action == appctlpb.EgressAction_PROXY {
 		proxy := action.Proxy
 		if proxy.GetSocks5Authentication().GetUser() != "" && proxy.GetSocks5Authentication().GetPassword() != "" {
@@ -258,7 +275,7 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 	}
 	switch action.Action {
 	case appctlpb.EgressAction_DIRECT:
-		if err := s.handleRequest(context.Background(), request, conn); err != nil {
+		if err := s.handleRequest(ctx, request, conn); err != nil {
 			return fmt.Errorf("handleRequest() failed: %w", err)
 		}
 	case appctlpb.EgressAction_PROXY:
@@ -267,6 +284,10 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 		}
 		return s.handleForwarding(request, conn, action.Proxy)
 	case appctlpb.EgressAction_REJECT:
+		RejectByRules.Add(1)
+		if err := sendReply(conn, notAllowedByRuleSet, nil); err != nil {
+			return fmt.Errorf("failed to send reply for notAllowedByRuleSet error: %w", err)
+		}
 		return fmt.Errorf("connection is rejected by egress rules")
 	}
 	return nil

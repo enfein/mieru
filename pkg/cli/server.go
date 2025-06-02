@@ -458,7 +458,6 @@ var serverRunFunc = func(s []string) error {
 
 		// Create the egress socks5 server.
 		socks5Config := &socks5.Config{
-			AllowLocalDestination: config.GetAdvancedSettings().GetAllowLocalDestination(),
 			AuthOpts: socks5.Auth{
 				ClientSideAuthentication: true,
 			},

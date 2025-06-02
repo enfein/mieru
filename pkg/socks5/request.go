@@ -23,7 +23,7 @@ import (
 const (
 	successReply         byte = 0
 	serverFailure        byte = 1
-	ruleFailure          byte = 2
+	notAllowedByRuleSet  byte = 2
 	networkUnreachable   byte = 3
 	hostUnreachable      byte = 4
 	connectionRefused    byte = 5
@@ -106,11 +106,6 @@ func (s *Server) handleRequest(ctx context.Context, req *Request, conn net.Conn)
 			}
 			log.Debugf("Resolved domain name %s to IP addresses %v, selected IP address %v", dst.FQDN, ips, dst.IP)
 		}
-	}
-
-	// Return error if access local destination is not allowed.
-	if !s.config.AllowLocalDestination && isLocalhostDst(req) {
-		return fmt.Errorf("access to localhost resource via proxy is not allowed")
 	}
 
 	// Switch on the command.
@@ -527,14 +522,4 @@ func sendReply(w io.Writer, resp uint8, addr *model.AddrSpec) error {
 	// Send the message.
 	_, err := w.Write(buf.Bytes())
 	return err
-}
-
-func isLocalhostDst(req *Request) bool {
-	if req == nil || req.DstAddr == nil {
-		return false
-	}
-	if req.DstAddr.FQDN == "localhost" || req.DstAddr.FQDN == "ip6-localhost" || req.DstAddr.FQDN == "ip6-loopback" || req.DstAddr.IP.IsLoopback() {
-		return true
-	}
-	return false
 }

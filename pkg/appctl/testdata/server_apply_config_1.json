@@ -14,7 +14,8 @@
                     "days": 7,
                     "megabytes": 1000
                 }
-            ]
+            ],
+            "allowPrivateIP": true
         }
     ],
     "loggingLevel": "DEBUG",

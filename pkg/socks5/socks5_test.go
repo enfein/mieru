@@ -47,7 +47,7 @@ func TestSocks5Connect(t *testing.T) {
 
 	// Create a socks server.
 	conf := &Config{
-		AllowLocalDestination: true,
+		AllowLoopbackDestination: true,
 	}
 	serv, err := New(conf)
 	if err != nil {
@@ -156,7 +156,7 @@ func TestSocks5UDPAssociation(t *testing.T) {
 
 	// Create a socks server.
 	conf := &Config{
-		AllowLocalDestination: true,
+		AllowLoopbackDestination: true,
 	}
 	serv, err := New(conf)
 	if err != nil {

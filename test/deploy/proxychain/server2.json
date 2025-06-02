@@ -12,11 +12,9 @@
     "users": [
         {
             "name": "meiyougongchandang",
-            "password": "caiyouxinzhongguo"
+            "password": "caiyouxinzhongguo",
+            "allowLoopbackIP": true
         }
     ],
-    "advancedSettings": {
-        "allowLocalDestination": true
-    },
     "loggingLevel": "INFO"
 }

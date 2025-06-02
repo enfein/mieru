@@ -45,7 +45,7 @@ func TestRequestConnect(t *testing.T) {
 	// Create a socks server.
 	s := &Server{
 		config: &Config{
-			AllowLocalDestination: true,
+			AllowLoopbackDestination: true,
 		},
 	}
 
@@ -107,7 +107,7 @@ func TestRequestUnsupportedCommand(t *testing.T) {
 	// Create a socks server.
 	s := &Server{
 		config: &Config{
-			AllowLocalDestination: true,
+			AllowLoopbackDestination: true,
 		},
 	}
 
