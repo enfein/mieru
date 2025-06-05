@@ -159,7 +159,19 @@ func (s *serverManagementService) Start(ctx context.Context, req *pb.Empty) (*pb
 	}()
 
 	initProxyTasks.Wait()
+
+	if config.GetAdvancedSettings().GetMetricsLoggingInterval() != "" {
+		metricsDuration, err := time.ParseDuration(config.GetAdvancedSettings().GetMetricsLoggingInterval())
+		if err != nil {
+			log.Warnf("Failed to parse metrics logging interval %q from server configuration: %v", config.GetAdvancedSettings().GetMetricsLoggingInterval(), err)
+		} else {
+			if err := metrics.SetLoggingDuration(metricsDuration); err != nil {
+				log.Warnf("Failed to set metrics logging duration: %v", err)
+			}
+		}
+	}
 	metrics.EnableLogging()
+
 	SetAppStatus(pb.AppStatus_RUNNING)
 	log.Infof("completed Start request from RPC caller")
 	return &pb.Empty{}, nil
@@ -552,6 +564,7 @@ func DeleteServerUsers(names []string) error {
 // 5.2. the domain names must be "*"
 // 5.3. the action must be "PROXY"
 // 5.4. the proxy name is defined
+// 6. if set, metrics logging interval is valid, and it is not less than 1 second
 func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 	if _, err := appctlcommon.FlatPortBindings(patch.GetPortBindings()); err != nil {
 		return err
@@ -630,6 +643,15 @@ func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 			return fmt.Errorf("egress rule: proxy %q is not defined", rule.GetProxyName())
 		}
 	}
+	if patch.GetAdvancedSettings().GetMetricsLoggingInterval() != "" {
+		d, err := time.ParseDuration(patch.GetAdvancedSettings().GetMetricsLoggingInterval())
+		if err != nil {
+			return fmt.Errorf("metrics logging interval %q is invalid: %w", patch.GetAdvancedSettings().GetMetricsLoggingInterval(), err)
+		}
+		if d < time.Second {
+			return fmt.Errorf("metrics logging interval %q is less than 1 second", patch.GetAdvancedSettings().GetMetricsLoggingInterval())
+		}
+	}
 	return nil
 }
 
@@ -643,6 +665,7 @@ func ValidateFullServerConfig(config *pb.ServerConfig) error {
 	if err := ValidateServerConfigPatch(config); err != nil {
 		return err
 	}
+
 	if proto.Equal(config, &pb.ServerConfig{}) {
 		return fmt.Errorf("server config is empty")
 	}

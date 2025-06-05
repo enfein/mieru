@@ -36,7 +36,7 @@ var stopLogging chan struct{}
 var logMutex sync.Mutex
 
 func init() {
-	logDuration = time.Minute
+	logDuration = 10 * time.Minute
 	stopLogging = make(chan struct{}, 1) // doesn't block
 }
 

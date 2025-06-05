@@ -68,7 +68,9 @@ func TestClientApplyReject(t *testing.T) {
 	cases := []string{
 		"testdata/client_reject_active_profile_mismatch.json",
 		"testdata/client_reject_invalid_http_port.json",
+		"testdata/client_reject_invalid_metrics_logging_interval.json",
 		"testdata/client_reject_invalid_rpc_port.json",
+		"testdata/client_reject_metrics_logging_interval_too_small.json",
 		"testdata/client_reject_mtu_too_big.json",
 		"testdata/client_reject_mtu_too_small.json",
 		"testdata/client_reject_no_active_profile.json",

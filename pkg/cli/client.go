@@ -679,6 +679,17 @@ var clientRunFunc = func(s []string) error {
 	}
 
 	<-appctl.ClientSocks5ServerStarted
+
+	if config.GetAdvancedSettings().GetMetricsLoggingInterval() != "" {
+		metricsDuration, err := time.ParseDuration(config.GetAdvancedSettings().GetMetricsLoggingInterval())
+		if err != nil {
+			log.Warnf("Failed to parse metrics logging interval %q from client configuration: %v", config.GetAdvancedSettings().GetMetricsLoggingInterval(), err)
+		} else {
+			if err := metrics.SetLoggingDuration(metricsDuration); err != nil {
+				log.Warnf("Failed to set metrics logging duration: %v", err)
+			}
+		}
+	}
 	metrics.EnableLogging()
 
 	appctl.SetAppStatus(appctlpb.AppStatus_RUNNING)

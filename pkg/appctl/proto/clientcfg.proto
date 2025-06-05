@@ -88,4 +88,9 @@ enum MultiplexingLevel {
 message ClientAdvancedSettings {
     // Do not check update when client is started.
     optional bool noCheckUpdate = 1;
+
+    // The interval to log metrics.
+    // Examples: 30s, 5m, 2h.
+    // If empty, the default interval is used.
+    optional string metricsLoggingInterval = 2;
 }

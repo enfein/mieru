@@ -66,11 +66,13 @@ func TestApply2ServerConfig(t *testing.T) {
 
 func TestServerApplyReject(t *testing.T) {
 	cases := []string{
+		"testdata/server_reject_invalid_metrics_logging_interval.json",
 		"testdata/server_reject_invalid_port_range_1.json",
 		"testdata/server_reject_invalid_port_range_2.json",
 		"testdata/server_reject_invalid_port_range_3.json",
 		"testdata/server_reject_invalid_quota_days.json",
 		"testdata/server_reject_invalid_quota_megabytes.json",
+		"testdata/server_reject_metrics_logging_interval_too_small.json",
 		"testdata/server_reject_mtu_too_big.json",
 		"testdata/server_reject_mtu_too_small.json",
 		"testdata/server_reject_no_password.json",

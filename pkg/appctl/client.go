@@ -26,6 +26,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlcommon"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlgrpc"
@@ -375,6 +376,7 @@ func DeleteClientConfigProfile(profileName string) error {
 // 1. it has 0 or more profile
 // 2. validate each profile
 // 3. for each socks5 authentication, the user and password are not empty
+// 4. metrics logging interval is valid, and it is not less than 1 second
 func ValidateClientConfigPatch(patch *pb.ClientConfig) error {
 	for _, profile := range patch.GetProfiles() {
 		if err := appctlcommon.ValidateClientConfigSingleProfile(profile); err != nil {
@@ -389,6 +391,15 @@ func ValidateClientConfigPatch(patch *pb.ClientConfig) error {
 			return fmt.Errorf("socks5 authentication password is not set")
 		}
 	}
+	if patch.GetAdvancedSettings().GetMetricsLoggingInterval() != "" {
+		d, err := time.ParseDuration(patch.GetAdvancedSettings().GetMetricsLoggingInterval())
+		if err != nil {
+			return fmt.Errorf("metrics logging interval %q is invalid: %w", patch.GetAdvancedSettings().GetMetricsLoggingInterval(), err)
+		}
+		if d < time.Second {
+			return fmt.Errorf("metrics logging interval %q is less than 1 second", patch.GetAdvancedSettings().GetMetricsLoggingInterval())
+		}
+	}
 	return nil
 }
 
@@ -400,10 +411,12 @@ func ValidateClientConfigPatch(patch *pb.ClientConfig) error {
 // 3. RPC port is valid
 // 4. socks5 port is valid
 // 5. RPC port, socks5 port, http proxy port are different
+// 6. if set, metrics logging interval is valid, and it is not less than 1 second
 func ValidateFullClientConfig(config *pb.ClientConfig) error {
 	if err := ValidateClientConfigPatch(config); err != nil {
 		return err
 	}
+
 	if len(config.GetProfiles()) == 0 {
 		return fmt.Errorf("profiles are not set")
 	}

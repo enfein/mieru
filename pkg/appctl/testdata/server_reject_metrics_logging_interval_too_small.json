@@ -1,0 +1,26 @@
+{
+    "portBindings": [
+        {
+            "port": 8000,
+            "protocol": "TCP"
+        }
+    ],
+    "users": [
+        {
+            "name": "user1",
+            "password": "fa7206ed2a94",
+            "quotas": [
+                {
+                    "days": 7,
+                    "megabytes": 1000
+                }
+            ],
+            "allowPrivateIP": true
+        }
+    ],
+    "advancedSettings": {
+        "metricsLoggingInterval": "100ms"
+    },
+    "loggingLevel": "DEBUG",
+    "mtu": 1300
+}

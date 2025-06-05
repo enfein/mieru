@@ -492,7 +492,19 @@ var serverRunFunc = func(s []string) error {
 		}()
 
 		initProxyTasks.Wait()
+
+		if config.GetAdvancedSettings().GetMetricsLoggingInterval() != "" {
+			metricsDuration, err := time.ParseDuration(config.GetAdvancedSettings().GetMetricsLoggingInterval())
+			if err != nil {
+				log.Warnf("Failed to parse metrics logging interval %q from server configuration: %v", config.GetAdvancedSettings().GetMetricsLoggingInterval(), err)
+			} else {
+				if err := metrics.SetLoggingDuration(metricsDuration); err != nil {
+					log.Warnf("Failed to set metrics logging duration: %v", err)
+				}
+			}
+		}
 		metrics.EnableLogging()
+
 		appctl.SetAppStatus(appctlpb.AppStatus_RUNNING)
 		log.Debugf("Started proxy after %v", appctl.Elapsed())
 		proxyTasks.Wait()
