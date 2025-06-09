@@ -144,6 +144,28 @@ mieru stop
 mieru start
 ```
 
+All supported logging levels include `FATAL`, `ERROR`, `WARN`, `INFO`, `DEBUG` and `TRACE`.
+
+## Changing the Metrics Logging Interval
+
+By default, mieru / mita prints metrics information in the logs every 10 minutes. If you want to adjust this output interval, use the following settings:
+
+```js
+{
+    "advancedSettings": {
+        "metricsLoggingInterval": "1h30m"
+    }
+}
+```
+
+You can specify the interval in:
+
+- seconds `s`
+- minutes `m`
+- hours `h`
+
+or any combination of these units.
+
 ## View User Network Traffic
 
 You can run the commands `mita get users` and `mita get quotas` on the server to check each user's most recent active time and the amount of network traffic used.

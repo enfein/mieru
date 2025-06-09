@@ -16,7 +16,9 @@
         },
         {
             "name": "meiyougongchandang",
-            "password": "caiyouxinzhongguo"
+            "password": "caiyouxinzhongguo",
+            "allowPrivateIP": true,
+            "allowLoopbackIP": true
         }
     ],
     "loggingLevel": "INFO",

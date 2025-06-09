@@ -18,32 +18,32 @@ sudo python3 setup.py --lang=zh
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.15.0/mita_3.15.0_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.16.0/mita_3.16.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.15.0/mita_3.15.0_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.16.0/mita_3.16.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.15.0/mita-3.15.0-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.16.0/mita-3.16.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.15.0/mita-3.15.0-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.16.0/mita-3.16.0-1.aarch64.rpm
 ```
 
 ## 安装 mita 软件包
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_3.15.0_amd64.deb
+sudo dpkg -i mita_3.16.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_3.15.0_arm64.deb
+sudo dpkg -i mita_3.16.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-3.15.0-1.x86_64.rpm
+sudo rpm -Uvh --force mita-3.16.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-3.15.0-1.aarch64.rpm
+sudo rpm -Uvh --force mita-3.16.0-1.aarch64.rpm
 ```
 
 上述指令也可以用来升级 mita 软件包的版本。
@@ -254,22 +254,37 @@ Tor 浏览器 -> mieru 客户端 -> GFW -> mita 服务器 -> Tor 网络 -> 目�
 4. `ONLY_IPv4`：强制使用 DNS 服务器返回的第一个 IPv4 地址。如果没有 IPv4 地址则连接失败。
 5. `ONLY_IPv6`：强制使用 DNS 服务器返回的第一个 IPv6 地址。如果没有 IPv6 地址则连接失败。
 
+### 允许用户访问内网
+
+默认情况下，代理服务器只允许用户向互联网发起代理请求。
+
+如果需要允许用户通过代理服务器访问私有 IP 地址，例如 `192.168.1.100`，请设置 `users` -> `allowPrivateIP` 属性。
+
+如果需要允许用户通过代理服务器访问服务器本机，例如 `127.0.0.1`，请设置 `users` -> `allowLoopbackIP` 属性。
+
+```js
+{
+    "users": [
+        {
+            "name": "ducaiguozei",
+            "password": "xijinping",
+            "allowPrivateIP": true,
+            "allowLoopbackIP": true
+        },
+        {
+            "name": "meiyougongchandang",
+            "password": "caiyouxinzhongguo"
+        }
+    ]
+}
+```
+
 ### 限制用户流量
 
 我们可以使用 `users` -> `quotas` 属性限制用户可以使用的流量大小。例如，如果想让用户 "ducaiguozei" 在 1 天时间内最多使用 1 GB 流量，并且在 30 天时间内最多使用 10 GB 流量，可以应用下面的设置。
 
 ```js
 {
-    "portBindings": [
-        {
-            "portRange": "2012-2022",
-            "protocol": "TCP"
-        },
-        {
-            "port": 2027,
-            "protocol": "TCP"
-        }
-    ],
     "users": [
         {
             "name": "ducaiguozei",
@@ -289,9 +304,7 @@ Tor 浏览器 -> mieru 客户端 -> GFW -> mita 服务器 -> Tor 网络 -> 目�
             "name": "meiyougongchandang",
             "password": "caiyouxinzhongguo"
         }
-    ],
-    "loggingLevel": "INFO",
-    "mtu": 1400
+    ]
 }
 ```
 

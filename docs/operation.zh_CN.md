@@ -144,6 +144,28 @@ mieru stop
 mieru start
 ```
 
+所有支持的日志等级包括 `FATAL`, `ERROR`, `WARN`, `INFO`, `DEBUG` 和 `TRACE`。
+
+## 修改指标日志输出间隔
+
+mieru / mita 每隔 10 分钟通过日志打印指标信息。如果想要调整这个输出的间隔，请使用下面的设置：
+
+```js
+{
+    "advancedSettings": {
+        "metricsLoggingInterval": "1h30m"
+    }
+}
+```
+
+其中可以使用单位
+
+- 秒 `s`
+- 分钟 `m`
+- 小时 `h`
+
+以及他们的组合。
+
 ## 查看用户网络流量
 
 可以在服务器运行 `mita get users` 和 `mita get quotas` 指令，查看每个用户最近的活跃时间和消耗的网络流量。

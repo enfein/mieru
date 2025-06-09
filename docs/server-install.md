@@ -18,32 +18,32 @@ Or you can manually install and configure proxy server using the steps below.
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.15.0/mita_3.15.0_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.16.0/mita_3.16.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.15.0/mita_3.15.0_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.16.0/mita_3.16.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.15.0/mita-3.15.0-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.16.0/mita-3.16.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.15.0/mita-3.15.0-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.16.0/mita-3.16.0-1.aarch64.rpm
 ```
 
 ## Install mita package
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_3.15.0_amd64.deb
+sudo dpkg -i mita_3.16.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_3.15.0_arm64.deb
+sudo dpkg -i mita_3.16.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-3.15.0-1.x86_64.rpm
+sudo rpm -Uvh --force mita-3.16.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-3.15.0-1.aarch64.rpm
+sudo rpm -Uvh --force mita-3.16.0-1.aarch64.rpm
 ```
 
 Those instructions can also be used to upgrade the version of mita software package.
@@ -254,22 +254,37 @@ The `dns` -> `dualStack` attribute supports the following values:
 4. `ONLY_IPv4`: Force to use the first IPv4 address returned by the DNS server. If there is no IPv4 address, the connection fails.
 5. `ONLY_IPv6`: Force to use the first IPv6 address returned by the DNS server. If there is no IPv6 address, the connection fails.
 
+### Allow Users to Access Internal Network
+
+By default, proxy server only allows users to send proxy requests to the Internet.
+
+If you want to allow users to access private IP addresses (e.g., `192.168.1.100`) through the proxy server, set the `users` -> `allowPrivateIP` attribute.
+
+If you want to allow users to access the server's local machine (e.g., `127.0.0.1`) through the proxy server, add the `users` -> `allowLoopbackIP` attribute.
+
+```js
+{
+    "users": [
+        {
+            "name": "ducaiguozei",
+            "password": "xijinping",
+            "allowPrivateIP": true,
+            "allowLoopbackIP": true
+        },
+        {
+            "name": "meiyougongchandang",
+            "password": "caiyouxinzhongguo"
+        }
+    ]
+}
+```
+
 ### Limiting User Traffic
 
 We can use the `users` -> `quotas` property to limit the amount of traffic a user is allowed to use. For example, if you want user "ducaiguozei" to use no more than 1 GB of traffic within 1 day, and no more than 10 GB within 30 days, you can apply the following settings.
 
 ```js
 {
-    "portBindings": [
-        {
-            "portRange": "2012-2022",
-            "protocol": "TCP"
-        },
-        {
-            "port": 2027,
-            "protocol": "TCP"
-        }
-    ],
     "users": [
         {
             "name": "ducaiguozei",
@@ -289,9 +304,7 @@ We can use the `users` -> `quotas` property to limit the amount of traffic a use
             "name": "meiyougongchandang",
             "password": "caiyouxinzhongguo"
         }
-    ],
-    "loggingLevel": "INFO",
-    "mtu": 1400
+    ]
 }
 ```
 
