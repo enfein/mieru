@@ -40,6 +40,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 const (
@@ -96,13 +97,13 @@ type clientManagementService struct {
 	appctlgrpc.UnimplementedClientManagementServiceServer
 }
 
-func (c *clientManagementService) GetStatus(ctx context.Context, req *pb.Empty) (*pb.AppStatusMsg, error) {
+func (c *clientManagementService) GetStatus(ctx context.Context, req *emptypb.Empty) (*pb.AppStatusMsg, error) {
 	status := GetAppStatus()
 	log.Infof("return app status %s back to RPC caller", status.String())
 	return &pb.AppStatusMsg{Status: &status}, nil
 }
 
-func (c *clientManagementService) Exit(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
+func (c *clientManagementService) Exit(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
 	SetAppStatus(pb.AppStatus_STOPPING)
 	log.Infof("received Exit request from RPC caller")
 	socks5Server := clientSocks5ServerRef.Load()
@@ -122,10 +123,10 @@ func (c *clientManagementService) Exit(ctx context.Context, req *pb.Empty) (*pb.
 		log.Infof("RPC server reference not found")
 	}
 	log.Infof("completed Exit request from RPC caller")
-	return &pb.Empty{}, nil
+	return &emptypb.Empty{}, nil
 }
 
-func (c *clientManagementService) GetMetrics(ctx context.Context, req *pb.Empty) (*pb.Metrics, error) {
+func (c *clientManagementService) GetMetrics(ctx context.Context, req *emptypb.Empty) (*pb.Metrics, error) {
 	b, err := metrics.GetMetricsAsJSON()
 	if err != nil {
 		return &pb.Metrics{}, err
@@ -133,7 +134,7 @@ func (c *clientManagementService) GetMetrics(ctx context.Context, req *pb.Empty)
 	return &pb.Metrics{Json: proto.String(string(b))}, nil
 }
 
-func (c *clientManagementService) GetSessionInfoList(context.Context, *pb.Empty) (*pb.SessionInfoList, error) {
+func (c *clientManagementService) GetSessionInfoList(context.Context, *emptypb.Empty) (*pb.SessionInfoList, error) {
 	mux := clientMuxRef.Load()
 	if mux == nil {
 		return &pb.SessionInfoList{}, fmt.Errorf("client multiplexier is unavailable")
@@ -141,26 +142,26 @@ func (c *clientManagementService) GetSessionInfoList(context.Context, *pb.Empty)
 	return mux.ExportSessionInfoList(), nil
 }
 
-func (c *clientManagementService) GetThreadDump(ctx context.Context, req *pb.Empty) (*pb.ThreadDump, error) {
+func (c *clientManagementService) GetThreadDump(ctx context.Context, req *emptypb.Empty) (*pb.ThreadDump, error) {
 	return &pb.ThreadDump{ThreadDump: proto.String(common.GetAllStackTrace())}, nil
 }
 
-func (c *clientManagementService) StartCPUProfile(ctx context.Context, req *pb.ProfileSavePath) (*pb.Empty, error) {
+func (c *clientManagementService) StartCPUProfile(ctx context.Context, req *pb.ProfileSavePath) (*emptypb.Empty, error) {
 	err := common.StartCPUProfile(req.GetFilePath())
-	return &pb.Empty{}, err
+	return &emptypb.Empty{}, err
 }
 
-func (c *clientManagementService) StopCPUProfile(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
+func (c *clientManagementService) StopCPUProfile(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
 	common.StopCPUProfile()
-	return &pb.Empty{}, nil
+	return &emptypb.Empty{}, nil
 }
 
-func (c *clientManagementService) GetHeapProfile(ctx context.Context, req *pb.ProfileSavePath) (*pb.Empty, error) {
+func (c *clientManagementService) GetHeapProfile(ctx context.Context, req *pb.ProfileSavePath) (*emptypb.Empty, error) {
 	err := common.GetHeapProfile(req.GetFilePath())
-	return &pb.Empty{}, err
+	return &emptypb.Empty{}, err
 }
 
-func (c *clientManagementService) GetMemoryStatistics(ctx context.Context, req *pb.Empty) (*pb.MemoryStatistics, error) {
+func (c *clientManagementService) GetMemoryStatistics(ctx context.Context, req *emptypb.Empty) (*pb.MemoryStatistics, error) {
 	return getMemoryStatistics()
 }
 
@@ -195,7 +196,7 @@ func IsClientDaemonRunning(ctx context.Context) error {
 	}
 	timedctx, cancelFunc := context.WithTimeout(ctx, RPCTimeout)
 	defer cancelFunc()
-	if _, err = client.GetStatus(timedctx, &pb.Empty{}); err != nil {
+	if _, err = client.GetStatus(timedctx, &emptypb.Empty{}); err != nil {
 		return fmt.Errorf("ClientManagementService.GetStatus() failed: %w", err)
 	}
 	return nil

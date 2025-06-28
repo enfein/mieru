@@ -20,81 +20,82 @@ package appctl;
 import "appctl/proto/base.proto";
 import "appctl/proto/misc.proto";
 import "appctl/proto/servercfg.proto";
+import "appctl/proto/google/protobuf/empty.proto";
 
 option go_package = "github.com/enfein/mieru/v3/pkg/appctl/appctlgrpc";
 
 service ClientManagementService {
     // Fetch client application status.
-    rpc GetStatus(Empty) returns (AppStatusMsg);
+    rpc GetStatus(google.protobuf.Empty) returns (AppStatusMsg);
 
     // Quit client daemon.
-    rpc Exit(Empty) returns (Empty);
+    rpc Exit(google.protobuf.Empty) returns (google.protobuf.Empty);
 
     // Get client metrics.
-    rpc GetMetrics(Empty) returns (Metrics);
+    rpc GetMetrics(google.protobuf.Empty) returns (Metrics);
 
     // Get client session information.
-    rpc GetSessionInfoList(Empty) returns (SessionInfoList);
+    rpc GetSessionInfoList(google.protobuf.Empty) returns (SessionInfoList);
 
     // Generate a thread dump of client daemon.
-    rpc GetThreadDump(Empty) returns (ThreadDump);
+    rpc GetThreadDump(google.protobuf.Empty) returns (ThreadDump);
 
     // Start CPU profiling.
-    rpc StartCPUProfile(ProfileSavePath) returns (Empty);
+    rpc StartCPUProfile(ProfileSavePath) returns (google.protobuf.Empty);
 
     // Stop CPU profiling.
-    rpc StopCPUProfile(Empty) returns (Empty);
+    rpc StopCPUProfile(google.protobuf.Empty) returns (google.protobuf.Empty);
 
     // Generate a heap profile.
-    rpc GetHeapProfile(ProfileSavePath) returns (Empty);
+    rpc GetHeapProfile(ProfileSavePath) returns (google.protobuf.Empty);
 
     // Get memory statistics of client daemon.
-    rpc GetMemoryStatistics(Empty) returns (MemoryStatistics);
+    rpc GetMemoryStatistics(google.protobuf.Empty) returns (MemoryStatistics);
 }
 
 service ServerManagementService {
     // Fetch server application status.
-    rpc GetStatus(Empty) returns (AppStatusMsg);
+    rpc GetStatus(google.protobuf.Empty) returns (AppStatusMsg);
 
     // Start proxy in server application.
-    rpc Start(Empty) returns (Empty);
+    rpc Start(google.protobuf.Empty) returns (google.protobuf.Empty);
 
     // Stop proxy in server application.
-    rpc Stop(Empty) returns (Empty);
+    rpc Stop(google.protobuf.Empty) returns (google.protobuf.Empty);
 
     // Fetch the server config.
-    rpc GetConfig(Empty) returns (ServerConfig);
+    rpc GetConfig(google.protobuf.Empty) returns (ServerConfig);
 
     // Update server config.
     rpc SetConfig(ServerConfig) returns (ServerConfig);
 
     // Reload server configuration.
-    rpc Reload(Empty) returns (Empty);
+    rpc Reload(google.protobuf.Empty) returns (google.protobuf.Empty);
 
     // Quit server daemon.
-    rpc Exit(Empty) returns (Empty);
+    rpc Exit(google.protobuf.Empty) returns (google.protobuf.Empty);
 
     // Get server metrics.
-    rpc GetMetrics(Empty) returns (Metrics);
+    rpc GetMetrics(google.protobuf.Empty) returns (Metrics);
 
     // Get server session information.
-    rpc GetSessionInfoList(Empty) returns (SessionInfoList);
+    rpc GetSessionInfoList(google.protobuf.Empty) returns (SessionInfoList);
 
     // Get users setting and runtime information.
-    rpc GetUsers(Empty) returns (UserWithMetricsList);
+    rpc GetUsers(google.protobuf.Empty) returns (UserWithMetricsList);
 
     // Generate a thread dump of server daemon.
-    rpc GetThreadDump(Empty) returns (ThreadDump);
+    rpc GetThreadDump(google.protobuf.Empty) returns (ThreadDump);
 
     // Start CPU profiling.
-    rpc StartCPUProfile(ProfileSavePath) returns (Empty);
+    rpc StartCPUProfile(ProfileSavePath) returns (google.protobuf.Empty);
 
     // Stop CPU profiling.
-    rpc StopCPUProfile(Empty) returns (Empty);
+    rpc StopCPUProfile(google.protobuf.Empty) returns (google.protobuf.Empty);
 
     // Generate a heap profile.
-    rpc GetHeapProfile(ProfileSavePath) returns (Empty);
+    rpc GetHeapProfile(ProfileSavePath) returns (google.protobuf.Empty);
 
     // Get memory statistics of server daemon.
-    rpc GetMemoryStatistics(Empty) returns (MemoryStatistics);
+    rpc GetMemoryStatistics(google.protobuf.Empty) returns (MemoryStatistics);
 }

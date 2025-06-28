@@ -39,6 +39,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 var (
@@ -88,20 +89,20 @@ type serverManagementService struct {
 	appctlgrpc.UnimplementedServerManagementServiceServer
 }
 
-func (s *serverManagementService) GetStatus(ctx context.Context, req *pb.Empty) (*pb.AppStatusMsg, error) {
+func (s *serverManagementService) GetStatus(ctx context.Context, req *emptypb.Empty) (*pb.AppStatusMsg, error) {
 	status := GetAppStatus()
 	log.Infof("return app status %s back to RPC caller", status.String())
 	return &pb.AppStatusMsg{Status: &status}, nil
 }
 
-func (s *serverManagementService) Start(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
+func (s *serverManagementService) Start(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
 	log.Infof("received Start request from RPC caller")
 	config, err := LoadServerConfig()
 	if err != nil {
-		return &pb.Empty{}, fmt.Errorf("LoadServerConfig() failed: %w", err)
+		return &emptypb.Empty{}, fmt.Errorf("LoadServerConfig() failed: %w", err)
 	}
 	if err = ValidateFullServerConfig(config); err != nil {
-		return &pb.Empty{}, fmt.Errorf("ValidateFullServerConfig() failed: %w", err)
+		return &emptypb.Empty{}, fmt.Errorf("ValidateFullServerConfig() failed: %w", err)
 	}
 	loggingLevel := config.GetLoggingLevel().String()
 	if loggingLevel != pb.LoggingLevel_DEFAULT.String() {
@@ -109,7 +110,7 @@ func (s *serverManagementService) Start(ctx context.Context, req *pb.Empty) (*pb
 	}
 	if socks5ServerRef.Load() != nil {
 		log.Infof("socks5 server already exist")
-		return &pb.Empty{}, nil
+		return &emptypb.Empty{}, nil
 	}
 
 	SetAppStatus(pb.AppStatus_STARTING)
@@ -122,7 +123,7 @@ func (s *serverManagementService) Start(ctx context.Context, req *pb.Empty) (*pb
 	}
 	endpoints, err := PortBindingsToUnderlayProperties(config.GetPortBindings(), mtu)
 	if err != nil {
-		return &pb.Empty{}, err
+		return &emptypb.Empty{}, err
 	}
 	mux.SetEndpoints(endpoints)
 
@@ -138,7 +139,7 @@ func (s *serverManagementService) Start(ctx context.Context, req *pb.Empty) (*pb
 	}
 	socks5Server, err := socks5.New(socks5Config)
 	if err != nil {
-		return &pb.Empty{}, fmt.Errorf(stderror.CreateSocks5ServerFailedErr, err)
+		return &emptypb.Empty{}, fmt.Errorf(stderror.CreateSocks5ServerFailedErr, err)
 	}
 	SetSocks5Server(socks5Server)
 
@@ -174,10 +175,10 @@ func (s *serverManagementService) Start(ctx context.Context, req *pb.Empty) (*pb
 
 	SetAppStatus(pb.AppStatus_RUNNING)
 	log.Infof("completed Start request from RPC caller")
-	return &pb.Empty{}, nil
+	return &emptypb.Empty{}, nil
 }
 
-func (s *serverManagementService) Stop(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
+func (s *serverManagementService) Stop(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
 	SetAppStatus(pb.AppStatus_STOPPING)
 	log.Infof("received Stop request from RPC caller")
 	if socks5ServerRef.Load() != nil {
@@ -191,10 +192,10 @@ func (s *serverManagementService) Stop(ctx context.Context, req *pb.Empty) (*pb.
 	}
 	SetAppStatus(pb.AppStatus_IDLE)
 	log.Infof("completed Stop request from RPC caller")
-	return &pb.Empty{}, nil
+	return &emptypb.Empty{}, nil
 }
 
-func (s *serverManagementService) GetConfig(ctx context.Context, req *pb.Empty) (*pb.ServerConfig, error) {
+func (s *serverManagementService) GetConfig(ctx context.Context, req *emptypb.Empty) (*pb.ServerConfig, error) {
 	config, err := LoadServerConfig()
 	if err != nil {
 		return &pb.ServerConfig{}, fmt.Errorf("LoadServerConfig() failed: %w", err)
@@ -213,14 +214,14 @@ func (s *serverManagementService) SetConfig(ctx context.Context, req *pb.ServerC
 	return config, nil
 }
 
-func (s *serverManagementService) Reload(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
+func (s *serverManagementService) Reload(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
 	log.Infof("received Reload request from RPC caller")
 	config, err := LoadServerConfig()
 	if err != nil {
-		return &pb.Empty{}, fmt.Errorf("LoadServerConfig() failed: %w", err)
+		return &emptypb.Empty{}, fmt.Errorf("LoadServerConfig() failed: %w", err)
 	}
 	if err = ValidateFullServerConfig(config); err != nil {
-		return &pb.Empty{}, fmt.Errorf("ValidateFullServerConfig() failed: %w", err)
+		return &emptypb.Empty{}, fmt.Errorf("ValidateFullServerConfig() failed: %w", err)
 	}
 
 	// Adjust loggingLevel.
@@ -239,7 +240,7 @@ func (s *serverManagementService) Reload(ctx context.Context, req *pb.Empty) (*p
 		}
 		endpoints, err := PortBindingsToUnderlayProperties(config.GetPortBindings(), mtu)
 		if err != nil {
-			return &pb.Empty{}, err
+			return &emptypb.Empty{}, err
 		}
 		mux.SetEndpoints(endpoints)
 
@@ -247,10 +248,10 @@ func (s *serverManagementService) Reload(ctx context.Context, req *pb.Empty) (*p
 		mux.SetServerUsers(UserListToMap(config.GetUsers()))
 	}
 	log.Infof("completed Reload request from RPC caller")
-	return &pb.Empty{}, nil
+	return &emptypb.Empty{}, nil
 }
 
-func (s *serverManagementService) Exit(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
+func (s *serverManagementService) Exit(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
 	SetAppStatus(pb.AppStatus_STOPPING)
 	log.Infof("received Exit request from RPC caller")
 	if socks5ServerRef.Load() != nil {
@@ -272,10 +273,10 @@ func (s *serverManagementService) Exit(ctx context.Context, req *pb.Empty) (*pb.
 		log.Infof("RPC server reference not found")
 	}
 	log.Infof("completed Exit request from RPC caller")
-	return &pb.Empty{}, nil
+	return &emptypb.Empty{}, nil
 }
 
-func (s *serverManagementService) GetMetrics(ctx context.Context, req *pb.Empty) (*pb.Metrics, error) {
+func (s *serverManagementService) GetMetrics(ctx context.Context, req *emptypb.Empty) (*pb.Metrics, error) {
 	b, err := metrics.GetMetricsAsJSON()
 	if err != nil {
 		return &pb.Metrics{}, err
@@ -283,7 +284,7 @@ func (s *serverManagementService) GetMetrics(ctx context.Context, req *pb.Empty)
 	return &pb.Metrics{Json: proto.String(string(b))}, nil
 }
 
-func (s *serverManagementService) GetSessionInfoList(context.Context, *pb.Empty) (*pb.SessionInfoList, error) {
+func (s *serverManagementService) GetSessionInfoList(context.Context, *emptypb.Empty) (*pb.SessionInfoList, error) {
 	mux := serverMuxRef.Load()
 	if mux == nil {
 		return &pb.SessionInfoList{}, fmt.Errorf("server multiplexier is unavailable")
@@ -291,7 +292,7 @@ func (s *serverManagementService) GetSessionInfoList(context.Context, *pb.Empty)
 	return mux.ExportSessionInfoList(), nil
 }
 
-func (s *serverManagementService) GetUsers(context.Context, *pb.Empty) (*pb.UserWithMetricsList, error) {
+func (s *serverManagementService) GetUsers(context.Context, *emptypb.Empty) (*pb.UserWithMetricsList, error) {
 	config, err := LoadServerConfig()
 	if err != nil {
 		return &pb.UserWithMetricsList{}, fmt.Errorf("LoadServerConfig() failed: %w", err)
@@ -310,26 +311,26 @@ func (s *serverManagementService) GetUsers(context.Context, *pb.Empty) (*pb.User
 	return &pb.UserWithMetricsList{Items: items}, nil
 }
 
-func (s *serverManagementService) GetThreadDump(ctx context.Context, req *pb.Empty) (*pb.ThreadDump, error) {
+func (s *serverManagementService) GetThreadDump(ctx context.Context, req *emptypb.Empty) (*pb.ThreadDump, error) {
 	return &pb.ThreadDump{ThreadDump: proto.String(common.GetAllStackTrace())}, nil
 }
 
-func (s *serverManagementService) StartCPUProfile(ctx context.Context, req *pb.ProfileSavePath) (*pb.Empty, error) {
+func (s *serverManagementService) StartCPUProfile(ctx context.Context, req *pb.ProfileSavePath) (*emptypb.Empty, error) {
 	err := common.StartCPUProfile(req.GetFilePath())
-	return &pb.Empty{}, err
+	return &emptypb.Empty{}, err
 }
 
-func (s *serverManagementService) StopCPUProfile(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
+func (s *serverManagementService) StopCPUProfile(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
 	common.StopCPUProfile()
-	return &pb.Empty{}, nil
+	return &emptypb.Empty{}, nil
 }
 
-func (s *serverManagementService) GetHeapProfile(ctx context.Context, req *pb.ProfileSavePath) (*pb.Empty, error) {
+func (s *serverManagementService) GetHeapProfile(ctx context.Context, req *pb.ProfileSavePath) (*emptypb.Empty, error) {
 	err := common.GetHeapProfile(req.GetFilePath())
-	return &pb.Empty{}, err
+	return &emptypb.Empty{}, err
 }
 
-func (s *serverManagementService) GetMemoryStatistics(ctx context.Context, req *pb.Empty) (*pb.MemoryStatistics, error) {
+func (s *serverManagementService) GetMemoryStatistics(ctx context.Context, req *emptypb.Empty) (*pb.MemoryStatistics, error) {
 	return getMemoryStatistics()
 }
 
@@ -356,7 +357,7 @@ func GetServerStatusWithRPC(ctx context.Context) (*pb.AppStatusMsg, error) {
 	}
 	timedctx, cancelFunc := context.WithTimeout(ctx, RPCTimeout)
 	defer cancelFunc()
-	status, err := client.GetStatus(timedctx, &pb.Empty{})
+	status, err := client.GetStatus(timedctx, &emptypb.Empty{})
 	if err != nil {
 		return nil, fmt.Errorf("ServerManagementService.GetStatus() failed: %w", err)
 	}

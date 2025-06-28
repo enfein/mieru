@@ -27,6 +27,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -51,23 +52,23 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ClientManagementServiceClient interface {
 	// Fetch client application status.
-	GetStatus(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.AppStatusMsg, error)
+	GetStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.AppStatusMsg, error)
 	// Quit client daemon.
-	Exit(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error)
+	Exit(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Get client metrics.
-	GetMetrics(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Metrics, error)
+	GetMetrics(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.Metrics, error)
 	// Get client session information.
-	GetSessionInfoList(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.SessionInfoList, error)
+	GetSessionInfoList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.SessionInfoList, error)
 	// Generate a thread dump of client daemon.
-	GetThreadDump(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.ThreadDump, error)
+	GetThreadDump(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.ThreadDump, error)
 	// Start CPU profiling.
-	StartCPUProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*appctlpb.Empty, error)
+	StartCPUProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Stop CPU profiling.
-	StopCPUProfile(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error)
+	StopCPUProfile(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Generate a heap profile.
-	GetHeapProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*appctlpb.Empty, error)
+	GetHeapProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Get memory statistics of client daemon.
-	GetMemoryStatistics(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.MemoryStatistics, error)
+	GetMemoryStatistics(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.MemoryStatistics, error)
 }
 
 type clientManagementServiceClient struct {
@@ -78,7 +79,7 @@ func NewClientManagementServiceClient(cc grpc.ClientConnInterface) ClientManagem
 	return &clientManagementServiceClient{cc}
 }
 
-func (c *clientManagementServiceClient) GetStatus(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.AppStatusMsg, error) {
+func (c *clientManagementServiceClient) GetStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.AppStatusMsg, error) {
 	out := new(appctlpb.AppStatusMsg)
 	err := c.cc.Invoke(ctx, ClientManagementService_GetStatus_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -87,8 +88,8 @@ func (c *clientManagementServiceClient) GetStatus(ctx context.Context, in *appct
 	return out, nil
 }
 
-func (c *clientManagementServiceClient) Exit(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
-	out := new(appctlpb.Empty)
+func (c *clientManagementServiceClient) Exit(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, ClientManagementService_Exit_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -96,7 +97,7 @@ func (c *clientManagementServiceClient) Exit(ctx context.Context, in *appctlpb.E
 	return out, nil
 }
 
-func (c *clientManagementServiceClient) GetMetrics(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Metrics, error) {
+func (c *clientManagementServiceClient) GetMetrics(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.Metrics, error) {
 	out := new(appctlpb.Metrics)
 	err := c.cc.Invoke(ctx, ClientManagementService_GetMetrics_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -105,7 +106,7 @@ func (c *clientManagementServiceClient) GetMetrics(ctx context.Context, in *appc
 	return out, nil
 }
 
-func (c *clientManagementServiceClient) GetSessionInfoList(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.SessionInfoList, error) {
+func (c *clientManagementServiceClient) GetSessionInfoList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.SessionInfoList, error) {
 	out := new(appctlpb.SessionInfoList)
 	err := c.cc.Invoke(ctx, ClientManagementService_GetSessionInfoList_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -114,7 +115,7 @@ func (c *clientManagementServiceClient) GetSessionInfoList(ctx context.Context, 
 	return out, nil
 }
 
-func (c *clientManagementServiceClient) GetThreadDump(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.ThreadDump, error) {
+func (c *clientManagementServiceClient) GetThreadDump(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.ThreadDump, error) {
 	out := new(appctlpb.ThreadDump)
 	err := c.cc.Invoke(ctx, ClientManagementService_GetThreadDump_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -123,8 +124,8 @@ func (c *clientManagementServiceClient) GetThreadDump(ctx context.Context, in *a
 	return out, nil
 }
 
-func (c *clientManagementServiceClient) StartCPUProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
-	out := new(appctlpb.Empty)
+func (c *clientManagementServiceClient) StartCPUProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, ClientManagementService_StartCPUProfile_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -132,8 +133,8 @@ func (c *clientManagementServiceClient) StartCPUProfile(ctx context.Context, in 
 	return out, nil
 }
 
-func (c *clientManagementServiceClient) StopCPUProfile(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
-	out := new(appctlpb.Empty)
+func (c *clientManagementServiceClient) StopCPUProfile(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, ClientManagementService_StopCPUProfile_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -141,8 +142,8 @@ func (c *clientManagementServiceClient) StopCPUProfile(ctx context.Context, in *
 	return out, nil
 }
 
-func (c *clientManagementServiceClient) GetHeapProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
-	out := new(appctlpb.Empty)
+func (c *clientManagementServiceClient) GetHeapProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, ClientManagementService_GetHeapProfile_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -150,7 +151,7 @@ func (c *clientManagementServiceClient) GetHeapProfile(ctx context.Context, in *
 	return out, nil
 }
 
-func (c *clientManagementServiceClient) GetMemoryStatistics(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.MemoryStatistics, error) {
+func (c *clientManagementServiceClient) GetMemoryStatistics(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.MemoryStatistics, error) {
 	out := new(appctlpb.MemoryStatistics)
 	err := c.cc.Invoke(ctx, ClientManagementService_GetMemoryStatistics_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -164,23 +165,23 @@ func (c *clientManagementServiceClient) GetMemoryStatistics(ctx context.Context,
 // for forward compatibility
 type ClientManagementServiceServer interface {
 	// Fetch client application status.
-	GetStatus(context.Context, *appctlpb.Empty) (*appctlpb.AppStatusMsg, error)
+	GetStatus(context.Context, *emptypb.Empty) (*appctlpb.AppStatusMsg, error)
 	// Quit client daemon.
-	Exit(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error)
+	Exit(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	// Get client metrics.
-	GetMetrics(context.Context, *appctlpb.Empty) (*appctlpb.Metrics, error)
+	GetMetrics(context.Context, *emptypb.Empty) (*appctlpb.Metrics, error)
 	// Get client session information.
-	GetSessionInfoList(context.Context, *appctlpb.Empty) (*appctlpb.SessionInfoList, error)
+	GetSessionInfoList(context.Context, *emptypb.Empty) (*appctlpb.SessionInfoList, error)
 	// Generate a thread dump of client daemon.
-	GetThreadDump(context.Context, *appctlpb.Empty) (*appctlpb.ThreadDump, error)
+	GetThreadDump(context.Context, *emptypb.Empty) (*appctlpb.ThreadDump, error)
 	// Start CPU profiling.
-	StartCPUProfile(context.Context, *appctlpb.ProfileSavePath) (*appctlpb.Empty, error)
+	StartCPUProfile(context.Context, *appctlpb.ProfileSavePath) (*emptypb.Empty, error)
 	// Stop CPU profiling.
-	StopCPUProfile(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error)
+	StopCPUProfile(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	// Generate a heap profile.
-	GetHeapProfile(context.Context, *appctlpb.ProfileSavePath) (*appctlpb.Empty, error)
+	GetHeapProfile(context.Context, *appctlpb.ProfileSavePath) (*emptypb.Empty, error)
 	// Get memory statistics of client daemon.
-	GetMemoryStatistics(context.Context, *appctlpb.Empty) (*appctlpb.MemoryStatistics, error)
+	GetMemoryStatistics(context.Context, *emptypb.Empty) (*appctlpb.MemoryStatistics, error)
 	mustEmbedUnimplementedClientManagementServiceServer()
 }
 
@@ -188,31 +189,31 @@ type ClientManagementServiceServer interface {
 type UnimplementedClientManagementServiceServer struct {
 }
 
-func (UnimplementedClientManagementServiceServer) GetStatus(context.Context, *appctlpb.Empty) (*appctlpb.AppStatusMsg, error) {
+func (UnimplementedClientManagementServiceServer) GetStatus(context.Context, *emptypb.Empty) (*appctlpb.AppStatusMsg, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStatus not implemented")
 }
-func (UnimplementedClientManagementServiceServer) Exit(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error) {
+func (UnimplementedClientManagementServiceServer) Exit(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Exit not implemented")
 }
-func (UnimplementedClientManagementServiceServer) GetMetrics(context.Context, *appctlpb.Empty) (*appctlpb.Metrics, error) {
+func (UnimplementedClientManagementServiceServer) GetMetrics(context.Context, *emptypb.Empty) (*appctlpb.Metrics, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMetrics not implemented")
 }
-func (UnimplementedClientManagementServiceServer) GetSessionInfoList(context.Context, *appctlpb.Empty) (*appctlpb.SessionInfoList, error) {
+func (UnimplementedClientManagementServiceServer) GetSessionInfoList(context.Context, *emptypb.Empty) (*appctlpb.SessionInfoList, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSessionInfoList not implemented")
 }
-func (UnimplementedClientManagementServiceServer) GetThreadDump(context.Context, *appctlpb.Empty) (*appctlpb.ThreadDump, error) {
+func (UnimplementedClientManagementServiceServer) GetThreadDump(context.Context, *emptypb.Empty) (*appctlpb.ThreadDump, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetThreadDump not implemented")
 }
-func (UnimplementedClientManagementServiceServer) StartCPUProfile(context.Context, *appctlpb.ProfileSavePath) (*appctlpb.Empty, error) {
+func (UnimplementedClientManagementServiceServer) StartCPUProfile(context.Context, *appctlpb.ProfileSavePath) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartCPUProfile not implemented")
 }
-func (UnimplementedClientManagementServiceServer) StopCPUProfile(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error) {
+func (UnimplementedClientManagementServiceServer) StopCPUProfile(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StopCPUProfile not implemented")
 }
-func (UnimplementedClientManagementServiceServer) GetHeapProfile(context.Context, *appctlpb.ProfileSavePath) (*appctlpb.Empty, error) {
+func (UnimplementedClientManagementServiceServer) GetHeapProfile(context.Context, *appctlpb.ProfileSavePath) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetHeapProfile not implemented")
 }
-func (UnimplementedClientManagementServiceServer) GetMemoryStatistics(context.Context, *appctlpb.Empty) (*appctlpb.MemoryStatistics, error) {
+func (UnimplementedClientManagementServiceServer) GetMemoryStatistics(context.Context, *emptypb.Empty) (*appctlpb.MemoryStatistics, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMemoryStatistics not implemented")
 }
 func (UnimplementedClientManagementServiceServer) mustEmbedUnimplementedClientManagementServiceServer() {
@@ -230,7 +231,7 @@ func RegisterClientManagementServiceServer(s grpc.ServiceRegistrar, srv ClientMa
 }
 
 func _ClientManagementService_GetStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -242,13 +243,13 @@ func _ClientManagementService_GetStatus_Handler(srv interface{}, ctx context.Con
 		FullMethod: ClientManagementService_GetStatus_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ClientManagementServiceServer).GetStatus(ctx, req.(*appctlpb.Empty))
+		return srv.(ClientManagementServiceServer).GetStatus(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _ClientManagementService_Exit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -260,13 +261,13 @@ func _ClientManagementService_Exit_Handler(srv interface{}, ctx context.Context,
 		FullMethod: ClientManagementService_Exit_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ClientManagementServiceServer).Exit(ctx, req.(*appctlpb.Empty))
+		return srv.(ClientManagementServiceServer).Exit(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _ClientManagementService_GetMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -278,13 +279,13 @@ func _ClientManagementService_GetMetrics_Handler(srv interface{}, ctx context.Co
 		FullMethod: ClientManagementService_GetMetrics_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ClientManagementServiceServer).GetMetrics(ctx, req.(*appctlpb.Empty))
+		return srv.(ClientManagementServiceServer).GetMetrics(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _ClientManagementService_GetSessionInfoList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -296,13 +297,13 @@ func _ClientManagementService_GetSessionInfoList_Handler(srv interface{}, ctx co
 		FullMethod: ClientManagementService_GetSessionInfoList_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ClientManagementServiceServer).GetSessionInfoList(ctx, req.(*appctlpb.Empty))
+		return srv.(ClientManagementServiceServer).GetSessionInfoList(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _ClientManagementService_GetThreadDump_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -314,7 +315,7 @@ func _ClientManagementService_GetThreadDump_Handler(srv interface{}, ctx context
 		FullMethod: ClientManagementService_GetThreadDump_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ClientManagementServiceServer).GetThreadDump(ctx, req.(*appctlpb.Empty))
+		return srv.(ClientManagementServiceServer).GetThreadDump(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -338,7 +339,7 @@ func _ClientManagementService_StartCPUProfile_Handler(srv interface{}, ctx conte
 }
 
 func _ClientManagementService_StopCPUProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -350,7 +351,7 @@ func _ClientManagementService_StopCPUProfile_Handler(srv interface{}, ctx contex
 		FullMethod: ClientManagementService_StopCPUProfile_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ClientManagementServiceServer).StopCPUProfile(ctx, req.(*appctlpb.Empty))
+		return srv.(ClientManagementServiceServer).StopCPUProfile(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -374,7 +375,7 @@ func _ClientManagementService_GetHeapProfile_Handler(srv interface{}, ctx contex
 }
 
 func _ClientManagementService_GetMemoryStatistics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -386,7 +387,7 @@ func _ClientManagementService_GetMemoryStatistics_Handler(srv interface{}, ctx c
 		FullMethod: ClientManagementService_GetMemoryStatistics_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ClientManagementServiceServer).GetMemoryStatistics(ctx, req.(*appctlpb.Empty))
+		return srv.(ClientManagementServiceServer).GetMemoryStatistics(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -462,35 +463,35 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ServerManagementServiceClient interface {
 	// Fetch server application status.
-	GetStatus(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.AppStatusMsg, error)
+	GetStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.AppStatusMsg, error)
 	// Start proxy in server application.
-	Start(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error)
+	Start(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Stop proxy in server application.
-	Stop(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error)
+	Stop(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Fetch the server config.
-	GetConfig(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.ServerConfig, error)
+	GetConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.ServerConfig, error)
 	// Update server config.
 	SetConfig(ctx context.Context, in *appctlpb.ServerConfig, opts ...grpc.CallOption) (*appctlpb.ServerConfig, error)
 	// Reload server configuration.
-	Reload(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error)
+	Reload(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Quit server daemon.
-	Exit(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error)
+	Exit(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Get server metrics.
-	GetMetrics(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Metrics, error)
+	GetMetrics(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.Metrics, error)
 	// Get server session information.
-	GetSessionInfoList(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.SessionInfoList, error)
+	GetSessionInfoList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.SessionInfoList, error)
 	// Get users setting and runtime information.
-	GetUsers(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.UserWithMetricsList, error)
+	GetUsers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.UserWithMetricsList, error)
 	// Generate a thread dump of server daemon.
-	GetThreadDump(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.ThreadDump, error)
+	GetThreadDump(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.ThreadDump, error)
 	// Start CPU profiling.
-	StartCPUProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*appctlpb.Empty, error)
+	StartCPUProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Stop CPU profiling.
-	StopCPUProfile(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error)
+	StopCPUProfile(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Generate a heap profile.
-	GetHeapProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*appctlpb.Empty, error)
+	GetHeapProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Get memory statistics of server daemon.
-	GetMemoryStatistics(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.MemoryStatistics, error)
+	GetMemoryStatistics(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.MemoryStatistics, error)
 }
 
 type serverManagementServiceClient struct {
@@ -501,7 +502,7 @@ func NewServerManagementServiceClient(cc grpc.ClientConnInterface) ServerManagem
 	return &serverManagementServiceClient{cc}
 }
 
-func (c *serverManagementServiceClient) GetStatus(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.AppStatusMsg, error) {
+func (c *serverManagementServiceClient) GetStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.AppStatusMsg, error) {
 	out := new(appctlpb.AppStatusMsg)
 	err := c.cc.Invoke(ctx, ServerManagementService_GetStatus_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -510,8 +511,8 @@ func (c *serverManagementServiceClient) GetStatus(ctx context.Context, in *appct
 	return out, nil
 }
 
-func (c *serverManagementServiceClient) Start(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
-	out := new(appctlpb.Empty)
+func (c *serverManagementServiceClient) Start(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, ServerManagementService_Start_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -519,8 +520,8 @@ func (c *serverManagementServiceClient) Start(ctx context.Context, in *appctlpb.
 	return out, nil
 }
 
-func (c *serverManagementServiceClient) Stop(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
-	out := new(appctlpb.Empty)
+func (c *serverManagementServiceClient) Stop(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, ServerManagementService_Stop_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -528,7 +529,7 @@ func (c *serverManagementServiceClient) Stop(ctx context.Context, in *appctlpb.E
 	return out, nil
 }
 
-func (c *serverManagementServiceClient) GetConfig(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.ServerConfig, error) {
+func (c *serverManagementServiceClient) GetConfig(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.ServerConfig, error) {
 	out := new(appctlpb.ServerConfig)
 	err := c.cc.Invoke(ctx, ServerManagementService_GetConfig_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -546,8 +547,8 @@ func (c *serverManagementServiceClient) SetConfig(ctx context.Context, in *appct
 	return out, nil
 }
 
-func (c *serverManagementServiceClient) Reload(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
-	out := new(appctlpb.Empty)
+func (c *serverManagementServiceClient) Reload(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, ServerManagementService_Reload_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -555,8 +556,8 @@ func (c *serverManagementServiceClient) Reload(ctx context.Context, in *appctlpb
 	return out, nil
 }
 
-func (c *serverManagementServiceClient) Exit(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
-	out := new(appctlpb.Empty)
+func (c *serverManagementServiceClient) Exit(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, ServerManagementService_Exit_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -564,7 +565,7 @@ func (c *serverManagementServiceClient) Exit(ctx context.Context, in *appctlpb.E
 	return out, nil
 }
 
-func (c *serverManagementServiceClient) GetMetrics(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Metrics, error) {
+func (c *serverManagementServiceClient) GetMetrics(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.Metrics, error) {
 	out := new(appctlpb.Metrics)
 	err := c.cc.Invoke(ctx, ServerManagementService_GetMetrics_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -573,7 +574,7 @@ func (c *serverManagementServiceClient) GetMetrics(ctx context.Context, in *appc
 	return out, nil
 }
 
-func (c *serverManagementServiceClient) GetSessionInfoList(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.SessionInfoList, error) {
+func (c *serverManagementServiceClient) GetSessionInfoList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.SessionInfoList, error) {
 	out := new(appctlpb.SessionInfoList)
 	err := c.cc.Invoke(ctx, ServerManagementService_GetSessionInfoList_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -582,7 +583,7 @@ func (c *serverManagementServiceClient) GetSessionInfoList(ctx context.Context, 
 	return out, nil
 }
 
-func (c *serverManagementServiceClient) GetUsers(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.UserWithMetricsList, error) {
+func (c *serverManagementServiceClient) GetUsers(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.UserWithMetricsList, error) {
 	out := new(appctlpb.UserWithMetricsList)
 	err := c.cc.Invoke(ctx, ServerManagementService_GetUsers_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -591,7 +592,7 @@ func (c *serverManagementServiceClient) GetUsers(ctx context.Context, in *appctl
 	return out, nil
 }
 
-func (c *serverManagementServiceClient) GetThreadDump(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.ThreadDump, error) {
+func (c *serverManagementServiceClient) GetThreadDump(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.ThreadDump, error) {
 	out := new(appctlpb.ThreadDump)
 	err := c.cc.Invoke(ctx, ServerManagementService_GetThreadDump_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -600,8 +601,8 @@ func (c *serverManagementServiceClient) GetThreadDump(ctx context.Context, in *a
 	return out, nil
 }
 
-func (c *serverManagementServiceClient) StartCPUProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
-	out := new(appctlpb.Empty)
+func (c *serverManagementServiceClient) StartCPUProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, ServerManagementService_StartCPUProfile_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -609,8 +610,8 @@ func (c *serverManagementServiceClient) StartCPUProfile(ctx context.Context, in 
 	return out, nil
 }
 
-func (c *serverManagementServiceClient) StopCPUProfile(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
-	out := new(appctlpb.Empty)
+func (c *serverManagementServiceClient) StopCPUProfile(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, ServerManagementService_StopCPUProfile_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -618,8 +619,8 @@ func (c *serverManagementServiceClient) StopCPUProfile(ctx context.Context, in *
 	return out, nil
 }
 
-func (c *serverManagementServiceClient) GetHeapProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*appctlpb.Empty, error) {
-	out := new(appctlpb.Empty)
+func (c *serverManagementServiceClient) GetHeapProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, ServerManagementService_GetHeapProfile_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -627,7 +628,7 @@ func (c *serverManagementServiceClient) GetHeapProfile(ctx context.Context, in *
 	return out, nil
 }
 
-func (c *serverManagementServiceClient) GetMemoryStatistics(ctx context.Context, in *appctlpb.Empty, opts ...grpc.CallOption) (*appctlpb.MemoryStatistics, error) {
+func (c *serverManagementServiceClient) GetMemoryStatistics(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.MemoryStatistics, error) {
 	out := new(appctlpb.MemoryStatistics)
 	err := c.cc.Invoke(ctx, ServerManagementService_GetMemoryStatistics_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -641,35 +642,35 @@ func (c *serverManagementServiceClient) GetMemoryStatistics(ctx context.Context,
 // for forward compatibility
 type ServerManagementServiceServer interface {
 	// Fetch server application status.
-	GetStatus(context.Context, *appctlpb.Empty) (*appctlpb.AppStatusMsg, error)
+	GetStatus(context.Context, *emptypb.Empty) (*appctlpb.AppStatusMsg, error)
 	// Start proxy in server application.
-	Start(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error)
+	Start(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	// Stop proxy in server application.
-	Stop(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error)
+	Stop(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	// Fetch the server config.
-	GetConfig(context.Context, *appctlpb.Empty) (*appctlpb.ServerConfig, error)
+	GetConfig(context.Context, *emptypb.Empty) (*appctlpb.ServerConfig, error)
 	// Update server config.
 	SetConfig(context.Context, *appctlpb.ServerConfig) (*appctlpb.ServerConfig, error)
 	// Reload server configuration.
-	Reload(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error)
+	Reload(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	// Quit server daemon.
-	Exit(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error)
+	Exit(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	// Get server metrics.
-	GetMetrics(context.Context, *appctlpb.Empty) (*appctlpb.Metrics, error)
+	GetMetrics(context.Context, *emptypb.Empty) (*appctlpb.Metrics, error)
 	// Get server session information.
-	GetSessionInfoList(context.Context, *appctlpb.Empty) (*appctlpb.SessionInfoList, error)
+	GetSessionInfoList(context.Context, *emptypb.Empty) (*appctlpb.SessionInfoList, error)
 	// Get users setting and runtime information.
-	GetUsers(context.Context, *appctlpb.Empty) (*appctlpb.UserWithMetricsList, error)
+	GetUsers(context.Context, *emptypb.Empty) (*appctlpb.UserWithMetricsList, error)
 	// Generate a thread dump of server daemon.
-	GetThreadDump(context.Context, *appctlpb.Empty) (*appctlpb.ThreadDump, error)
+	GetThreadDump(context.Context, *emptypb.Empty) (*appctlpb.ThreadDump, error)
 	// Start CPU profiling.
-	StartCPUProfile(context.Context, *appctlpb.ProfileSavePath) (*appctlpb.Empty, error)
+	StartCPUProfile(context.Context, *appctlpb.ProfileSavePath) (*emptypb.Empty, error)
 	// Stop CPU profiling.
-	StopCPUProfile(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error)
+	StopCPUProfile(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 	// Generate a heap profile.
-	GetHeapProfile(context.Context, *appctlpb.ProfileSavePath) (*appctlpb.Empty, error)
+	GetHeapProfile(context.Context, *appctlpb.ProfileSavePath) (*emptypb.Empty, error)
 	// Get memory statistics of server daemon.
-	GetMemoryStatistics(context.Context, *appctlpb.Empty) (*appctlpb.MemoryStatistics, error)
+	GetMemoryStatistics(context.Context, *emptypb.Empty) (*appctlpb.MemoryStatistics, error)
 	mustEmbedUnimplementedServerManagementServiceServer()
 }
 
@@ -677,49 +678,49 @@ type ServerManagementServiceServer interface {
 type UnimplementedServerManagementServiceServer struct {
 }
 
-func (UnimplementedServerManagementServiceServer) GetStatus(context.Context, *appctlpb.Empty) (*appctlpb.AppStatusMsg, error) {
+func (UnimplementedServerManagementServiceServer) GetStatus(context.Context, *emptypb.Empty) (*appctlpb.AppStatusMsg, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStatus not implemented")
 }
-func (UnimplementedServerManagementServiceServer) Start(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error) {
+func (UnimplementedServerManagementServiceServer) Start(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Start not implemented")
 }
-func (UnimplementedServerManagementServiceServer) Stop(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error) {
+func (UnimplementedServerManagementServiceServer) Stop(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Stop not implemented")
 }
-func (UnimplementedServerManagementServiceServer) GetConfig(context.Context, *appctlpb.Empty) (*appctlpb.ServerConfig, error) {
+func (UnimplementedServerManagementServiceServer) GetConfig(context.Context, *emptypb.Empty) (*appctlpb.ServerConfig, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetConfig not implemented")
 }
 func (UnimplementedServerManagementServiceServer) SetConfig(context.Context, *appctlpb.ServerConfig) (*appctlpb.ServerConfig, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetConfig not implemented")
 }
-func (UnimplementedServerManagementServiceServer) Reload(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error) {
+func (UnimplementedServerManagementServiceServer) Reload(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Reload not implemented")
 }
-func (UnimplementedServerManagementServiceServer) Exit(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error) {
+func (UnimplementedServerManagementServiceServer) Exit(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Exit not implemented")
 }
-func (UnimplementedServerManagementServiceServer) GetMetrics(context.Context, *appctlpb.Empty) (*appctlpb.Metrics, error) {
+func (UnimplementedServerManagementServiceServer) GetMetrics(context.Context, *emptypb.Empty) (*appctlpb.Metrics, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMetrics not implemented")
 }
-func (UnimplementedServerManagementServiceServer) GetSessionInfoList(context.Context, *appctlpb.Empty) (*appctlpb.SessionInfoList, error) {
+func (UnimplementedServerManagementServiceServer) GetSessionInfoList(context.Context, *emptypb.Empty) (*appctlpb.SessionInfoList, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSessionInfoList not implemented")
 }
-func (UnimplementedServerManagementServiceServer) GetUsers(context.Context, *appctlpb.Empty) (*appctlpb.UserWithMetricsList, error) {
+func (UnimplementedServerManagementServiceServer) GetUsers(context.Context, *emptypb.Empty) (*appctlpb.UserWithMetricsList, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetUsers not implemented")
 }
-func (UnimplementedServerManagementServiceServer) GetThreadDump(context.Context, *appctlpb.Empty) (*appctlpb.ThreadDump, error) {
+func (UnimplementedServerManagementServiceServer) GetThreadDump(context.Context, *emptypb.Empty) (*appctlpb.ThreadDump, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetThreadDump not implemented")
 }
-func (UnimplementedServerManagementServiceServer) StartCPUProfile(context.Context, *appctlpb.ProfileSavePath) (*appctlpb.Empty, error) {
+func (UnimplementedServerManagementServiceServer) StartCPUProfile(context.Context, *appctlpb.ProfileSavePath) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartCPUProfile not implemented")
 }
-func (UnimplementedServerManagementServiceServer) StopCPUProfile(context.Context, *appctlpb.Empty) (*appctlpb.Empty, error) {
+func (UnimplementedServerManagementServiceServer) StopCPUProfile(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StopCPUProfile not implemented")
 }
-func (UnimplementedServerManagementServiceServer) GetHeapProfile(context.Context, *appctlpb.ProfileSavePath) (*appctlpb.Empty, error) {
+func (UnimplementedServerManagementServiceServer) GetHeapProfile(context.Context, *appctlpb.ProfileSavePath) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetHeapProfile not implemented")
 }
-func (UnimplementedServerManagementServiceServer) GetMemoryStatistics(context.Context, *appctlpb.Empty) (*appctlpb.MemoryStatistics, error) {
+func (UnimplementedServerManagementServiceServer) GetMemoryStatistics(context.Context, *emptypb.Empty) (*appctlpb.MemoryStatistics, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMemoryStatistics not implemented")
 }
 func (UnimplementedServerManagementServiceServer) mustEmbedUnimplementedServerManagementServiceServer() {
@@ -737,7 +738,7 @@ func RegisterServerManagementServiceServer(s grpc.ServiceRegistrar, srv ServerMa
 }
 
 func _ServerManagementService_GetStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -749,13 +750,13 @@ func _ServerManagementService_GetStatus_Handler(srv interface{}, ctx context.Con
 		FullMethod: ServerManagementService_GetStatus_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerManagementServiceServer).GetStatus(ctx, req.(*appctlpb.Empty))
+		return srv.(ServerManagementServiceServer).GetStatus(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _ServerManagementService_Start_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -767,13 +768,13 @@ func _ServerManagementService_Start_Handler(srv interface{}, ctx context.Context
 		FullMethod: ServerManagementService_Start_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerManagementServiceServer).Start(ctx, req.(*appctlpb.Empty))
+		return srv.(ServerManagementServiceServer).Start(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _ServerManagementService_Stop_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -785,13 +786,13 @@ func _ServerManagementService_Stop_Handler(srv interface{}, ctx context.Context,
 		FullMethod: ServerManagementService_Stop_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerManagementServiceServer).Stop(ctx, req.(*appctlpb.Empty))
+		return srv.(ServerManagementServiceServer).Stop(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _ServerManagementService_GetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -803,7 +804,7 @@ func _ServerManagementService_GetConfig_Handler(srv interface{}, ctx context.Con
 		FullMethod: ServerManagementService_GetConfig_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerManagementServiceServer).GetConfig(ctx, req.(*appctlpb.Empty))
+		return srv.(ServerManagementServiceServer).GetConfig(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -827,7 +828,7 @@ func _ServerManagementService_SetConfig_Handler(srv interface{}, ctx context.Con
 }
 
 func _ServerManagementService_Reload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -839,13 +840,13 @@ func _ServerManagementService_Reload_Handler(srv interface{}, ctx context.Contex
 		FullMethod: ServerManagementService_Reload_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerManagementServiceServer).Reload(ctx, req.(*appctlpb.Empty))
+		return srv.(ServerManagementServiceServer).Reload(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _ServerManagementService_Exit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -857,13 +858,13 @@ func _ServerManagementService_Exit_Handler(srv interface{}, ctx context.Context,
 		FullMethod: ServerManagementService_Exit_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerManagementServiceServer).Exit(ctx, req.(*appctlpb.Empty))
+		return srv.(ServerManagementServiceServer).Exit(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _ServerManagementService_GetMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -875,13 +876,13 @@ func _ServerManagementService_GetMetrics_Handler(srv interface{}, ctx context.Co
 		FullMethod: ServerManagementService_GetMetrics_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerManagementServiceServer).GetMetrics(ctx, req.(*appctlpb.Empty))
+		return srv.(ServerManagementServiceServer).GetMetrics(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _ServerManagementService_GetSessionInfoList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -893,13 +894,13 @@ func _ServerManagementService_GetSessionInfoList_Handler(srv interface{}, ctx co
 		FullMethod: ServerManagementService_GetSessionInfoList_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerManagementServiceServer).GetSessionInfoList(ctx, req.(*appctlpb.Empty))
+		return srv.(ServerManagementServiceServer).GetSessionInfoList(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _ServerManagementService_GetUsers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -911,13 +912,13 @@ func _ServerManagementService_GetUsers_Handler(srv interface{}, ctx context.Cont
 		FullMethod: ServerManagementService_GetUsers_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerManagementServiceServer).GetUsers(ctx, req.(*appctlpb.Empty))
+		return srv.(ServerManagementServiceServer).GetUsers(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _ServerManagementService_GetThreadDump_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -929,7 +930,7 @@ func _ServerManagementService_GetThreadDump_Handler(srv interface{}, ctx context
 		FullMethod: ServerManagementService_GetThreadDump_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerManagementServiceServer).GetThreadDump(ctx, req.(*appctlpb.Empty))
+		return srv.(ServerManagementServiceServer).GetThreadDump(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -953,7 +954,7 @@ func _ServerManagementService_StartCPUProfile_Handler(srv interface{}, ctx conte
 }
 
 func _ServerManagementService_StopCPUProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -965,7 +966,7 @@ func _ServerManagementService_StopCPUProfile_Handler(srv interface{}, ctx contex
 		FullMethod: ServerManagementService_StopCPUProfile_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerManagementServiceServer).StopCPUProfile(ctx, req.(*appctlpb.Empty))
+		return srv.(ServerManagementServiceServer).StopCPUProfile(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -989,7 +990,7 @@ func _ServerManagementService_GetHeapProfile_Handler(srv interface{}, ctx contex
 }
 
 func _ServerManagementService_GetMemoryStatistics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(appctlpb.Empty)
+	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -1001,7 +1002,7 @@ func _ServerManagementService_GetMemoryStatistics_Handler(srv interface{}, ctx c
 		FullMethod: ServerManagementService_GetMemoryStatistics_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerManagementServiceServer).GetMemoryStatistics(ctx, req.(*appctlpb.Empty))
+		return srv.(ServerManagementServiceServer).GetMemoryStatistics(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }

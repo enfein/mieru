@@ -175,11 +175,13 @@ func (u *PacketUnderlay) RunEventLoop(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
+			u.closeIdleSessions()
 			return nil
 		case <-u.done:
+			u.closeIdleSessions()
 			return nil
 		case <-u.idleSessionTicker.C:
-			go u.closeIdleSessions()
+			u.closeIdleSessions()
 		default:
 		}
 		seg, addr, err := u.readOneSegment()

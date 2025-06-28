@@ -49,6 +49,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // RegisterClientCommands registers all the client side CLI commands.
@@ -715,7 +716,7 @@ var clientStopFunc = func(s []string) error {
 		return err
 	}
 
-	if _, err = client.Exit(ctx, &appctlpb.Empty{}); err != nil {
+	if _, err = client.Exit(ctx, &emptypb.Empty{}); err != nil {
 		return fmt.Errorf(stderror.ExitFailedErr, err)
 	}
 	log.Infof("mieru client is stopped")
@@ -926,7 +927,7 @@ var clientGetMetricsFunc = func(s []string) error {
 		return err
 	}
 
-	metrics, err := client.GetMetrics(ctx, &appctlpb.Empty{})
+	metrics, err := client.GetMetrics(ctx, &emptypb.Empty{})
 	if err != nil {
 		return fmt.Errorf(stderror.GetMetricsFailedErr, err)
 	}
@@ -945,7 +946,7 @@ var clientGetConnectionsFunc = func(s []string) error {
 		return err
 	}
 
-	info, err := client.GetSessionInfoList(ctx, &appctlpb.Empty{})
+	info, err := client.GetSessionInfoList(ctx, &emptypb.Empty{})
 	if err != nil {
 		return fmt.Errorf(stderror.GetConnectionsFailedErr, err)
 	}
@@ -964,7 +965,7 @@ var clientGetThreadDumpFunc = func(s []string) error {
 		return err
 	}
 
-	dump, err := client.GetThreadDump(ctx, &appctlpb.Empty{})
+	dump, err := client.GetThreadDump(ctx, &emptypb.Empty{})
 	if err != nil {
 		return fmt.Errorf(stderror.GetThreadDumpFailedErr, err)
 	}
@@ -1001,7 +1002,7 @@ var clientGetMemoryStatisticsFunc = func(s []string) error {
 		return err
 	}
 
-	memStats, err := client.GetMemoryStatistics(ctx, &appctlpb.Empty{})
+	memStats, err := client.GetMemoryStatistics(ctx, &emptypb.Empty{})
 	if err != nil {
 		return fmt.Errorf(stderror.GetMemoryStatisticsFailedErr, err)
 	}
@@ -1042,7 +1043,7 @@ var clientStopCPUProfileFunc = func(s []string) error {
 		return err
 	}
 
-	client.StopCPUProfile(ctx, &appctlpb.Empty{})
+	client.StopCPUProfile(ctx, &emptypb.Empty{})
 	return nil
 }
 

@@ -42,6 +42,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // RegisterServerCommands registers all the server side CLI commands.
@@ -339,7 +340,7 @@ var serverStartFunc = func(s []string) error {
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
-	_, err = client.Start(timedctx, &appctlpb.Empty{})
+	_, err = client.Start(timedctx, &emptypb.Empty{})
 	if err != nil {
 		return fmt.Errorf(stderror.StartServerProxyFailedErr, err)
 	}
@@ -545,7 +546,7 @@ var serverStopFunc = func(s []string) error {
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
-	if _, err = client.Stop(timedctx, &appctlpb.Empty{}); err != nil {
+	if _, err = client.Stop(timedctx, &emptypb.Empty{}); err != nil {
 		return fmt.Errorf(stderror.StopServerProxyFailedErr, err)
 	}
 	log.Infof("mita server proxy is stopped")
@@ -570,7 +571,7 @@ var serverReloadFunc = func(s []string) error {
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
-	if _, err = client.Reload(timedctx, &appctlpb.Empty{}); err != nil {
+	if _, err = client.Reload(timedctx, &emptypb.Empty{}); err != nil {
 		return fmt.Errorf(stderror.ReloadServerFailedErr, err)
 	}
 	log.Infof("mita server is reloaded")
@@ -660,7 +661,7 @@ var serverDescribeConfigFunc = func(s []string) error {
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
-	config, err := client.GetConfig(timedctx, &appctlpb.Empty{})
+	config, err := client.GetConfig(timedctx, &emptypb.Empty{})
 	if err != nil {
 		return fmt.Errorf(stderror.GetServerConfigFailedErr, err)
 	}
@@ -690,7 +691,7 @@ var serverDeleteUserFunc = func(s []string) error {
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
-	config, err := client.GetConfig(timedctx, &appctlpb.Empty{})
+	config, err := client.GetConfig(timedctx, &emptypb.Empty{})
 	if err != nil {
 		return fmt.Errorf(stderror.GetServerConfigFailedErr, err)
 	}
@@ -743,7 +744,7 @@ var serverGetMetricsFunc = func(s []string) error {
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
-	metrics, err := client.GetMetrics(timedctx, &appctlpb.Empty{})
+	metrics, err := client.GetMetrics(timedctx, &emptypb.Empty{})
 	if err != nil {
 		return fmt.Errorf(stderror.GetMetricsFailedErr, err)
 	}
@@ -769,7 +770,7 @@ var serverGetConnectionsFunc = func(s []string) error {
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
-	info, err := client.GetSessionInfoList(timedctx, &appctlpb.Empty{})
+	info, err := client.GetSessionInfoList(timedctx, &emptypb.Empty{})
 	if err != nil {
 		return fmt.Errorf(stderror.GetConnectionsFailedErr, err)
 	}
@@ -795,7 +796,7 @@ var serverGetUsersFunc = func(_ []string) error {
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
-	userWithMetricsList, err := client.GetUsers(timedctx, &appctlpb.Empty{})
+	userWithMetricsList, err := client.GetUsers(timedctx, &emptypb.Empty{})
 	if err != nil {
 		return fmt.Errorf(stderror.GetUsersFailedErr, err)
 	}
@@ -881,7 +882,7 @@ var serverGetQuotasFunc = func(_ []string) error {
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
-	userWithMetricsList, err := client.GetUsers(timedctx, &appctlpb.Empty{})
+	userWithMetricsList, err := client.GetUsers(timedctx, &emptypb.Empty{})
 	if err != nil {
 		return fmt.Errorf(stderror.GetUsersFailedErr, err)
 	}
@@ -948,7 +949,7 @@ var serverGetThreadDumpFunc = func(s []string) error {
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
-	dump, err := client.GetThreadDump(timedctx, &appctlpb.Empty{})
+	dump, err := client.GetThreadDump(timedctx, &emptypb.Empty{})
 	if err != nil {
 		return fmt.Errorf(stderror.GetThreadDumpFailedErr, err)
 	}
@@ -993,7 +994,7 @@ var serverGetMemoryStatisticsFunc = func(s []string) error {
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
-	memStats, err := client.GetMemoryStatistics(timedctx, &appctlpb.Empty{})
+	memStats, err := client.GetMemoryStatistics(timedctx, &emptypb.Empty{})
 	if err != nil {
 		return fmt.Errorf(stderror.GetMemoryStatisticsFailedErr, err)
 	}
@@ -1042,7 +1043,7 @@ var serverStopCPUProfileFunc = func(s []string) error {
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
-	client.StopCPUProfile(timedctx, &appctlpb.Empty{})
+	client.StopCPUProfile(timedctx, &emptypb.Empty{})
 	return nil
 }
 

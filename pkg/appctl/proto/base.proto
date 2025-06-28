@@ -19,8 +19,6 @@ package appctl;
 
 option go_package = "github.com/enfein/mieru/v3/pkg/appctl/appctlpb";
 
-message Empty {}
-
 message AppStatusMsg {
     optional AppStatus status = 1;
 }
