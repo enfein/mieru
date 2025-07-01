@@ -1,0 +1,67 @@
+name: Bug report
+description: "Bug report"
+body:
+  - type: dropdown
+    attributes:
+      label: Operating system
+      description: Operating system type
+      options:
+        - Windows
+        - MacOS
+        - Linux
+        - Android
+        - iOS
+        - Others
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: System version
+      description: Operating system version
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: Installation type
+      description: Installation type
+      options:
+        - Original mita & mieru executable file
+        - Third party mieru client
+        - Others
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Server version
+      description: If you are using the original mita executable file, please provide the output of the `mita version` command.
+      render: shell
+  - type: textarea
+    attributes:
+      label: Client version
+      description: If you are using the original mieru executable file, please provide the output of the `mieru version` command.
+      render: shell
+  - type: textarea
+    attributes:
+      label: Description
+      description: Detailed description of the error.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Reproduction
+      description: Steps to reproduce the error, including the configuration files.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Logs
+      description: Provide server and client logs at DEBUG level.
+      render: shell
+  - type: checkboxes
+    attributes:
+      label: Integrity requirements
+      description: |-
+        Please check all of the following options to prove that you have read and understood the requirements.
+      options:
+        - label: I confirm that I have read all the documentation, and understand the meaning of all the configuration items I used.
+          required: true

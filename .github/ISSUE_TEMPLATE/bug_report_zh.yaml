@@ -1,0 +1,67 @@
+name: 错误反馈
+description: "错误反馈"
+body:
+  - type: dropdown
+    attributes:
+      label: 操作系统
+      description: 操作系统类型
+      options:
+        - Windows
+        - MacOS
+        - Linux
+        - Android
+        - iOS
+        - 其他
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: 系统版本
+      description: 操作系统版本
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: 安装类型
+      description: 安装类型
+      options:
+        - 原始 mita & mieru 可执行文件
+        - 第三方 mieru 客户端
+        - 其他
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 服务器版本
+      description: 如果您使用原始 mita 可执行文件，请提供 `mita version` 命令的输出。
+      render: shell
+  - type: textarea
+    attributes:
+      label: 客户端版本
+      description: 如果您使用原始 mieru 可执行文件，请提供 `mieru version` 命令的输出。
+      render: shell
+  - type: textarea
+    attributes:
+      label: 描述
+      description: 请提供错误的详细描述。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 重现方式
+      description: 请提供重现错误的步骤，包括重现错误的配置文件。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 日志
+      description: 提供服务器和客户端级别为 DEBUG 的日志。
+      render: shell
+  - type: checkboxes
+    attributes:
+      label: 完整性要求
+      description: |-
+        请勾选以下所有选项以证明您已经阅读并理解了以下要求。
+      options:
+        - label: 我保证阅读了全部文档，了解所有我编写的配置文件项的含义。
+          required: true
