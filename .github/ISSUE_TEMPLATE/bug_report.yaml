@@ -56,7 +56,6 @@ body:
     attributes:
       label: Logs
       description: Provide server and client logs at DEBUG level.
-      render: shell
   - type: checkboxes
     attributes:
       label: Integrity requirements

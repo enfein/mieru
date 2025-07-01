@@ -56,7 +56,6 @@ body:
     attributes:
       label: 日志
       description: 提供服务器和客户端级别为 DEBUG 的日志。
-      render: shell
   - type: checkboxes
     attributes:
       label: 完整性要求
