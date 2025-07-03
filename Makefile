@@ -59,6 +59,11 @@ fmt:
 vet:
 	CGO_ENABLED=0 go vet ./...
 
+# Run golangci-lint.
+.PHONY: lint
+lint:
+	golangci-lint run ./...
+
 # Run benchmark.
 .PHONY: bench
 bench:
