@@ -30,6 +30,20 @@ var (
 	_ egress.Controller = (*Server)(nil)
 )
 
+var wellKnownIPv4LocalDomainNames = []string{
+	"localhost", // can be resolved to IPv6 address
+	"localhost4",
+	"localhost.localdomain", // can be resolved to IPv6 address
+	"localhost4.localdomain4",
+}
+
+var wellKnownIPv6LocalDomainNames = []string{
+	"localhost6",
+	"ip6-localhost",
+	"ip6-loopback",
+	"localhost6.localdomain6",
+}
+
 func (s *Server) FindAction(ctx context.Context, in egress.Input) egress.Action {
 	// DIRECT is used for all invalid inputs, such that they are handled by
 	// the subsequent logic.
@@ -77,15 +91,31 @@ func (s *Server) rejectPrivateAndLoopbackIPAction(ctx context.Context, in egress
 	} else if in.Data[3] == constant.Socks5FQDNAddress {
 		domainNameLength := int(in.Data[4])
 		domainName := string(in.Data[5 : 5+domainNameLength])
-		ips, err := s.config.Resolver.LookupIP(ctx, "ip", domainName)
-		if err != nil || len(ips) == 0 {
-			// Allow the connection here.
-			// The correct error is returned when server is processing the request.
+		// If we do a DNS lookup, we leak the destination domain name to the DNS server.
+		// For user privacy, we only check some well-known local domain names.
+		isWellKnownIPv4LocalDomainName := false
+		isWellKnownIPv6LocalDomainName := false
+		for _, d := range wellKnownIPv4LocalDomainNames {
+			if domainName == d {
+				isWellKnownIPv4LocalDomainName = true
+				break
+			}
+		}
+		for _, d := range wellKnownIPv6LocalDomainNames {
+			if domainName == d {
+				isWellKnownIPv6LocalDomainName = true
+				break
+			}
+		}
+		if isWellKnownIPv4LocalDomainName {
+			ip = net.ParseIP("127.0.0.1")
+		} else if isWellKnownIPv6LocalDomainName {
+			ip = net.ParseIP("::1")
+		} else {
 			return egress.Action{
 				Action: appctlpb.EgressAction_DIRECT,
 			}
 		}
-		ip = ips[0]
 	}
 
 	if !ip.IsPrivate() && !ip.IsLoopback() {
@@ -105,6 +135,7 @@ func (s *Server) rejectPrivateAndLoopbackIPAction(ctx context.Context, in egress
 	userName, ok := in.Env["user"]
 	if !ok || userName == "" {
 		// User name is unknown.
+		// By default, we reject the request.
 		return egress.Action{
 			Action: appctlpb.EgressAction_REJECT,
 		}
@@ -112,6 +143,7 @@ func (s *Server) rejectPrivateAndLoopbackIPAction(ctx context.Context, in egress
 	user, ok := s.config.Users[userName]
 	if !ok {
 		// User is not registered.
+		// By default, we reject the request.
 		return egress.Action{
 			Action: appctlpb.EgressAction_REJECT,
 		}

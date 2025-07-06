@@ -292,24 +292,3 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 	}
 	return nil
 }
-
-func (s *Server) handleForwarding(req *Request, conn net.Conn, proxy *appctlpb.EgressProxy) error {
-	forwardHost := proxy.GetHost()
-	forwardPort := proxy.GetPort()
-	proxyConn, err := net.Dial("tcp", common.MaybeDecorateIPv6(forwardHost)+":"+strconv.Itoa(int(forwardPort)))
-	if err != nil {
-		HandshakeErrors.Add(1)
-		return fmt.Errorf("dial to egress proxy failed: %w", err)
-	}
-
-	if err := s.dialWithAuthentication(proxyConn, proxy.GetSocks5Authentication()); err != nil {
-		return err
-	}
-
-	if _, err := proxyConn.Write(req.Raw); err != nil {
-		HandshakeErrors.Add(1)
-		proxyConn.Close()
-		return fmt.Errorf("failed to write socks5 request to egress proxy: %w", err)
-	}
-	return common.BidiCopy(conn, proxyConn)
-}

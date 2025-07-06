@@ -14,6 +14,7 @@ import (
 	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/apis/model"
+	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/stderror"
@@ -352,6 +353,27 @@ func (s *Server) handleAssociate(_ context.Context, _ *Request, conn net.Conn) e
 
 	wg.Wait()
 	return udpErr.Load().(error)
+}
+
+func (s *Server) handleForwarding(req *Request, conn net.Conn, proxy *appctlpb.EgressProxy) error {
+	forwardHost := proxy.GetHost()
+	forwardPort := proxy.GetPort()
+	proxyConn, err := net.Dial("tcp", common.MaybeDecorateIPv6(forwardHost)+":"+strconv.Itoa(int(forwardPort)))
+	if err != nil {
+		HandshakeErrors.Add(1)
+		return fmt.Errorf("dial to egress proxy failed: %w", err)
+	}
+
+	if err := s.dialWithAuthentication(proxyConn, proxy.GetSocks5Authentication()); err != nil {
+		return err
+	}
+
+	if _, err := proxyConn.Write(req.Raw); err != nil {
+		HandshakeErrors.Add(1)
+		proxyConn.Close()
+		return fmt.Errorf("failed to write socks5 request to egress proxy: %w", err)
+	}
+	return common.BidiCopy(conn, proxyConn)
 }
 
 // proxySocks5AuthReq transfers the socks5 authentication request and response
