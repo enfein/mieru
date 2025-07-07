@@ -312,7 +312,16 @@ We can use the `users` -> `quotas` property to limit the amount of traffic a use
 
 The client and proxy server software calculate the key based on the user name, password and system time. The server can decrypt and respond to the client's request only if the client and server have the same key. This requires that the system time of the client and the server must be in sync.
 
-To ensure that the server system time is accurate, we recommend that users install the NTP network time service. In many Linux distributions, installing NTP is only one command.
+To ensure that the server system time is accurate, we recommend that users enable or install the NTP network time service.
+
+In Linux, if system time synchronization is controlled by `systemd-timesyncd` service, you can modify configuration file `/etc/systemd/timesyncd.conf` to the following.
+
+```
+[Time]
+NTP=time.google.com
+```
+
+Otherwise, install NTP with the following command.
 
 ```sh
 # Debian / Ubuntu
