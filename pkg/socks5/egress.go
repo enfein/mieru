@@ -18,6 +18,7 @@ package socks5
 import (
 	"context"
 	"net"
+	"strings"
 
 	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
@@ -72,17 +73,14 @@ func (s *Server) FindAction(ctx context.Context, in egress.Input) egress.Action 
 			return action
 		}
 		// 2. Check if the request should be forwarded to another proxy.
-		action = s.forwardToProxyAction(ctx, in)
-		if action.Action == appctlpb.EgressAction_PROXY {
-			return action
-		}
+		return s.forwardToProxyAction(ctx, in)
 	}
 	return egress.Action{
 		Action: appctlpb.EgressAction_DIRECT,
 	}
 }
 
-func (s *Server) rejectPrivateAndLoopbackIPAction(ctx context.Context, in egress.Input) egress.Action {
+func (s *Server) rejectPrivateAndLoopbackIPAction(_ context.Context, in egress.Input) egress.Action {
 	var ip net.IP
 	if in.Data[3] == constant.Socks5IPv4Address {
 		ip = net.IP(in.Data[4:8])
@@ -163,21 +161,66 @@ func (s *Server) rejectPrivateAndLoopbackIPAction(ctx context.Context, in egress
 }
 
 func (s *Server) forwardToProxyAction(_ context.Context, in egress.Input) egress.Action {
-	isIP := in.Data[3] == constant.Socks5IPv4Address || in.Data[3] == constant.Socks5IPv6Address
-	isDomainName := in.Data[3] == constant.Socks5FQDNAddress
+	addrType := in.Data[3]
+	var addr net.IP
+	var domain string
+
+	switch addrType {
+	case constant.Socks5IPv4Address:
+		addr = net.IP(in.Data[4:8])
+	case constant.Socks5IPv6Address:
+		addr = net.IP(in.Data[4:20])
+	case constant.Socks5FQDNAddress:
+		domainLen := int(in.Data[4])
+		domain = string(in.Data[5 : 5+domainLen])
+	default:
+		return egress.Action{Action: appctlpb.EgressAction_DIRECT}
+	}
+
 	for _, rule := range s.config.Egress.GetRules() {
-		if (isIP && len(rule.GetIpRanges()) > 0 && rule.GetIpRanges()[0] == "*") || (isDomainName && len(rule.GetDomainNames()) > 0 && rule.GetDomainNames()[0] == "*") {
-			for _, proxy := range s.config.Egress.GetProxies() {
-				if proxy.GetName() == rule.GetProxyName() {
-					return egress.Action{
-						Action: rule.GetAction(),
-						Proxy:  proxy,
+		if s.matchEgressRule(addr, domain, rule) {
+			if rule.GetAction() == appctlpb.EgressAction_PROXY {
+				for _, proxy := range s.config.Egress.GetProxies() {
+					if proxy.GetName() == rule.GetProxyName() {
+						return egress.Action{
+							Action: rule.GetAction(),
+							Proxy:  proxy,
+						}
 					}
 				}
 			}
+			return egress.Action{Action: rule.GetAction()}
 		}
 	}
-	return egress.Action{
-		Action: appctlpb.EgressAction_DIRECT,
+
+	return egress.Action{Action: appctlpb.EgressAction_DIRECT}
+}
+
+func (s *Server) matchEgressRule(addr net.IP, domain string, rule *appctlpb.EgressRule) bool {
+	if addr != nil {
+		// IP based rule
+		for _, ipRange := range rule.GetIpRanges() {
+			if ipRange == "*" {
+				return true
+			}
+			_, cidr, err := net.ParseCIDR(ipRange)
+			if err != nil {
+				continue
+			}
+			if cidr.Contains(addr) {
+				return true
+			}
+		}
+	} else if domain != "" {
+		// Domain name based rule.
+		for _, d := range rule.GetDomainNames() {
+			if d == "*" {
+				return true
+			}
+			if domain == d || strings.HasSuffix(domain, "."+d) {
+				return true
+			}
+		}
 	}
+	return false
 }

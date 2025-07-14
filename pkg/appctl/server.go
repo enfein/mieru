@@ -560,11 +560,10 @@ func DeleteServerUsers(names []string) error {
 // 4.4. host is not empty
 // 4.5. port is valid
 // 4.6. if socks5 authentication is used, the user and password are not empty
-// 5. there is maximum 1 egress rule
-// 5.1. the IP ranges must be "*"
-// 5.2. the domain names must be "*"
-// 5.3. the action must be "PROXY"
-// 5.4. the proxy name is defined
+// 5. for each egress rule
+// 5.1. each IP range is either "*" or a valid IP CIDR
+// 5.2. each domain name is not empty, and does not begin or end with a dot
+// 5.3. if the action is "PROXY", the proxy is defined
 // 6. if set, metrics logging interval is valid, and it is not less than 1 second
 func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 	if _, err := appctlcommon.FlatPortBindings(patch.GetPortBindings()); err != nil {
@@ -616,32 +615,32 @@ func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 			return fmt.Errorf("egress proxy socks5 authentication password is not set")
 		}
 	}
-	if len(patch.GetEgress().GetRules()) > 1 {
-		return fmt.Errorf("found %d egress rules, maximum number of supported rules is 1", len(patch.GetEgress().GetRules()))
-	}
-	if len(patch.GetEgress().GetRules()) == 1 {
-		rule := patch.GetEgress().GetRules()[0]
-		if len(rule.GetIpRanges()) != 1 || rule.GetIpRanges()[0] != "*" {
-			return fmt.Errorf("egress rule: the only supported IP range value is %q", "*")
-		}
-		if len(rule.GetDomainNames()) != 1 || rule.GetDomainNames()[0] != "*" {
-			return fmt.Errorf("egress rule: the only supported domain name value is %q", "*")
-		}
-		if rule.GetAction() != pb.EgressAction_PROXY {
-			return fmt.Errorf("egress rule: the only supported action is %q", pb.EgressAction_PROXY.String())
-		}
-		if rule.GetProxyName() == "" {
-			return fmt.Errorf("egress rule: proxy name is not set")
-		}
-		foundProxy := false
-		for _, proxy := range patch.GetEgress().GetProxies() {
-			if proxy.GetName() == rule.GetProxyName() {
-				foundProxy = true
-				break
+	for _, rule := range patch.GetEgress().GetRules() {
+		for _, ipRange := range rule.GetIpRanges() {
+			if ipRange != "*" {
+				if _, _, err := net.ParseCIDR(ipRange); err != nil {
+					return fmt.Errorf("egress rule: invalid IP CIDR: %s", ipRange)
+				}
 			}
 		}
-		if !foundProxy {
-			return fmt.Errorf("egress rule: proxy %q is not defined", rule.GetProxyName())
+		for _, domain := range rule.GetDomainNames() {
+			if domain == "" {
+				return fmt.Errorf("egress rule: domain name is empty")
+			}
+			if domain[0] == '.' {
+				return fmt.Errorf("egress rule: domain name %q must not begin with a dot", domain)
+			}
+			if domain[len(domain)-1] == '.' {
+				return fmt.Errorf("egress rule: domain name %q must not end with a dot", domain)
+			}
+		}
+		if rule.GetAction() == pb.EgressAction_PROXY {
+			if rule.GetProxyName() == "" {
+				return fmt.Errorf("egress rule: proxy name is not set for PROXY action")
+			}
+			if _, found := usedProxyNames[rule.GetProxyName()]; !found {
+				return fmt.Errorf("egress rule: proxy %q is not defined", rule.GetProxyName())
+			}
 		}
 	}
 	if patch.GetAdvancedSettings().GetMetricsLoggingInterval() != "" {

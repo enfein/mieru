@@ -154,3 +154,111 @@ func TestEgressRule(t *testing.T) {
 		}
 	}
 }
+
+func TestMatchEgressRule(t *testing.T) {
+	controller := &Server{
+		config: &Config{
+			Egress: &appctlpb.Egress{
+				Proxies: []*appctlpb.EgressProxy{
+					{
+						Name:     proto.String("cloudflare"),
+						Protocol: appctlpb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL.Enum(),
+						Host:     proto.String("127.0.0.1"),
+						Port:     proto.Int32(6789),
+					},
+				},
+				Rules: []*appctlpb.EgressRule{
+					{
+						IpRanges: []string{"192.168.0.0/16"},
+						Action:   appctlpb.EgressAction_DIRECT.Enum(),
+					},
+					{
+						DomainNames: []string{"google.com"},
+						Action:      appctlpb.EgressAction_DIRECT.Enum(),
+					},
+					{
+						IpRanges:    []string{"*"},
+						DomainNames: []string{"*"},
+						Action:      appctlpb.EgressAction_PROXY.Enum(),
+						ProxyName:   proto.String("cloudflare"),
+					},
+				},
+			},
+			Resolver: apicommon.NilDNSResolver{},
+			Users: map[string]*appctlpb.User{
+				"test": {
+					Name:           proto.String("test"),
+					AllowPrivateIP: proto.Bool(true),
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name       string
+		input      egress.Input
+		wantAction appctlpb.EgressAction
+	}{
+		{
+			name: "IP matching explicit rule",
+			input: egress.Input{
+				Protocol: appctlpb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL,
+				Data:     []byte{5, 1, 0, 1, 192, 168, 0, 1, 1, 187},
+				Env:      map[string]string{"user": "test"},
+			},
+			wantAction: appctlpb.EgressAction_DIRECT,
+		},
+		{
+			name: "Domain matching explicit rule",
+			input: egress.Input{
+				Protocol: appctlpb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL,
+				Data:     []byte{5, 1, 0, 3, 12, 'a', '.', 'g', 'o', 'o', 'g', 'l', 'e', '.', 'c', 'o', 'm', 1, 187},
+			},
+			wantAction: appctlpb.EgressAction_DIRECT,
+		},
+		{
+			name: "IP matching default rule",
+			input: egress.Input{
+				Protocol: appctlpb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL,
+				Data:     []byte{5, 1, 0, 1, 8, 8, 8, 8, 0, 53},
+			},
+			wantAction: appctlpb.EgressAction_PROXY,
+		},
+		{
+			name: "Domain matching default rule",
+			input: egress.Input{
+				Protocol: appctlpb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL,
+				Data:     []byte{5, 1, 0, 3, 11, 'e', 'x', 'a', 'm', 'p', 'l', 'e', '.', 'c', 'o', 'm', 1, 187},
+			},
+			wantAction: appctlpb.EgressAction_PROXY,
+		},
+		{
+			name: "Domain matching explicit rule exactly",
+			input: egress.Input{
+				Protocol: appctlpb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL,
+				Data:     []byte{5, 1, 0, 3, 10, 'g', 'o', 'o', 'g', 'l', 'e', '.', 'c', 'o', 'm', 1, 187},
+			},
+			wantAction: appctlpb.EgressAction_DIRECT,
+		},
+		{
+			name: "Partial domain suffix does not match",
+			input: egress.Input{
+				Protocol: appctlpb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL,
+				Data:     []byte{5, 1, 0, 3, 14, 'e', 'v', 'i', 'l', 'g', 'o', 'o', 'g', 'l', 'e', '.', 'c', 'o', 'm', 1, 187},
+			},
+			wantAction: appctlpb.EgressAction_PROXY,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			action := controller.FindAction(context.Background(), tt.input)
+			if action.Action != tt.wantAction {
+				t.Errorf("expected %v, but got %v", tt.wantAction, action.Action)
+			}
+			if action.Action == appctlpb.EgressAction_PROXY && action.Proxy == nil {
+				t.Errorf("expected Proxy to be non-nil, but got nil")
+			}
+		})
+	}
+}
