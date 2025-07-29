@@ -24,18 +24,32 @@
     "egress": {
         "proxies": [
             {
-                "name": "cloudflare",
+                "name": "proxy1",
                 "protocol": "SOCKS5_PROXY_PROTOCOL",
-                "host": "127.0.0.1",
-                "port": 4000
+                "host": "localhost",
+                "port": 1081
+            },
+            {
+                "name": "proxy2",
+                "protocol": "SOCKS5_PROXY_PROTOCOL",
+                "host": "localhost",
+                "port": 1082
             }
         ],
         "rules": [
             {
+                "ipRanges": ["8.8.4.4/32", "8.8.8.8/32"],
+                "action": "REJECT"
+            },
+            {
+                "domainNames": ["chatgpt.com", "grok.com"],
+                "action": "PROXY",
+                "proxyNames": ["proxy1", "proxy2"]
+            },
+            {
                 "ipRanges": ["*"],
                 "domainNames": ["*"],
-                "action": "PROXY",
-                "proxyName": "cloudflare"
+                "action": "DIRECT"
             }
         ]
     }

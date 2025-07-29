@@ -45,6 +45,7 @@ const (
 	ClientManagementService_StopCPUProfile_FullMethodName      = "/appctl.ClientManagementService/StopCPUProfile"
 	ClientManagementService_GetHeapProfile_FullMethodName      = "/appctl.ClientManagementService/GetHeapProfile"
 	ClientManagementService_GetMemoryStatistics_FullMethodName = "/appctl.ClientManagementService/GetMemoryStatistics"
+	ClientManagementService_GetVersion_FullMethodName          = "/appctl.ClientManagementService/GetVersion"
 )
 
 // ClientManagementServiceClient is the client API for ClientManagementService service.
@@ -69,6 +70,8 @@ type ClientManagementServiceClient interface {
 	GetHeapProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Get memory statistics of client daemon.
 	GetMemoryStatistics(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.MemoryStatistics, error)
+	// Get client version.
+	GetVersion(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.Version, error)
 }
 
 type clientManagementServiceClient struct {
@@ -160,6 +163,15 @@ func (c *clientManagementServiceClient) GetMemoryStatistics(ctx context.Context,
 	return out, nil
 }
 
+func (c *clientManagementServiceClient) GetVersion(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.Version, error) {
+	out := new(appctlpb.Version)
+	err := c.cc.Invoke(ctx, ClientManagementService_GetVersion_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ClientManagementServiceServer is the server API for ClientManagementService service.
 // All implementations must embed UnimplementedClientManagementServiceServer
 // for forward compatibility
@@ -182,6 +194,8 @@ type ClientManagementServiceServer interface {
 	GetHeapProfile(context.Context, *appctlpb.ProfileSavePath) (*emptypb.Empty, error)
 	// Get memory statistics of client daemon.
 	GetMemoryStatistics(context.Context, *emptypb.Empty) (*appctlpb.MemoryStatistics, error)
+	// Get client version.
+	GetVersion(context.Context, *emptypb.Empty) (*appctlpb.Version, error)
 	mustEmbedUnimplementedClientManagementServiceServer()
 }
 
@@ -215,6 +229,9 @@ func (UnimplementedClientManagementServiceServer) GetHeapProfile(context.Context
 }
 func (UnimplementedClientManagementServiceServer) GetMemoryStatistics(context.Context, *emptypb.Empty) (*appctlpb.MemoryStatistics, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMemoryStatistics not implemented")
+}
+func (UnimplementedClientManagementServiceServer) GetVersion(context.Context, *emptypb.Empty) (*appctlpb.Version, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetVersion not implemented")
 }
 func (UnimplementedClientManagementServiceServer) mustEmbedUnimplementedClientManagementServiceServer() {
 }
@@ -392,6 +409,24 @@ func _ClientManagementService_GetMemoryStatistics_Handler(srv interface{}, ctx c
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ClientManagementService_GetVersion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClientManagementServiceServer).GetVersion(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ClientManagementService_GetVersion_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClientManagementServiceServer).GetVersion(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ClientManagementService_ServiceDesc is the grpc.ServiceDesc for ClientManagementService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -435,6 +470,10 @@ var ClientManagementService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "GetMemoryStatistics",
 			Handler:    _ClientManagementService_GetMemoryStatistics_Handler,
 		},
+		{
+			MethodName: "GetVersion",
+			Handler:    _ClientManagementService_GetVersion_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "appctl/proto/rpc.proto",
@@ -456,6 +495,7 @@ const (
 	ServerManagementService_StopCPUProfile_FullMethodName      = "/appctl.ServerManagementService/StopCPUProfile"
 	ServerManagementService_GetHeapProfile_FullMethodName      = "/appctl.ServerManagementService/GetHeapProfile"
 	ServerManagementService_GetMemoryStatistics_FullMethodName = "/appctl.ServerManagementService/GetMemoryStatistics"
+	ServerManagementService_GetVersion_FullMethodName          = "/appctl.ServerManagementService/GetVersion"
 )
 
 // ServerManagementServiceClient is the client API for ServerManagementService service.
@@ -492,6 +532,8 @@ type ServerManagementServiceClient interface {
 	GetHeapProfile(ctx context.Context, in *appctlpb.ProfileSavePath, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Get memory statistics of server daemon.
 	GetMemoryStatistics(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.MemoryStatistics, error)
+	// Get server version.
+	GetVersion(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.Version, error)
 }
 
 type serverManagementServiceClient struct {
@@ -637,6 +679,15 @@ func (c *serverManagementServiceClient) GetMemoryStatistics(ctx context.Context,
 	return out, nil
 }
 
+func (c *serverManagementServiceClient) GetVersion(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*appctlpb.Version, error) {
+	out := new(appctlpb.Version)
+	err := c.cc.Invoke(ctx, ServerManagementService_GetVersion_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ServerManagementServiceServer is the server API for ServerManagementService service.
 // All implementations must embed UnimplementedServerManagementServiceServer
 // for forward compatibility
@@ -671,6 +722,8 @@ type ServerManagementServiceServer interface {
 	GetHeapProfile(context.Context, *appctlpb.ProfileSavePath) (*emptypb.Empty, error)
 	// Get memory statistics of server daemon.
 	GetMemoryStatistics(context.Context, *emptypb.Empty) (*appctlpb.MemoryStatistics, error)
+	// Get server version.
+	GetVersion(context.Context, *emptypb.Empty) (*appctlpb.Version, error)
 	mustEmbedUnimplementedServerManagementServiceServer()
 }
 
@@ -722,6 +775,9 @@ func (UnimplementedServerManagementServiceServer) GetHeapProfile(context.Context
 }
 func (UnimplementedServerManagementServiceServer) GetMemoryStatistics(context.Context, *emptypb.Empty) (*appctlpb.MemoryStatistics, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMemoryStatistics not implemented")
+}
+func (UnimplementedServerManagementServiceServer) GetVersion(context.Context, *emptypb.Empty) (*appctlpb.Version, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetVersion not implemented")
 }
 func (UnimplementedServerManagementServiceServer) mustEmbedUnimplementedServerManagementServiceServer() {
 }
@@ -1007,6 +1063,24 @@ func _ServerManagementService_GetMemoryStatistics_Handler(srv interface{}, ctx c
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ServerManagementService_GetVersion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerManagementServiceServer).GetVersion(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerManagementService_GetVersion_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerManagementServiceServer).GetVersion(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ServerManagementService_ServiceDesc is the grpc.ServiceDesc for ServerManagementService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1073,6 +1147,10 @@ var ServerManagementService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetMemoryStatistics",
 			Handler:    _ServerManagementService_GetMemoryStatistics_Handler,
+		},
+		{
+			MethodName: "GetVersion",
+			Handler:    _ServerManagementService_GetVersion_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

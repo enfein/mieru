@@ -39,7 +39,7 @@
                 "ipRanges": ["*"],
                 "domainNames": ["*"],
                 "action": "PROXY",
-                "proxyName": "cloudflare"
+                "proxyNames": ["cloudflare"]
             }
         ]
     }

@@ -37,6 +37,7 @@ import (
 	"github.com/enfein/mieru/v3/pkg/protocol"
 	"github.com/enfein/mieru/v3/pkg/socks5"
 	"github.com/enfein/mieru/v3/pkg/stderror"
+	"github.com/enfein/mieru/v3/pkg/version"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
@@ -163,6 +164,18 @@ func (c *clientManagementService) GetHeapProfile(ctx context.Context, req *pb.Pr
 
 func (c *clientManagementService) GetMemoryStatistics(ctx context.Context, req *emptypb.Empty) (*pb.MemoryStatistics, error) {
 	return getMemoryStatistics()
+}
+
+func (c *clientManagementService) GetVersion(ctx context.Context, req *emptypb.Empty) (*pb.Version, error) {
+	v, err := version.Parse(version.AppVersion)
+	if err != nil {
+		return &pb.Version{}, err
+	}
+	return &pb.Version{
+		Major: proto.Uint32(uint32(v.Major)),
+		Minor: proto.Uint32(uint32(v.Minor)),
+		Patch: proto.Uint32(uint32(v.Patch)),
+	}, nil
 }
 
 // NewClientManagementService creates a new ClientManagementService RPC server.

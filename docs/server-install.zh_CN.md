@@ -18,32 +18,32 @@ sudo python3 setup.py --lang=zh
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.16.2/mita_3.16.2_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.17.0/mita_3.17.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.16.2/mita_3.16.2_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.17.0/mita_3.17.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.16.2/mita-3.16.2-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.17.0/mita-3.17.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.16.2/mita-3.16.2-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.17.0/mita-3.17.0-1.aarch64.rpm
 ```
 
 ## 安装 mita 软件包
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_3.16.2_amd64.deb
+sudo dpkg -i mita_3.17.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_3.16.2_arm64.deb
+sudo dpkg -i mita_3.17.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-3.16.2-1.x86_64.rpm
+sudo rpm -Uvh --force mita-3.17.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-3.16.2-1.aarch64.rpm
+sudo rpm -Uvh --force mita-3.17.0-1.aarch64.rpm
 ```
 
 上述指令也可以用来升级 mita 软件包的版本。
@@ -211,10 +211,18 @@ mieru 客户端 -> GFW -> mita 服务器 -> cloudflare 代理客户端 -> cloudf
         ],
         "rules": [
             {
+                "ipRanges": ["8.8.4.4/32", "8.8.8.8/32"],
+                "action": "REJECT"
+            },
+            {
+                "domainNames": ["chatgpt.com", "grok.com"],
+                "action": "PROXY",
+                "proxyNames": ["cloudflare"]
+            },
+            {
                 "ipRanges": ["*"],
                 "domainNames": ["*"],
-                "action": "PROXY",
-                "proxyName": "cloudflare"
+                "action": "DIRECT"
             }
         ]
     }
@@ -222,7 +230,7 @@ mieru 客户端 -> GFW -> mita 服务器 -> cloudflare 代理客户端 -> cloudf
 ```
 
 1. 在 `egress` -> `proxies` 属性中列举出站代理服务器的信息。当前版本只支持 socks5 出站，因此 `protocol` 的值必须设定为 `SOCKS5_PROXY_PROTOCOL`。如果出站代理服务器需要 socks5 用户名和密码验证，请填写 `socks5Authentication` 属性。否则，请删除 `socks5Authentication` 属性。
-2. 在 `egress` -> `rules` 属性中列举出站规则。当前版本最多允许用户添加一条规则，且 `ipRanges`, `domainNames` 和 `action` 的值必须与上面的例子相同。`proxyName` 需要指向一个 `egress` -> `proxies` 属性中存在的代理。
+2. 在 `egress` -> `rules` 属性中列举出站规则。`proxyNames` 需要指向 `egress` -> `proxies` 属性中存在的代理。
 
 如果想要关闭出站代理功能，将 `egress` 属性设置为空 `{}` 即可。
 

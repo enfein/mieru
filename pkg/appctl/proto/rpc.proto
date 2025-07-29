@@ -51,6 +51,9 @@ service ClientManagementService {
 
     // Get memory statistics of client daemon.
     rpc GetMemoryStatistics(google.protobuf.Empty) returns (MemoryStatistics);
+
+    // Get client version.
+    rpc GetVersion(google.protobuf.Empty) returns (Version);
 }
 
 service ServerManagementService {
@@ -98,4 +101,7 @@ service ServerManagementService {
 
     // Get memory statistics of server daemon.
     rpc GetMemoryStatistics(google.protobuf.Empty) returns (MemoryStatistics);
+
+    // Get server version.
+    rpc GetVersion(google.protobuf.Empty) returns (Version);
 }

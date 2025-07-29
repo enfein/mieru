@@ -18,32 +18,32 @@ Or you can manually install and configure proxy server using the steps below.
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.16.2/mita_3.16.2_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.17.0/mita_3.17.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.16.2/mita_3.16.2_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.17.0/mita_3.17.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.16.2/mita-3.16.2-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.17.0/mita-3.17.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.16.2/mita-3.16.2-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.17.0/mita-3.17.0-1.aarch64.rpm
 ```
 
 ## Install mita package
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_3.16.2_amd64.deb
+sudo dpkg -i mita_3.17.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_3.16.2_arm64.deb
+sudo dpkg -i mita_3.17.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-3.16.2-1.x86_64.rpm
+sudo rpm -Uvh --force mita-3.17.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-3.16.2-1.aarch64.rpm
+sudo rpm -Uvh --force mita-3.17.0-1.aarch64.rpm
 ```
 
 Those instructions can also be used to upgrade the version of mita software package.
@@ -211,10 +211,18 @@ Below is an example to configure a proxy chain.
         ],
         "rules": [
             {
+                "ipRanges": ["8.8.4.4/32", "8.8.8.8/32"],
+                "action": "REJECT"
+            },
+            {
+                "domainNames": ["chatgpt.com", "grok.com"],
+                "action": "PROXY",
+                "proxyNames": ["cloudflare"]
+            },
+            {
                 "ipRanges": ["*"],
                 "domainNames": ["*"],
-                "action": "PROXY",
-                "proxyName": "cloudflare"
+                "action": "DIRECT"
             }
         ]
     }
@@ -222,7 +230,7 @@ Below is an example to configure a proxy chain.
 ```
 
 1. In the `egress` -> `proxies` property, list the information of outbound proxy servers. The current version only supports socks5 outbound, so the value of `protocol` must be set to `SOCKS5_PROXY_PROTOCOL`. If the outbound proxy server requires socks5 username and password authentication, please fill in the `socks5Authentication` property. Otherwise, please remove the `socks5Authentication` property.
-2. In the `egress` -> `rules` property, list outbound rules. The current version allows users to add up to one rule, and the values of `ipRanges`, `domainNames`, and `action` must be the same as the example above. `proxyName` needs to point to a proxy that exists in `egress` -> `proxies` property.
+2. In the `egress` -> `rules` property, list outbound rules. `proxyNames` needs to point to proxies that exist in `egress` -> `proxies` property.
 
 If you want to turn off the outbound proxy feature, simply set the `egress` property to an empty value `{}`.
 

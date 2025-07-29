@@ -101,9 +101,11 @@ message EgressRule {
     // The action to do when the rule is matched.
     optional EgressAction action = 3;
 
-    // The name of proxy to connect.
-    // This is required when the action is PROXY.
-    optional string proxyName = 4;
+    // The list of proxies to connect.
+    // This must not be empty when the action is PROXY.
+    // When multiple proxies are provided, a random one is selected
+    // for each request.
+    repeated string proxyNames = 4;
 }
 
 enum EgressAction {

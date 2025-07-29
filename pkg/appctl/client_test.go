@@ -16,12 +16,14 @@
 package appctl
 
 import (
+	"context"
 	"os"
 	"testing"
 
 	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/common"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func TestApply2ClientConfig(t *testing.T) {
@@ -211,6 +213,14 @@ func TestClientDeleteProfileRejectActiveProfile(t *testing.T) {
 	}
 
 	afterClientTest(t)
+}
+
+func TestClientGetVersion(t *testing.T) {
+	rpcServer := NewClientManagementService()
+	_, err := rpcServer.GetVersion(context.Background(), &emptypb.Empty{})
+	if err != nil {
+		t.Fatalf("GetVersion() failed: %v", err)
+	}
 }
 
 func beforeClientTest(t *testing.T) {

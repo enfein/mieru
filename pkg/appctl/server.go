@@ -36,6 +36,7 @@ import (
 	"github.com/enfein/mieru/v3/pkg/protocol"
 	"github.com/enfein/mieru/v3/pkg/socks5"
 	"github.com/enfein/mieru/v3/pkg/stderror"
+	"github.com/enfein/mieru/v3/pkg/version"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
@@ -332,6 +333,18 @@ func (s *serverManagementService) GetHeapProfile(ctx context.Context, req *pb.Pr
 
 func (s *serverManagementService) GetMemoryStatistics(ctx context.Context, req *emptypb.Empty) (*pb.MemoryStatistics, error) {
 	return getMemoryStatistics()
+}
+
+func (s *serverManagementService) GetVersion(ctx context.Context, req *emptypb.Empty) (*pb.Version, error) {
+	v, err := version.Parse(version.AppVersion)
+	if err != nil {
+		return &pb.Version{}, err
+	}
+	return &pb.Version{
+		Major: proto.Uint32(uint32(v.Major)),
+		Minor: proto.Uint32(uint32(v.Minor)),
+		Patch: proto.Uint32(uint32(v.Patch)),
+	}, nil
 }
 
 // NewServerManagementService creates a new ServerManagementService RPC server.
@@ -635,11 +648,17 @@ func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 			}
 		}
 		if rule.GetAction() == pb.EgressAction_PROXY {
-			if rule.GetProxyName() == "" {
-				return fmt.Errorf("egress rule: proxy name is not set for PROXY action")
+			if len(rule.GetProxyNames()) == 0 {
+				return fmt.Errorf("egress rule: proxy name list is empty for PROXY action")
 			}
-			if _, found := usedProxyNames[rule.GetProxyName()]; !found {
-				return fmt.Errorf("egress rule: proxy %q is not defined", rule.GetProxyName())
+			for _, proxyName := range rule.GetProxyNames() {
+				if _, found := usedProxyNames[proxyName]; !found {
+					return fmt.Errorf("egress rule: proxy %q is referenced but not defined", proxyName)
+				}
+			}
+		} else {
+			if len(rule.GetProxyNames()) > 0 {
+				return fmt.Errorf("egress rule: proxy name list is not empty for non-PROXY action")
 			}
 		}
 	}

@@ -17,6 +17,7 @@ package socks5
 
 import (
 	"context"
+	mrand "math/rand"
 	"net"
 	"strings"
 
@@ -180,8 +181,14 @@ func (s *Server) forwardToProxyAction(_ context.Context, in egress.Input) egress
 	for _, rule := range s.config.Egress.GetRules() {
 		if s.matchEgressRule(addr, domain, rule) {
 			if rule.GetAction() == appctlpb.EgressAction_PROXY {
+				allProxyNames := rule.GetProxyNames()
+				var selectedProxyName string
+				if len(allProxyNames) > 0 {
+					idx := mrand.Intn(len(allProxyNames))
+					selectedProxyName = allProxyNames[idx]
+				}
 				for _, proxy := range s.config.Egress.GetProxies() {
-					if proxy.GetName() == rule.GetProxyName() {
+					if proxy.GetName() == selectedProxyName {
 						return egress.Action{
 							Action: rule.GetAction(),
 							Proxy:  proxy,

@@ -1,5 +1,5 @@
 Name: mita
-Version: 3.16.2
+Version: 3.17.0
 Release: 1%{?dist}
 Summary: Mieru proxy server
 License: GPLv3+

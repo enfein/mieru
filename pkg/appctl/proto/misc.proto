@@ -79,3 +79,9 @@ message MemoryStatistics {
     optional uint64 targetHeapBytes = 5;
     optional uint64 stackBytes = 6;
 }
+
+message Version {
+    optional uint32 Major = 1;
+    optional uint32 Minor = 2;
+    optional uint32 Patch = 3;
+}

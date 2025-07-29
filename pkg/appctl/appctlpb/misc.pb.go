@@ -554,6 +554,69 @@ func (x *MemoryStatistics) GetStackBytes() uint64 {
 	return 0
 }
 
+type Version struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Major *uint32 `protobuf:"varint,1,opt,name=Major,proto3,oneof" json:"Major,omitempty"`
+	Minor *uint32 `protobuf:"varint,2,opt,name=Minor,proto3,oneof" json:"Minor,omitempty"`
+	Patch *uint32 `protobuf:"varint,3,opt,name=Patch,proto3,oneof" json:"Patch,omitempty"`
+}
+
+func (x *Version) Reset() {
+	*x = Version{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_appctl_proto_misc_proto_msgTypes[8]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Version) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Version) ProtoMessage() {}
+
+func (x *Version) ProtoReflect() protoreflect.Message {
+	mi := &file_appctl_proto_misc_proto_msgTypes[8]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Version.ProtoReflect.Descriptor instead.
+func (*Version) Descriptor() ([]byte, []int) {
+	return file_appctl_proto_misc_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *Version) GetMajor() uint32 {
+	if x != nil && x.Major != nil {
+		return *x.Major
+	}
+	return 0
+}
+
+func (x *Version) GetMinor() uint32 {
+	if x != nil && x.Minor != nil {
+		return *x.Minor
+	}
+	return 0
+}
+
+func (x *Version) GetPatch() uint32 {
+	if x != nil && x.Patch != nil {
+		return *x.Patch
+	}
+	return 0
+}
+
 var File_appctl_proto_misc_proto protoreflect.FileDescriptor
 
 var file_appctl_proto_misc_proto_rawDesc = []byte{
@@ -652,11 +715,18 @@ var file_appctl_proto_misc_proto_rawDesc = []byte{
 	0x0f, 0x0a, 0x0d, 0x5f, 0x6d, 0x61, 0x78, 0x48, 0x65, 0x61, 0x70, 0x42, 0x79, 0x74, 0x65, 0x73,
 	0x42, 0x12, 0x0a, 0x10, 0x5f, 0x74, 0x61, 0x72, 0x67, 0x65, 0x74, 0x48, 0x65, 0x61, 0x70, 0x42,
 	0x79, 0x74, 0x65, 0x73, 0x42, 0x0d, 0x0a, 0x0b, 0x5f, 0x73, 0x74, 0x61, 0x63, 0x6b, 0x42, 0x79,
-	0x74, 0x65, 0x73, 0x4a, 0x04, 0x08, 0x01, 0x10, 0x02, 0x42, 0x30, 0x5a, 0x2e, 0x67, 0x69, 0x74,
-	0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x65, 0x6e, 0x66, 0x65, 0x69, 0x6e, 0x2f, 0x6d,
-	0x69, 0x65, 0x72, 0x75, 0x2f, 0x76, 0x33, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x61, 0x70, 0x70, 0x63,
-	0x74, 0x6c, 0x2f, 0x61, 0x70, 0x70, 0x63, 0x74, 0x6c, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x33,
+	0x74, 0x65, 0x73, 0x4a, 0x04, 0x08, 0x01, 0x10, 0x02, 0x22, 0x78, 0x0a, 0x07, 0x56, 0x65, 0x72,
+	0x73, 0x69, 0x6f, 0x6e, 0x12, 0x19, 0x0a, 0x05, 0x4d, 0x61, 0x6a, 0x6f, 0x72, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x0d, 0x48, 0x00, 0x52, 0x05, 0x4d, 0x61, 0x6a, 0x6f, 0x72, 0x88, 0x01, 0x01, 0x12,
+	0x19, 0x0a, 0x05, 0x4d, 0x69, 0x6e, 0x6f, 0x72, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0d, 0x48, 0x01,
+	0x52, 0x05, 0x4d, 0x69, 0x6e, 0x6f, 0x72, 0x88, 0x01, 0x01, 0x12, 0x19, 0x0a, 0x05, 0x50, 0x61,
+	0x74, 0x63, 0x68, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0d, 0x48, 0x02, 0x52, 0x05, 0x50, 0x61, 0x74,
+	0x63, 0x68, 0x88, 0x01, 0x01, 0x42, 0x08, 0x0a, 0x06, 0x5f, 0x4d, 0x61, 0x6a, 0x6f, 0x72, 0x42,
+	0x08, 0x0a, 0x06, 0x5f, 0x4d, 0x69, 0x6e, 0x6f, 0x72, 0x42, 0x08, 0x0a, 0x06, 0x5f, 0x50, 0x61,
+	0x74, 0x63, 0x68, 0x42, 0x30, 0x5a, 0x2e, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f,
+	0x6d, 0x2f, 0x65, 0x6e, 0x66, 0x65, 0x69, 0x6e, 0x2f, 0x6d, 0x69, 0x65, 0x72, 0x75, 0x2f, 0x76,
+	0x33, 0x2f, 0x70, 0x6b, 0x67, 0x2f, 0x61, 0x70, 0x70, 0x63, 0x74, 0x6c, 0x2f, 0x61, 0x70, 0x70,
+	0x63, 0x74, 0x6c, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -671,7 +741,7 @@ func file_appctl_proto_misc_proto_rawDescGZIP() []byte {
 	return file_appctl_proto_misc_proto_rawDescData
 }
 
-var file_appctl_proto_misc_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_appctl_proto_misc_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_appctl_proto_misc_proto_goTypes = []interface{}{
 	(*Metrics)(nil),               // 0: appctl.Metrics
 	(*UserWithMetrics)(nil),       // 1: appctl.UserWithMetrics
@@ -681,16 +751,17 @@ var file_appctl_proto_misc_proto_goTypes = []interface{}{
 	(*SessionInfoList)(nil),       // 5: appctl.SessionInfoList
 	(*ThreadDump)(nil),            // 6: appctl.ThreadDump
 	(*MemoryStatistics)(nil),      // 7: appctl.MemoryStatistics
-	(*User)(nil),                  // 8: appctl.User
-	(*metricspb.Metric)(nil),      // 9: metrics.Metric
-	(*timestamppb.Timestamp)(nil), // 10: google.protobuf.Timestamp
+	(*Version)(nil),               // 8: appctl.Version
+	(*User)(nil),                  // 9: appctl.User
+	(*metricspb.Metric)(nil),      // 10: metrics.Metric
+	(*timestamppb.Timestamp)(nil), // 11: google.protobuf.Timestamp
 }
 var file_appctl_proto_misc_proto_depIdxs = []int32{
-	8,  // 0: appctl.UserWithMetrics.user:type_name -> appctl.User
-	9,  // 1: appctl.UserWithMetrics.metrics:type_name -> metrics.Metric
+	9,  // 0: appctl.UserWithMetrics.user:type_name -> appctl.User
+	10, // 1: appctl.UserWithMetrics.metrics:type_name -> metrics.Metric
 	1,  // 2: appctl.UserWithMetricsList.items:type_name -> appctl.UserWithMetrics
-	10, // 3: appctl.SessionInfo.lastRecvTime:type_name -> google.protobuf.Timestamp
-	10, // 4: appctl.SessionInfo.lastSendTime:type_name -> google.protobuf.Timestamp
+	11, // 3: appctl.SessionInfo.lastRecvTime:type_name -> google.protobuf.Timestamp
+	11, // 4: appctl.SessionInfo.lastSendTime:type_name -> google.protobuf.Timestamp
 	4,  // 5: appctl.SessionInfoList.items:type_name -> appctl.SessionInfo
 	6,  // [6:6] is the sub-list for method output_type
 	6,  // [6:6] is the sub-list for method input_type
@@ -802,6 +873,18 @@ func file_appctl_proto_misc_proto_init() {
 				return nil
 			}
 		}
+		file_appctl_proto_misc_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Version); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	file_appctl_proto_misc_proto_msgTypes[0].OneofWrappers = []interface{}{}
 	file_appctl_proto_misc_proto_msgTypes[1].OneofWrappers = []interface{}{}
@@ -809,13 +892,14 @@ func file_appctl_proto_misc_proto_init() {
 	file_appctl_proto_misc_proto_msgTypes[4].OneofWrappers = []interface{}{}
 	file_appctl_proto_misc_proto_msgTypes[6].OneofWrappers = []interface{}{}
 	file_appctl_proto_misc_proto_msgTypes[7].OneofWrappers = []interface{}{}
+	file_appctl_proto_misc_proto_msgTypes[8].OneofWrappers = []interface{}{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_appctl_proto_misc_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

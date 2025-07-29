@@ -35,7 +35,7 @@
                 "ipRanges": ["*"],
                 "domainNames": ["*"],
                 "action": "PROXY",
-                "proxyName": "client2"
+                "proxyNames": ["client2"]
             }
         ]
     }
