@@ -17,8 +17,10 @@ package metrics
 
 import (
 	"errors"
+	mrand "math/rand"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -62,24 +64,106 @@ func TestMetricsDump(t *testing.T) {
 	}
 }
 
+func TestToMetricPBConcurrent(t *testing.T) {
+	counter := &Counter{name: "counter", timeSeries: true}
+
+	var wg sync.WaitGroup
+	stop := make(chan struct{})
+
+	// Goroutine to continuously add history.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		currentTime := time.Now()
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				// Add a small random duration to the time to ensure it's always increasing.
+				currentTime = currentTime.Add(time.Duration(mrand.Intn(100)+1) * time.Millisecond)
+				counter.addWithTime(int64(mrand.Intn(100)), currentTime)
+				// Run the for loop enough times to trigger rollup.
+				time.Sleep(time.Microsecond)
+			}
+		}
+	}()
+
+	// Goroutine to verify the counter value matches the sum of history.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				p := ToMetricPB(counter)
+				var sum int64
+				for _, h := range p.GetHistory() {
+					sum += h.GetDelta()
+				}
+				if p.GetValue() != sum {
+					t.Errorf("sum of history deltas (%d) does not match counter value (%d)", sum, p.GetValue())
+				}
+				time.Sleep(time.Duration(mrand.Intn(100)) * time.Microsecond)
+			}
+		}
+	}()
+
+	time.Sleep(time.Second)
+	close(stop)
+	wg.Wait()
+}
+
 func TestMetricPBConvertion(t *testing.T) {
-	p := &pb.Metric{
-		Name:  proto.String("counter"),
-		Type:  pb.MetricType_COUNTER_TIME_SERIES.Enum(),
-		Value: proto.Int64(100),
-		History: []*pb.History{
-			{
-				TimeUnixMilli: proto.Int64(time.Now().UnixMilli()),
-				Delta:         proto.Int64(100),
+	testCases := []struct {
+		name     string
+		metricPB *pb.Metric
+	}{
+		{
+			name: "CounterTimeSeries",
+			metricPB: &pb.Metric{
+				Name:  proto.String("counter_ts"),
+				Type:  pb.MetricType_COUNTER_TIME_SERIES.Enum(),
+				Value: proto.Int64(100),
+				History: []*pb.History{
+					{
+						TimeUnixMilli: proto.Int64(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC).UnixMilli()),
+						Delta:         proto.Int64(100),
+					},
+				},
+			},
+		},
+		{
+			name: "Counter",
+			metricPB: &pb.Metric{
+				Name:  proto.String("counter"),
+				Type:  pb.MetricType_COUNTER.Enum(),
+				Value: proto.Int64(200),
+			},
+		},
+		{
+			name: "Gauge",
+			metricPB: &pb.Metric{
+				Name:  proto.String("gauge"),
+				Type:  pb.MetricType_GAUGE.Enum(),
+				Value: proto.Int64(300),
 			},
 		},
 	}
-	c, err := NewCounterFromMetricPB(p)
-	if err != nil {
-		t.Fatalf("NewCounterFromMetricPB() failed: %v", err)
-	}
-	p2 := ToMetricPB(c)
-	if !proto.Equal(p, p2) {
-		t.Errorf("metric protobuf doesn't match")
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			m, err := FromMetricPB(tc.metricPB)
+			if err != nil {
+				t.Fatalf("FromMetricPB() failed: %v", err)
+			}
+			p2 := ToMetricPB(m)
+
+			if !proto.Equal(tc.metricPB, p2) {
+				t.Errorf("metric protobuf doesn't match.\nwant: %v\ngot: %v", tc.metricPB, p2)
+			}
+		})
 	}
 }

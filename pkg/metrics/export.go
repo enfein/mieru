@@ -211,6 +211,7 @@ func ToMetricPB(src Metric) *pb.Metric {
 	if src.Type() == COUNTER_TIME_SERIES {
 		counter := src.(*Counter)
 		counter.mu.Lock()
+		dst.Value = proto.Int64(counter.value) // Make sure value matches history.
 		dst.History = make([]*pb.History, len(counter.history))
 		copy(dst.History, counter.history)
 		counter.mu.Unlock()
@@ -218,20 +219,32 @@ func ToMetricPB(src Metric) *pb.Metric {
 	return dst
 }
 
-// NewCounterFromMetricPB creates a counter metric from the protobuf.
-func NewCounterFromMetricPB(src *pb.Metric) (*Counter, error) {
-	if src.GetType() != pb.MetricType_COUNTER && src.GetType() != pb.MetricType_COUNTER_TIME_SERIES {
-		return nil, fmt.Errorf("type %v can't be converted to Counter", src.GetType().String())
+// FromMetricPB creates a metric from the protobuf.
+func FromMetricPB(src *pb.Metric) (Metric, error) {
+	if src.GetType() != pb.MetricType_COUNTER && src.GetType() != pb.MetricType_COUNTER_TIME_SERIES && src.GetType() != pb.MetricType_GAUGE {
+		return nil, fmt.Errorf("metric type %v is invalid", src.GetType().String())
 	}
 
-	c := &Counter{
-		name: src.GetName(),
+	var m Metric
+	switch src.GetType() {
+	case pb.MetricType_COUNTER:
+		m = &Counter{
+			name: src.GetName(),
+		}
+		loadCounterFromMetricPB(m.(*Counter), src)
+	case pb.MetricType_COUNTER_TIME_SERIES:
+		m = &Counter{
+			name:       src.GetName(),
+			timeSeries: true,
+		}
+		loadCounterFromMetricPB(m.(*Counter), src)
+	case pb.MetricType_GAUGE:
+		m = &Gauge{
+			name: src.GetName(),
+		}
+		loadGaugeFromMetricPB(m.(*Gauge), src)
 	}
-	if src.GetType() == pb.MetricType_COUNTER_TIME_SERIES {
-		c.timeSeries = true
-	}
-	loadCounterFromMetricPB(c, src)
-	return c, nil
+	return m, nil
 }
 
 // LogMetricsNow writes the current metrics to log.
@@ -269,7 +282,7 @@ func logMetricsLoop() {
 }
 
 func loadCounterFromMetricPB(dst *Counter, src *pb.Metric) {
-	// Verify the name and type matches.
+	// Verify the type matches.
 	if src.GetName() != dst.Name() {
 		return
 	}
@@ -279,4 +292,13 @@ func loadCounterFromMetricPB(dst *Counter, src *pb.Metric) {
 		dst.Add(delta)
 		dst.history = src.GetHistory()
 	}
+}
+
+func loadGaugeFromMetricPB(dst *Gauge, src *pb.Metric) {
+	// Verify the type matches.
+	if src.GetName() != dst.Name() {
+		return
+	}
+
+	dst.Store(src.GetValue())
 }

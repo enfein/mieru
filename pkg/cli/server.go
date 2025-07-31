@@ -817,19 +817,20 @@ var serverGetUsersFunc = func(_ []string) error {
 
 		// Collect download and upload metrics of this user.
 		var down, up *metrics.Counter
-		var err error
 		for _, metric := range userWithMetrics.GetMetrics() {
 			switch metric.GetName() {
 			case metrics.UserMetricDownloadBytes:
-				down, err = metrics.NewCounterFromMetricPB(metric)
+				downMetric, err := metrics.FromMetricPB(metric)
 				if err != nil {
-					return fmt.Errorf("metrics.NewCounterFromMetricPB() failed: %w", err)
+					return fmt.Errorf("metrics.FromMetricPB() failed: %w", err)
 				}
+				down = downMetric.(*metrics.Counter)
 			case metrics.UserMetricUploadBytes:
-				up, err = metrics.NewCounterFromMetricPB(metric)
+				upMetric, err := metrics.FromMetricPB(metric)
 				if err != nil {
-					return fmt.Errorf("metrics.NewCounterFromMetricPB() failed: %w", err)
+					return fmt.Errorf("metrics.FromMetricPB() failed: %w", err)
 				}
+				up = upMetric.(*metrics.Counter)
 			}
 		}
 
@@ -902,19 +903,20 @@ var serverGetQuotasFunc = func(_ []string) error {
 
 		// Collect download and upload metrics of this user.
 		var down, up *metrics.Counter
-		var err error
 		for _, metric := range userWithMetrics.GetMetrics() {
 			switch metric.GetName() {
 			case metrics.UserMetricDownloadBytes:
-				down, err = metrics.NewCounterFromMetricPB(metric)
+				downMetric, err := metrics.FromMetricPB(metric)
 				if err != nil {
-					return fmt.Errorf("metrics.NewCounterFromMetricPB() failed: %w", err)
+					return fmt.Errorf("metrics.FromMetricPB() failed: %w", err)
 				}
+				down = downMetric.(*metrics.Counter)
 			case metrics.UserMetricUploadBytes:
-				up, err = metrics.NewCounterFromMetricPB(metric)
+				upMetric, err := metrics.FromMetricPB(metric)
 				if err != nil {
-					return fmt.Errorf("metrics.NewCounterFromMetricPB() failed: %w", err)
+					return fmt.Errorf("metrics.FromMetricPB() failed: %w", err)
 				}
+				up = upMetric.(*metrics.Counter)
 			}
 		}
 		if down == nil || up == nil {

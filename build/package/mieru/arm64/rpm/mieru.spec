@@ -1,5 +1,5 @@
 Name: mieru
-Version: 3.17.0
+Version: 3.17.1
 Release: 1%{?dist}
 Summary: Mieru proxy client
 License: GPLv3+

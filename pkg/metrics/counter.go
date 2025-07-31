@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	rollUpInterval       = 1024
+	rollUpInterval       = 1000
 	rollUpToSecond       = 2 * time.Second
 	rollUpSecondToMinute = 120 * time.Second
 	rollUpMinuteToHour   = 120 * time.Minute
