@@ -230,7 +230,7 @@ Below is an example to configure a proxy chain.
 ```
 
 1. In the `egress` -> `proxies` property, list the information of outbound proxy servers. The current version only supports socks5 outbound, so the value of `protocol` must be set to `SOCKS5_PROXY_PROTOCOL`. If the outbound proxy server requires socks5 username and password authentication, please fill in the `socks5Authentication` property. Otherwise, please remove the `socks5Authentication` property.
-2. In the `egress` -> `rules` property, list outbound rules. `proxyNames` needs to point to proxies that exist in `egress` -> `proxies` property.
+2. In the `egress` -> `rules` property, list outbound rules. Outbound actions include `DIRECT`, `PROXY` and `REJECT`. `proxyNames` must be set if `PROXY` action is used. `proxyNames` needs to point to proxies that exist in `egress` -> `proxies` property.
 
 If you want to turn off the outbound proxy feature, simply set the `egress` property to an empty value `{}`.
 

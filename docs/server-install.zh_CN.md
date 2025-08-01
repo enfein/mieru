@@ -230,7 +230,7 @@ mieru 客户端 -> GFW -> mita 服务器 -> cloudflare 代理客户端 -> cloudf
 ```
 
 1. 在 `egress` -> `proxies` 属性中列举出站代理服务器的信息。当前版本只支持 socks5 出站，因此 `protocol` 的值必须设定为 `SOCKS5_PROXY_PROTOCOL`。如果出站代理服务器需要 socks5 用户名和密码验证，请填写 `socks5Authentication` 属性。否则，请删除 `socks5Authentication` 属性。
-2. 在 `egress` -> `rules` 属性中列举出站规则。`proxyNames` 需要指向 `egress` -> `proxies` 属性中存在的代理。
+2. 在 `egress` -> `rules` 属性中列举出站规则。出站行为包括 `DIRECT`，`PROXY` 和 `REJECT`。其中 `PROXY` 行为必须指定 `proxyNames`。`proxyNames` 需要指向 `egress` -> `proxies` 属性中存在的代理。
 
 如果想要关闭出站代理功能，将 `egress` 属性设置为空 `{}` 即可。
 
