@@ -15,7 +15,7 @@
 
 syntax = "proto3";
 
-package updater;
+package mieru.updater;
 
 option go_package = "github.com/enfein/mieru/v3/pkg/version/updater/updaterpb";
 

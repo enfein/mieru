@@ -15,7 +15,7 @@
 
 syntax = "proto3";
 
-package appctl;
+package mieru.appctl;
 
 option go_package = "github.com/enfein/mieru/v3/pkg/appctl/appctlpb";
 

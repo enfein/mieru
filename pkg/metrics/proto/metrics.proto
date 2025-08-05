@@ -15,7 +15,7 @@
 
 syntax = "proto3";
 
-package metrics;
+package mieru.metrics;
 
 option go_package = "github.com/enfein/mieru/v3/pkg/metrics/metricspb";
 

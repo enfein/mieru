@@ -36,16 +36,16 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	ClientManagementService_GetStatus_FullMethodName           = "/appctl.ClientManagementService/GetStatus"
-	ClientManagementService_Exit_FullMethodName                = "/appctl.ClientManagementService/Exit"
-	ClientManagementService_GetMetrics_FullMethodName          = "/appctl.ClientManagementService/GetMetrics"
-	ClientManagementService_GetSessionInfoList_FullMethodName  = "/appctl.ClientManagementService/GetSessionInfoList"
-	ClientManagementService_GetThreadDump_FullMethodName       = "/appctl.ClientManagementService/GetThreadDump"
-	ClientManagementService_StartCPUProfile_FullMethodName     = "/appctl.ClientManagementService/StartCPUProfile"
-	ClientManagementService_StopCPUProfile_FullMethodName      = "/appctl.ClientManagementService/StopCPUProfile"
-	ClientManagementService_GetHeapProfile_FullMethodName      = "/appctl.ClientManagementService/GetHeapProfile"
-	ClientManagementService_GetMemoryStatistics_FullMethodName = "/appctl.ClientManagementService/GetMemoryStatistics"
-	ClientManagementService_GetVersion_FullMethodName          = "/appctl.ClientManagementService/GetVersion"
+	ClientManagementService_GetStatus_FullMethodName           = "/mieru.appctl.ClientManagementService/GetStatus"
+	ClientManagementService_Exit_FullMethodName                = "/mieru.appctl.ClientManagementService/Exit"
+	ClientManagementService_GetMetrics_FullMethodName          = "/mieru.appctl.ClientManagementService/GetMetrics"
+	ClientManagementService_GetSessionInfoList_FullMethodName  = "/mieru.appctl.ClientManagementService/GetSessionInfoList"
+	ClientManagementService_GetThreadDump_FullMethodName       = "/mieru.appctl.ClientManagementService/GetThreadDump"
+	ClientManagementService_StartCPUProfile_FullMethodName     = "/mieru.appctl.ClientManagementService/StartCPUProfile"
+	ClientManagementService_StopCPUProfile_FullMethodName      = "/mieru.appctl.ClientManagementService/StopCPUProfile"
+	ClientManagementService_GetHeapProfile_FullMethodName      = "/mieru.appctl.ClientManagementService/GetHeapProfile"
+	ClientManagementService_GetMemoryStatistics_FullMethodName = "/mieru.appctl.ClientManagementService/GetMemoryStatistics"
+	ClientManagementService_GetVersion_FullMethodName          = "/mieru.appctl.ClientManagementService/GetVersion"
 )
 
 // ClientManagementServiceClient is the client API for ClientManagementService service.
@@ -431,7 +431,7 @@ func _ClientManagementService_GetVersion_Handler(srv interface{}, ctx context.Co
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var ClientManagementService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "appctl.ClientManagementService",
+	ServiceName: "mieru.appctl.ClientManagementService",
 	HandlerType: (*ClientManagementServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -480,22 +480,22 @@ var ClientManagementService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	ServerManagementService_GetStatus_FullMethodName           = "/appctl.ServerManagementService/GetStatus"
-	ServerManagementService_Start_FullMethodName               = "/appctl.ServerManagementService/Start"
-	ServerManagementService_Stop_FullMethodName                = "/appctl.ServerManagementService/Stop"
-	ServerManagementService_GetConfig_FullMethodName           = "/appctl.ServerManagementService/GetConfig"
-	ServerManagementService_SetConfig_FullMethodName           = "/appctl.ServerManagementService/SetConfig"
-	ServerManagementService_Reload_FullMethodName              = "/appctl.ServerManagementService/Reload"
-	ServerManagementService_Exit_FullMethodName                = "/appctl.ServerManagementService/Exit"
-	ServerManagementService_GetMetrics_FullMethodName          = "/appctl.ServerManagementService/GetMetrics"
-	ServerManagementService_GetSessionInfoList_FullMethodName  = "/appctl.ServerManagementService/GetSessionInfoList"
-	ServerManagementService_GetUsers_FullMethodName            = "/appctl.ServerManagementService/GetUsers"
-	ServerManagementService_GetThreadDump_FullMethodName       = "/appctl.ServerManagementService/GetThreadDump"
-	ServerManagementService_StartCPUProfile_FullMethodName     = "/appctl.ServerManagementService/StartCPUProfile"
-	ServerManagementService_StopCPUProfile_FullMethodName      = "/appctl.ServerManagementService/StopCPUProfile"
-	ServerManagementService_GetHeapProfile_FullMethodName      = "/appctl.ServerManagementService/GetHeapProfile"
-	ServerManagementService_GetMemoryStatistics_FullMethodName = "/appctl.ServerManagementService/GetMemoryStatistics"
-	ServerManagementService_GetVersion_FullMethodName          = "/appctl.ServerManagementService/GetVersion"
+	ServerManagementService_GetStatus_FullMethodName           = "/mieru.appctl.ServerManagementService/GetStatus"
+	ServerManagementService_Start_FullMethodName               = "/mieru.appctl.ServerManagementService/Start"
+	ServerManagementService_Stop_FullMethodName                = "/mieru.appctl.ServerManagementService/Stop"
+	ServerManagementService_GetConfig_FullMethodName           = "/mieru.appctl.ServerManagementService/GetConfig"
+	ServerManagementService_SetConfig_FullMethodName           = "/mieru.appctl.ServerManagementService/SetConfig"
+	ServerManagementService_Reload_FullMethodName              = "/mieru.appctl.ServerManagementService/Reload"
+	ServerManagementService_Exit_FullMethodName                = "/mieru.appctl.ServerManagementService/Exit"
+	ServerManagementService_GetMetrics_FullMethodName          = "/mieru.appctl.ServerManagementService/GetMetrics"
+	ServerManagementService_GetSessionInfoList_FullMethodName  = "/mieru.appctl.ServerManagementService/GetSessionInfoList"
+	ServerManagementService_GetUsers_FullMethodName            = "/mieru.appctl.ServerManagementService/GetUsers"
+	ServerManagementService_GetThreadDump_FullMethodName       = "/mieru.appctl.ServerManagementService/GetThreadDump"
+	ServerManagementService_StartCPUProfile_FullMethodName     = "/mieru.appctl.ServerManagementService/StartCPUProfile"
+	ServerManagementService_StopCPUProfile_FullMethodName      = "/mieru.appctl.ServerManagementService/StopCPUProfile"
+	ServerManagementService_GetHeapProfile_FullMethodName      = "/mieru.appctl.ServerManagementService/GetHeapProfile"
+	ServerManagementService_GetMemoryStatistics_FullMethodName = "/mieru.appctl.ServerManagementService/GetMemoryStatistics"
+	ServerManagementService_GetVersion_FullMethodName          = "/mieru.appctl.ServerManagementService/GetVersion"
 )
 
 // ServerManagementServiceClient is the client API for ServerManagementService service.
@@ -1085,7 +1085,7 @@ func _ServerManagementService_GetVersion_Handler(srv interface{}, ctx context.Co
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var ServerManagementService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "appctl.ServerManagementService",
+	ServiceName: "mieru.appctl.ServerManagementService",
 	HandlerType: (*ServerManagementServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

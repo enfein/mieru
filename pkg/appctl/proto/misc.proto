@@ -15,7 +15,7 @@
 
 syntax = "proto3";
 
-package appctl;
+package mieru.appctl;
 
 import "appctl/proto/base.proto";
 import "appctl/proto/google/protobuf/timestamp.proto";
