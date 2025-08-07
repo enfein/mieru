@@ -804,15 +804,17 @@ var serverGetUsersFunc = func(_ []string) error {
 	header := []string{
 		"User",
 		"LastActive",
-		"1DayDownload",
-		"1DayUpload",
-		"30DaysDownload",
-		"30DaysUpload",
+		"1DayDown",
+		"1DayUp",
+		"7DaysDown",
+		"7DaysUp",
+		"30DaysDown",
+		"30DaysUp",
 	}
 	table := make([][]string, 0)
 	table = append(table, header)
 	for _, userWithMetrics := range userWithMetricsList.GetItems() {
-		row := make([]string, 6)
+		row := make([]string, 8)
 		row[0] = userWithMetrics.GetUser().GetName()
 
 		// Collect download and upload metrics of this user.
@@ -835,21 +837,26 @@ var serverGetUsersFunc = func(_ []string) error {
 		}
 
 		var lastDownloadTime, lastUploadTime time.Time
+		now := time.Now()
 		if down != nil {
 			lastDownloadTime = down.LastUpdateTime()
-			row[2] = common.ByteCountIEC(down.DeltaBetween(time.Now().Add(-24*time.Hour), time.Now()))
-			row[4] = common.ByteCountIEC(down.DeltaBetween(time.Now().Add(-720*time.Hour), time.Now()))
+			row[2] = common.ByteCountIEC(down.DeltaBetween(now.Add(-24*time.Hour), now))
+			row[4] = common.ByteCountIEC(down.DeltaBetween(now.Add(-168*time.Hour), now))
+			row[6] = common.ByteCountIEC(down.DeltaBetween(now.Add(-720*time.Hour), now))
 		} else {
 			row[2] = "-"
 			row[4] = "-"
+			row[6] = "-"
 		}
 		if up != nil {
 			lastUploadTime = up.LastUpdateTime()
-			row[3] = common.ByteCountIEC(up.DeltaBetween(time.Now().Add(-24*time.Hour), time.Now()))
-			row[5] = common.ByteCountIEC(up.DeltaBetween(time.Now().Add(-720*time.Hour), time.Now()))
+			row[3] = common.ByteCountIEC(up.DeltaBetween(now.Add(-24*time.Hour), now))
+			row[5] = common.ByteCountIEC(up.DeltaBetween(now.Add(-168*time.Hour), now))
+			row[7] = common.ByteCountIEC(up.DeltaBetween(now.Add(-720*time.Hour), now))
 		} else {
 			row[3] = "-"
 			row[5] = "-"
+			row[7] = "-"
 		}
 		if lastDownloadTime.IsZero() && lastUploadTime.IsZero() {
 			row[1] = "-"
