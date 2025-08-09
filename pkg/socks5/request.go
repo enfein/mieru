@@ -420,8 +420,9 @@ func (s *Server) proxySocks5AuthReq(conn, proxyConn net.Conn) error {
 }
 
 // proxySocks5ConnReq transfers the socks5 connection request and response
-// between socks5 client and server. Optionally, if UDP association is used,
-// return the created UDP connection.
+// between socks5 client and server.
+// If HandshakeNoWait is true, socks5 client will fake the connection response.
+// If UDP association is used, return the created UDP connection, otherwise return nil.
 func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, error) {
 	// Send the connection request to the server.
 	defer common.SetReadTimeout(conn, 0)
@@ -461,6 +462,25 @@ func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, err
 	}
 	log.Debugf("Sent socks5 request %v to server", connReq)
 
+	// Fake server connection response if HandshakeNoWait is true.
+	if s.config.HandshakeNoWait && cmd == constant.Socks5ConnectCmd {
+		var resp bytes.Buffer
+		// Instead of using server bound address and port, use the proxy connection address and port.
+		serverBoundAddr := model.NetAddrSpec{}
+		if err := serverBoundAddr.From(proxyConn.RemoteAddr()); err != nil {
+			return nil, fmt.Errorf("failed to get proxy connection address: %w", err)
+		}
+		resp.Write([]byte{constant.Socks5Version, 0, 0})
+		if err := serverBoundAddr.WriteToSocks5(&resp); err != nil {
+			return nil, fmt.Errorf("failed to write proxy connection address: %w", err)
+		}
+
+		if _, err := conn.Write(resp.Bytes()); err != nil {
+			return nil, fmt.Errorf("failed to write fake connection response to the socks5 client: %w", err)
+		}
+		return nil, nil
+	}
+
 	// Get server connection response.
 	common.SetReadTimeout(proxyConn, s.config.HandshakeTimeout)
 	connResp := make([]byte, 4)
@@ -492,9 +512,11 @@ func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, err
 	}
 	connResp = append(connResp, bindAddr...)
 
+	// Handle UDP association.
 	var udpConn *net.UDPConn
 	if cmd == constant.Socks5UDPAssociateCmd {
 		// Create a UDP listener on a random port in IPv4 network.
+		// Assume server uses 0.0.0.0:<port> as the bind address so we only need to change port number.
 		var err error
 		udpAddr := &net.UDPAddr{IP: net.IP{0, 0, 0, 0}, Port: 0}
 		udpConn, err = net.ListenUDP("udp4", udpAddr)
@@ -520,7 +542,6 @@ func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, err
 	if _, err := conn.Write(connResp); err != nil {
 		return nil, fmt.Errorf("failed to write connection response to the socks5 client: %w", err)
 	}
-
 	return udpConn, nil
 }
 

@@ -68,6 +68,12 @@ type Config struct {
 	// Allow using socks5 to access resources served from loopback address.
 	// This is for testing purpose.
 	AllowLoopbackDestination bool
+
+	// ---- client only fields ----
+
+	// Do not wait for handshake to complete before sending payload.
+	// This has no effect if UDP association is used.
+	HandshakeNoWait bool
 }
 
 // Server is responsible for accepting connections and handling
@@ -213,17 +219,19 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 		proxyConn.Close()
 		return err
 	}
-
-	if udpAssociateConn != nil {
-		log.Debugf("UDP association is listening on %v", udpAssociateConn.LocalAddr())
-		conn.(common.HierarchyConn).AddSubConnection(udpAssociateConn)
-		go func() {
-			common.ReadAllAndDiscard(conn)
-			conn.Close()
-		}()
-		return BidiCopyUDP(udpAssociateConn, apicommon.NewPacketOverStreamTunnel(proxyConn))
+	if udpAssociateConn == nil {
+		if s.config.HandshakeNoWait {
+			return BidiCopySocks5(conn, proxyConn)
+		}
+		return common.BidiCopy(conn, proxyConn)
 	}
-	return common.BidiCopy(conn, proxyConn)
+	log.Debugf("UDP association is listening on %v", udpAssociateConn.LocalAddr())
+	conn.(common.HierarchyConn).AddSubConnection(udpAssociateConn)
+	go func() {
+		common.ReadAllAndDiscard(conn)
+		conn.Close()
+	}()
+	return BidiCopyUDP(udpAssociateConn, apicommon.NewPacketOverStreamTunnel(proxyConn))
 }
 
 func (s *Server) serverServeConn(conn net.Conn) error {

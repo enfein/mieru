@@ -127,6 +127,48 @@ if [[ "$?" -ne 0 ]]; then
 fi
 sleep 1
 
+print_mieru_client_log
+delete_mieru_client_log
+sleep 1
+
+# Update mieru client with TCP config handshake no wait mode.
+./mieru apply config client_tcp_no_wait.json
+if [[ "$?" -ne 0 ]]; then
+    echo "command 'mieru apply config client_tcp_no_wait.json' failed"
+    exit 1
+fi
+echo "mieru client config:"
+./mieru describe config
+
+# Start mieru client.
+./mieru start
+if [[ "$?" -ne 0 ]]; then
+    echo "command 'mieru start' failed"
+    exit 1
+fi
+
+# Start testing.
+sleep 2
+echo ">>> socks5 - new connections - TCP <<<"
+./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
+  -local_proxy_host=127.0.0.1 -local_proxy_port=1080 \
+  -test_case=new_conn -num_request=3000
+if [ "$?" -ne "0" ]; then
+    print_mieru_client_log
+    print_mieru_client_thread_dump
+    print_mieru_server_thread_dump
+    echo "TCP - test socks5 new_conn (handshake no wait) failed."
+    exit 1
+fi
+
+# Stop mieru client.
+./mieru stop
+if [[ "$?" -ne 0 ]]; then
+    echo "command 'mieru stop' failed"
+    exit 1
+fi
+sleep 1
+
 # Stop mieru server proxy.
 ./mita stop
 if [[ "$?" -ne 0 ]]; then

@@ -20,7 +20,8 @@
             "mtu": 1300,
             "multiplexing": {
                 "level": "MULTIPLEXING_LOW"
-            }
+            },
+            "handshakeMode": "HANDSHAKE_STANDARD"
         }
     ],
     "activeProfile": "default",

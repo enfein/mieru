@@ -279,8 +279,10 @@ func (s *Session) Write(b []byte) (n int, err error) {
 		s.writeDeadline = time.Time{}
 	}()
 
-	if s.isClient && s.isState(sessionAttached) {
-		// Before the first write, client needs to send open session request.
+	// Before the first write, client needs to send open session request.
+	// Note: even in sessionAttached state, client is allowed to send more packets,
+	// so open session request is only sent when nextSend is 0.
+	if s.isClient && s.isState(sessionAttached) && s.nextSend == 0 {
 		s.oLock.Lock()
 		seg := &segment{
 			metadata: &sessionStruct{
@@ -293,6 +295,7 @@ func (s *Session) Write(b []byte) (n int, err error) {
 			transport: s.conn.TransportProtocol(),
 		}
 		s.nextSend++
+		// Allow open session request to carry payload.
 		if len(b) <= MaxSessionOpenPayload {
 			seg.metadata.(*sessionStruct).payloadLen = uint16(len(b))
 			seg.payload = make([]byte, len(b))

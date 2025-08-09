@@ -59,7 +59,8 @@
             "mtu": 1400,
             "multiplexing": {
                 "level": "MULTIPLEXING_OFF"
-            }
+            },
+            "handshakeMode": "HANDSHAKE_NO_WAIT"
         }
     ],
     "activeProfile": "new",

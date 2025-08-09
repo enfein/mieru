@@ -17,10 +17,12 @@ package socks5
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"sync/atomic"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
+	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
@@ -52,7 +54,7 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *apicommon.PacketOverStreamTun
 				break
 			}
 			if _, err = tunnelConn.Write(buf[:n]); err != nil {
-				errCh <- fmt.Errorf("Write tunnel failed: %w", err)
+				errCh <- fmt.Errorf("write tunnel failed: %w", err)
 				break
 			}
 		}
@@ -62,7 +64,7 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *apicommon.PacketOverStreamTun
 		for {
 			n, err := tunnelConn.Read(buf)
 			if err != nil {
-				errCh <- fmt.Errorf("Read tunnel failed: %w", err)
+				errCh <- fmt.Errorf("read tunnel failed: %w", err)
 				break
 			}
 			udpAddr := addr.Load()
@@ -94,4 +96,62 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *apicommon.PacketOverStreamTun
 		log.Debugf("BidiCopyUDP() with endpoint %v failed 2: %v", udpConn.LocalAddr(), err)
 	}
 	return nil
+}
+
+// BidiCopySocks5 does bi-directional data copy.
+// This function is aware of socks5 protocol and doesn't copy the socks5 reply header
+// sent by the server.
+func BidiCopySocks5(conn, proxyConn io.ReadWriteCloser) error {
+	errCh := make(chan error, 2)
+	go func() {
+		_, err := io.Copy(proxyConn, conn)
+		proxyConn.Close()
+		errCh <- err
+	}()
+	go func() {
+		connResp := make([]byte, 4)
+		if _, err := io.ReadFull(proxyConn, connResp); err != nil {
+			conn.Close()
+			errCh <- fmt.Errorf("failed to read connection response from the server: %w", err)
+			return
+		}
+		respAddrType := connResp[3]
+		var respFQDNLen []byte
+		var bindAddr []byte
+		switch respAddrType {
+		case constant.Socks5IPv4Address:
+			bindAddr = make([]byte, 6)
+		case constant.Socks5FQDNAddress:
+			respFQDNLen = []byte{0}
+			if _, err := io.ReadFull(proxyConn, respFQDNLen); err != nil {
+				conn.Close()
+				errCh <- fmt.Errorf("failed to get FQDN length: %w", err)
+				return
+			}
+			bindAddr = make([]byte, respFQDNLen[0]+2)
+		case constant.Socks5IPv6Address:
+			bindAddr = make([]byte, 18)
+		default:
+			conn.Close()
+			errCh <- fmt.Errorf("unsupported address type: %d", respAddrType)
+			return
+		}
+		if _, err := io.ReadFull(proxyConn, bindAddr); err != nil {
+			conn.Close()
+			errCh <- fmt.Errorf("failed to get bind address: %w", err)
+			return
+		}
+		if len(respFQDNLen) != 0 {
+			connResp = append(connResp, respFQDNLen...)
+		}
+		connResp = append(connResp, bindAddr...)
+		log.Debugf("HANDSHAKE_NO_WAIT mode socks5 server reply: %v", connResp)
+		_, err := io.Copy(conn, proxyConn)
+		conn.Close()
+		errCh <- err
+	}()
+
+	err := <-errCh
+	<-errCh
+	return err
 }

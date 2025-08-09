@@ -619,6 +619,9 @@ var clientRunFunc = func(s []string) error {
 		Resolver:         resolver,
 		HandshakeTimeout: 10 * time.Second,
 	}
+	if activeProfile.GetHandshakeMode() == appctlpb.HandshakeMode_HANDSHAKE_NO_WAIT {
+		socks5Config.HandshakeNoWait = true
+	}
 	socks5Server, err := socks5.New(socks5Config)
 	if err != nil {
 		return fmt.Errorf(stderror.CreateSocks5ServerFailedErr, err)

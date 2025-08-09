@@ -70,6 +70,9 @@ message ClientProfile {
 
     // Multiplexing behaviors.
     optional MultiplexingConfig multiplexing = 5;
+
+    // Handshake mode when client open a connection.
+    optional HandshakeMode handshakeMode = 6;
 }
 
 message MultiplexingConfig {
@@ -83,6 +86,19 @@ enum MultiplexingLevel {
     MULTIPLEXING_LOW = 2;
     MULTIPLEXING_MIDDLE = 3;
     MULTIPLEXING_HIGH = 4;
+}
+
+enum HandshakeMode {
+    HANDSHAKE_DEFAULT = 0;
+
+    // Client wait for proxy server to establish connection to the destination
+    // before sending the payload.
+    // Also known as 1-RTT.
+    HANDSHAKE_STANDARD = 1;
+
+    // Client send payload at the same time when connecting to the proxy server.
+    // Also known as 0-RTT.
+    HANDSHAKE_NO_WAIT = 2;
 }
 
 message ClientAdvancedSettings {

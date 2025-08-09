@@ -1,0 +1,49 @@
+{
+    "profiles": [
+        {
+            "profileName": "default",
+            "user": {
+                "name": "baozi",
+                "password": "manlianpenfen"
+            },
+            "servers": [
+                {
+                    "domainName": "localhost",
+                    "portBindings": [
+                        {
+                            "portRange": "8964-8965",
+                            "protocol": "UDP"
+                        },
+                        {
+                            "port": 9648,
+                            "protocol": "UDP"
+                        },
+                        {
+                            "port": 6489,
+                            "protocol": "UDP"
+                        },
+                        {
+                            "port": 4896,
+                            "protocol": "UDP"
+                        }
+                    ]
+                }
+            ],
+            "mtu": 1400,
+            "multiplexing": {
+                "level": "MULTIPLEXING_HIGH"
+            },
+            "handshakeMode": "HANDSHAKE_NO_WAIT"
+        }
+    ],
+    "activeProfile": "default",
+    "rpcPort": 8989,
+    "socks5Port": 1080,
+    "advancedSettings": {
+        "noCheckUpdate": true
+    },
+    "loggingLevel": "INFO",
+    "socks5ListenLAN": true,
+    "httpProxyPort": 8808,
+    "httpProxyListenLAN": true
+}
