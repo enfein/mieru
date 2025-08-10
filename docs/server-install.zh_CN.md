@@ -18,32 +18,32 @@ sudo python3 setup.py --lang=zh
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.17.1/mita_3.17.1_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.18.0/mita_3.18.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.17.1/mita_3.17.1_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.18.0/mita_3.18.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.17.1/mita-3.17.1-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.18.0/mita-3.18.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.17.1/mita-3.17.1-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.18.0/mita-3.18.0-1.aarch64.rpm
 ```
 
 ## 安装 mita 软件包
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_3.17.1_amd64.deb
+sudo dpkg -i mita_3.18.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_3.17.1_arm64.deb
+sudo dpkg -i mita_3.18.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-3.17.1-1.x86_64.rpm
+sudo rpm -Uvh --force mita-3.18.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-3.17.1-1.aarch64.rpm
+sudo rpm -Uvh --force mita-3.18.0-1.aarch64.rpm
 ```
 
 上述指令也可以用来升级 mita 软件包的版本。
@@ -230,7 +230,7 @@ mieru 客户端 -> GFW -> mita 服务器 -> cloudflare 代理客户端 -> cloudf
 ```
 
 1. 在 `egress` -> `proxies` 属性中列举出站代理服务器的信息。当前版本只支持 socks5 出站，因此 `protocol` 的值必须设定为 `SOCKS5_PROXY_PROTOCOL`。如果出站代理服务器需要 socks5 用户名和密码验证，请填写 `socks5Authentication` 属性。否则，请删除 `socks5Authentication` 属性。
-2. 在 `egress` -> `rules` 属性中列举出站规则。出站行为包括 `DIRECT`，`PROXY` 和 `REJECT`。其中 `PROXY` 行为必须指定 `proxyNames`。`proxyNames` 需要指向 `egress` -> `proxies` 属性中存在的代理。
+2. 在 `egress` -> `rules` 属性中列举出站规则。从上到下，第一条匹配 IP 地址段或 DNS 后缀的规则会被执行。使用通配符 `"*"` 匹配所有 IP 地址或域名。出站行为包括 `DIRECT`，`PROXY` 和 `REJECT`。其中 `PROXY` 行为必须指定 `proxyNames`。`proxyNames` 需要指向 `egress` -> `proxies` 属性中存在的代理。默认的出站行为是 `DIRECT`。
 
 如果想要关闭出站代理功能，将 `egress` 属性设置为空 `{}` 即可。
 

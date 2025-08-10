@@ -18,32 +18,32 @@ Or you can manually install and configure proxy server using the steps below.
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.17.1/mita_3.17.1_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.18.0/mita_3.18.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.17.1/mita_3.17.1_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.18.0/mita_3.18.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.17.1/mita-3.17.1-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.18.0/mita-3.18.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.17.1/mita-3.17.1-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.18.0/mita-3.18.0-1.aarch64.rpm
 ```
 
 ## Install mita package
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_3.17.1_amd64.deb
+sudo dpkg -i mita_3.18.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_3.17.1_arm64.deb
+sudo dpkg -i mita_3.18.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-3.17.1-1.x86_64.rpm
+sudo rpm -Uvh --force mita-3.18.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-3.17.1-1.aarch64.rpm
+sudo rpm -Uvh --force mita-3.18.0-1.aarch64.rpm
 ```
 
 Those instructions can also be used to upgrade the version of mita software package.
@@ -230,7 +230,7 @@ Below is an example to configure a proxy chain.
 ```
 
 1. In the `egress` -> `proxies` property, list the information of outbound proxy servers. The current version only supports socks5 outbound, so the value of `protocol` must be set to `SOCKS5_PROXY_PROTOCOL`. If the outbound proxy server requires socks5 username and password authentication, please fill in the `socks5Authentication` property. Otherwise, please remove the `socks5Authentication` property.
-2. In the `egress` -> `rules` property, list outbound rules. Outbound actions include `DIRECT`, `PROXY` and `REJECT`. `proxyNames` must be set if `PROXY` action is used. `proxyNames` needs to point to proxies that exist in `egress` -> `proxies` property.
+2. In the `egress` -> `rules` property, list outbound rules. From begin to end, the first rule that matches IP address range or DNS suffix is executed. Use wildcard `"*"` to match all IP addresses or domain names. Outbound actions include `DIRECT`, `PROXY` and `REJECT`. `proxyNames` must be set if `PROXY` action is used. `proxyNames` needs to point to proxies that exist in `egress` -> `proxies` property. The default outbound action is `DIRECT`.
 
 If you want to turn off the outbound proxy feature, simply set the `egress` property to an empty value `{}`.
 

@@ -461,7 +461,8 @@ class ClientConfig:
                 'servers': [{
                     'ipAddress': '',
                     'portBindings': [{}],
-                }]
+                }],
+                'handshakeMode': 'HANDSHAKE_NO_WAIT'
             }],
             'activeProfile': 'default',
             'rpcPort': 0,
