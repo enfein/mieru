@@ -462,7 +462,7 @@ class ClientConfig:
                     'ipAddress': '',
                     'portBindings': [{}],
                 }],
-                'handshakeMode': 'HANDSHAKE_NO_WAIT'
+                'handshakeMode': 'HANDSHAKE_STANDARD'
             }],
             'activeProfile': 'default',
             'rpcPort': 0,
