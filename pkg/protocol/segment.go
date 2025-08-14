@@ -250,6 +250,10 @@ func (t *segmentTree) DeleteAll() {
 func (t *segmentTree) Ascend(si segmentIterator) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
+	if t.tr.Len() == 0 {
+		return
+	}
 	t.tr.Ascend(btree.ItemIteratorG[*segment](si))
 }
 

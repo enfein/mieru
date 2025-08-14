@@ -18,6 +18,11 @@ package protocol
 import "time"
 
 const (
-	// tickInterval is the event trigger interval.
-	tickInterval = 1 * time.Millisecond
+	// periodicOutputInterval triggers periodic output of packet transport,
+	// even if there is no new data to send.
+	periodicOutputInterval = 1 * time.Millisecond
+
+	// backPressureDelay is a short sleep to add back pressure
+	// to the writer.
+	backPressureDelay = 100 * time.Microsecond
 )

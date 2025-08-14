@@ -125,7 +125,8 @@ type Session struct {
 	remoteWindowSize    uint16
 
 	wg    sync.WaitGroup
-	rLock sync.Mutex // serialize read from application
+	rLock sync.Mutex // serialize application read
+	wLock sync.Mutex // serialize application write
 	oLock sync.Mutex // serialize the output sequence
 	sLock sync.Mutex // serialize the state transition
 }
@@ -141,7 +142,7 @@ var (
 // NewSession creates a new session.
 func NewSession(id uint32, isClient bool, mtu int, users map[string]*appctlpb.User) *Session {
 	rttStat := congestion.NewRTTStats()
-	rttStat.SetMaxAckDelay(tickInterval)
+	rttStat.SetMaxAckDelay(periodicOutputInterval)
 	rttStat.SetRTOMultiplier(txTimeoutBackOff)
 	return &Session{
 		conn:                nil,
@@ -184,6 +185,7 @@ func (s *Session) String() string {
 func (s *Session) Read(b []byte) (n int, err error) {
 	s.rLock.Lock()
 	defer s.rLock.Unlock()
+
 	defer func() {
 		s.readDeadline = time.Time{}
 	}()
@@ -265,6 +267,9 @@ func (s *Session) Read(b []byte) (n int, err error) {
 
 // Write stores the data to send queue.
 func (s *Session) Write(b []byte) (n int, err error) {
+	s.wLock.Lock()
+	defer s.wLock.Unlock()
+
 	if s.closeRequested.Load() {
 		return 0, io.ErrClosedPipe
 	}
@@ -484,7 +489,7 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 			return 0, stderror.ErrTimeout
 		default:
 		}
-		time.Sleep(tickInterval) // add back pressure if queue is full
+		time.Sleep(backPressureDelay) // add back pressure if queue is full
 	}
 
 	s.oLock.Lock()
@@ -535,20 +540,25 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 	}
 	s.oLock.Unlock()
 
-	// To create back pressure, wait until sendQueue is moving.
+	// To create back pressure, wait until sendQueue is empty or moving.
+	shouldReturn := false
 	for {
-		shouldReturn := false
 		select {
 		case <-s.sendQueue.chanEmptyEvent:
 			shouldReturn = true
-		case <-s.sendQueue.chanNotEmptyEvent:
-			seqAfterWrite, err := s.sendQueue.MinSeq()
-			if err != nil || seqAfterWrite > seqBeforeWrite {
-				shouldReturn = true
-			}
+		// do not consume s.sendQueue.chanNotEmptyEvent,
+		// because it is used to drive the output loop.
+		default:
 		}
 		if shouldReturn {
 			break
+		}
+
+		seqAfterWrite, err := s.sendQueue.MinSeq()
+		if err != nil || seqAfterWrite > seqBeforeWrite {
+			break
+		} else {
+			time.Sleep(backPressureDelay) // add back pressure if send queue is not moving
 		}
 	}
 
@@ -580,38 +590,46 @@ func (s *Session) runInputLoop(ctx context.Context) error {
 }
 
 func (s *Session) runOutputLoop(ctx context.Context) error {
-	ticker := time.NewTicker(tickInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-s.closedChan:
-			return nil
-		case <-ticker.C:
-		case <-s.sendQueue.chanNotEmptyEvent:
-		}
-
-		switch s.conn.TransportProtocol() {
-		case common.StreamTransport:
-			s.runOutputOnceStream()
-		case common.PacketTransport:
-			s.runOutputOncePacket()
-		default:
-			err := fmt.Errorf("unsupported transport protocol %v", s.conn.TransportProtocol())
-			log.Debugf("%v %v", s, err)
-			if s.outputHasErr.CompareAndSwap(false, true) {
-				close(s.outputErr)
+	switch s.conn.TransportProtocol() {
+	case common.StreamTransport:
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-s.closedChan:
+				return nil
+			case <-s.sendQueue.chanNotEmptyEvent:
+				s.runOutputOnceStream()
 			}
-			s.closeWithError(err)
 		}
+	case common.PacketTransport:
+		ticker := time.NewTicker(periodicOutputInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-s.closedChan:
+				return nil
+			case <-ticker.C:
+			case <-s.sendQueue.chanNotEmptyEvent:
+			}
+			s.runOutputOncePacket()
+		}
+	default:
+		err := fmt.Errorf("unsupported transport protocol %v", s.conn.TransportProtocol())
+		log.Debugf("%v %v", s, err)
+		if s.outputHasErr.CompareAndSwap(false, true) {
+			close(s.outputErr)
+		}
+		return s.closeWithError(err)
 	}
 }
 
 func (s *Session) runOutputOnceStream() {
 	if s.outputHasErr.Load() {
 		// Can't run output.
-		time.Sleep(tickInterval)
+		time.Sleep(periodicOutputInterval)
 		return
 	}
 
@@ -638,7 +656,7 @@ func (s *Session) runOutputOnceStream() {
 func (s *Session) runOutputOncePacket() {
 	if s.outputHasErr.Load() {
 		// Can't run output.
-		time.Sleep(tickInterval)
+		time.Sleep(periodicOutputInterval)
 		return
 	}
 
