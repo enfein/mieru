@@ -38,8 +38,15 @@ import (
 )
 
 const (
-	segmentTreeCapacity = 4096
+	// Buffer some segments before blocking the underlay input loop.
 	segmentChanCapacity = 1024
+
+	// Maximum number of segments in a queue or buffer.
+	segmentTreeCapacity = 4096
+
+	// Use a very large value for receive queue, because application may be lazy
+	// and only read received segments on demand.
+	segmentTreeRecvQueueCapacity = 1024 * 1024
 
 	minWindowSize = 16
 	maxWindowSize = segmentTreeCapacity
@@ -162,7 +169,7 @@ func NewSession(id uint32, isClient bool, mtu int, users map[string]*appctlpb.Us
 		sendQueue:           newSegmentTree(segmentTreeCapacity),
 		sendBuf:             newSegmentTree(segmentTreeCapacity),
 		recvBuf:             newSegmentTree(segmentTreeCapacity),
-		recvQueue:           newSegmentTree(segmentTreeCapacity),
+		recvQueue:           newSegmentTree(segmentTreeRecvQueueCapacity),
 		recvChan:            make(chan *segment, segmentChanCapacity),
 		lastRXTime:          time.Now(),
 		lastTXTime:          time.Now(),
@@ -725,6 +732,11 @@ func (s *Session) runOutputOncePacket() {
 	if s.sendQueue.Len() > 0 {
 		s.oLock.Lock()
 		for {
+			if s.sendBuf.Remaining() <= 1 {
+				s.oLock.Unlock()
+				break
+			}
+
 			seg, deleted := s.sendQueue.DeleteMinIf(func(iter *segment) bool {
 				return s.sendAlgorithm.CanSend(bytesInFlight, int64(packetOverhead+len(iter.payload)))
 			})
@@ -890,8 +902,15 @@ func (s *Session) inputData(seg *segment) error {
 	switch s.conn.TransportProtocol() {
 	case common.StreamTransport:
 		// Deliver the segment directly to recvQueue.
+		for {
+			if s.recvQueue.Remaining() <= 1 {
+				time.Sleep(backPressureDelay)
+			} else {
+				break
+			}
+		}
 		if !s.recvQueue.Insert(seg) {
-			return fmt.Errorf("insert %v to receive queue failed", seg)
+			return fmt.Errorf("inputData() failed: insert %v to receive queue failed", seg)
 		}
 	case common.PacketTransport:
 		// Delete all previous acknowledged segments from sendBuf.
@@ -928,12 +947,23 @@ func (s *Session) inputData(seg *segment) error {
 		}
 
 		// Deliver the segment to recvBuf.
+		for {
+			if s.recvBuf.Remaining() <= 1 {
+				time.Sleep(backPressureDelay)
+			} else {
+				break
+			}
+		}
 		if !s.recvBuf.Insert(seg) {
-			return fmt.Errorf("insert %v to receive buffer failed", seg)
+			return fmt.Errorf("inputData() failed: insert %v to receive buffer failed", seg)
 		}
 
 		// Move recvBuf to recvQueue.
 		for {
+			if s.recvQueue.Remaining() <= 1 {
+				break
+			}
+
 			seg3, deleted := s.recvBuf.DeleteMinIf(func(iter *segment) bool {
 				seq, _ := iter.Seq()
 				return seq <= s.nextRecv
@@ -944,7 +974,7 @@ func (s *Session) inputData(seg *segment) error {
 			seq, _ := seg3.Seq()
 			if seq == s.nextRecv {
 				if !s.recvQueue.Insert(seg3) {
-					return fmt.Errorf("insert %v to receive queue failed", seg3)
+					return fmt.Errorf("inputData() failed: insert %v to receive queue failed", seg3)
 				}
 				s.nextRecv++
 				das, ok := seg3.metadata.(*dataAckStruct)
@@ -992,7 +1022,7 @@ func (s *Session) inputData(seg *segment) error {
 			}
 			if !s.sendQueue.Insert(seg4) {
 				s.oLock.Unlock()
-				return fmt.Errorf("insert %v to send queue failed", seg4)
+				return fmt.Errorf("inputData() failed: insert %v to send queue failed", seg4)
 			} else {
 				s.oLock.Unlock()
 				s.forwardStateTo(sessionEstablished)
