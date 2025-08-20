@@ -34,6 +34,7 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *apicommon.PacketOverStreamTun
 	errCh := make(chan error, 2)
 
 	go func() {
+		// udpConn -> tunnelConn
 		buf := make([]byte, 1<<16)
 		for {
 			n, a, err := udpConn.ReadFrom(buf)
@@ -60,6 +61,7 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *apicommon.PacketOverStreamTun
 		}
 	}()
 	go func() {
+		// tunnelConn -> udpConn
 		buf := make([]byte, 1<<16)
 		for {
 			n, err := tunnelConn.Read(buf)
@@ -101,14 +103,38 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *apicommon.PacketOverStreamTun
 // BidiCopySocks5 does bi-directional data copy.
 // This function is aware of socks5 protocol and doesn't copy the socks5 reply header
 // sent by the server.
-func BidiCopySocks5(conn, proxyConn io.ReadWriteCloser) error {
+// If pendingReq is not empty, it is prepended to proxyConn.
+func BidiCopySocks5(conn, proxyConn io.ReadWriteCloser, pendingReq []byte) error {
 	errCh := make(chan error, 2)
+
 	go func() {
-		_, err := io.Copy(proxyConn, conn)
+		// conn -> proxyConn
+		buf := make([]byte, 1<<16)
+		reqLen := len(pendingReq)
+		if reqLen > 0 {
+			log.Debugf("HANDSHAKE_NO_WAIT mode socks5 client request: %v", pendingReq)
+			reqLen = copy(buf, pendingReq)
+		}
+		n, err := conn.Read(buf[reqLen:])
+		if err != nil {
+			proxyConn.Close()
+			errCh <- fmt.Errorf("failed to read connection request from the client: %w", err)
+			return
+		}
+		n += reqLen
+		_, err = proxyConn.Write(buf[:n])
+		if err != nil {
+			proxyConn.Close()
+			errCh <- fmt.Errorf("failed to write connection request to the server: %w", err)
+			return
+		}
+		_, err = io.Copy(proxyConn, conn)
 		proxyConn.Close()
 		errCh <- err
 	}()
+
 	go func() {
+		// proxyConn -> conn
 		connResp := make([]byte, 4)
 		if _, err := io.ReadFull(proxyConn, connResp); err != nil {
 			conn.Close()

@@ -421,16 +421,17 @@ func (s *Server) proxySocks5AuthReq(conn, proxyConn net.Conn) error {
 
 // proxySocks5ConnReq transfers the socks5 connection request and response
 // between socks5 client and server.
-// If HandshakeNoWait is true, socks5 client will fake the connection response.
-// If UDP association is used, return the created UDP connection, otherwise return nil.
-func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, error) {
-	// Send the connection request to the server.
+// If HandshakeNoWait is true, socks5 client will fake the connection response
+// and return the pending connection request to the server.
+// If UDP association is used, return the created UDP connection.
+func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, []byte, error) {
 	defer common.SetReadTimeout(conn, 0)
 	defer common.SetReadTimeout(proxyConn, 0)
 	common.SetReadTimeout(conn, s.config.HandshakeTimeout)
+
 	connReq := make([]byte, 4)
 	if _, err := io.ReadFull(conn, connReq); err != nil {
-		return nil, fmt.Errorf("failed to get socks5 connection request: %w", err)
+		return nil, nil, fmt.Errorf("failed to get socks5 connection request: %w", err)
 	}
 	cmd := connReq[1]
 	reqAddrType := connReq[3]
@@ -442,25 +443,21 @@ func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, err
 	case constant.Socks5FQDNAddress:
 		reqFQDNLen = []byte{0}
 		if _, err := io.ReadFull(conn, reqFQDNLen); err != nil {
-			return nil, fmt.Errorf("failed to get FQDN length: %w", err)
+			return nil, nil, fmt.Errorf("failed to get FQDN length: %w", err)
 		}
 		dstAddr = make([]byte, reqFQDNLen[0]+2)
 	case constant.Socks5IPv6Address:
 		dstAddr = make([]byte, 18)
 	default:
-		return nil, fmt.Errorf("unsupported address type: %d", reqAddrType)
+		return nil, nil, fmt.Errorf("unsupported address type: %d", reqAddrType)
 	}
 	if _, err := io.ReadFull(conn, dstAddr); err != nil {
-		return nil, fmt.Errorf("failed to get destination address: %w", err)
+		return nil, nil, fmt.Errorf("failed to get destination address: %w", err)
 	}
 	if len(reqFQDNLen) != 0 {
 		connReq = append(connReq, reqFQDNLen...)
 	}
 	connReq = append(connReq, dstAddr...)
-	if _, err := proxyConn.Write(connReq); err != nil {
-		return nil, fmt.Errorf("failed to write connection request to the server: %w", err)
-	}
-	log.Debugf("Sent socks5 request %v to server", connReq)
 
 	// Fake server connection response if HandshakeNoWait is true.
 	if s.config.HandshakeNoWait && cmd == constant.Socks5ConnectCmd {
@@ -468,24 +465,30 @@ func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, err
 		// Instead of using server bound address and port, use the proxy connection address and port.
 		serverBoundAddr := model.NetAddrSpec{}
 		if err := serverBoundAddr.From(proxyConn.RemoteAddr()); err != nil {
-			return nil, fmt.Errorf("failed to get proxy connection address: %w", err)
+			return nil, nil, fmt.Errorf("failed to get proxy connection address: %w", err)
 		}
 		resp.Write([]byte{constant.Socks5Version, 0, 0})
 		if err := serverBoundAddr.WriteToSocks5(&resp); err != nil {
-			return nil, fmt.Errorf("failed to write proxy connection address: %w", err)
+			return nil, nil, fmt.Errorf("failed to write proxy connection address: %w", err)
 		}
 
 		if _, err := conn.Write(resp.Bytes()); err != nil {
-			return nil, fmt.Errorf("failed to write fake connection response to the socks5 client: %w", err)
+			return nil, nil, fmt.Errorf("failed to write fake connection response to the socks5 client: %w", err)
 		}
-		return nil, nil
+		return nil, connReq, nil
 	}
+
+	// Send the connection request to the server.
+	if _, err := proxyConn.Write(connReq); err != nil {
+		return nil, nil, fmt.Errorf("failed to write connection request to the server: %w", err)
+	}
+	log.Debugf("Sent socks5 request %v to server", connReq)
 
 	// Get server connection response.
 	common.SetReadTimeout(proxyConn, s.config.HandshakeTimeout)
 	connResp := make([]byte, 4)
 	if _, err := io.ReadFull(proxyConn, connResp); err != nil {
-		return nil, fmt.Errorf("failed to read connection response from the server: %w", err)
+		return nil, nil, fmt.Errorf("failed to read connection response from the server: %w", err)
 	}
 	respAddrType := connResp[3]
 	var respFQDNLen []byte
@@ -496,21 +499,22 @@ func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, err
 	case constant.Socks5FQDNAddress:
 		respFQDNLen = []byte{0}
 		if _, err := io.ReadFull(proxyConn, respFQDNLen); err != nil {
-			return nil, fmt.Errorf("failed to get FQDN length: %w", err)
+			return nil, nil, fmt.Errorf("failed to get FQDN length: %w", err)
 		}
 		bindAddr = make([]byte, respFQDNLen[0]+2)
 	case constant.Socks5IPv6Address:
 		bindAddr = make([]byte, 18)
 	default:
-		return nil, fmt.Errorf("unsupported address type: %d", respAddrType)
+		return nil, nil, fmt.Errorf("unsupported address type: %d", respAddrType)
 	}
 	if _, err := io.ReadFull(proxyConn, bindAddr); err != nil {
-		return nil, fmt.Errorf("failed to get bind address: %w", err)
+		return nil, nil, fmt.Errorf("failed to get bind address: %w", err)
 	}
 	if len(respFQDNLen) != 0 {
 		connResp = append(connResp, respFQDNLen...)
 	}
 	connResp = append(connResp, bindAddr...)
+	log.Debugf("Received socks5 response %v from server", connResp)
 
 	// Handle UDP association.
 	var udpConn *net.UDPConn
@@ -521,18 +525,18 @@ func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, err
 		udpAddr := &net.UDPAddr{IP: net.IP{0, 0, 0, 0}, Port: 0}
 		udpConn, err = net.ListenUDP("udp4", udpAddr)
 		if err != nil {
-			return nil, fmt.Errorf("net.ListenUDP() failed: %w", err)
+			return nil, nil, fmt.Errorf("net.ListenUDP() failed: %w", err)
 		}
 		// Get the port number and rewrite the response.
 		_, udpPortStr, err := net.SplitHostPort(udpConn.LocalAddr().String())
 		if err != nil {
 			udpConn.Close()
-			return nil, fmt.Errorf("net.SplitHostPort() failed: %w", err)
+			return nil, nil, fmt.Errorf("net.SplitHostPort() failed: %w", err)
 		}
 		udpPort, err := strconv.Atoi(udpPortStr)
 		if err != nil {
 			udpConn.Close()
-			return nil, fmt.Errorf("strconv.Atoi() failed: %w", err)
+			return nil, nil, fmt.Errorf("strconv.Atoi() failed: %w", err)
 		}
 		lenResp := len(connResp)
 		connResp[lenResp-2] = byte(udpPort >> 8)
@@ -540,9 +544,9 @@ func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, err
 	}
 
 	if _, err := conn.Write(connResp); err != nil {
-		return nil, fmt.Errorf("failed to write connection response to the socks5 client: %w", err)
+		return nil, nil, fmt.Errorf("failed to write connection response to the socks5 client: %w", err)
 	}
-	return udpConn, nil
+	return udpConn, nil, nil
 }
 
 // sendReply is used to send a reply message.

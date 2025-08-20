@@ -292,9 +292,7 @@ func (s *Session) Write(b []byte) (n int, err error) {
 	}()
 
 	// Before the first write, client needs to send open session request.
-	// Note: even in sessionAttached state, client is allowed to send more packets,
-	// so open session request is only sent when nextSend is 0.
-	if s.isClient && s.isState(sessionAttached) && s.nextSend == 0 {
+	if s.isClient && s.isState(sessionAttached) {
 		s.oLock.Lock()
 		seg := &segment{
 			metadata: &sessionStruct{

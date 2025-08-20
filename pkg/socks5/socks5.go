@@ -197,7 +197,7 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 		}
 	}
 
-	// Forward remaining bytes to proxy.
+	// Establish connection to proxy server.
 	ctx := context.Background()
 	var proxyConn net.Conn
 	var err error
@@ -213,7 +213,7 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 			return err
 		}
 	}
-	udpAssociateConn, err := s.proxySocks5ConnReq(conn, proxyConn)
+	udpAssociateConn, pendingConnReq, err := s.proxySocks5ConnReq(conn, proxyConn)
 	if err != nil {
 		HandshakeErrors.Add(1)
 		proxyConn.Close()
@@ -221,7 +221,7 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 	}
 	if udpAssociateConn == nil {
 		if s.config.HandshakeNoWait {
-			return BidiCopySocks5(conn, proxyConn)
+			return BidiCopySocks5(conn, proxyConn, pendingConnReq)
 		}
 		return common.BidiCopy(conn, proxyConn)
 	}
