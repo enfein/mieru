@@ -16,7 +16,8 @@
                         }
                     ]
                 }
-            ]
+            ],
+            "handshakeMode": "HANDSHAKE_NO_WAIT"
         }
     ],
     "activeProfile": "default",

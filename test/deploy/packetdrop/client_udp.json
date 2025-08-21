@@ -17,7 +17,8 @@
                     ]
                 }
             ],
-            "mtu": 1400
+            "mtu": 1400,
+            "handshakeMode": "HANDSHAKE_NO_WAIT"
         }
     ],
     "activeProfile": "default",
