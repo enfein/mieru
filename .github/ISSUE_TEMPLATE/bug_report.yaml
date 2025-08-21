@@ -50,8 +50,6 @@ body:
     attributes:
       label: Reproduction
       description: Steps to reproduce the error, including the configuration files.
-    validations:
-      required: true
   - type: textarea
     attributes:
       label: Logs

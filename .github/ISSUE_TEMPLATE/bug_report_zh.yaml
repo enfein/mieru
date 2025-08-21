@@ -50,8 +50,6 @@ body:
     attributes:
       label: 重现方式
       description: 请提供重现错误的步骤，包括重现错误的配置文件。
-    validations:
-      required: true
   - type: textarea
     attributes:
       label: 日志
