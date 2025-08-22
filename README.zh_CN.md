@@ -26,11 +26,13 @@ mieru 代理软件由称为 mieru【見える】的客户端软件和称为 mita
 - 安卓
   - [ClashMetaForAndroid](https://github.com/MetaCubeX/ClashMetaForAndroid)
   - [ClashMi](https://clashmi.app/)
-  - [Exclave](https://github.com/dyhkwong/Exclave) with [mieru plugin](https://github.com/dyhkwong/Exclave/releases?q=mieru-plugin)
-  - [husi](https://github.com/xchacha20-poly1305/husi) with [mieru plugin](https://github.com/xchacha20-poly1305/husi/releases?q=plugin-mieru)
-  - [NekoBoxForAndroid](https://github.com/MatsuriDayo/NekoBoxForAndroid) with [mieru plugin](https://github.com/enfein/NekoBoxPlugins)
+  - [Exclave](https://github.com/dyhkwong/Exclave) + [mieru plugin](https://github.com/dyhkwong/Exclave/releases?q=mieru-plugin)
+  - [husi](https://github.com/xchacha20-poly1305/husi) + [mieru plugin](https://github.com/xchacha20-poly1305/husi/releases?q=plugin-mieru)
+  - [Karing](https://karing.app/)
+  - [NekoBoxForAndroid](https://github.com/MatsuriDayo/NekoBoxForAndroid) + [mieru plugin](https://github.com/enfein/NekoBoxPlugins)
 - iOS
   - [ClashMi](https://clashmi.app/)
+  - [Karing](https://karing.app/)
 
 ## 使用教程
 
