@@ -47,11 +47,41 @@ _lang = ''
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument('--lang', type=str, default='en', help='language')
+    parser.add_argument('--uninstall', action='store_true', help='uninstall mita proxy server')
     args = parser.parse_args()
     global _lang
     _lang = args.lang
 
     sys_info = SysInfo()
+
+    if args.uninstall:
+        if not sys_info.is_mita_installed:
+            if _lang == ZH:
+                print('mita 代理服务器软件尚未安装。')
+            else:
+                print('mita proxy server is not installed.')
+            return
+        uninstall_prompt = '''
+[uninstall mita]
+mita proxy server is installed.
+Type "y" to uninstall mita proxy server and delete configuration.
+Type any other character to exit.
+(default is "n")
+>>> '''
+        if _lang == ZH:
+            uninstall_prompt = '''
+[卸载 mita]
+已经安装 mita 代理服务器。
+输入 "y" 卸载 mita 代理服务器并删除配置。
+输入其他任意字符退出。
+(默认值是 "n")
+>>> '''
+        uninstall, _ = check_input(prompt=uninstall_prompt, validator=any_validator(), default='n')
+        if uninstall != 'y':
+            return
+        uninstaller = Uninstaller()
+        uninstaller.uninstall_mita(sys_info)
+        return
 
     if not sys_info.is_mita_installed:
         install_prompt = '''
@@ -186,27 +216,10 @@ Type any other character to exit.
         configurer.build_client_configuration()
         return # exit after configuration is successful
 
-    if sys_info.is_mita_installed:
-        uninstall_prompt = '''
-[uninstall mita]
-mita proxy server is installed.
-Type "y" to uninstall mita proxy server and delete configuration.
-Type any other character to exit.
-(default is "n")
->>> '''
-        if _lang == ZH:
-            uninstall_prompt = '''
-[卸载 mita]
-已经安装 mita 代理服务器。
-输入 "y" 卸载 mita 代理服务器并删除配置。
-输入其他任意字符退出。
-(默认值是 "n")
->>> '''
-        uninstall, _ = check_input(prompt=uninstall_prompt, validator=any_validator(), default='n')
-        if uninstall != 'y':
-            return
-        uninstaller = Uninstaller()
-        uninstaller.uninstall_mita(sys_info)
+    if _lang == ZH:
+        print('mita 代理服务器安装与配置成功。')
+    else:
+        print('mita proxy server is installed and configured successfully.')
 
 
 class SysInfo:
