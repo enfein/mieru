@@ -129,6 +129,32 @@ mieru doesn't use socks5 authentication.
 
 For configuring the socks5 proxy in the Tor browser, see the [Security Guide](./security.md).
 
+## Clash Settings
+
+If you use Clash.Meta / mihomo clients, please refer to the settings below.
+
+```yaml
+proxies:
+  - name: server1
+    type: mieru
+    server: 12.34.56.78
+    port-range: 2012-2022
+    transport: TCP
+    udp: true
+    username: ducaiguozei
+    password: xijinping
+    multiplexing: MULTIPLEXING_HIGH
+  - name: server2
+    type: mieru
+    server: 12.34.56.78
+    port: 2027
+    transport: TCP
+    udp: true
+    username: ducaiguozei
+    password: xijinping
+    multiplexing: MULTIPLEXING_HIGH
+```
+
 ## Advanced Settings
 
 ### socks5 Username and Password Authentication

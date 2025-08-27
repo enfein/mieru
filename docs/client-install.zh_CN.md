@@ -129,6 +129,32 @@ mieru 不使用 socks5 用户名和密码进行身份验证。
 
 关于在 Tor 浏览器中配置 socks5 代理，参见[翻墙安全指南](./security.zh_CN.md)。
 
+## Clash 设置
+
+如果使用 Clash.Meta / mihomo 客户端，请参考下面的配置。
+
+```yaml
+proxies:
+  - name: server1
+    type: mieru
+    server: 12.34.56.78
+    port-range: 2012-2022
+    transport: TCP
+    udp: true
+    username: ducaiguozei
+    password: xijinping
+    multiplexing: MULTIPLEXING_HIGH
+  - name: server2
+    type: mieru
+    server: 12.34.56.78
+    port: 2027
+    transport: TCP
+    udp: true
+    username: ducaiguozei
+    password: xijinping
+    multiplexing: MULTIPLEXING_HIGH
+```
+
 ## 高级设置
 
 ### socks5 用户名和密码验证
