@@ -155,6 +155,8 @@ proxies:
     multiplexing: MULTIPLEXING_HIGH
 ```
 
+Clash.Meta / mihomo only support mieru TCP proxy protocol. Use `udp: true` to allow socks5 UDP associate requests. You can't have both `port` and `port-range` properties in a single configuration.
+
 ## Advanced Settings
 
 ### socks5 Username and Password Authentication
