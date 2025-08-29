@@ -1,0 +1,32 @@
+{
+    "profiles": [
+        {
+            "profileName": "default",
+            "user": {
+                "name": "shilishanlu",
+                "password": "buhuanjian"
+            },
+            "servers": [
+                {
+                    "ipAddress": "192.168.234.2",
+                    "portBindings": [
+                        {
+                            "port": 8964,
+                            "protocol": "UDP"
+                        }
+                    ]
+                }
+            ],
+            "mtu": 1400,
+            "handshakeMode": "HANDSHAKE_STANDARD"
+        }
+    ],
+    "activeProfile": "default",
+    "rpcPort": 8989,
+    "socks5Port": 1080,
+    "advancedSettings": {
+        "noCheckUpdate": true
+    },
+    "loggingLevel": "DEBUG",
+    "socks5ListenLAN": true
+}

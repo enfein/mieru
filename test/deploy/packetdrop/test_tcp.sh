@@ -40,9 +40,14 @@ if [[ "$?" -ne 0 ]]; then
 fi
 
 # Update mieru client with TCP config.
-./mieru apply config ${PATH_PREFIX}/client_tcp.json
+if [[ -z "${MIERU_HANDSHAKE_NO_WAIT}" ]]; then
+  CLIENT_CONFIG="${PATH_PREFIX}/client_tcp_handshake_standard.json"
+else
+  CLIENT_CONFIG="${PATH_PREFIX}/client_tcp_handshake_no_wait.json"
+fi
+./mieru apply config ${CLIENT_CONFIG}
 if [[ "$?" -ne 0 ]]; then
-    echo "command 'mieru apply config client_tcp.json' failed"
+    echo "command 'mieru apply config ${CLIENT_CONFIG}' failed"
     exit 1
 fi
 echo "mieru client config:"

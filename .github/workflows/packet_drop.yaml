@@ -1,5 +1,12 @@
 name: 'packet drop test'
-on: [workflow_dispatch]
+on:
+  workflow_dispatch:
+    inputs:
+      handshake_no_wait:
+        description: 'Set to y to enable handshake no wait mode'
+        required: false
+        default: 'n'
+        type: string
 jobs:
   run-test:
     runs-on: ubuntu-latest
@@ -13,5 +20,8 @@ jobs:
           go-version-file: go.mod
       - name: Build test binaries
         run: make test-binary
+      - name: Set env
+        if: github.event.inputs.handshake_no_wait == 'y'
+        run: echo "MIERU_HANDSHAKE_NO_WAIT=1" >> $GITHUB_ENV
       - name: Run packet drop test
-        run: sudo ./test/deploy/packetdrop/test.sh
+        run: sudo -E ./test/deploy/packetdrop/test.sh
