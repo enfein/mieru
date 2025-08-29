@@ -46,7 +46,7 @@ const (
 	// Data size in bytes.
 	smallDataSize = 64 * 1024
 	largeDataSize = 1 * 1024 * 1024
-	hugeDataSize  = 256 * 1024 * 1024
+	hugeDataSize  = 64 * 1024 * 1024
 
 	// Range of each category.
 	smallUpperRange = 90
