@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       handshake_no_wait:
-        description: 'Set to y to enable handshake no wait mode'
+        description: 'Handshake no wait mode (y/n)'
         required: false
         default: 'n'
         type: string
