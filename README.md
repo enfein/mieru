@@ -63,3 +63,5 @@ Use GitHub issue.
 ## License
 
 Use of this software is subject to the GPL-3 license.
+
+[![Star History Chart](https://api.star-history.com/svg?repos=enfein/mieru&type=Date)](https://www.star-history.com/#enfein/mieru&Date)
