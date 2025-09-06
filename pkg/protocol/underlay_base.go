@@ -21,6 +21,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/common"
@@ -28,7 +29,10 @@ import (
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
 
-const sessionChanCapacity = 64
+const (
+	sessionChanCapacity  = 64
+	sessionCleanInterval = 5 * time.Second
+)
 
 // baseUnderlay contains a partial implementation of underlay.
 type baseUnderlay struct {

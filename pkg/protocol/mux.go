@@ -38,7 +38,7 @@ import (
 )
 
 const (
-	idleUnderlayTickerInterval = 5 * time.Second
+	underlayCleanInterval = 5 * time.Second
 )
 
 // Mux manages the sessions and underlays.
@@ -85,7 +85,7 @@ func NewMux(isClinet bool) *Mux {
 		chAccept:  make(chan net.Conn, sessionChanCapacity),
 		acceptErr: make(chan error),
 		done:      make(chan struct{}),
-		cleaner:   time.NewTicker(idleUnderlayTickerInterval),
+		cleaner:   time.NewTicker(underlayCleanInterval),
 	}
 	mux.ctx, mux.ctxCancelFunc = context.WithCancel(context.Background())
 
@@ -479,10 +479,10 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 		}
 		log.Infof("Mux is listening to endpoint %s %s", network, laddr)
 		underlay := &PacketUnderlay{
-			baseUnderlay:      *newBaseUnderlay(false, properties.MTU()),
-			conn:              conn,
-			idleSessionTicker: time.NewTicker(idleSessionTickerInterval),
-			users:             m.users,
+			baseUnderlay:       *newBaseUnderlay(false, properties.MTU()),
+			conn:               conn,
+			sessionCleanTicker: time.NewTicker(sessionCleanInterval),
+			users:              m.users,
 		}
 		log.Infof("Created new server underlay %v", underlay)
 		m.mu.Lock()
@@ -564,10 +564,11 @@ func (m *Mux) serverWrapTCPConn(rawConn net.Conn, mtu int, users map[string]*app
 		blocks = append(blocks, blocksFromUser...)
 	}
 	return &StreamUnderlay{
-		baseUnderlay: *newBaseUnderlay(false, mtu),
-		conn:         rawConn,
-		candidates:   blocks,
-		users:        users,
+		baseUnderlay:       *newBaseUnderlay(false, mtu),
+		conn:               rawConn,
+		candidates:         blocks,
+		sessionCleanTicker: time.NewTicker(sessionCleanInterval),
+		users:              users,
 	}
 }
 

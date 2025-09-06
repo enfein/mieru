@@ -38,8 +38,7 @@ const (
 	packetOverhead          = cipher.DefaultNonceSize + MetadataLength + cipher.DefaultOverhead*2
 	packetNonHeaderPosition = cipher.DefaultNonceSize + MetadataLength + cipher.DefaultOverhead
 
-	idleSessionTickerInterval = 5 * time.Second
-	idleSessionTimeout        = time.Minute
+	idleSessionTimeout = time.Minute
 
 	readOneSegmentTimeout = 5 * time.Second
 )
@@ -51,7 +50,7 @@ type PacketUnderlay struct {
 	baseUnderlay
 	conn net.PacketConn
 
-	idleSessionTicker *time.Ticker
+	sessionCleanTicker *time.Ticker
 
 	// ---- client fields ----
 	serverAddr net.Addr
@@ -91,11 +90,11 @@ func NewPacketUnderlay(ctx context.Context, network, addr string, mtu int, block
 		return nil, fmt.Errorf("ApplyUDPControls() failed: %w", err)
 	}
 	u := &PacketUnderlay{
-		baseUnderlay:      *newBaseUnderlay(true, mtu),
-		conn:              conn,
-		idleSessionTicker: time.NewTicker(idleSessionTickerInterval),
-		serverAddr:        remoteAddr,
-		block:             block,
+		baseUnderlay:       *newBaseUnderlay(true, mtu),
+		conn:               conn,
+		sessionCleanTicker: time.NewTicker(sessionCleanInterval),
+		serverAddr:         remoteAddr,
+		block:              block,
 	}
 	// The block cipher expires after this time.
 	u.scheduler.SetRemainingTime(cipher.KeyRefreshInterval / 2)
@@ -123,7 +122,7 @@ func (u *PacketUnderlay) Close() error {
 	}
 
 	log.Debugf("Closing %v", u)
-	u.idleSessionTicker.Stop()
+	u.sessionCleanTicker.Stop()
 	u.baseUnderlay.Close()
 	return u.conn.Close()
 }
@@ -175,13 +174,13 @@ func (u *PacketUnderlay) RunEventLoop(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			u.closeIdleSessions()
+			u.cleanSessions()
 			return nil
 		case <-u.done:
-			u.closeIdleSessions()
+			u.cleanSessions()
 			return nil
-		case <-u.idleSessionTicker.C:
-			u.closeIdleSessions()
+		case <-u.sessionCleanTicker.C:
+			u.cleanSessions()
 		default:
 		}
 		seg, addr, err := u.readOneSegment()
@@ -706,7 +705,7 @@ func (u *PacketUnderlay) writeOneSegment(seg *segment, addr net.Addr) error {
 	return nil
 }
 
-func (u *PacketUnderlay) closeIdleSessions() {
+func (u *PacketUnderlay) cleanSessions() {
 	u.sessionMap.Range(func(k, v any) bool {
 		session := v.(*Session)
 		select {

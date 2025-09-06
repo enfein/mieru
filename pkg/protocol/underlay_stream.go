@@ -50,6 +50,8 @@ type StreamUnderlay struct {
 	// When isClient is true, there must be exactly 1 element in the slice.
 	candidates []cipher.BlockCipher
 
+	sessionCleanTicker *time.Ticker
+
 	// ---- server fields ----
 	users map[string]*appctlpb.User
 }
@@ -75,9 +77,10 @@ func NewStreamUnderlay(ctx context.Context, dialer apicommon.Dialer, network, ad
 		return nil, fmt.Errorf("DialContext() failed: %w", err)
 	}
 	t := &StreamUnderlay{
-		baseUnderlay: *newBaseUnderlay(true, mtu),
-		conn:         conn,
-		candidates:   []cipher.BlockCipher{block},
+		baseUnderlay:       *newBaseUnderlay(true, mtu),
+		conn:               conn,
+		candidates:         []cipher.BlockCipher{block},
+		sessionCleanTicker: time.NewTicker(sessionCleanInterval),
 	}
 	return t, nil
 }
@@ -99,6 +102,7 @@ func (t *StreamUnderlay) Close() error {
 	}
 
 	log.Debugf("Closing %v", t)
+	t.sessionCleanTicker.Stop()
 	t.baseUnderlay.Close()
 	return t.conn.Close()
 }
@@ -157,9 +161,13 @@ func (t *StreamUnderlay) RunEventLoop(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
+			t.cleanSessions()
 			return nil
 		case <-t.done:
+			t.cleanSessions()
 			return nil
+		case <-t.sessionCleanTicker.C:
+			t.cleanSessions()
 		default:
 		}
 		seg, err := t.readOneSegment()
@@ -635,4 +643,19 @@ func (t *StreamUnderlay) drainAfterError() {
 	} else {
 		log.Debugf("%v read at least %d bytes after stream error", t, n)
 	}
+}
+
+func (t *StreamUnderlay) cleanSessions() {
+	t.sessionMap.Range(func(k, v any) bool {
+		session := v.(*Session)
+		select {
+		case <-session.closedChan:
+			log.Debugf("Found closed %v", session)
+			if err := t.RemoveSession(session); err != nil {
+				log.Debugf("%v RemoveSession() failed: %v", t, err)
+			}
+		default:
+		}
+		return true
+	})
 }
