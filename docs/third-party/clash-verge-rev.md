@@ -10,7 +10,11 @@ Once a new profile is created, right click the card, then click `Edit File` butt
 
 ![edit file](../assets/clash_verge_edit_file.png)
 
-In the text editor, enter mieru configuration. If you have multiple proxy servers, ports or port ranges, you can use `proxy-groups` to organize them. Set the rules to determine when traffic should be forwarded to mieru proxy servers.
+In the text editor, enter mieru configuration.
+
+[Click here](../client-install.md) to know detailed inforamtion about mieru configuration.
+
+If you have multiple proxy servers, ports or port ranges, you can use `proxy-groups` to organize them. Set the rules to determine when traffic should be forwarded to mieru proxy servers.
 
 ![test delay](../assets/clash_verge_test_delay.png)
 

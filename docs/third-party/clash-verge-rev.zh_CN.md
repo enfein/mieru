@@ -10,7 +10,11 @@
 
 ![edit file](../assets/clash_verge_edit_file.png)
 
-在文本编辑器中，输入 mieru 配置。如果有多个代理服务器、端口或端口段，你可以使用 `proxy-groups` 来组织它们。设置规则以决定何时应将流量转发到 mieru 代理服务器。
+在文本编辑器中，输入 mieru 配置。
+
+[点击这里](../client-install.zh_CN.md) 了解 mieru 配置的详细信息。
+
+如果有多个代理服务器、端口或端口段，你可以使用 `proxy-groups` 来组织它们。设置规则以决定何时应将流量转发到 mieru 代理服务器。
 
 ![test delay](../assets/clash_verge_test_delay.png)
 
