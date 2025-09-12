@@ -149,7 +149,7 @@ fi
 
 # Start testing.
 sleep 2
-echo ">>> socks5 - new connections - TCP <<<"
+echo ">>> socks5 - new connections - TCP - handshake no wait <<<"
 ./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
   -local_proxy_host=127.0.0.1 -local_proxy_port=1080 \
   -test_case=new_conn -num_request=3000
@@ -158,6 +158,16 @@ if [ "$?" -ne "0" ]; then
     print_mieru_client_thread_dump
     print_mieru_server_thread_dump
     echo "TCP - test socks5 new_conn (handshake no wait) failed."
+    exit 1
+fi
+
+sleep 1
+echo ">>> socks5 - new connections with API client - TCP - handshake no wait <<<"
+./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
+  -local_proxy_host=127.0.0.1 -local_proxy_port=1083 \
+  -test_case=new_conn -num_request=3000
+if [ "$?" -ne "0" ]; then
+    echo "TCP - test socks5 new_conn (handshake no wait) with API client failed."
     exit 1
 fi
 

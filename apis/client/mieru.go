@@ -246,6 +246,9 @@ func (mc *mieruClient) DialContext(ctx context.Context, addr net.Addr) (net.Conn
 	if err != nil {
 		return nil, err
 	}
+	if mc.config.Profile.GetHandshakeMode() == appctlpb.HandshakeMode_HANDSHAKE_NO_WAIT {
+		return apicommon.NewEarlyConn(conn, netAddrSpec), nil
+	}
 	return mc.dialPostHandshake(conn, netAddrSpec)
 }
 

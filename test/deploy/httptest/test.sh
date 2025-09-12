@@ -35,9 +35,18 @@ sleep 1
 ./mita run &
 sleep 1
 
-# Start mieru API client.
+# Start mieru API clients.
 ./exampleapiclient -port=1081 -username=baozi -password=manlianpenfen \
-  -server_ip=127.0.0.1 -server_port=8964 &
+  -server_ip=127.0.0.1 -server_port=8964 -server_protocol=TCP &
+sleep 1
+./exampleapiclient -port=1082 -username=baozi -password=manlianpenfen \
+  -server_ip=127.0.0.1 -server_port=8964 -server_protocol=UDP &
+sleep 1
+./exampleapiclient -port=1083 -username=baozi -password=manlianpenfen \
+  -server_ip=127.0.0.1 -server_port=8964 -server_protocol=TCP -handshake_mode=HANDSHAKE_NO_WAIT &
+sleep 1
+./exampleapiclient -port=1084 -username=baozi -password=manlianpenfen \
+  -server_ip=127.0.0.1 -server_port=8964 -server_protocol=UDP -handshake_mode=HANDSHAKE_NO_WAIT &
 sleep 1
 
 # Run TCP test.

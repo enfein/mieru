@@ -74,6 +74,10 @@ type ClientNetworkService interface {
 	// DialContext returns a new proxy connection to reach the destination.
 	// It uses the dialer in ClientConfig to connect to a proxy server endpoint.
 	//
+	// If HandshakeMode in ClientConfig is HANDSHAKE_NO_WAIT, handshake is performed
+	// upon the first write to the network connection. Otherwise, handshake is
+	// performed before this method returns.
+	//
 	// This is a streaming based proxy connection. If the destination is a packet
 	// endpoint, packets are encapsulated in the streaming connection.
 	//
@@ -84,6 +88,7 @@ type ClientNetworkService interface {
 
 // ClientConfig stores proxy client configuration.
 type ClientConfig struct {
+	// Main configuration.
 	Profile *appctlpb.ClientProfile
 
 	// A dialer to connect to proxy server via stream-oriented network connections.

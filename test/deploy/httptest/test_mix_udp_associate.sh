@@ -105,6 +105,19 @@ if [ "$?" -ne "0" ]; then
     exit 1
 fi
 
+sleep 1
+echo ">>> socks5 UDP associate - TCP with API client - handshake no wait <<<"
+./socksudpclient -dst_host=127.0.0.1 -dst_port=9090 \
+  -local_proxy_host=127.0.0.1 -local_proxy_port=1083 \
+  -interval_ms=10 -num_request=100 -num_conn=60
+if [ "$?" -ne "0" ]; then
+    print_mieru_client_log
+    print_mieru_client_thread_dump
+    print_mieru_server_thread_dump
+    echo "Test UDP associate - TCP with API client (handshake no wait) failed."
+    exit 1
+fi
+
 # Collect profile with UDP associate.
 ./mieru get heap-profile /test/mieru.associate.heap.gz
 ./mita get heap-profile /test/mita.associate.heap.gz

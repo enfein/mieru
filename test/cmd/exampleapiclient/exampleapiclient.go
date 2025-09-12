@@ -41,6 +41,7 @@ var (
 	serverIP       = flag.String("server_ip", "", "IP address of mieru proxy server")
 	serverPort     = flag.Int("server_port", 0, "Port number of mieru proxy server")
 	serverProtocol = flag.String("server_protocol", "TCP", "Transport protocol: TCP or UDP")
+	handshakeMode  = flag.String("handshake_mode", "HANDSHAKE_STANDARD", "Handshake mode: HANDSHAKE_STANDARD or HANDSHAKE_NO_WAIT")
 	debug          = flag.Bool("debug", false, "Display debug messages")
 )
 
@@ -73,6 +74,15 @@ func main() {
 	default:
 		panic(fmt.Sprintf("Transport protocol %q is invalid", *serverProtocol))
 	}
+	var handshakeModeConfig appctlpb.HandshakeMode
+	switch *handshakeMode {
+	case "HANDSHAKE_STANDARD":
+		handshakeModeConfig = appctlpb.HandshakeMode_HANDSHAKE_STANDARD
+	case "HANDSHAKE_NO_WAIT":
+		handshakeModeConfig = appctlpb.HandshakeMode_HANDSHAKE_NO_WAIT
+	default:
+		panic(fmt.Sprintf("Handshake mode %q is invalid", *handshakeMode))
+	}
 
 	c := client.NewClient()
 	if err := c.Store(&client.ClientConfig{
@@ -93,7 +103,8 @@ func main() {
 					},
 				},
 			},
-			Mtu: proto.Int32(1400),
+			Mtu:           proto.Int32(1400),
+			HandshakeMode: &handshakeModeConfig,
 		},
 	}); err != nil {
 		panic(err)
