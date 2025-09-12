@@ -40,6 +40,8 @@ fi
 # Start mihomo.
 ./mihomo -f mihomo-config.yaml &
 sleep 1
+./mihomo -f mihomo-config-no-wait.yaml &
+sleep 1
 
 # Start testing.
 sleep 2
@@ -83,6 +85,50 @@ echo ">>> socks5 UDP associate - TCP <<<"
 if [ "$?" -ne "0" ]; then
     print_mieru_server_thread_dump
     echo "TCP - test socks5 udp_associate failed."
+    exit 1
+fi
+
+sleep 1
+echo ">>> socks5 - new connections - TCP - handshake no wait <<<"
+./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
+  -local_proxy_host=127.0.0.1 -local_proxy_port=1081 \
+  -test_case=new_conn -num_request=3000
+if [ "$?" -ne "0" ]; then
+    print_mieru_server_thread_dump
+    echo "TCP - test socks5 new_conn (handshake no wait) failed."
+    exit 1
+fi
+
+sleep 1
+echo ">>> http - new connections - TCP - handshake no wait <<<"
+./sockshttpclient -proxy_mode=http -dst_host=127.0.0.1 -dst_port=8080 \
+  -local_http_host=127.0.0.1 -local_http_port=1081 \
+  -test_case=new_conn -num_request=1000
+if [ "$?" -ne "0" ]; then
+    print_mieru_server_thread_dump
+    echo "TCP - test HTTP new_conn (handshake no wait) failed."
+    exit 1
+fi
+
+sleep 1
+echo ">>> socks5 - reuse one connection - TCP - handshake no wait <<<"
+./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
+  -local_proxy_host=127.0.0.1 -local_proxy_port=1081 \
+  -test_case=reuse_conn -test_time_sec=30
+if [ "$?" -ne "0" ]; then
+    print_mieru_server_thread_dump
+    echo "TCP - test socks5 reuse_conn (handshake no wait) failed."
+    exit 1
+fi
+
+sleep 1
+echo ">>> socks5 UDP associate - TCP - handshake no wait <<<"
+./socksudpclient -dst_host=127.0.0.1 -dst_port=9090 \
+  -local_proxy_host=127.0.0.1 -local_proxy_port=1081 \
+  -interval_ms=10 -num_request=100 -num_conn=60
+if [ "$?" -ne "0" ]; then
+    print_mieru_server_thread_dump
+    echo "TCP - test socks5 udp_associate (handshake no wait) failed."
     exit 1
 fi
 
