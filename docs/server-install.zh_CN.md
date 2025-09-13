@@ -18,32 +18,32 @@ sudo python3 setup.py --lang=zh
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.19.2/mita_3.19.2_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.20.0/mita_3.20.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.19.2/mita_3.19.2_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.20.0/mita_3.20.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.19.2/mita-3.19.2-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.20.0/mita-3.20.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.19.2/mita-3.19.2-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.20.0/mita-3.20.0-1.aarch64.rpm
 ```
 
 ## 安装 mita 软件包
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_3.19.2_amd64.deb
+sudo dpkg -i mita_3.20.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_3.19.2_arm64.deb
+sudo dpkg -i mita_3.20.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-3.19.2-1.x86_64.rpm
+sudo rpm -Uvh --force mita-3.20.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-3.19.2-1.aarch64.rpm
+sudo rpm -Uvh --force mita-3.20.0-1.aarch64.rpm
 ```
 
 上述指令也可以用来升级 mita 软件包的版本。
