@@ -81,7 +81,7 @@ message MemoryStatistics {
 }
 
 message Version {
-    optional uint32 Major = 1;
-    optional uint32 Minor = 2;
-    optional uint32 Patch = 3;
+    optional uint32 major = 1;
+    optional uint32 minor = 2;
+    optional uint32 patch = 3;
 }
