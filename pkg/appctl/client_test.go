@@ -18,6 +18,7 @@ package appctl
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 
 	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
@@ -67,39 +68,273 @@ func TestApply2ClientConfig(t *testing.T) {
 }
 
 func TestClientApplyReject(t *testing.T) {
-	cases := []string{
-		"testdata/client_reject_active_profile_mismatch.json",
-		"testdata/client_reject_invalid_http_port.json",
-		"testdata/client_reject_invalid_metrics_logging_interval.json",
-		"testdata/client_reject_invalid_rpc_port.json",
-		"testdata/client_reject_metrics_logging_interval_too_small.json",
-		"testdata/client_reject_mtu_too_big.json",
-		"testdata/client_reject_mtu_too_small.json",
-		"testdata/client_reject_no_active_profile.json",
-		"testdata/client_reject_no_password.json",
-		"testdata/client_reject_no_port_binding.json",
-		"testdata/client_reject_no_port.json",
-		"testdata/client_reject_no_profile_name.json",
-		"testdata/client_reject_no_profiles.json",
-		"testdata/client_reject_no_protocol.json",
-		"testdata/client_reject_no_server_addr.json",
-		"testdata/client_reject_no_servers.json",
-		"testdata/client_reject_no_socks5_port.json",
-		"testdata/client_reject_no_user_name.json",
-		"testdata/client_reject_same_port_http_rpc.json",
-		"testdata/client_reject_same_port_http_socks5.json",
-		"testdata/client_reject_same_port_rpc_socks5.json",
-		"testdata/client_reject_socks5_auth_no_password.json",
-		"testdata/client_reject_socks5_auth_no_user.json",
-		"testdata/client_reject_user_has_quota.json",
-		"testdata/client_reject_wrong_ipv4_address.json",
-		"testdata/client_reject_wrong_ipv6_address.json",
+	validConfig := func() *pb.ClientConfig {
+		return &pb.ClientConfig{
+			ActiveProfile: proto.String("default"),
+			Profiles: []*pb.ClientProfile{
+				{
+					ProfileName: proto.String("default"),
+					User: &pb.User{
+						Name:     proto.String("hello"),
+						Password: proto.String("world"),
+					},
+					Servers: []*pb.ServerEndpoint{
+						{
+							IpAddress: proto.String("127.0.0.1"),
+							PortBindings: []*pb.PortBinding{
+								{
+									Port:     proto.Int32(10001),
+									Protocol: pb.TransportProtocol_TCP.Enum(),
+								},
+							},
+						},
+					},
+				},
+			},
+			Socks5Port: proto.Int32(1080),
+		}
 	}
+
+	cases := []struct {
+		name          string
+		config        *pb.ClientConfig
+		wantErrString string
+	}{
+		{
+			name: "active_profile_mismatch",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.ActiveProfile = proto.String("p2")
+				return c
+			}(),
+			wantErrString: "active profile is not found in the profile list",
+		},
+		{
+			name: "invalid_http_port",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.HttpProxyPort = proto.Int32(70000)
+				return c
+			}(),
+			wantErrString: "HTTP proxy port number 70000 is invalid",
+		},
+		{
+			name: "invalid_rpc_port",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.RpcPort = proto.Int32(70000)
+				return c
+			}(),
+			wantErrString: "RPC port number 70000 is invalid",
+		},
+		{
+			name: "metrics_logging_interval_too_small",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.AdvancedSettings = &pb.ClientAdvancedSettings{
+					MetricsLoggingInterval: proto.String("0s"),
+				}
+				return c
+			}(),
+			wantErrString: "is less than 1 second",
+		},
+		{
+			name: "mtu_too_big",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.Profiles[0].Mtu = proto.Int32(9000)
+				return c
+			}(),
+			wantErrString: "MTU value 9000 is out of range",
+		},
+		{
+			name: "mtu_too_small",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.Profiles[0].Mtu = proto.Int32(100)
+				return c
+			}(),
+			wantErrString: "MTU value 100 is out of range",
+		},
+		{
+			name: "no_active_profile",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.ActiveProfile = nil
+				return c
+			}(),
+			wantErrString: "active profile is not set",
+		},
+		{
+			name: "no_password",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.Profiles[0].User.Password = nil
+				return c
+			}(),
+			wantErrString: "password is not set",
+		},
+		{
+			name: "no_port_binding",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.Profiles[0].Servers[0].PortBindings = nil
+				return c
+			}(),
+			wantErrString: "server port binding is not set",
+		},
+		{
+			name: "no_port",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.Profiles[0].Servers[0].PortBindings[0].Port = nil
+				return c
+			}(),
+			wantErrString: "unable to parse port range",
+		},
+		{
+			name: "no_profile_name",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.Profiles[0].ProfileName = nil
+				return c
+			}(),
+			wantErrString: "profile name is not set",
+		},
+		{
+			name: "no_profiles",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.Profiles = nil
+				return c
+			}(),
+			wantErrString: "profiles are not set",
+		},
+		{
+			name: "no_protocol",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.Profiles[0].Servers[0].PortBindings[0].Protocol = nil
+				return c
+			}(),
+			wantErrString: "protocol is not set",
+		},
+		{
+			name: "no_server_addr",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.Profiles[0].Servers[0].IpAddress = nil
+				return c
+			}(),
+			wantErrString: "neither server IP address nor domain name is set",
+		},
+		{
+			name: "no_servers",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.Profiles[0].Servers = nil
+				return c
+			}(),
+			wantErrString: "servers are not set",
+		},
+		{
+			name: "no_user_name",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.Profiles[0].User.Name = nil
+				return c
+			}(),
+			wantErrString: "user name is not set",
+		},
+		{
+			name: "same_port_http_rpc",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.HttpProxyPort = proto.Int32(1080)
+				c.RpcPort = proto.Int32(1080)
+				c.Socks5Port = nil
+				return c
+			}(),
+			wantErrString: "socks5 port number 0 is invalid",
+		},
+		{
+			name: "same_port_http_socks5",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.HttpProxyPort = proto.Int32(1080)
+				return c
+			}(),
+			wantErrString: "HTTP proxy port number 1080 is the same as socks5 port number",
+		},
+		{
+			name: "same_port_rpc_socks5",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.RpcPort = proto.Int32(1080)
+				return c
+			}(),
+			wantErrString: "RPC port number 1080 is the same as socks5 port number",
+		},
+		{
+			name: "socks5_auth_no_password",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.Socks5Authentication = []*pb.Auth{
+					{User: proto.String("user")},
+				}
+				return c
+			}(),
+			wantErrString: "socks5 authentication password is not set",
+		},
+		{
+			name: "socks5_auth_no_user",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.Socks5Authentication = []*pb.Auth{
+					{Password: proto.String("pass")},
+				}
+				return c
+			}(),
+			wantErrString: "socks5 authentication user is not set",
+		},
+		{
+			name: "user_has_quota",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.Profiles[0].User.Quotas = []*pb.Quota{{Days: proto.Int32(1), Megabytes: proto.Int32(1)}}
+				return c
+			}(),
+			wantErrString: "user quota is not supported by proxy client",
+		},
+		{
+			name: "wrong_ipv4_address",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.Profiles[0].Servers[0].IpAddress = proto.String("127.0.0.256")
+				return c
+			}(),
+			wantErrString: "failed to parse IP address",
+		},
+		{
+			name: "wrong_ipv6_address",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.Profiles[0].Servers[0].IpAddress = proto.String("::ffff::1")
+				return c
+			}(),
+			wantErrString: "failed to parse IP address",
+		},
+	}
+
 	for _, c := range cases {
-		t.Run(c, func(t *testing.T) {
+		t.Run(c.name, func(t *testing.T) {
 			beforeClientTest(t)
-			if err := ApplyJSONClientConfig(c); err == nil {
-				t.Errorf("want error in ApplyJSONClientConfig(%q), got no error", c)
+			err := applyClientConfig(c.config)
+			if err == nil {
+				t.Fatalf("want error in applyClientConfig(%q), got no error", c.name)
+			}
+			if !strings.Contains(err.Error(), c.wantErrString) {
+				t.Errorf("in applyClientConfig(%q), want error string %q, got %q", c.name, c.wantErrString, err.Error())
 			}
 			afterClientTest(t)
 		})

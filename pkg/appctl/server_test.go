@@ -18,6 +18,7 @@ package appctl
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 
 	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
@@ -27,6 +28,7 @@ import (
 )
 
 func TestApply2ServerConfig(t *testing.T) {
+
 	beforeServerTest(t)
 
 	// Apply config1, and then apply config2.
@@ -67,37 +69,182 @@ func TestApply2ServerConfig(t *testing.T) {
 }
 
 func TestServerApplyReject(t *testing.T) {
-	cases := []string{
-		"testdata/server_reject_invalid_metrics_logging_interval.json",
-		"testdata/server_reject_invalid_port_range_1.json",
-		"testdata/server_reject_invalid_port_range_2.json",
-		"testdata/server_reject_invalid_port_range_3.json",
-		"testdata/server_reject_invalid_quota_days.json",
-		"testdata/server_reject_invalid_quota_megabytes.json",
-		"testdata/server_reject_metrics_logging_interval_too_small.json",
-		"testdata/server_reject_mtu_too_big.json",
-		"testdata/server_reject_mtu_too_small.json",
-		"testdata/server_reject_no_password.json",
-		"testdata/server_reject_no_port_bindings.json",
-		"testdata/server_reject_no_port.json",
-		"testdata/server_reject_no_protocol.json",
-		"testdata/server_reject_no_user_name.json",
+	validConfig := func() *pb.ServerConfig {
+		return &pb.ServerConfig{
+			PortBindings: []*pb.PortBinding{
+				{
+					Port:     proto.Int32(10001),
+					Protocol: pb.TransportProtocol_TCP.Enum(),
+				},
+			},
+			Users: []*pb.User{
+				{
+					Name:     proto.String("hello"),
+					Password: proto.String("world"),
+				},
+			},
+		}
+	}
+
+	cases := []struct {
+		name          string
+		config        *pb.ServerConfig
+		wantErrString string
+	}{
+		{
+			name: "invalid_metrics_logging_interval",
+			config: func() *pb.ServerConfig {
+				c := validConfig()
+				c.AdvancedSettings = &pb.ServerAdvancedSettings{
+					MetricsLoggingInterval: proto.String("1"),
+				}
+				return c
+			}(),
+			wantErrString: `metrics logging interval "1" is invalid`,
+		},
+		{
+			name: "invalid_port_range_1",
+			config: func() *pb.ServerConfig {
+				c := validConfig()
+				c.PortBindings[0].Port = nil
+				c.PortBindings[0].PortRange = proto.String("1-2-3")
+				return c
+			}(),
+			wantErrString: "unable to parse port range",
+		},
+		{
+			name: "invalid_port_range_2",
+			config: func() *pb.ServerConfig {
+				c := validConfig()
+				c.PortBindings[0].Port = nil
+				c.PortBindings[0].PortRange = proto.String("2-1")
+				return c
+			}(),
+			wantErrString: "begin of port range 2 is bigger than end of port range 1",
+		},
+		{
+			name: "invalid_port_range_3",
+			config: func() *pb.ServerConfig {
+				c := validConfig()
+				c.PortBindings[0].Port = nil
+				c.PortBindings[0].PortRange = proto.String("0-1")
+				return c
+			}(),
+			wantErrString: "port number 0 is invalid",
+		},
+		{
+			name: "invalid_quota_days",
+			config: func() *pb.ServerConfig {
+				c := validConfig()
+				c.Users[0].Quotas = []*pb.Quota{
+					{Days: proto.Int32(0), Megabytes: proto.Int32(1)},
+				}
+				return c
+			}(),
+			wantErrString: "quota: number of days 0 is invalid",
+		},
+		{
+			name: "invalid_quota_megabytes",
+			config: func() *pb.ServerConfig {
+				c := validConfig()
+				c.Users[0].Quotas = []*pb.Quota{
+					{Days: proto.Int32(1), Megabytes: proto.Int32(0)},
+				}
+				return c
+			}(),
+			wantErrString: "quota: traffic volume in megabyte 0 is invalid",
+		},
+		{
+			name: "metrics_logging_interval_too_small",
+			config: func() *pb.ServerConfig {
+				c := validConfig()
+				c.AdvancedSettings = &pb.ServerAdvancedSettings{MetricsLoggingInterval: proto.String("1ms")}
+				return c
+			}(),
+			wantErrString: "is less than 1 second",
+		},
+		{
+			name: "mtu_too_big",
+			config: func() *pb.ServerConfig {
+				c := validConfig()
+				c.Mtu = proto.Int32(9000)
+				return c
+			}(),
+			wantErrString: "MTU value 9000 is out of range",
+		},
+		{
+			name: "mtu_too_small",
+			config: func() *pb.ServerConfig {
+				c := validConfig()
+				c.Mtu = proto.Int32(100)
+				return c
+			}(),
+			wantErrString: "MTU value 100 is out of range",
+		},
+		{
+			name: "no_password",
+			config: func() *pb.ServerConfig {
+				c := validConfig()
+				c.Users[0].Password = nil
+				return c
+			}(),
+			wantErrString: "user password is not set",
+		},
+		{
+			name: "no_port_bindings",
+			config: func() *pb.ServerConfig {
+				c := validConfig()
+				c.PortBindings = nil
+				return c
+			}(),
+			wantErrString: "server port binding is not set",
+		},
+		{
+			name: "no_port",
+			config: func() *pb.ServerConfig {
+				c := validConfig()
+				c.PortBindings[0].Port = nil
+				return c
+			}(),
+			wantErrString: "unable to parse port range",
+		},
+		{
+			name: "no_protocol",
+			config: func() *pb.ServerConfig {
+				c := validConfig()
+				c.PortBindings[0].Protocol = nil
+				return c
+			}(),
+			wantErrString: "protocol is not set",
+		},
+		{
+			name: "no_user_name",
+			config: func() *pb.ServerConfig {
+				c := validConfig()
+				c.Users[0].Name = nil
+				return c
+			}(),
+			wantErrString: "user name is not set",
+		},
 	}
 
 	for _, c := range cases {
-		t.Run(c, func(t *testing.T) {
+		t.Run(c.name, func(t *testing.T) {
 			beforeServerTest(t)
-
-			if err := ApplyJSONServerConfig(c); err == nil {
-				t.Errorf("want error in ApplyJSONServerConfig(%q), got no error", c)
+			err := ValidateFullServerConfig(c.config)
+			if err == nil {
+				t.Fatalf("want error in ValidateFullServerConfig(%q), got no error", c.name)
 			}
-
+			if !strings.Contains(err.Error(), c.wantErrString) {
+				t.Errorf("in ValidateFullServerConfig(%q), want error string %q, got %q", c.name, c.wantErrString, err.Error())
+			}
 			afterServerTest(t)
 		})
 	}
 }
 
 func TestServerDeleteUser(t *testing.T) {
+
 	beforeServerTest(t)
 
 	configFile := "testdata/server_apply_config_2.json"
@@ -124,6 +271,7 @@ func TestServerDeleteUser(t *testing.T) {
 }
 
 func TestServerHashUserPassword(t *testing.T) {
+
 	beforeServerTest(t)
 
 	configFile := "testdata/server_apply_config_1.json"
