@@ -9,7 +9,7 @@ proxies:
   - name: mieru
     type: mieru
     server: 127.0.0.1
-    port: 8964
+    port: 4896,6489,8964-8965,9648
     transport: TCP
     udp: true
     username: baozi
