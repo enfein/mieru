@@ -26,12 +26,12 @@ import (
 
 var (
 	ErrNoClientConfig              = errors.New("no client config")
-	ErrInvalidConfigConfig         = errors.New("invalid client config")
+	ErrInvalidClientConfig         = errors.New("invalid client config")
 	ErrClientIsNotRunning          = errors.New("client is not running")
 	ErrStoreClientConfigAfterStart = errors.New("can't store client config after start")
 )
 
-// Client contains methods supported by a mieru client.
+// Client contains methods supported by a proxy client.
 type Client interface {
 	ClientConfigurationService
 	ClientLifecycleService

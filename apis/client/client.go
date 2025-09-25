@@ -75,16 +75,16 @@ func (mc *mieruClient) Store(config *ClientConfig) error {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
 	if config == nil {
-		return fmt.Errorf("%w: client config is nil", ErrInvalidConfigConfig)
+		return fmt.Errorf("%w: client config is nil", ErrInvalidClientConfig)
 	}
 	if config.Profile == nil {
-		return fmt.Errorf("%w: client config profile is nil", ErrInvalidConfigConfig)
+		return fmt.Errorf("%w: client config profile is nil", ErrInvalidClientConfig)
 	}
 	if mc.running {
 		return ErrStoreClientConfigAfterStart
 	}
 	if err := appctlcommon.ValidateClientConfigSingleProfile(config.Profile); err != nil {
-		return fmt.Errorf("%w: %s", ErrInvalidConfigConfig, err.Error())
+		return fmt.Errorf("%w: %s", ErrInvalidClientConfig, err.Error())
 	}
 	mc.config = config
 	return nil
