@@ -45,11 +45,10 @@ import (
 type mieruClient struct {
 	initTask sync.Once
 	mu       sync.RWMutex
+	running  bool
 
 	config *ClientConfig
 	mux    *protocol.Mux
-
-	running bool
 }
 
 var _ Client = &mieruClient{}

@@ -559,12 +559,7 @@ func DeleteServerUsers(names []string) error {
 //
 // A server config patch must satisfy:
 // 1. port bindings are valid
-// 2. for each user
-// 2.1. user name is not empty
-// 2.2. user has either a password or a hashed password
-// 2.3. for each quota
-// 2.3.1. number of days is valid
-// 2.3.2. traffic volume in megabyte is valid
+// 2. users are valid
 // 3. if set, MTU is valid
 // 4. for each egress proxy
 // 4.1. name is not empty
@@ -583,19 +578,8 @@ func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 		return err
 	}
 	for _, user := range patch.GetUsers() {
-		if user.GetName() == "" {
-			return fmt.Errorf("user name is not set")
-		}
-		if user.GetPassword() == "" && user.GetHashedPassword() == "" {
-			return fmt.Errorf("user password is not set")
-		}
-		for _, quota := range user.GetQuotas() {
-			if quota.GetDays() <= 0 {
-				return fmt.Errorf("quota: number of days %d is invalid", quota.GetDays())
-			}
-			if quota.GetMegabytes() <= 0 {
-				return fmt.Errorf("quota: traffic volume in megabyte %d is invalid", quota.GetMegabytes())
-			}
+		if err := appctlcommon.ValidateServerConfigSingleUser(user); err != nil {
+			return err
 		}
 	}
 	if patch.GetMtu() != 0 && (patch.GetMtu() < 1280 || patch.GetMtu() > 1500) {

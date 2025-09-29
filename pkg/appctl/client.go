@@ -388,7 +388,7 @@ func DeleteClientConfigProfile(profileName string) error {
 //
 // A client config patch must satisfy:
 // 1. it has 0 or more profile
-// 2. validate each profile
+// 2. each profile is valid
 // 3. for each socks5 authentication, the user and password are not empty
 // 4. metrics logging interval is valid, and it is not less than 1 second
 func ValidateClientConfigPatch(patch *pb.ClientConfig) error {

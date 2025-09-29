@@ -32,7 +32,7 @@ PROJECT_NAME=$(shell basename "${ROOT}")
 # - pkg/version/current.go
 #
 # Use `tools/bump_version.sh` script to change all those files at one shot.
-VERSION="3.20.0"
+VERSION="3.20.1"
 
 # Build binaries and installation packages.
 .PHONY: build
@@ -212,7 +212,11 @@ server-linux-amd64:
 	mkdir -p release/linux/amd64
 	env GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/linux/amd64/mita cmd/mita/mita.go
 	cd release/linux/amd64;\
-		sha256sum mita > mita_${VERSION}_linux_amd64.sha256.txt
+		sha256sum mita > mita_${VERSION}_linux_amd64.sha256.txt;\
+		tar -zcvf mita_${VERSION}_linux_amd64.tar.gz mita;\
+		sha256sum mita_${VERSION}_linux_amd64.tar.gz > mita_${VERSION}_linux_amd64.tar.gz.sha256.txt
+	mv release/linux/amd64/mita_${VERSION}_linux_amd64.tar.gz release/
+	mv release/linux/amd64/mita_${VERSION}_linux_amd64.tar.gz.sha256.txt release/
 
 # Build linux arm64 server.
 .PHONY: server-linux-arm64
@@ -220,7 +224,11 @@ server-linux-arm64:
 	mkdir -p release/linux/arm64
 	env GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/linux/arm64/mita cmd/mita/mita.go
 	cd release/linux/arm64;\
-		sha256sum mita > mita_${VERSION}_linux_arm64.sha256.txt
+		sha256sum mita > mita_${VERSION}_linux_arm64.sha256.txt;\
+		tar -zcvf mita_${VERSION}_linux_arm64.tar.gz mita;\
+		sha256sum mita_${VERSION}_linux_arm64.tar.gz > mita_${VERSION}_linux_arm64.tar.gz.sha256.txt
+	mv release/linux/arm64/mita_${VERSION}_linux_arm64.tar.gz release/
+	mv release/linux/arm64/mita_${VERSION}_linux_arm64.tar.gz.sha256.txt release/
 
 # Build debian installation packages.
 .PHONY: deb
