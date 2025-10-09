@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/enfein/mieru/v3/pkg/appctl"
+	"github.com/enfein/mieru/v3/pkg/appctl/appctlcommon"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlgrpc"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
@@ -445,13 +446,13 @@ var serverRunFunc = func(s []string) error {
 	if err = appctl.ValidateFullServerConfig(config); err == nil {
 		appctl.SetAppStatus(appctlpb.AppStatus_STARTING)
 
-		mux := protocol.NewMux(false).SetServerUsers(appctl.UserListToMap(config.GetUsers()))
+		mux := protocol.NewMux(false).SetServerUsers(appctlcommon.UserListToMap(config.GetUsers()))
 		appctl.SetServerMuxRef(mux)
 		mtu := common.DefaultMTU
 		if config.GetMtu() != 0 {
 			mtu = int(config.GetMtu())
 		}
-		endpoints, err := appctl.PortBindingsToUnderlayProperties(config.GetPortBindings(), mtu)
+		endpoints, err := appctlcommon.PortBindingsToUnderlayProperties(config.GetPortBindings(), mtu)
 		if err != nil {
 			return err
 		}
@@ -465,7 +466,7 @@ var serverRunFunc = func(s []string) error {
 			DualStackPreference: common.DualStackPreference(config.GetDns().GetDualStack()),
 			Egress:              config.GetEgress(),
 			HandshakeTimeout:    10 * time.Second,
-			Users:               appctl.UserListToMap(config.GetUsers()),
+			Users:               appctlcommon.UserListToMap(config.GetUsers()),
 		}
 		socks5Server, err := socks5.New(socks5Config)
 		if err != nil {

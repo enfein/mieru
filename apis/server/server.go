@@ -17,10 +17,13 @@ package server
 
 import (
 	"fmt"
+	"net"
 	"sync"
 
+	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlcommon"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
+	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/protocol"
 )
@@ -37,6 +40,8 @@ type mieruServer struct {
 	config *ServerConfig
 	mux    *protocol.Mux
 }
+
+var _ Server = &mieruServer{}
 
 // initOnce should be called when constructing the mieru server.
 func (ms *mieruServer) initOnce() {
@@ -66,6 +71,56 @@ func (ms *mieruServer) Store(config *ServerConfig) error {
 	}
 	ms.config = config
 	return nil
+}
+
+func (ms *mieruServer) Start() error {
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+	if ms.config == nil {
+		return ErrNoServerConfig
+	}
+
+	ms.mux = protocol.NewMux(false).SetServerUsers(appctlcommon.UserListToMap(ms.config.Config.GetUsers()))
+	mtu := common.DefaultMTU
+	if ms.config.Config.GetMtu() != 0 {
+		mtu = int(ms.config.Config.GetMtu())
+	}
+	endpoints, err := appctlcommon.PortBindingsToUnderlayProperties(ms.config.Config.GetPortBindings(), mtu)
+	if err != nil {
+		return err
+	}
+	ms.mux.SetEndpoints(endpoints)
+	if err := ms.mux.Start(); err != nil {
+		return err
+	}
+	ms.running = true
+	return nil
+}
+
+func (ms *mieruServer) Stop() error {
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+
+	ms.running = false
+	if ms.mux != nil {
+		ms.mux.Close()
+	}
+	return nil
+}
+
+func (ms *mieruServer) IsRunning() bool {
+	ms.mu.RLock()
+	defer ms.mu.RUnlock()
+	return ms.running
+}
+
+func (ms *mieruServer) Accept() (net.Conn, model.NetAddrSpec, error) {
+	conn, err := ms.mux.Accept()
+	if err != nil {
+		return nil, model.NetAddrSpec{}, err
+	}
+	// TODO: complete handshake and return the network address of the destination.
+	return conn, model.NetAddrSpec{}, nil
 }
 
 func validateServerConfig(config *appctlpb.ServerConfig) error {

@@ -32,8 +32,13 @@ type RawControl = func(fd uintptr)
 type RawControlErr = func(fd uintptr) error
 
 // ApplyTCPControls applies all the recommended controls to the TCP listener.
-func ApplyTCPControls(listener *net.TCPListener) error {
-	rawConn, err := listener.SyscallConn()
+// It does nothing if the listener is not a *net.TCPListener.
+func ApplyTCPControls(listener net.Listener) error {
+	l, ok := listener.(*net.TCPListener)
+	if !ok {
+		return nil
+	}
+	rawConn, err := l.SyscallConn()
 	if err != nil {
 		return fmt.Errorf("SyscallConn() failed: %w", err)
 	}
@@ -47,8 +52,13 @@ func ApplyTCPControls(listener *net.TCPListener) error {
 }
 
 // ApplyUDPControls applies all the recommended controls to the UDP connection.
-func ApplyUDPControls(conn *net.UDPConn) error {
-	rawConn, err := conn.SyscallConn()
+// It does nothing if the connection is not a *net.UDPConn.
+func ApplyUDPControls(conn net.PacketConn) error {
+	c, ok := conn.(*net.UDPConn)
+	if !ok {
+		return nil
+	}
+	rawConn, err := c.SyscallConn()
 	if err != nil {
 		return fmt.Errorf("SyscallConn() failed: %w", err)
 	}
@@ -59,4 +69,19 @@ func ApplyUDPControls(conn *net.UDPConn) error {
 		return rawConn.Control(ProtectPathRaw(path))
 	}
 	return nil
+}
+
+// DefaultControl returns a default Control that applies recommended controls.
+func DefaultControl() Control {
+	return func(network, address string, c syscall.RawConn) error {
+		if err := c.Control(ReuseAddrPortRaw()); err != nil {
+			return err
+		}
+		if path, found := os.LookupEnv("MIERU_PROTECT_PATH"); found {
+			if err := c.Control(ProtectPathRaw(path)); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 }

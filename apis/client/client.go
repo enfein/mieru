@@ -180,7 +180,9 @@ func (mc *mieruClient) Start() error {
 			switch bindingInfo.GetProtocol() {
 			case appctlpb.TransportProtocol_TCP:
 				if proxyIP != nil {
-					endpoint = protocol.NewUnderlayProperties(mtu, common.StreamTransport, nil, &net.TCPAddr{IP: proxyIP, Port: int(proxyPort)})
+					endpoint = protocol.NewUnderlayProperties(mtu, common.StreamTransport, nil,
+						&net.TCPAddr{IP: proxyIP, Port: int(proxyPort)},
+					)
 				} else {
 					endpoint = protocol.NewUnderlayProperties(mtu, common.StreamTransport, nil,
 						&model.NetAddrSpec{Net: "tcp", AddrSpec: model.AddrSpec{FQDN: proxyHost, Port: int(proxyPort)}},
@@ -188,7 +190,9 @@ func (mc *mieruClient) Start() error {
 				}
 			case appctlpb.TransportProtocol_UDP:
 				if proxyIP != nil {
-					endpoint = protocol.NewUnderlayProperties(mtu, common.PacketTransport, nil, &net.UDPAddr{IP: proxyIP, Port: int(proxyPort)})
+					endpoint = protocol.NewUnderlayProperties(mtu, common.PacketTransport, nil,
+						&net.UDPAddr{IP: proxyIP, Port: int(proxyPort)},
+					)
 				} else {
 					endpoint = protocol.NewUnderlayProperties(mtu, common.PacketTransport, nil,
 						&model.NetAddrSpec{Net: "udp", AddrSpec: model.AddrSpec{FQDN: proxyHost, Port: int(proxyPort)}},

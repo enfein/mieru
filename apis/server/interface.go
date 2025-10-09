@@ -17,7 +17,10 @@ package server
 
 import (
 	"errors"
+	"net"
 
+	apicommon "github.com/enfein/mieru/v3/apis/common"
+	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 )
 
@@ -65,9 +68,20 @@ type ServerLifecycleService interface {
 	IsRunning() bool
 }
 
-type ServerNetworkService interface{}
+type ServerNetworkService interface {
+	// Accept accepts a new proxy connection from a client.
+	// It returns the proxy connection and the network address of the destination.
+	// Handshake is completed before this method returns.
+	Accept() (net.Conn, model.NetAddrSpec, error)
+}
 
 // ServerConfig stores proxy server configuration.
 type ServerConfig struct {
+	// Main configuration.
 	Config *appctlpb.ServerConfig
+
+	// A listener factory to create network listeners.
+	//
+	// If this field is not set, a default listener factory is used.
+	ListenerFactory apicommon.ListenerFactory
 }

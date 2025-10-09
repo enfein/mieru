@@ -299,7 +299,7 @@ func StoreClientConfig(config *pb.ClientConfig) error {
 	}
 
 	for _, profile := range config.GetProfiles() {
-		profile.User = HashUserPassword(profile.GetUser(), true)
+		profile.User = appctlcommon.HashUserPassword(profile.GetUser(), true)
 	}
 
 	var b []byte

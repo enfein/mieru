@@ -44,20 +44,21 @@ const (
 // Mux manages the sessions and underlays.
 type Mux struct {
 	// ---- common fields ----
-	isClient      bool
-	endpoints     []UnderlayProperties
-	underlays     []Underlay
-	dialer        apicommon.Dialer
-	resolver      apicommon.DNSResolver
-	chAccept      chan net.Conn
-	acceptHasErr  atomic.Bool
-	acceptErr     chan error // this channel is closed when accept has error
-	used          bool
-	done          chan struct{}
-	ctx           context.Context    // mux master context
-	ctxCancelFunc context.CancelFunc // function to cancel master context when mux is closed
-	mu            sync.Mutex
-	cleaner       *time.Ticker
+	isClient        bool
+	endpoints       []UnderlayProperties
+	underlays       []Underlay
+	dialer          apicommon.Dialer
+	resolver        apicommon.DNSResolver
+	listenerFactory apicommon.ListenerFactory
+	chAccept        chan net.Conn
+	acceptHasErr    atomic.Bool
+	acceptErr       chan error // this channel is closed when accept has error
+	used            bool
+	done            chan struct{}
+	ctx             context.Context    // mux master context
+	ctxCancelFunc   context.CancelFunc // function to cancel master context when mux is closed
+	mu              sync.Mutex
+	cleaner         *time.Ticker
 
 	// ---- client only fields ----
 	username        string
@@ -78,14 +79,15 @@ func NewMux(isClinet bool) *Mux {
 		log.Infof("Initializing server multiplexer")
 	}
 	mux := &Mux{
-		isClient:  isClinet,
-		underlays: make([]Underlay, 0),
-		dialer:    &net.Dialer{Timeout: 10 * time.Second, Control: sockopts.ReuseAddrPort()},
-		resolver:  &net.Resolver{},
-		chAccept:  make(chan net.Conn, sessionChanCapacity),
-		acceptErr: make(chan error),
-		done:      make(chan struct{}),
-		cleaner:   time.NewTicker(underlayCleanInterval),
+		isClient:        isClinet,
+		underlays:       make([]Underlay, 0),
+		dialer:          &net.Dialer{Timeout: 10 * time.Second, Control: sockopts.DefaultControl()},
+		resolver:        &net.Resolver{},
+		listenerFactory: &net.ListenConfig{Control: sockopts.DefaultControl()},
+		chAccept:        make(chan net.Conn, sessionChanCapacity),
+		acceptErr:       make(chan error),
+		done:            make(chan struct{}),
+		cleaner:         time.NewTicker(underlayCleanInterval),
 	}
 	mux.ctx, mux.ctxCancelFunc = context.WithCancel(context.Background())
 
@@ -378,28 +380,19 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 			}
 			return
 		}
-		rawListener, err := net.ListenTCP("tcp", tcpAddr)
+		rawListener, err := m.listenerFactory.Listen(ctx, tcpAddr.Network(), tcpAddr.String())
 		if err != nil {
-			log.Errorf("ListenTCP() failed: %v", err)
+			log.Errorf("Listen() failed: %v", err)
 			if m.acceptHasErr.CompareAndSwap(false, true) {
 				close(m.acceptErr)
 			}
-			return
-		}
-		if err := sockopts.ApplyTCPControls(rawListener); err != nil {
-			log.Errorf("ApplyTCPControls() failed: %v", err)
-			if m.acceptHasErr.CompareAndSwap(false, true) {
-				close(m.acceptErr)
-			}
-			log.Infof("Closing TCPListener %v", rawListener.Addr())
-			rawListener.Close()
 			return
 		}
 		log.Infof("Mux is listening to endpoint %s %s", network, laddr)
 
 		// Close the rawListener if the master context is canceled.
 		// This can break the forever loop below.
-		go func(ctx context.Context, l *net.TCPListener) {
+		go func(ctx context.Context, l net.Listener) {
 			<-ctx.Done()
 			log.Infof("Closing TCPListener %v", rawListener.Addr())
 			rawListener.Close()
@@ -460,21 +453,12 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 			}
 			return
 		}
-		conn, err := net.ListenUDP(network, udpAddr)
+		conn, err := m.listenerFactory.ListenPacket(ctx, udpAddr.Network(), udpAddr.String())
 		if err != nil {
-			log.Errorf("ListenUDP() failed: %v", err)
+			log.Errorf("ListenPacket() failed: %v", err)
 			if m.acceptHasErr.CompareAndSwap(false, true) {
 				close(m.acceptErr)
 			}
-			return
-		}
-		if err := sockopts.ApplyUDPControls(conn); err != nil {
-			log.Errorf("ApplyUDPControls() failed: %v", err)
-			if m.acceptHasErr.CompareAndSwap(false, true) {
-				close(m.acceptErr)
-			}
-			log.Infof("Closing UDPConn %v", conn.LocalAddr())
-			conn.Close()
 			return
 		}
 		log.Infof("Mux is listening to endpoint %s %s", network, laddr)

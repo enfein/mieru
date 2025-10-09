@@ -116,13 +116,13 @@ func (s *serverManagementService) Start(ctx context.Context, req *emptypb.Empty)
 
 	SetAppStatus(pb.AppStatus_STARTING)
 
-	mux := protocol.NewMux(false).SetServerUsers(UserListToMap(config.GetUsers()))
+	mux := protocol.NewMux(false).SetServerUsers(appctlcommon.UserListToMap(config.GetUsers()))
 	SetServerMuxRef(mux)
 	mtu := common.DefaultMTU
 	if config.GetMtu() != 0 {
 		mtu = int(config.GetMtu())
 	}
-	endpoints, err := PortBindingsToUnderlayProperties(config.GetPortBindings(), mtu)
+	endpoints, err := appctlcommon.PortBindingsToUnderlayProperties(config.GetPortBindings(), mtu)
 	if err != nil {
 		return &emptypb.Empty{}, err
 	}
@@ -136,7 +136,7 @@ func (s *serverManagementService) Start(ctx context.Context, req *emptypb.Empty)
 		DualStackPreference: common.DualStackPreference(config.GetDns().GetDualStack()),
 		Egress:              config.GetEgress(),
 		HandshakeTimeout:    10 * time.Second,
-		Users:               UserListToMap(config.GetUsers()),
+		Users:               appctlcommon.UserListToMap(config.GetUsers()),
 	}
 	socks5Server, err := socks5.New(socks5Config)
 	if err != nil {
@@ -239,14 +239,14 @@ func (s *serverManagementService) Reload(ctx context.Context, req *emptypb.Empty
 		if config.GetMtu() != 0 {
 			mtu = int(config.GetMtu())
 		}
-		endpoints, err := PortBindingsToUnderlayProperties(config.GetPortBindings(), mtu)
+		endpoints, err := appctlcommon.PortBindingsToUnderlayProperties(config.GetPortBindings(), mtu)
 		if err != nil {
 			return &emptypb.Empty{}, err
 		}
 		mux.SetEndpoints(endpoints)
 
 		// Adjust users.
-		mux.SetServerUsers(UserListToMap(config.GetUsers()))
+		mux.SetServerUsers(appctlcommon.UserListToMap(config.GetUsers()))
 	}
 	log.Infof("completed Reload request from RPC caller")
 	return &emptypb.Empty{}, nil
@@ -465,7 +465,7 @@ func StoreServerConfig(config *pb.ServerConfig) error {
 	if config == nil {
 		return fmt.Errorf("ServerConfig is nil")
 	}
-	config.Users = HashUserPasswords(config.GetUsers(), false)
+	config.Users = appctlcommon.HashUserPasswords(config.GetUsers(), false)
 
 	fileName, fileType, err := serverConfigFilePath()
 	if err != nil {
@@ -676,35 +676,6 @@ func ValidateFullServerConfig(config *pb.ServerConfig) error {
 		return fmt.Errorf("server port binding is not set")
 	}
 	return nil
-}
-
-// PortBindingsToUnderlayProperties converts port bindings to underlay properties.
-func PortBindingsToUnderlayProperties(portBindings []*pb.PortBinding, mtu int) ([]protocol.UnderlayProperties, error) {
-	endpoints := make([]protocol.UnderlayProperties, 0)
-	listenIP := net.ParseIP(common.AllIPAddr())
-	if listenIP == nil {
-		return endpoints, fmt.Errorf(stderror.ParseIPFailed)
-	}
-	portBindings, err := appctlcommon.FlatPortBindings(portBindings)
-	if err != nil {
-		return endpoints, fmt.Errorf(stderror.InvalidPortBindingsErr, err)
-	}
-	n := len(portBindings)
-	for i := 0; i < n; i++ {
-		proto := portBindings[i].GetProtocol()
-		port := portBindings[i].GetPort()
-		switch proto {
-		case pb.TransportProtocol_TCP:
-			endpoint := protocol.NewUnderlayProperties(mtu, common.StreamTransport, &net.TCPAddr{IP: listenIP, Port: int(port)}, nil)
-			endpoints = append(endpoints, endpoint)
-		case pb.TransportProtocol_UDP:
-			endpoint := protocol.NewUnderlayProperties(mtu, common.PacketTransport, &net.UDPAddr{IP: listenIP, Port: int(port)}, nil)
-			endpoints = append(endpoints, endpoint)
-		default:
-			return []protocol.UnderlayProperties{}, fmt.Errorf(stderror.InvalidTransportProtocol)
-		}
-	}
-	return endpoints, nil
 }
 
 // checkServerConfigDir validates if server config directory exists.

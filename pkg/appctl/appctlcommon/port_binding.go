@@ -17,11 +17,15 @@ package appctlcommon
 
 import (
 	"fmt"
+	"net"
 	"regexp"
 	"sort"
 	"strconv"
 
 	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
+	"github.com/enfein/mieru/v3/pkg/common"
+	"github.com/enfein/mieru/v3/pkg/protocol"
+	"github.com/enfein/mieru/v3/pkg/stderror"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -112,4 +116,33 @@ func FlatPortBindings(bindings []*pb.PortBinding) ([]*pb.PortBinding, error) {
 		})
 	}
 	return res, nil
+}
+
+// PortBindingsToUnderlayProperties converts port bindings to underlay properties.
+func PortBindingsToUnderlayProperties(portBindings []*pb.PortBinding, mtu int) ([]protocol.UnderlayProperties, error) {
+	endpoints := make([]protocol.UnderlayProperties, 0)
+	listenIP := net.ParseIP(common.AllIPAddr())
+	if listenIP == nil {
+		return endpoints, fmt.Errorf(stderror.ParseIPFailed)
+	}
+	portBindings, err := FlatPortBindings(portBindings)
+	if err != nil {
+		return endpoints, fmt.Errorf(stderror.InvalidPortBindingsErr, err)
+	}
+	n := len(portBindings)
+	for i := 0; i < n; i++ {
+		proto := portBindings[i].GetProtocol()
+		port := portBindings[i].GetPort()
+		switch proto {
+		case pb.TransportProtocol_TCP:
+			endpoint := protocol.NewUnderlayProperties(mtu, common.StreamTransport, &net.TCPAddr{IP: listenIP, Port: int(port)}, nil)
+			endpoints = append(endpoints, endpoint)
+		case pb.TransportProtocol_UDP:
+			endpoint := protocol.NewUnderlayProperties(mtu, common.PacketTransport, &net.UDPAddr{IP: listenIP, Port: int(port)}, nil)
+			endpoints = append(endpoints, endpoint)
+		default:
+			return []protocol.UnderlayProperties{}, fmt.Errorf(stderror.InvalidTransportProtocol)
+		}
+	}
+	return endpoints, nil
 }
