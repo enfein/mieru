@@ -102,6 +102,7 @@ func TestClientProfileWithMultiURLs(t *testing.T) {
 		Multiplexing: &pb.MultiplexingConfig{
 			Level: pb.MultiplexingLevel_MULTIPLEXING_MIDDLE.Enum(),
 		},
+		HandshakeMode: pb.HandshakeMode_HANDSHAKE_NO_WAIT.Enum(),
 	}
 
 	p0 := &pb.ClientProfile{
@@ -129,6 +130,7 @@ func TestClientProfileWithMultiURLs(t *testing.T) {
 		Multiplexing: &pb.MultiplexingConfig{
 			Level: pb.MultiplexingLevel_MULTIPLEXING_MIDDLE.Enum(),
 		},
+		HandshakeMode: pb.HandshakeMode_HANDSHAKE_NO_WAIT.Enum(),
 	}
 
 	p1 := &pb.ClientProfile{
@@ -152,6 +154,7 @@ func TestClientProfileWithMultiURLs(t *testing.T) {
 		Multiplexing: &pb.MultiplexingConfig{
 			Level: pb.MultiplexingLevel_MULTIPLEXING_MIDDLE.Enum(),
 		},
+		HandshakeMode: pb.HandshakeMode_HANDSHAKE_NO_WAIT.Enum(),
 	}
 
 	urls, err := ClientProfileToMultiURLs(p)

@@ -84,6 +84,9 @@ func ClientProfileToMultiURLs(profile *pb.ClientProfile) (urls []string, err err
 		if profile.Multiplexing != nil && profile.Multiplexing.Level != nil {
 			q.Add("multiplexing", profile.GetMultiplexing().GetLevel().String())
 		}
+		if profile.HandshakeMode != nil {
+			q.Add("handshake-mode", profile.GetHandshakeMode().String())
+		}
 		for _, binding := range server.GetPortBindings() {
 			if binding.GetPortRange() != "" {
 				q.Add("port", binding.GetPortRange())
@@ -180,6 +183,10 @@ func URLToClientProfile(s string) (*pb.ClientProfile, error) {
 		p.Multiplexing = &pb.MultiplexingConfig{
 			Level: &level,
 		}
+	}
+	if q.Get("handshake-mode") != "" {
+		mode := pb.HandshakeMode(pb.HandshakeMode_value[q.Get("handshake-mode")])
+		p.HandshakeMode = &mode
 	}
 
 	portList := q["port"]
