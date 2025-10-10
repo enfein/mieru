@@ -81,9 +81,9 @@ func NewMux(isClinet bool) *Mux {
 	mux := &Mux{
 		isClient:        isClinet,
 		underlays:       make([]Underlay, 0),
-		dialer:          &net.Dialer{Timeout: 10 * time.Second, Control: sockopts.DefaultControl()},
+		dialer:          &net.Dialer{Timeout: 10 * time.Second, Control: sockopts.DefaultDialerControl()},
 		resolver:        &net.Resolver{},
-		listenerFactory: &net.ListenConfig{Control: sockopts.DefaultControl()},
+		listenerFactory: &net.ListenConfig{Control: sockopts.DefaultListenerControl()},
 		chAccept:        make(chan net.Conn, sessionChanCapacity),
 		acceptErr:       make(chan error),
 		done:            make(chan struct{}),

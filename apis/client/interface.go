@@ -79,7 +79,8 @@ type ClientNetworkService interface {
 	// performed before this method returns.
 	//
 	// This is a streaming based proxy connection. If the destination is a packet
-	// endpoint, packets are encapsulated in the streaming connection.
+	// endpoint, packets need to be encapsulated in the streaming connection.
+	// UDPAssociateWrapper and PacketOverStreamTunnel can be used for this purpose.
 	//
 	// It returns an error if the client has not been started,
 	// or has been stopped.

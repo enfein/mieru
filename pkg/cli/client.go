@@ -506,7 +506,7 @@ var clientRunFunc = func(s []string) error {
 			if err != nil {
 				log.Fatalf("Listen on RPC address %q failed: %v", rpcAddr, err)
 			}
-			if err := sockopts.ApplyTCPControls(rpcListener); err != nil {
+			if err := sockopts.ApplyTCPControl(rpcListener, sockopts.DefaultListenerControl()); err != nil {
 				log.Fatalf("ApplyTCPControls() failed: %v", err)
 			}
 			grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(appctl.MaxRecvMsgSize))
@@ -645,7 +645,7 @@ var clientRunFunc = func(s []string) error {
 		if err != nil {
 			log.Fatalf("Listen on socks5 address %q failed: %v", socks5Addr, err)
 		}
-		if err := sockopts.ApplyTCPControls(socks5Listener); err != nil {
+		if err := sockopts.ApplyTCPControl(socks5Listener, sockopts.DefaultListenerControl()); err != nil {
 			log.Fatalf("ApplyTCPControls() failed: %v", err)
 		}
 		close(appctl.ClientSocks5ServerStarted)

@@ -28,6 +28,7 @@ import (
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/constant"
+	apiinternal "github.com/enfein/mieru/v3/apis/internal"
 	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlcommon"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
@@ -250,7 +251,7 @@ func (mc *mieruClient) DialContext(ctx context.Context, addr net.Addr) (net.Conn
 		return nil, err
 	}
 	if mc.config.Profile.GetHandshakeMode() == appctlpb.HandshakeMode_HANDSHAKE_NO_WAIT {
-		return apicommon.NewEarlyConn(conn, netAddrSpec), nil
+		return apiinternal.NewEarlyConn(conn, netAddrSpec), nil
 	}
 	return mc.dialPostHandshake(conn, netAddrSpec)
 }

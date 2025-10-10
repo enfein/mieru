@@ -13,15 +13,15 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package common_test
+package internal_test
 
 import (
 	"io"
 	"sync"
 	"testing"
 
-	"github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/constant"
+	"github.com/enfein/mieru/v3/apis/internal"
 	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/testtool"
 )
@@ -84,7 +84,7 @@ func TestEarlyConn(t *testing.T) {
 		},
 		Net: "tcp",
 	}
-	conn := common.NewEarlyConn(clientConn, target)
+	conn := internal.NewEarlyConn(clientConn, target)
 	defer conn.Close()
 
 	// The first write triggers the handshake.

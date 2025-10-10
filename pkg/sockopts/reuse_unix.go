@@ -25,7 +25,7 @@ import (
 
 // ReuseAddrPort sets SO_REUSEADDR and SO_REUSEPORT options to a given connection.
 func ReuseAddrPort() Control {
-	return func(network, address string, conn syscall.RawConn) error {
+	return func(_, _ string, conn syscall.RawConn) error {
 		var err error
 		conn.Control(func(fd uintptr) { err = ReuseAddrPortRawErr()(fd) })
 		return err

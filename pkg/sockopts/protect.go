@@ -21,7 +21,7 @@ import "syscall"
 
 // ProtectPath does nothing outside Android platform.
 func ProtectPath(protectPath string) Control {
-	return func(network, address string, conn syscall.RawConn) error {
+	return func(_, _ string, _ syscall.RawConn) error {
 		return nil
 	}
 }

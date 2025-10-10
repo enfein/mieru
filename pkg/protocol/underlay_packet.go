@@ -86,8 +86,8 @@ func NewPacketUnderlay(ctx context.Context, network, addr string, mtu int, block
 	if err != nil {
 		return nil, fmt.Errorf("net.ListenUDP() failed: %w", err)
 	}
-	if err := sockopts.ApplyUDPControls(conn); err != nil {
-		return nil, fmt.Errorf("ApplyUDPControls() failed: %w", err)
+	if err := sockopts.ApplyUDPControl(conn, sockopts.DefaultDialerControl()); err != nil {
+		return nil, fmt.Errorf("ApplyUDPControl() failed: %w", err)
 	}
 	u := &PacketUnderlay{
 		baseUnderlay:       *newBaseUnderlay(true, mtu),

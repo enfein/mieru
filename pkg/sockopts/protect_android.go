@@ -26,7 +26,7 @@ import (
 // By sending the file descriptor of the connection to the socket via out-of-band
 // channel, the connection will be protected by the Android VPN service.
 func ProtectPath(protectPath string) Control {
-	return func(network, address string, conn syscall.RawConn) error {
+	return func(_, _ string, conn syscall.RawConn) error {
 		var err error
 		conn.Control(func(fd uintptr) { err = ProtectPathRawErr(protectPath)(fd) })
 		return err

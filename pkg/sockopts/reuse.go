@@ -23,7 +23,7 @@ import (
 
 // ReuseAddrPort does nothing in unsupported platforms.
 func ReuseAddrPort() Control {
-	return func(network, address string, conn syscall.RawConn) error {
+	return func(_, _ string, _ syscall.RawConn) error {
 		return nil
 	}
 }

@@ -31,48 +31,26 @@ type RawControl = func(fd uintptr)
 // RawControlErr returns an error with RawControl.
 type RawControlErr = func(fd uintptr) error
 
-// ApplyTCPControls applies all the recommended controls to the TCP listener.
-// It does nothing if the listener is not a *net.TCPListener.
-func ApplyTCPControls(listener net.Listener) error {
-	l, ok := listener.(*net.TCPListener)
-	if !ok {
-		return nil
-	}
+// ApplyTCPControl applies the control to the TCP listener.
+func ApplyTCPControl(l *net.TCPListener, controlFunc Control) error {
 	rawConn, err := l.SyscallConn()
 	if err != nil {
 		return fmt.Errorf("SyscallConn() failed: %w", err)
 	}
-	if err := rawConn.Control(ReuseAddrPortRaw()); err != nil {
-		return err
-	}
-	if path, found := os.LookupEnv("MIERU_PROTECT_PATH"); found {
-		return rawConn.Control(ProtectPathRaw(path))
-	}
-	return nil
+	return controlFunc(l.Addr().Network(), l.Addr().String(), rawConn)
 }
 
-// ApplyUDPControls applies all the recommended controls to the UDP connection.
-// It does nothing if the connection is not a *net.UDPConn.
-func ApplyUDPControls(conn net.PacketConn) error {
-	c, ok := conn.(*net.UDPConn)
-	if !ok {
-		return nil
-	}
+// ApplyUDPControl applies the control to the UDP connection.
+func ApplyUDPControl(c *net.UDPConn, controlFunc Control) error {
 	rawConn, err := c.SyscallConn()
 	if err != nil {
 		return fmt.Errorf("SyscallConn() failed: %w", err)
 	}
-	if err := rawConn.Control(ReuseAddrPortRaw()); err != nil {
-		return err
-	}
-	if path, found := os.LookupEnv("MIERU_PROTECT_PATH"); found {
-		return rawConn.Control(ProtectPathRaw(path))
-	}
-	return nil
+	return controlFunc(c.LocalAddr().Network(), c.LocalAddr().String(), rawConn)
 }
 
-// DefaultControl returns a default Control that applies recommended controls.
-func DefaultControl() Control {
+// DefaultDialerControl is the default control function for dialer.
+func DefaultDialerControl() Control {
 	return func(network, address string, c syscall.RawConn) error {
 		if err := c.Control(ReuseAddrPortRaw()); err != nil {
 			return err
@@ -83,5 +61,12 @@ func DefaultControl() Control {
 			}
 		}
 		return nil
+	}
+}
+
+// DefaultListenerControl is the default control function for listener.
+func DefaultListenerControl() Control {
+	return func(network, address string, c syscall.RawConn) error {
+		return c.Control(ReuseAddrPortRaw())
 	}
 }
