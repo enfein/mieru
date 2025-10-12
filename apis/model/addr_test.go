@@ -42,18 +42,22 @@ func TestAddrSpecAddress(t *testing.T) {
 	testCases := []struct {
 		input    *AddrSpec
 		wantAddr string
+		wantType byte
 	}{
 		{
 			input:    &AddrSpec{IP: net.IP{127, 0, 0, 1}, Port: 8080},
 			wantAddr: "127.0.0.1:8080",
+			wantType: constant.Socks5IPv4Address,
 		},
 		{
 			input:    &AddrSpec{IP: net.ParseIP("::1"), Port: 8080},
 			wantAddr: "[::1]:8080",
+			wantType: constant.Socks5IPv6Address,
 		},
 		{
 			input:    &AddrSpec{FQDN: "localhost", Port: 8080},
 			wantAddr: "localhost:8080",
+			wantType: constant.Socks5FQDNAddress,
 		},
 	}
 
@@ -61,6 +65,10 @@ func TestAddrSpecAddress(t *testing.T) {
 		addr := tc.input.String()
 		if addr != tc.wantAddr {
 			t.Errorf("got %v, want %v", addr, tc.wantAddr)
+		}
+		addrType := tc.input.AddrType()
+		if addrType != tc.wantType {
+			t.Errorf("got %v, want %v", addrType, tc.wantType)
 		}
 	}
 }

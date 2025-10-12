@@ -47,6 +47,20 @@ func (a AddrSpec) String() string {
 	return net.JoinHostPort(a.FQDN, strconv.Itoa(a.Port))
 }
 
+// AddrType returns the socks5 address type.
+func (a AddrSpec) AddrType() uint8 {
+	if a.IP.To4() != nil {
+		return constant.Socks5IPv4Address
+	}
+	if a.IP.To16() != nil {
+		return constant.Socks5IPv6Address
+	}
+	if a.FQDN != "" {
+		return constant.Socks5FQDNAddress
+	}
+	return 0 // invalid address
+}
+
 // ReadFromSocks5 reads the AddrSpec from a socks5 request.
 func (a *AddrSpec) ReadFromSocks5(r io.Reader) error {
 	// Get the address type.

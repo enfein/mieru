@@ -45,3 +45,16 @@ const (
 	Socks5AuthSuccess byte = 0
 	Socks5AuthFailure byte = 1
 )
+
+// socks5 reply types.
+const (
+	Socks5ReplySuccess              byte = 0
+	Socks5ReplyServerFailure        byte = 1
+	Socks5ReplyNotAllowedByRuleSet  byte = 2
+	Socks5ReplyNetworkUnreachable   byte = 3
+	Socks5ReplyHostUnreachable      byte = 4
+	Socks5ReplyConnectionRefused    byte = 5
+	Socks5ReplyTTLExpired           byte = 6
+	Socks5ReplyCommandNotSupported  byte = 7
+	Socks5ReplyAddrTypeNotSupported byte = 8
+)

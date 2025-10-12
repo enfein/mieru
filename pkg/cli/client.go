@@ -17,7 +17,6 @@ package cli
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -41,7 +40,6 @@ import (
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/metrics"
-	"github.com/enfein/mieru/v3/pkg/protocol"
 	"github.com/enfein/mieru/v3/pkg/sockopts"
 	"github.com/enfein/mieru/v3/pkg/socks5"
 	"github.com/enfein/mieru/v3/pkg/stderror"
@@ -524,82 +522,16 @@ var clientRunFunc = func(s []string) error {
 		<-appctl.ClientRPCServerStarted
 	}
 
-	// Collect remote proxy addresses and password.
-	mux := protocol.NewMux(true)
-	appctl.SetClientMuxRef(mux)
+	// Create the client multiplexer.
 	activeProfile, err := appctl.GetActiveProfileFromConfig(config, config.GetActiveProfile())
 	if err != nil {
 		return fmt.Errorf(stderror.ClientGetActiveProfileFailedErr, err)
 	}
-	user := activeProfile.GetUser()
-	var hashedPassword []byte
-	if user.GetHashedPassword() != "" {
-		hashedPassword, err = hex.DecodeString(user.GetHashedPassword())
-		if err != nil {
-			return fmt.Errorf(stderror.DecodeHashedPasswordFailedErr, err)
-		}
-	} else {
-		hashedPassword = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
+	mux, err := appctlcommon.NewClientMuxFromProfile(activeProfile, nil, resolver)
+	if err != nil {
+		return err
 	}
-	mux = mux.SetClientUserNamePassword(user.GetName(), hashedPassword)
-
-	multiplexFactor := 1
-	switch activeProfile.GetMultiplexing().GetLevel() {
-	case appctlpb.MultiplexingLevel_MULTIPLEXING_OFF:
-		multiplexFactor = 0
-	case appctlpb.MultiplexingLevel_MULTIPLEXING_LOW:
-		multiplexFactor = 1
-	case appctlpb.MultiplexingLevel_MULTIPLEXING_MIDDLE:
-		multiplexFactor = 2
-	case appctlpb.MultiplexingLevel_MULTIPLEXING_HIGH:
-		multiplexFactor = 3
-	}
-	mux = mux.SetClientMultiplexFactor(multiplexFactor)
-
-	mtu := common.DefaultMTU
-	if activeProfile.GetMtu() != 0 {
-		mtu = int(activeProfile.GetMtu())
-	}
-	endpoints := make([]protocol.UnderlayProperties, 0)
-	for _, serverInfo := range activeProfile.GetServers() {
-		var proxyHost string
-		var proxyIP net.IP
-		if serverInfo.GetDomainName() != "" {
-			proxyHost = serverInfo.GetDomainName()
-			proxyIPs, err := resolver.LookupIP(context.Background(), "ip", proxyHost)
-			if err != nil {
-				return fmt.Errorf(stderror.LookupIPFailedErr, err)
-			}
-			if len(proxyIPs) == 0 {
-				return fmt.Errorf(stderror.IPAddressNotFound, proxyHost)
-			}
-			proxyIP = proxyIPs[0]
-		} else {
-			proxyHost = serverInfo.GetIpAddress()
-			proxyIP = net.ParseIP(proxyHost)
-			if proxyIP == nil {
-				return fmt.Errorf(stderror.ParseIPFailed)
-			}
-		}
-		portBindings, err := appctlcommon.FlatPortBindings(serverInfo.GetPortBindings())
-		if err != nil {
-			return fmt.Errorf(stderror.InvalidPortBindingsErr, err)
-		}
-		for _, bindingInfo := range portBindings {
-			proxyPort := bindingInfo.GetPort()
-			switch bindingInfo.GetProtocol() {
-			case appctlpb.TransportProtocol_TCP:
-				endpoint := protocol.NewUnderlayProperties(mtu, common.StreamTransport, nil, &net.TCPAddr{IP: proxyIP, Port: int(proxyPort)})
-				endpoints = append(endpoints, endpoint)
-			case appctlpb.TransportProtocol_UDP:
-				endpoint := protocol.NewUnderlayProperties(mtu, common.PacketTransport, nil, &net.UDPAddr{IP: proxyIP, Port: int(proxyPort)})
-				endpoints = append(endpoints, endpoint)
-			default:
-				return fmt.Errorf(stderror.InvalidTransportProtocol)
-			}
-		}
-	}
-	mux.SetEndpoints(endpoints)
+	appctl.SetClientMuxRef(mux)
 
 	// Create the local socks5 server.
 	var socks5IngressCredentials []socks5.Credential

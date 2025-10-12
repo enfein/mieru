@@ -16,10 +16,18 @@
 package appctlcommon
 
 import (
+	"context"
+	"encoding/hex"
 	"fmt"
 	"net"
 
+	apicommon "github.com/enfein/mieru/v3/apis/common"
+	"github.com/enfein/mieru/v3/apis/model"
 	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
+	"github.com/enfein/mieru/v3/pkg/cipher"
+	"github.com/enfein/mieru/v3/pkg/common"
+	"github.com/enfein/mieru/v3/pkg/protocol"
+	"github.com/enfein/mieru/v3/pkg/stderror"
 )
 
 // ValidateClientConfigSingleProfile validates
@@ -73,4 +81,119 @@ func ValidateClientConfigSingleProfile(profile *pb.ClientProfile) error {
 		return fmt.Errorf("MTU value %d is out of range, valid range is [1280, 1500]", profile.GetMtu())
 	}
 	return nil
+}
+
+func NewClientMuxFromProfile(activeProfile *pb.ClientProfile, dialer apicommon.Dialer, resolver apicommon.DNSResolver) (*protocol.Mux, error) {
+	var err error
+	mux := protocol.NewMux(true)
+
+	// Set dialer.
+	if dialer != nil {
+		mux.SetDialer(dialer)
+	}
+
+	// Set DNS resolver.
+	// If DNS resolver is not provided, disable DNS resolution.
+	// Connection to a domain name endpoint may fail.
+	enableDNS := false
+	if resolver != nil {
+		enableDNS = true
+	} else {
+		resolver = apicommon.NilDNSResolver{}
+	}
+	mux.SetResolver(resolver)
+
+	// Set user name and password.
+	user := activeProfile.GetUser()
+	var hashedPassword []byte
+	if user.GetHashedPassword() != "" {
+		hashedPassword, err = hex.DecodeString(user.GetHashedPassword())
+		if err != nil {
+			return nil, fmt.Errorf(stderror.DecodeHashedPasswordFailedErr, err)
+		}
+	} else {
+		hashedPassword = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
+	}
+	mux = mux.SetClientUserNamePassword(user.GetName(), hashedPassword)
+
+	// Set multiplex factor.
+	multiplexFactor := 1
+	switch activeProfile.GetMultiplexing().GetLevel() {
+	case pb.MultiplexingLevel_MULTIPLEXING_OFF:
+		multiplexFactor = 0
+	case pb.MultiplexingLevel_MULTIPLEXING_LOW:
+		multiplexFactor = 1
+	case pb.MultiplexingLevel_MULTIPLEXING_MIDDLE:
+		multiplexFactor = 2
+	case pb.MultiplexingLevel_MULTIPLEXING_HIGH:
+		multiplexFactor = 3
+	}
+	mux = mux.SetClientMultiplexFactor(multiplexFactor)
+
+	// Set server endpoints.
+	mtu := common.DefaultMTU
+	if activeProfile.GetMtu() != 0 {
+		mtu = int(activeProfile.GetMtu())
+	}
+	endpoints := make([]protocol.UnderlayProperties, 0)
+	for _, serverInfo := range activeProfile.GetServers() {
+		var proxyHost string
+		var proxyIP net.IP
+		if serverInfo.GetDomainName() != "" {
+			proxyHost = serverInfo.GetDomainName()
+			if enableDNS {
+				proxyIPs, err := resolver.LookupIP(context.Background(), "ip", proxyHost)
+				if err != nil {
+					return nil, fmt.Errorf(stderror.LookupIPFailedErr, err)
+				}
+				if len(proxyIPs) == 0 {
+					return nil, fmt.Errorf(stderror.IPAddressNotFound, proxyHost)
+				}
+				proxyIP = proxyIPs[0]
+			}
+		} else {
+			proxyHost = serverInfo.GetIpAddress()
+			proxyIP = net.ParseIP(proxyHost)
+			if proxyIP == nil {
+				return nil, fmt.Errorf(stderror.ParseIPFailed)
+			}
+		}
+		portBindings, err := FlatPortBindings(serverInfo.GetPortBindings())
+		if err != nil {
+			return nil, fmt.Errorf(stderror.InvalidPortBindingsErr, err)
+		}
+		for _, bindingInfo := range portBindings {
+			proxyPort := bindingInfo.GetPort()
+			var endpoint protocol.UnderlayProperties
+			switch bindingInfo.GetProtocol() {
+			case pb.TransportProtocol_TCP:
+				if proxyIP != nil {
+					endpoint = protocol.NewUnderlayProperties(mtu, common.StreamTransport, nil,
+						&net.TCPAddr{IP: proxyIP, Port: int(proxyPort)},
+					)
+				} else {
+					endpoint = protocol.NewUnderlayProperties(mtu, common.StreamTransport, nil,
+						&model.NetAddrSpec{Net: "tcp", AddrSpec: model.AddrSpec{FQDN: proxyHost, Port: int(proxyPort)}},
+					)
+				}
+			case pb.TransportProtocol_UDP:
+				if proxyIP != nil {
+					endpoint = protocol.NewUnderlayProperties(mtu, common.PacketTransport, nil,
+						&net.UDPAddr{IP: proxyIP, Port: int(proxyPort)},
+					)
+				} else {
+					endpoint = protocol.NewUnderlayProperties(mtu, common.PacketTransport, nil,
+						&model.NetAddrSpec{Net: "udp", AddrSpec: model.AddrSpec{FQDN: proxyHost, Port: int(proxyPort)}},
+					)
+				}
+			default:
+				return nil, fmt.Errorf(stderror.InvalidTransportProtocol)
+			}
+			if endpoint != nil {
+				endpoints = append(endpoints, endpoint)
+			}
+		}
+	}
+	mux.SetEndpoints(endpoints)
+	return mux, nil
 }

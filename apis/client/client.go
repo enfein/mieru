@@ -16,27 +16,18 @@
 package client
 
 import (
-	"bytes"
 	"context"
-	"encoding/hex"
 	"fmt"
-	"io"
 	"net"
 	"strings"
 	"sync"
-	"time"
 
-	apicommon "github.com/enfein/mieru/v3/apis/common"
-	"github.com/enfein/mieru/v3/apis/constant"
-	apiinternal "github.com/enfein/mieru/v3/apis/internal"
+	"github.com/enfein/mieru/v3/apis/internal"
 	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlcommon"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
-	"github.com/enfein/mieru/v3/pkg/cipher"
-	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/protocol"
-	"github.com/enfein/mieru/v3/pkg/stderror"
 )
 
 // This package should not depends on github.com/enfein/mieru/v3/pkg/appctl,
@@ -97,118 +88,11 @@ func (mc *mieruClient) Start() error {
 		return ErrNoClientConfig
 	}
 
-	var err error
-	mc.mux = protocol.NewMux(true)
-	activeProfile := mc.config.Profile
-
-	// Set dialer.
-	if mc.config.Dialer != nil {
-		mc.mux.SetDialer(mc.config.Dialer)
+	mux, err := appctlcommon.NewClientMuxFromProfile(mc.config.Profile, mc.config.Dialer, mc.config.Resolver)
+	if err != nil {
+		return err
 	}
-
-	// Set DNS resolver.
-	// If DNS resolver is not provided, disable DNS resolution.
-	enableDNS := false
-	var resolver apicommon.DNSResolver = apicommon.NilDNSResolver{}
-	if mc.config.Resolver != nil {
-		enableDNS = true
-		resolver = mc.config.Resolver
-	}
-	mc.mux.SetResolver(resolver)
-
-	// Set user name and password.
-	user := activeProfile.GetUser()
-	var hashedPassword []byte
-	if user.GetHashedPassword() != "" {
-		hashedPassword, err = hex.DecodeString(user.GetHashedPassword())
-		if err != nil {
-			return fmt.Errorf(stderror.DecodeHashedPasswordFailedErr, err)
-		}
-	} else {
-		hashedPassword = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
-	}
-	mc.mux = mc.mux.SetClientUserNamePassword(user.GetName(), hashedPassword)
-
-	// Set multiplex factor.
-	multiplexFactor := 1
-	switch activeProfile.GetMultiplexing().GetLevel() {
-	case appctlpb.MultiplexingLevel_MULTIPLEXING_OFF:
-		multiplexFactor = 0
-	case appctlpb.MultiplexingLevel_MULTIPLEXING_LOW:
-		multiplexFactor = 1
-	case appctlpb.MultiplexingLevel_MULTIPLEXING_MIDDLE:
-		multiplexFactor = 2
-	case appctlpb.MultiplexingLevel_MULTIPLEXING_HIGH:
-		multiplexFactor = 3
-	}
-	mc.mux = mc.mux.SetClientMultiplexFactor(multiplexFactor)
-
-	// Set server endpoints.
-	mtu := common.DefaultMTU
-	if activeProfile.GetMtu() != 0 {
-		mtu = int(activeProfile.GetMtu())
-	}
-	endpoints := make([]protocol.UnderlayProperties, 0)
-	for _, serverInfo := range activeProfile.GetServers() {
-		var proxyHost string
-		var proxyIP net.IP
-		if serverInfo.GetDomainName() != "" {
-			proxyHost = serverInfo.GetDomainName()
-			if enableDNS {
-				proxyIPs, err := resolver.LookupIP(context.Background(), "ip", proxyHost)
-				if err != nil {
-					return fmt.Errorf(stderror.LookupIPFailedErr, err)
-				}
-				if len(proxyIPs) == 0 {
-					return fmt.Errorf(stderror.IPAddressNotFound, proxyHost)
-				}
-				proxyIP = proxyIPs[0]
-			}
-		} else {
-			proxyHost = serverInfo.GetIpAddress()
-			proxyIP = net.ParseIP(proxyHost)
-			if proxyIP == nil {
-				return fmt.Errorf(stderror.ParseIPFailed)
-			}
-		}
-		portBindings, err := appctlcommon.FlatPortBindings(serverInfo.GetPortBindings())
-		if err != nil {
-			return fmt.Errorf(stderror.InvalidPortBindingsErr, err)
-		}
-		for _, bindingInfo := range portBindings {
-			proxyPort := bindingInfo.GetPort()
-			var endpoint protocol.UnderlayProperties
-			switch bindingInfo.GetProtocol() {
-			case appctlpb.TransportProtocol_TCP:
-				if proxyIP != nil {
-					endpoint = protocol.NewUnderlayProperties(mtu, common.StreamTransport, nil,
-						&net.TCPAddr{IP: proxyIP, Port: int(proxyPort)},
-					)
-				} else {
-					endpoint = protocol.NewUnderlayProperties(mtu, common.StreamTransport, nil,
-						&model.NetAddrSpec{Net: "tcp", AddrSpec: model.AddrSpec{FQDN: proxyHost, Port: int(proxyPort)}},
-					)
-				}
-			case appctlpb.TransportProtocol_UDP:
-				if proxyIP != nil {
-					endpoint = protocol.NewUnderlayProperties(mtu, common.PacketTransport, nil,
-						&net.UDPAddr{IP: proxyIP, Port: int(proxyPort)},
-					)
-				} else {
-					endpoint = protocol.NewUnderlayProperties(mtu, common.PacketTransport, nil,
-						&model.NetAddrSpec{Net: "udp", AddrSpec: model.AddrSpec{FQDN: proxyHost, Port: int(proxyPort)}},
-					)
-				}
-			default:
-				return fmt.Errorf(stderror.InvalidTransportProtocol)
-			}
-			if endpoint != nil {
-				endpoints = append(endpoints, endpoint)
-			}
-		}
-	}
-	mc.mux.SetEndpoints(endpoints)
-
+	mc.mux = mux
 	mc.running = true
 	return nil
 }
@@ -251,47 +135,8 @@ func (mc *mieruClient) DialContext(ctx context.Context, addr net.Addr) (net.Conn
 		return nil, err
 	}
 	if mc.config.Profile.GetHandshakeMode() == appctlpb.HandshakeMode_HANDSHAKE_NO_WAIT {
-		return apiinternal.NewEarlyConn(conn, netAddrSpec), nil
+		return internal.NewEarlyConn(conn, netAddrSpec), nil
 	}
-	return mc.dialPostHandshake(conn, netAddrSpec)
-}
-
-func (mc *mieruClient) dialPostHandshake(conn net.Conn, netAddrSpec model.NetAddrSpec) (net.Conn, error) {
-	var req bytes.Buffer
-	isTCP := strings.HasPrefix(netAddrSpec.Network(), "tcp")
-	isUDP := strings.HasPrefix(netAddrSpec.Network(), "udp")
-
-	if isTCP {
-		req.Write([]byte{constant.Socks5Version, constant.Socks5ConnectCmd, 0})
-	} else if isUDP {
-		req.Write([]byte{constant.Socks5Version, constant.Socks5UDPAssociateCmd, 0})
-	} else {
-		return nil, fmt.Errorf("unsupported network type %s", netAddrSpec.Network())
-	}
-
-	if err := netAddrSpec.WriteToSocks5(&req); err != nil {
-		return nil, err
-	}
-	if _, err := conn.Write(req.Bytes()); err != nil {
-		return nil, fmt.Errorf("failed to write socks5 connection request to the server: %w", err)
-	}
-
-	common.SetReadTimeout(conn, 10*time.Second)
-	defer func() {
-		common.SetReadTimeout(conn, 0)
-	}()
-
-	resp := make([]byte, 3)
-	if _, err := io.ReadFull(conn, resp); err != nil {
-		return nil, fmt.Errorf("failed to read socks5 connection response from the server: %w", err)
-	}
-	var respAddr model.NetAddrSpec
-	if err := respAddr.ReadFromSocks5(conn); err != nil {
-		return nil, fmt.Errorf("failed to read socks5 connection address response from the server: %w", err)
-	}
-	if resp[1] != 0 {
-		return nil, fmt.Errorf("server returned socks5 error code %d", resp[1])
-	}
-
-	return conn, nil
+	_, err = internal.PostDialHandshake(conn, netAddrSpec)
+	return conn, err
 }

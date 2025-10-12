@@ -101,6 +101,7 @@ type ClientConfig struct {
 	//
 	// This field is not required, if Dialer is able to do DNS, or proxy server
 	// endpoints are IP addresses rather than domain names.
+	// Otherwise, the proxy server won't be reachable.
 	Resolver apicommon.DNSResolver
 }
 
