@@ -15,8 +15,8 @@
 
 package constant
 
+// socks5 version number.
 const (
-	// socks5 version number.
 	Socks5Version byte = 5
 )
 
@@ -46,7 +46,7 @@ const (
 	Socks5AuthFailure byte = 1
 )
 
-// socks5 reply types.
+// socks5 reply values.
 const (
 	Socks5ReplySuccess              byte = 0
 	Socks5ReplyServerFailure        byte = 1

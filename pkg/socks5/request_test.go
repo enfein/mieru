@@ -54,7 +54,7 @@ func TestRequestConnect(t *testing.T) {
 	defer serverConn.Close()
 	defer clientConn.Close()
 
-	clientConn.Write([]byte{5, 1, 0, 1, 127, 0, 0, 1})
+	clientConn.Write([]byte{constant.Socks5Version, constant.Socks5ConnectCmd, 0, constant.Socks5IPv4Address, 127, 0, 0, 1})
 	port := []byte{0, 0}
 	binary.BigEndian.PutUint16(port, uint16(dstAddr.Port))
 	clientConn.Write(port)
@@ -78,7 +78,7 @@ func TestRequestConnect(t *testing.T) {
 		t.Fatalf("io.ReadFull() failed: %v", err)
 	}
 	want := []byte{
-		5, 0, 0, 1,
+		constant.Socks5Version, constant.Socks5ReplySuccess, 0, constant.Socks5IPv4Address,
 		127, 0, 0, 1,
 		0, 0,
 		'p', 'o', 'n', 'g',
@@ -100,7 +100,7 @@ func TestRequestUnsupportedCommand(t *testing.T) {
 	}{
 		{
 			[]byte{5, constant.Socks5BindCmd, 0, 1, 127, 0, 0, 1, 0, 1},
-			[]byte{5, commandNotSupported, 0, 1, 0, 0, 0, 0, 0, 0},
+			[]byte{5, constant.Socks5ReplyCommandNotSupported, 0, 1, 0, 0, 0, 0, 0, 0},
 		},
 	}
 

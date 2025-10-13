@@ -9,6 +9,7 @@ import (
 	"time"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
+	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/common"
@@ -246,7 +247,7 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 	if err != nil {
 		HandshakeErrors.Add(1)
 		if errors.Is(err, model.ErrUnrecognizedAddrType) {
-			if err := sendReply(conn, addrTypeNotSupported, nil); err != nil {
+			if err := sendReply(conn, constant.Socks5ReplyAddrTypeNotSupported, nil); err != nil {
 				return fmt.Errorf("failed to send reply for addrTypeNotSupported error: %w", err)
 			}
 		}
@@ -293,7 +294,7 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 		return s.handleForwarding(request, conn, action.Proxy)
 	case appctlpb.EgressAction_REJECT:
 		RejectByRules.Add(1)
-		if err := sendReply(conn, notAllowedByRuleSet, nil); err != nil {
+		if err := sendReply(conn, constant.Socks5ReplyNotAllowedByRuleSet, nil); err != nil {
 			return fmt.Errorf("failed to send reply for notAllowedByRuleSet error: %w", err)
 		}
 		return fmt.Errorf("connection is rejected by egress rules")
