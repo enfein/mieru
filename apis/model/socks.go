@@ -24,8 +24,6 @@ import (
 )
 
 type Request struct {
-	// Protocol version.
-	Version uint8
 	// Requested command.
 	Command uint8
 	// Desired destination.
@@ -43,10 +41,10 @@ func (r *Request) ReadFromSocks5(reader io.Reader) error {
 	if _, err := io.ReadFull(tee, header); err != nil {
 		return err
 	}
-	r.Version = header[0]
+	version := header[0]
 	r.Command = header[1]
-	if r.Version != constant.Socks5Version {
-		return fmt.Errorf("invalid version: %d", r.Version)
+	if version != constant.Socks5Version {
+		return fmt.Errorf("invalid version: %d", version)
 	}
 
 	if err := r.DstAddr.ReadFromSocks5(tee); err != nil {
@@ -61,10 +59,7 @@ func (r *Request) ReadFromSocks5(reader io.Reader) error {
 func (r *Request) WriteToSocks5(writer io.Writer) error {
 	var buf bytes.Buffer
 
-	if r.Version != constant.Socks5Version {
-		return fmt.Errorf("invalid version: %d", r.Version)
-	}
-	buf.Write([]byte{r.Version, r.Command, 0})
+	buf.Write([]byte{constant.Socks5Version, r.Command, 0})
 	if err := r.DstAddr.WriteToSocks5(&buf); err != nil {
 		return err
 	}
@@ -75,8 +70,6 @@ func (r *Request) WriteToSocks5(writer io.Writer) error {
 }
 
 type Response struct {
-	// Protocol version.
-	Version uint8
 	// Reply code.
 	Reply uint8
 	// Server bound address.
@@ -94,10 +87,10 @@ func (r *Response) ReadFromSocks5(reader io.Reader) error {
 	if _, err := io.ReadFull(tee, header); err != nil {
 		return err
 	}
-	r.Version = header[0]
+	version := header[0]
 	r.Reply = header[1]
-	if r.Version != constant.Socks5Version {
-		return fmt.Errorf("invalid version: %d", r.Version)
+	if version != constant.Socks5Version {
+		return fmt.Errorf("invalid version: %d", version)
 	}
 
 	if err := r.BindAddr.ReadFromSocks5(tee); err != nil {
@@ -112,10 +105,7 @@ func (r *Response) ReadFromSocks5(reader io.Reader) error {
 func (r *Response) WriteToSocks5(writer io.Writer) error {
 	var buf bytes.Buffer
 
-	if r.Version != constant.Socks5Version {
-		return fmt.Errorf("invalid version: %d", r.Version)
-	}
-	buf.Write([]byte{r.Version, r.Reply, 0})
+	buf.Write([]byte{constant.Socks5Version, r.Reply, 0})
 	if err := r.BindAddr.WriteToSocks5(&buf); err != nil {
 		return err
 	}

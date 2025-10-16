@@ -29,7 +29,6 @@ import (
 // PostDialHandshake completes the handshake after API client is connected to a server.
 func PostDialHandshake(conn net.Conn, destination model.NetAddrSpec) (*model.Response, error) {
 	req := &model.Request{
-		Version: constant.Socks5Version,
 		DstAddr: destination.AddrSpec,
 	}
 	isTCP := strings.HasPrefix(destination.Network(), "tcp")

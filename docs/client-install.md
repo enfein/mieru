@@ -203,7 +203,7 @@ A standard sharing link starts with `mieru://` and uses base64 encoding for the 
 Use command `mieru export config simple` to generate human-readable simple sharing links. For example:
 
 ```
-mierus://baozi:manlianpenfen@1.2.3.4?mtu=1400&multiplexing=MULTIPLEXING_HIGH&port=6666&port=9998-9999&port=6489&port=4896&profile=default&protocol=TCP&protocol=TCP&protocol=UDP&protocol=UDP
+mierus://baozi:manlianpenfen@1.2.3.4?handshake-mode=HANDSHAKE_NO_WAIT&mtu=1400&multiplexing=MULTIPLEXING_HIGH&port=6666&port=9998-9999&port=6489&port=4896&profile=default&protocol=TCP&protocol=TCP&protocol=UDP&protocol=UDP
 ```
 
 The format of the simple sharing link is as follows:
@@ -219,10 +219,11 @@ The supported parameters are:
 - `profile`
 - `mtu`
 - `multiplexing`
+- `handshake-mode`
 - `port`
 - `protocol`
 
-Among them, `profile` must appear once, `mtu` and `multiplexing` can appear at most once, `port` and `protocol` can appear multiple times, and they must appear the same number of times, such that the `port` and `protocol` at the same position can be associated. Additionally, `port` can also be used to specify a port range.
+Among them, `profile` must appear once, `mtu`, `multiplexing` and `handshake-mode` can appear at most once, `port` and `protocol` can appear multiple times, and they must appear the same number of times, such that the `port` and `protocol` at the same position can be associated. Additionally, `port` can also be used to specify a port range.
 
 The simple sharing link above is equivalent to the following client configuration fragment:
 
@@ -259,7 +260,8 @@ The simple sharing link above is equivalent to the following client configuratio
     "mtu":  1400,
     "multiplexing":  {
         "level":  "MULTIPLEXING_HIGH"
-    }
+    },
+    "handshakeMode":  "HANDSHAKE_NO_WAIT"
 }
 ```
 

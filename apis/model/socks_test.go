@@ -32,7 +32,6 @@ func TestRequestReadWrite(t *testing.T) {
 		{
 			input: []byte{constant.Socks5Version, constant.Socks5ConnectCmd, 0, constant.Socks5IPv4Address, 127, 0, 0, 1, 0, 80},
 			request: &Request{
-				Version: constant.Socks5Version,
 				Command: constant.Socks5ConnectCmd,
 				DstAddr: AddrSpec{
 					IP:   net.IP{127, 0, 0, 1},
@@ -43,7 +42,6 @@ func TestRequestReadWrite(t *testing.T) {
 		{
 			input: []byte{constant.Socks5Version, constant.Socks5ConnectCmd, 0, constant.Socks5IPv6Address, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 80},
 			request: &Request{
-				Version: constant.Socks5Version,
 				Command: constant.Socks5ConnectCmd,
 				DstAddr: AddrSpec{
 					IP:   net.ParseIP("::1"),
@@ -54,7 +52,6 @@ func TestRequestReadWrite(t *testing.T) {
 		{
 			input: []byte{constant.Socks5Version, constant.Socks5ConnectCmd, 0, constant.Socks5FQDNAddress, 9, 'l', 'o', 'c', 'a', 'l', 'h', 'o', 's', 't', 0, 80},
 			request: &Request{
-				Version: constant.Socks5Version,
 				Command: constant.Socks5ConnectCmd,
 				DstAddr: AddrSpec{
 					FQDN: "localhost",
@@ -69,9 +66,6 @@ func TestRequestReadWrite(t *testing.T) {
 		err := req.ReadFromSocks5(bytes.NewBuffer(tc.input))
 		if err != nil {
 			t.Fatalf("ReadFromSocks5() failed: %v", err)
-		}
-		if req.Version != tc.request.Version {
-			t.Errorf("got version %v, want %v", req.Version, tc.request.Version)
 		}
 		if req.Command != tc.request.Command {
 			t.Errorf("got command %v, want %v", req.Command, tc.request.Command)
@@ -100,8 +94,7 @@ func TestResponseReadWrite(t *testing.T) {
 		{
 			input: []byte{constant.Socks5Version, constant.Socks5ReplySuccess, 0, constant.Socks5IPv4Address, 127, 0, 0, 1, 0, 80},
 			response: &Response{
-				Version: constant.Socks5Version,
-				Reply:   constant.Socks5ReplySuccess,
+				Reply: constant.Socks5ReplySuccess,
 				BindAddr: AddrSpec{
 					IP:   net.IP{127, 0, 0, 1},
 					Port: 80,
@@ -111,8 +104,7 @@ func TestResponseReadWrite(t *testing.T) {
 		{
 			input: []byte{constant.Socks5Version, constant.Socks5ReplySuccess, 0, constant.Socks5IPv6Address, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 80},
 			response: &Response{
-				Version: constant.Socks5Version,
-				Reply:   constant.Socks5ReplySuccess,
+				Reply: constant.Socks5ReplySuccess,
 				BindAddr: AddrSpec{
 					IP:   net.ParseIP("::1"),
 					Port: 80,
@@ -122,8 +114,7 @@ func TestResponseReadWrite(t *testing.T) {
 		{
 			input: []byte{constant.Socks5Version, constant.Socks5ReplySuccess, 0, constant.Socks5FQDNAddress, 9, 'l', 'o', 'c', 'a', 'l', 'h', 'o', 's', 't', 0, 80},
 			response: &Response{
-				Version: constant.Socks5Version,
-				Reply:   constant.Socks5ReplySuccess,
+				Reply: constant.Socks5ReplySuccess,
 				BindAddr: AddrSpec{
 					FQDN: "localhost",
 					Port: 80,
@@ -137,9 +128,6 @@ func TestResponseReadWrite(t *testing.T) {
 		err := resp.ReadFromSocks5(bytes.NewBuffer(tc.input))
 		if err != nil {
 			t.Fatalf("ReadFromSocks5() failed: %v", err)
-		}
-		if resp.Version != tc.response.Version {
-			t.Errorf("got version %v, want %v", resp.Version, tc.response.Version)
 		}
 		if resp.Reply != tc.response.Reply {
 			t.Errorf("got reply %v, want %v", resp.Reply, tc.response.Reply)

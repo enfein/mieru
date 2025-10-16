@@ -243,11 +243,15 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 	}
 
 	ctx := context.Background()
-	request, err := s.newRequest(conn)
+	request, err := s.readRequest(conn)
 	if err != nil {
 		HandshakeErrors.Add(1)
 		if errors.Is(err, model.ErrUnrecognizedAddrType) {
-			if err := sendReply(conn, constant.Socks5ReplyAddrTypeNotSupported, nil); err != nil {
+			resp := &model.Response{
+				Reply:    constant.Socks5ReplyAddrTypeNotSupported,
+				BindAddr: model.AddrSpec{IP: net.IPv4(0, 0, 0, 0)},
+			}
+			if err := resp.WriteToSocks5(conn); err != nil {
 				return fmt.Errorf("failed to send reply for addrTypeNotSupported error: %w", err)
 			}
 		}
@@ -294,7 +298,11 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 		return s.handleForwarding(request, conn, action.Proxy)
 	case appctlpb.EgressAction_REJECT:
 		RejectByRules.Add(1)
-		if err := sendReply(conn, constant.Socks5ReplyNotAllowedByRuleSet, nil); err != nil {
+		resp := &model.Response{
+			Reply:    constant.Socks5ReplyNotAllowedByRuleSet,
+			BindAddr: model.AddrSpec{IP: net.IPv4(0, 0, 0, 0)},
+		}
+		if err := resp.WriteToSocks5(conn); err != nil {
 			return fmt.Errorf("failed to send reply for notAllowedByRuleSet error: %w", err)
 		}
 		return fmt.Errorf("connection is rejected by egress rules")

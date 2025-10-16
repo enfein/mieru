@@ -32,7 +32,7 @@ PROJECT_NAME=$(shell basename "${ROOT}")
 # - pkg/version/current.go
 #
 # Use `tools/bump_version.sh` script to change all those files at one shot.
-VERSION="3.20.1"
+VERSION="3.21.0"
 
 # Build binaries and installation packages.
 .PHONY: build

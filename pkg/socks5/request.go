@@ -20,20 +20,6 @@ import (
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
 
-// newRequest creates a new Request from the connection.
-func (s *Server) newRequest(conn io.Reader) (*model.Request, error) {
-	if netConn, ok := conn.(net.Conn); ok {
-		common.SetReadTimeout(netConn, s.config.HandshakeTimeout)
-		defer common.SetReadTimeout(netConn, 0)
-	}
-
-	req := &model.Request{}
-	if err := req.ReadFromSocks5(conn); err != nil {
-		return nil, err
-	}
-	return req, nil
-}
-
 // handleRequest is used for request processing after authentication.
 func (s *Server) handleRequest(ctx context.Context, req *model.Request, conn net.Conn) error {
 	// Resolve the address if we have a FQDN.
@@ -42,7 +28,11 @@ func (s *Server) handleRequest(ctx context.Context, req *model.Request, conn net
 		ips, err := s.config.Resolver.LookupIP(ctx, "ip", dst.FQDN)
 		if err != nil || len(ips) == 0 {
 			DNSResolveErrors.Add(1)
-			if err := sendReply(conn, constant.Socks5ReplyHostUnreachable, nil); err != nil {
+			resp := &model.Response{
+				Reply:    constant.Socks5ReplyHostUnreachable,
+				BindAddr: model.AddrSpec{IP: net.IPv4(0, 0, 0, 0)},
+			}
+			if err := resp.WriteToSocks5(conn); err != nil {
 				return fmt.Errorf("failed to send reply: %w", err)
 			}
 			if err != nil {
@@ -54,7 +44,11 @@ func (s *Server) handleRequest(ctx context.Context, req *model.Request, conn net
 			dst.IP = common.SelectIPFromList(ips, s.config.DualStackPreference)
 			if dst.IP == nil {
 				DNSResolveErrors.Add(1)
-				if err := sendReply(conn, constant.Socks5ReplyNetworkUnreachable, nil); err != nil {
+				resp := &model.Response{
+					Reply:    constant.Socks5ReplyNetworkUnreachable,
+					BindAddr: model.AddrSpec{IP: net.IPv4(0, 0, 0, 0)},
+				}
+				if err := resp.WriteToSocks5(conn); err != nil {
 					return fmt.Errorf("failed to send reply: %w", err)
 				}
 				return fmt.Errorf("resolved domain name %s to IP addresses %v, but no IP address satisfy DNS dual stack preference", dst.FQDN, ips)
@@ -73,7 +67,11 @@ func (s *Server) handleRequest(ctx context.Context, req *model.Request, conn net
 		return s.handleAssociate(ctx, req, conn)
 	default:
 		UnsupportedCommandErrors.Add(1)
-		if err := sendReply(conn, constant.Socks5ReplyCommandNotSupported, nil); err != nil {
+		resp := &model.Response{
+			Reply:    constant.Socks5ReplyCommandNotSupported,
+			BindAddr: model.AddrSpec{IP: net.IPv4(0, 0, 0, 0)},
+		}
+		if err := resp.WriteToSocks5(conn); err != nil {
 			return fmt.Errorf("failed to send reply: %w", err)
 		}
 		return fmt.Errorf("unsupported command: %v", req.Command)
@@ -86,18 +84,22 @@ func (s *Server) handleConnect(ctx context.Context, req *model.Request, conn net
 	target, err := d.DialContext(ctx, "tcp", req.DstAddr.String())
 	if err != nil {
 		msg := err.Error()
-		var resp uint8
+		var replyCode uint8
 		if strings.Contains(msg, "refused") {
-			resp = constant.Socks5ReplyConnectionRefused
+			replyCode = constant.Socks5ReplyConnectionRefused
 			ConnectionRefusedErrors.Add(1)
 		} else if strings.Contains(msg, "network is unreachable") {
-			resp = constant.Socks5ReplyNetworkUnreachable
+			replyCode = constant.Socks5ReplyNetworkUnreachable
 			NetworkUnreachableErrors.Add(1)
 		} else {
-			resp = constant.Socks5ReplyHostUnreachable
+			replyCode = constant.Socks5ReplyHostUnreachable
 			HostUnreachableErrors.Add(1)
 		}
-		if err := sendReply(conn, resp, nil); err != nil {
+		resp := &model.Response{
+			Reply:    replyCode,
+			BindAddr: model.AddrSpec{IP: net.IPv4(0, 0, 0, 0)},
+		}
+		if err := resp.WriteToSocks5(conn); err != nil {
 			return fmt.Errorf("failed to send reply: %w", err)
 		}
 		return fmt.Errorf("connect to %v failed: %w", req.DstAddr, err)
@@ -107,7 +109,11 @@ func (s *Server) handleConnect(ctx context.Context, req *model.Request, conn net
 	// Send success.
 	local := target.LocalAddr().(*net.TCPAddr)
 	bind := model.AddrSpec{IP: local.IP, Port: local.Port}
-	if err := sendReply(conn, constant.Socks5ReplySuccess, &bind); err != nil {
+	resp := &model.Response{
+		Reply:    constant.Socks5ReplySuccess,
+		BindAddr: bind,
+	}
+	if err := resp.WriteToSocks5(conn); err != nil {
 		HandshakeErrors.Add(1)
 		return fmt.Errorf("failed to send reply: %w", err)
 	}
@@ -118,7 +124,11 @@ func (s *Server) handleConnect(ctx context.Context, req *model.Request, conn net
 // handleBind is used to handle a bind command.
 func (s *Server) handleBind(_ context.Context, _ *model.Request, conn net.Conn) error {
 	UnsupportedCommandErrors.Add(1)
-	if err := sendReply(conn, constant.Socks5ReplyCommandNotSupported, nil); err != nil {
+	resp := &model.Response{
+		Reply:    constant.Socks5ReplyCommandNotSupported,
+		BindAddr: model.AddrSpec{IP: net.IPv4(0, 0, 0, 0)},
+	}
+	if err := resp.WriteToSocks5(conn); err != nil {
 		HandshakeErrors.Add(1)
 		return fmt.Errorf("failed to send reply: %w", err)
 	}
@@ -155,7 +165,11 @@ func (s *Server) handleAssociate(_ context.Context, _ *model.Request, conn net.C
 		return fmt.Errorf("strconv.Atoi() failed: %w", err)
 	}
 	bind := model.AddrSpec{IP: net.IP{0, 0, 0, 0}, Port: udpPort}
-	if err := sendReply(conn, constant.Socks5ReplySuccess, &bind); err != nil {
+	resp := &model.Response{
+		Reply:    constant.Socks5ReplySuccess,
+		BindAddr: bind,
+	}
+	if err := resp.WriteToSocks5(conn); err != nil {
 		HandshakeErrors.Add(1)
 		return fmt.Errorf("failed to send reply: %w", err)
 	}
@@ -503,24 +517,16 @@ func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, []b
 	return udpConn, nil, nil
 }
 
-// sendReply is used to send a reply message.
-func sendReply(w io.Writer, resp uint8, addr *model.AddrSpec) error {
-	if addr == nil {
-		// Assume it is an unspecified IPv4 address.
-		addr = &model.AddrSpec{
-			IP: net.IPv4(0, 0, 0, 0),
-		}
+// readRequest creates a new Request from the connection.
+func (s *Server) readRequest(conn io.Reader) (*model.Request, error) {
+	if netConn, ok := conn.(net.Conn); ok {
+		common.SetReadTimeout(netConn, s.config.HandshakeTimeout)
+		defer common.SetReadTimeout(netConn, 0)
 	}
 
-	var buf bytes.Buffer
-	buf.WriteByte(constant.Socks5Version)
-	buf.WriteByte(resp)
-	buf.WriteByte(0) // reserved byte
-	if err := addr.WriteToSocks5(&buf); err != nil {
-		return err
+	req := &model.Request{}
+	if err := req.ReadFromSocks5(conn); err != nil {
+		return nil, err
 	}
-
-	// Send the message.
-	_, err := w.Write(buf.Bytes())
-	return err
+	return req, nil
 }

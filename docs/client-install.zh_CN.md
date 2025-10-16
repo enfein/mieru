@@ -203,7 +203,7 @@ mieru://CpsBCgdkZWZhdWx0ElgKBWJhb3ppEg1tYW5saWFucGVuZmVuGkA0MGFiYWM0MGY1OWRhNTVk
 使用指令 `mieru export config simple` 生成人类可读的简单分享链接。例如：
 
 ```
-mierus://baozi:manlianpenfen@1.2.3.4?mtu=1400&multiplexing=MULTIPLEXING_HIGH&port=6666&port=9998-9999&port=6489&port=4896&profile=default&protocol=TCP&protocol=TCP&protocol=UDP&protocol=UDP
+mierus://baozi:manlianpenfen@1.2.3.4?handshake-mode=HANDSHAKE_NO_WAIT&mtu=1400&multiplexing=MULTIPLEXING_HIGH&port=6666&port=9998-9999&port=6489&port=4896&profile=default&protocol=TCP&protocol=TCP&protocol=UDP&protocol=UDP
 ```
 
 简单分享链接的格式如下：
@@ -219,10 +219,11 @@ mierus://baozi:manlianpenfen@1.2.3.4?mtu=1400&multiplexing=MULTIPLEXING_HIGH&por
 - `profile`
 - `mtu`
 - `multiplexing`
+- `handshake-mode`
 - `port`
 - `protocol`
 
-其中 `profile` 必须出现一次，`mtu` 以及 `multiplexing` 最多出现一次，`port` 和 `protocol` 可以出现多次，且他们出现的次数必须相同，以便将同一位置上的 `port` 和 `protocol` 联系起来。另外 `port` 也可以用来指定一段连续的端口。
+其中 `profile` 必须出现一次，`mtu`，`multiplexing` 以及 `handshake-mode` 最多出现一次，`port` 和 `protocol` 可以出现多次，且他们出现的次数必须相同，以便将同一位置上的 `port` 和 `protocol` 联系起来。另外 `port` 也可以用来指定一段连续的端口。
 
 上面的简单分享链接等同于如下的客户端配置片段：
 
@@ -259,7 +260,8 @@ mierus://baozi:manlianpenfen@1.2.3.4?mtu=1400&multiplexing=MULTIPLEXING_HIGH&por
     "mtu":  1400,
     "multiplexing":  {
         "level":  "MULTIPLEXING_HIGH"
-    }
+    },
+    "handshakeMode":  "HANDSHAKE_NO_WAIT"
 }
 ```
 
