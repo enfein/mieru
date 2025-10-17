@@ -22,6 +22,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/apis/internal"
 	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlcommon"
@@ -135,7 +136,16 @@ func (mc *mieruClient) DialContext(ctx context.Context, addr net.Addr) (net.Conn
 		return nil, err
 	}
 	if mc.config.Profile.GetHandshakeMode() == appctlpb.HandshakeMode_HANDSHAKE_NO_WAIT {
-		return internal.NewEarlyConn(conn, netAddrSpec), nil
+		req := &model.Request{}
+		if strings.HasPrefix(netAddrSpec.Network(), "tcp") {
+			req.Command = constant.Socks5ConnectCmd
+		} else if strings.HasPrefix(netAddrSpec.Network(), "udp") {
+			req.Command = constant.Socks5UDPAssociateCmd
+		} else {
+			return nil, fmt.Errorf("unsupported network type %s", netAddrSpec.Network())
+		}
+		req.DstAddr = netAddrSpec.AddrSpec
+		return internal.NewEarlyConn(conn, req), nil
 	}
 	_, err = internal.PostDialHandshake(conn, netAddrSpec)
 	return conn, err

@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"strings"
 	"sync"
 	"time"
 
@@ -28,23 +27,31 @@ import (
 	"github.com/enfein/mieru/v3/apis/model"
 )
 
+// Socks5Writer is an interface for socks5 objects that can be written to a writer.
+type Socks5Writer interface {
+	WriteToSocks5(writer io.Writer) error
+}
+
+var _ Socks5Writer = (*model.Request)(nil)
+var _ Socks5Writer = (*model.Response)(nil)
+
 // EarlyConn implements net.Conn interface.
 // When the Write() method on the net.Conn is called for the first time,
 // it performs the initial handshake and writes the request to the server.
 type EarlyConn struct {
 	net.Conn
+	object        Socks5Writer
 	handshakeOnce sync.Once
 	handshakeErr  error
 	handshaked    chan struct{}
-	netAddrSpec   model.NetAddrSpec
 }
 
 // NewEarlyConn creates a new EarlyConn.
-func NewEarlyConn(conn net.Conn, netAddrSpec model.NetAddrSpec) *EarlyConn {
+func NewEarlyConn(conn net.Conn, object Socks5Writer) *EarlyConn {
 	return &EarlyConn{
-		Conn:        conn,
-		handshaked:  make(chan struct{}),
-		netAddrSpec: netAddrSpec,
+		Conn:       conn,
+		object:     object,
+		handshaked: make(chan struct{}),
 	}
 }
 
@@ -97,44 +104,34 @@ func (c *EarlyConn) NeedHandshake() bool {
 }
 
 func (c *EarlyConn) doHandshakeAndWrite(b []byte) error {
-	var req bytes.Buffer
-	isTCP := strings.HasPrefix(c.netAddrSpec.Network(), "tcp")
-	isUDP := strings.HasPrefix(c.netAddrSpec.Network(), "udp")
-
-	if isTCP {
-		req.Write([]byte{constant.Socks5Version, constant.Socks5ConnectCmd, 0})
-	} else if isUDP {
-		req.Write([]byte{constant.Socks5Version, constant.Socks5UDPAssociateCmd, 0})
-	} else {
-		return fmt.Errorf("unsupported network type %s", c.netAddrSpec.Network())
-	}
-
-	if err := c.netAddrSpec.WriteToSocks5(&req); err != nil {
+	var buf bytes.Buffer
+	if err := c.object.WriteToSocks5(&buf); err != nil {
 		return err
 	}
 	if len(b) > 0 {
-		req.Write(b)
+		buf.Write(b)
+	}
+	if _, err := c.Conn.Write(buf.Bytes()); err != nil {
+		return fmt.Errorf("failed to write socks5 object to the connection: %w", err)
 	}
 
-	if _, err := c.Conn.Write(req.Bytes()); err != nil {
-		return fmt.Errorf("failed to write socks5 connection request to the server: %w", err)
-	}
+	// If this is a request, read the response.
+	switch c.object.(type) {
+	case *model.Request:
+		c.Conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+		defer c.Conn.SetReadDeadline(time.Time{})
 
-	c.Conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-	defer func() {
-		c.Conn.SetReadDeadline(time.Time{})
-	}()
-
-	resp := make([]byte, 3)
-	if _, err := io.ReadFull(c.Conn, resp); err != nil {
-		return fmt.Errorf("failed to read socks5 connection response from the server: %w", err)
-	}
-	var respAddr model.NetAddrSpec
-	if err := respAddr.ReadFromSocks5(c.Conn); err != nil {
-		return fmt.Errorf("failed to read socks5 connection address response from the server: %w", err)
-	}
-	if resp[1] != 0 {
-		return fmt.Errorf("server returned socks5 error code %d", resp[1])
+		var resp model.Response
+		if err := resp.ReadFromSocks5(c.Conn); err != nil {
+			return fmt.Errorf("failed to read socks5 response from the server: %w", err)
+		}
+		if resp.Reply != constant.Socks5ReplySuccess {
+			return fmt.Errorf("server returned socks5 error code %d", resp.Reply)
+		}
+	case *model.Response:
+		// No need to read anything.
+	default:
+		return fmt.Errorf("unsupported object type for EarlyConn: %T", c.object)
 	}
 
 	return nil

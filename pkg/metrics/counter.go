@@ -51,11 +51,15 @@ type Counter struct {
 var _ Metric = &Counter{}
 
 func (c *Counter) Name() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.op++
 	return c.name
 }
 
 func (c *Counter) Type() MetricType {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.op++
 	if c.timeSeries {
 		return COUNTER_TIME_SERIES

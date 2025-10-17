@@ -17,6 +17,7 @@ package internal_test
 
 import (
 	"io"
+	"net"
 	"sync"
 	"testing"
 
@@ -26,7 +27,7 @@ import (
 	"github.com/enfein/mieru/v3/pkg/testtool"
 )
 
-func TestEarlyConn(t *testing.T) {
+func TestEarlyConn_Request(t *testing.T) {
 	clientConn, serverConn := testtool.BufPipe()
 
 	var wg sync.WaitGroup
@@ -37,17 +38,10 @@ func TestEarlyConn(t *testing.T) {
 		defer wg.Done()
 		defer serverConn.Close()
 
-		// Read and discard socks5 request header.
-		reqHeader := make([]byte, 3)
-		if _, err := io.ReadFull(serverConn, reqHeader); err != nil {
-			t.Errorf("server: failed to read request header: %v", err)
-			return
-		}
-
-		// Read destination address.
-		var addr model.NetAddrSpec
-		if err := addr.ReadFromSocks5(serverConn); err != nil {
-			t.Errorf("server: failed to read destination address: %v", err)
+		// Read socks5 request.
+		var req model.Request
+		if err := req.ReadFromSocks5(serverConn); err != nil {
+			t.Errorf("server: failed to read request: %v", err)
 			return
 		}
 
@@ -77,14 +71,14 @@ func TestEarlyConn(t *testing.T) {
 	}()
 
 	// Create client early connection.
-	target := model.NetAddrSpec{
-		AddrSpec: model.AddrSpec{
+	req := &model.Request{
+		Command: constant.Socks5ConnectCmd,
+		DstAddr: model.AddrSpec{
 			FQDN: "example.com",
 			Port: 80,
 		},
-		Net: "tcp",
 	}
-	conn := internal.NewEarlyConn(clientConn, target)
+	conn := internal.NewEarlyConn(clientConn, req)
 	defer conn.Close()
 
 	// The first write triggers the handshake.
@@ -93,6 +87,71 @@ func TestEarlyConn(t *testing.T) {
 	}
 
 	// The server should respond with "pong" after the handshake is complete.
+	pong := make([]byte, 4)
+	if _, err := io.ReadFull(conn, pong); err != nil {
+		t.Fatalf("client: failed to read data: %v", err)
+	}
+
+	if string(pong) != "pong" {
+		t.Fatalf("client: expected server to send 'pong', got '%s'", string(pong))
+	}
+
+	wg.Wait()
+}
+
+func TestEarlyConn_Response(t *testing.T) {
+	clientConn, serverConn := testtool.BufPipe()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	// Run a fake server that just receives data.
+	go func() {
+		defer wg.Done()
+		defer serverConn.Close()
+
+		// Read socks5 response.
+		var resp model.Response
+		if err := resp.ReadFromSocks5(serverConn); err != nil {
+			t.Errorf("server: failed to read response: %v", err)
+			return
+		}
+
+		// Read client data ("ping").
+		ping := make([]byte, 4)
+		if _, err := io.ReadFull(serverConn, ping); err != nil {
+			t.Errorf("server: failed to read data: %v", err)
+			return
+		}
+		if string(ping) != "ping" {
+			t.Errorf("server: expected client to send 'ping', got '%s'", string(ping))
+			return
+		}
+
+		// Send server data ("pong").
+		if _, err := serverConn.Write([]byte("pong")); err != nil {
+			t.Errorf("server: failed to write data: %v", err)
+			return
+		}
+	}()
+
+	// Create client early connection with a response object.
+	resp := &model.Response{
+		Reply: constant.Socks5ReplySuccess,
+		BindAddr: model.AddrSpec{
+			IP:   net.IPv4(127, 0, 0, 1),
+			Port: 1080,
+		},
+	}
+	conn := internal.NewEarlyConn(clientConn, resp)
+	defer conn.Close()
+
+	// The first write triggers sending the response.
+	if _, err := conn.Write([]byte("ping")); err != nil {
+		t.Fatalf("client: failed to write data: %v", err)
+	}
+
+	// The server should respond with "pong".
 	pong := make([]byte, 4)
 	if _, err := io.ReadFull(conn, pong); err != nil {
 		t.Fatalf("client: failed to read data: %v", err)
