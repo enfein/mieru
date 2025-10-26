@@ -78,7 +78,8 @@ func TestEarlyConn_Request(t *testing.T) {
 			Port: 80,
 		},
 	}
-	conn := internal.NewEarlyConn(clientConn, req)
+	conn := internal.NewEarlyConn(clientConn)
+	conn.SetRequest(req)
 	defer conn.Close()
 
 	// The first write triggers the handshake.
@@ -143,7 +144,8 @@ func TestEarlyConn_Response(t *testing.T) {
 			Port: 1080,
 		},
 	}
-	conn := internal.NewEarlyConn(clientConn, resp)
+	conn := internal.NewEarlyConn(clientConn)
+	conn.SetResponse(resp)
 	defer conn.Close()
 
 	// The first write triggers sending the response.

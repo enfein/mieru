@@ -145,7 +145,9 @@ func (mc *mieruClient) DialContext(ctx context.Context, addr net.Addr) (net.Conn
 			return nil, fmt.Errorf("unsupported network type %s", netAddrSpec.Network())
 		}
 		req.DstAddr = netAddrSpec.AddrSpec
-		return internal.NewEarlyConn(conn, req), nil
+		earlyConn := internal.NewEarlyConn(conn)
+		earlyConn.SetRequest(req)
+		return earlyConn, nil
 	}
 	_, err = internal.PostDialHandshake(conn, netAddrSpec)
 	return conn, err

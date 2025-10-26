@@ -34,6 +34,11 @@ PROJECT_NAME=$(shell basename "${ROOT}")
 # Use `tools/bump_version.sh` script to change all those files at one shot.
 VERSION="3.21.0"
 
+# With .ONESHELL, each recipe is executed in a single shell instance.
+# This allows `cd` to affect subsequent commands in the same recipe.
+# .ONESHELL is supported in GNU Make version 3.82 and later.
+.ONESHELL:
+
 # Build binaries and installation packages.
 .PHONY: build
 build: bin deb rpm
@@ -82,16 +87,15 @@ client-android: client-android-arm64
 # Build Android arm64 client.
 .PHONY: client-android-arm64
 client-android-arm64:
-	if [ ! -z $$(command -v gcc) ]; then\
-		mkdir -p release/android/arm64;\
-		env GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/android/arm64/mieru cmd/mieru/mieru.go;\
-		cd release/android/arm64;\
-		sha256sum mieru > mieru_${VERSION}_android_arm64.sha256.txt;\
-		tar -zcvf mieru_${VERSION}_android_arm64.tar.gz mieru;\
-		sha256sum mieru_${VERSION}_android_arm64.tar.gz > mieru_${VERSION}_android_arm64.tar.gz.sha256.txt;\
-		cd "${ROOT}";\
-		mv release/android/arm64/mieru_${VERSION}_android_arm64.tar.gz release/;\
-		mv release/android/arm64/mieru_${VERSION}_android_arm64.tar.gz.sha256.txt release/;\
+	if [ ! -z $$(command -v gcc) ]; then
+		mkdir -p release/android/arm64
+		env GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/android/arm64/mieru cmd/mieru/mieru.go
+		cd release/android/arm64
+		sha256sum mieru > mieru_${VERSION}_android_arm64.sha256.txt
+		tar -zcvf mieru_${VERSION}_android_arm64.tar.gz mieru
+		sha256sum mieru_${VERSION}_android_arm64.tar.gz > mieru_${VERSION}_android_arm64.tar.gz.sha256.txt
+		mv mieru_${VERSION}_android_arm64.tar.gz ../../
+		mv mieru_${VERSION}_android_arm64.tar.gz.sha256.txt ../../
 	fi
 
 # Build linux clients.
@@ -103,48 +107,48 @@ client-linux: client-linux-amd64 client-linux-arm64 client-linux-armv7 client-li
 client-linux-amd64:
 	mkdir -p release/linux/amd64
 	env GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/linux/amd64/mieru cmd/mieru/mieru.go
-	cd release/linux/amd64;\
-		sha256sum mieru > mieru_${VERSION}_linux_amd64.sha256.txt;\
-		tar -zcvf mieru_${VERSION}_linux_amd64.tar.gz mieru;\
-		sha256sum mieru_${VERSION}_linux_amd64.tar.gz > mieru_${VERSION}_linux_amd64.tar.gz.sha256.txt
-	mv release/linux/amd64/mieru_${VERSION}_linux_amd64.tar.gz release/
-	mv release/linux/amd64/mieru_${VERSION}_linux_amd64.tar.gz.sha256.txt release/
+	cd release/linux/amd64
+	sha256sum mieru > mieru_${VERSION}_linux_amd64.sha256.txt
+	tar -zcvf mieru_${VERSION}_linux_amd64.tar.gz mieru
+	sha256sum mieru_${VERSION}_linux_amd64.tar.gz > mieru_${VERSION}_linux_amd64.tar.gz.sha256.txt
+	mv mieru_${VERSION}_linux_amd64.tar.gz ../../
+	mv mieru_${VERSION}_linux_amd64.tar.gz.sha256.txt ../../
 
 # Build linux arm64 client.
 .PHONY: client-linux-arm64
 client-linux-arm64:
 	mkdir -p release/linux/arm64
 	env GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/linux/arm64/mieru cmd/mieru/mieru.go
-	cd release/linux/arm64;\
-		sha256sum mieru > mieru_${VERSION}_linux_arm64.sha256.txt;\
-		tar -zcvf mieru_${VERSION}_linux_arm64.tar.gz mieru;\
-		sha256sum mieru_${VERSION}_linux_arm64.tar.gz > mieru_${VERSION}_linux_arm64.tar.gz.sha256.txt
-	mv release/linux/arm64/mieru_${VERSION}_linux_arm64.tar.gz release/
-	mv release/linux/arm64/mieru_${VERSION}_linux_arm64.tar.gz.sha256.txt release/
+	cd release/linux/arm64
+	sha256sum mieru > mieru_${VERSION}_linux_arm64.sha256.txt
+	tar -zcvf mieru_${VERSION}_linux_arm64.tar.gz mieru
+	sha256sum mieru_${VERSION}_linux_arm64.tar.gz > mieru_${VERSION}_linux_arm64.tar.gz.sha256.txt
+	mv mieru_${VERSION}_linux_arm64.tar.gz ../../
+	mv mieru_${VERSION}_linux_arm64.tar.gz.sha256.txt ../../
 
 # Build linux armv7 client.
 .PHONY: client-linux-armv7
 client-linux-armv7:
 	mkdir -p release/linux/armv7
 	env GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/linux/armv7/mieru cmd/mieru/mieru.go
-	cd release/linux/armv7;\
-		sha256sum mieru > mieru_${VERSION}_linux_armv7.sha256.txt;\
-		tar -zcvf mieru_${VERSION}_linux_armv7.tar.gz mieru;\
-		sha256sum mieru_${VERSION}_linux_armv7.tar.gz > mieru_${VERSION}_linux_armv7.tar.gz.sha256.txt
-	mv release/linux/armv7/mieru_${VERSION}_linux_armv7.tar.gz release/
-	mv release/linux/armv7/mieru_${VERSION}_linux_armv7.tar.gz.sha256.txt release/
+	cd release/linux/armv7
+	sha256sum mieru > mieru_${VERSION}_linux_armv7.sha256.txt
+	tar -zcvf mieru_${VERSION}_linux_armv7.tar.gz mieru
+	sha256sum mieru_${VERSION}_linux_armv7.tar.gz > mieru_${VERSION}_linux_armv7.tar.gz.sha256.txt
+	mv mieru_${VERSION}_linux_armv7.tar.gz ../../
+	mv mieru_${VERSION}_linux_armv7.tar.gz.sha256.txt ../../
 
 # Build linux riscv64 client.
 .PHONY: client-linux-riscv64
 client-linux-riscv64:
 	mkdir -p release/linux/riscv64
 	env GOOS=linux GOARCH=riscv64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/linux/riscv64/mieru cmd/mieru/mieru.go
-	cd release/linux/riscv64;\
-		sha256sum mieru > mieru_${VERSION}_linux_riscv64.sha256.txt;\
-		tar -zcvf mieru_${VERSION}_linux_riscv64.tar.gz mieru;\
-		sha256sum mieru_${VERSION}_linux_riscv64.tar.gz > mieru_${VERSION}_linux_riscv64.tar.gz.sha256.txt
-	mv release/linux/riscv64/mieru_${VERSION}_linux_riscv64.tar.gz release/
-	mv release/linux/riscv64/mieru_${VERSION}_linux_riscv64.tar.gz.sha256.txt release/
+	cd release/linux/riscv64
+	sha256sum mieru > mieru_${VERSION}_linux_riscv64.sha256.txt
+	tar -zcvf mieru_${VERSION}_linux_riscv64.tar.gz mieru
+	sha256sum mieru_${VERSION}_linux_riscv64.tar.gz > mieru_${VERSION}_linux_riscv64.tar.gz.sha256.txt
+	mv mieru_${VERSION}_linux_riscv64.tar.gz ../../
+	mv mieru_${VERSION}_linux_riscv64.tar.gz.sha256.txt ../../
 
 # Build MacOS clients.
 .PHONY: client-mac
@@ -155,24 +159,24 @@ client-mac: client-mac-amd64 client-mac-arm64
 client-mac-amd64:
 	mkdir -p release/macos/amd64
 	env GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/macos/amd64/mieru cmd/mieru/mieru.go
-	cd release/macos/amd64;\
-		sha256sum mieru > mieru_${VERSION}_macos_amd64.sha256.txt;\
-		tar -zcvf mieru_${VERSION}_macos_amd64.tar.gz mieru;\
-		sha256sum mieru_${VERSION}_macos_amd64.tar.gz > mieru_${VERSION}_macos_amd64.tar.gz.sha256.txt
-	mv release/macos/amd64/mieru_${VERSION}_macos_amd64.tar.gz release/
-	mv release/macos/amd64/mieru_${VERSION}_macos_amd64.tar.gz.sha256.txt release/
+	cd release/macos/amd64
+	sha256sum mieru > mieru_${VERSION}_macos_amd64.sha256.txt
+	tar -zcvf mieru_${VERSION}_macos_amd64.tar.gz mieru
+	sha256sum mieru_${VERSION}_macos_amd64.tar.gz > mieru_${VERSION}_macos_amd64.tar.gz.sha256.txt
+	mv mieru_${VERSION}_macos_amd64.tar.gz ../../
+	mv mieru_${VERSION}_macos_amd64.tar.gz.sha256.txt ../../
 
 # Build MacOS arm64 client.
 .PHONY: client-mac-arm64
 client-mac-arm64:
 	mkdir -p release/macos/arm64
 	env GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/macos/arm64/mieru cmd/mieru/mieru.go
-	cd release/macos/arm64;\
-		sha256sum mieru > mieru_${VERSION}_macos_arm64.sha256.txt;\
-		tar -zcvf mieru_${VERSION}_macos_arm64.tar.gz mieru;\
-		sha256sum mieru_${VERSION}_macos_arm64.tar.gz > mieru_${VERSION}_macos_arm64.tar.gz.sha256.txt
-	mv release/macos/arm64/mieru_${VERSION}_macos_arm64.tar.gz release/
-	mv release/macos/arm64/mieru_${VERSION}_macos_arm64.tar.gz.sha256.txt release/
+	cd release/macos/arm64
+	sha256sum mieru > mieru_${VERSION}_macos_arm64.sha256.txt
+	tar -zcvf mieru_${VERSION}_macos_arm64.tar.gz mieru
+	sha256sum mieru_${VERSION}_macos_arm64.tar.gz > mieru_${VERSION}_macos_arm64.tar.gz.sha256.txt
+	mv mieru_${VERSION}_macos_arm64.tar.gz ../../
+	mv mieru_${VERSION}_macos_arm64.tar.gz.sha256.txt ../../
 
 # Build windows clients.
 .PHONY: client-windows
@@ -183,24 +187,24 @@ client-windows: client-windows-x86 client-windows-amd64
 client-windows-x86:
 	mkdir -p release/windows/386
 	env GOOS=windows GOARCH=386 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/windows/386/mieru.exe cmd/mieru/mieru.go
-	cd release/windows/386;\
-		sha256sum mieru.exe > mieru_${VERSION}_windows_x86.exe.sha256.txt;\
-		zip -r mieru_${VERSION}_windows_x86.zip mieru.exe;\
-		sha256sum mieru_${VERSION}_windows_x86.zip > mieru_${VERSION}_windows_x86.zip.sha256.txt
-	mv release/windows/386/mieru_${VERSION}_windows_x86.zip release/
-	mv release/windows/386/mieru_${VERSION}_windows_x86.zip.sha256.txt release/
+	cd release/windows/386
+	sha256sum mieru.exe > mieru_${VERSION}_windows_x86.exe.sha256.txt
+	zip -r mieru_${VERSION}_windows_x86.zip mieru.exe
+	sha256sum mieru_${VERSION}_windows_x86.zip > mieru_${VERSION}_windows_x86.zip.sha256.txt
+	mv mieru_${VERSION}_windows_x86.zip ../../
+	mv mieru_${VERSION}_windows_x86.zip.sha256.txt ../../
 
 # Build windows amd64 client.
 .PHONY: client-windows-amd64
 client-windows-amd64:
 	mkdir -p release/windows/amd64
 	env GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/windows/amd64/mieru.exe cmd/mieru/mieru.go
-	cd release/windows/amd64;\
-		sha256sum mieru.exe > mieru_${VERSION}_windows_amd64.exe.sha256.txt;\
-		zip -r mieru_${VERSION}_windows_amd64.zip mieru.exe;\
-		sha256sum mieru_${VERSION}_windows_amd64.zip > mieru_${VERSION}_windows_amd64.zip.sha256.txt
-	mv release/windows/amd64/mieru_${VERSION}_windows_amd64.zip release/
-	mv release/windows/amd64/mieru_${VERSION}_windows_amd64.zip.sha256.txt release/
+	cd release/windows/amd64
+	sha256sum mieru.exe > mieru_${VERSION}_windows_amd64.exe.sha256.txt
+	zip -r mieru_${VERSION}_windows_amd64.zip mieru.exe
+	sha256sum mieru_${VERSION}_windows_amd64.zip > mieru_${VERSION}_windows_amd64.zip.sha256.txt
+	mv mieru_${VERSION}_windows_amd64.zip ../../
+	mv mieru_${VERSION}_windows_amd64.zip.sha256.txt ../../
 
 # Build linux servers.
 .PHONY: server-linux
@@ -211,24 +215,24 @@ server-linux: server-linux-amd64 server-linux-arm64
 server-linux-amd64:
 	mkdir -p release/linux/amd64
 	env GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/linux/amd64/mita cmd/mita/mita.go
-	cd release/linux/amd64;\
-		sha256sum mita > mita_${VERSION}_linux_amd64.sha256.txt;\
-		tar -zcvf mita_${VERSION}_linux_amd64.tar.gz mita;\
-		sha256sum mita_${VERSION}_linux_amd64.tar.gz > mita_${VERSION}_linux_amd64.tar.gz.sha256.txt
-	mv release/linux/amd64/mita_${VERSION}_linux_amd64.tar.gz release/
-	mv release/linux/amd64/mita_${VERSION}_linux_amd64.tar.gz.sha256.txt release/
+	cd release/linux/amd64
+	sha256sum mita > mita_${VERSION}_linux_amd64.sha256.txt
+	tar -zcvf mita_${VERSION}_linux_amd64.tar.gz mita
+	sha256sum mita_${VERSION}_linux_amd64.tar.gz > mita_${VERSION}_linux_amd64.tar.gz.sha256.txt
+	mv mita_${VERSION}_linux_amd64.tar.gz ../../
+	mv mita_${VERSION}_linux_amd64.tar.gz.sha256.txt ../../
 
 # Build linux arm64 server.
 .PHONY: server-linux-arm64
 server-linux-arm64:
 	mkdir -p release/linux/arm64
 	env GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/linux/arm64/mita cmd/mita/mita.go
-	cd release/linux/arm64;\
-		sha256sum mita > mita_${VERSION}_linux_arm64.sha256.txt;\
-		tar -zcvf mita_${VERSION}_linux_arm64.tar.gz mita;\
-		sha256sum mita_${VERSION}_linux_arm64.tar.gz > mita_${VERSION}_linux_arm64.tar.gz.sha256.txt
-	mv release/linux/arm64/mita_${VERSION}_linux_arm64.tar.gz release/
-	mv release/linux/arm64/mita_${VERSION}_linux_arm64.tar.gz.sha256.txt release/
+	cd release/linux/arm64
+	sha256sum mita > mita_${VERSION}_linux_arm64.sha256.txt
+	tar -zcvf mita_${VERSION}_linux_arm64.tar.gz mita
+	sha256sum mita_${VERSION}_linux_arm64.tar.gz > mita_${VERSION}_linux_arm64.tar.gz.sha256.txt
+	mv mita_${VERSION}_linux_arm64.tar.gz ../../
+	mv mita_${VERSION}_linux_arm64.tar.gz.sha256.txt ../../
 
 # Build debian installation packages.
 .PHONY: deb
@@ -237,61 +241,61 @@ deb: deb-client-amd64 deb-client-arm64 deb-server-amd64 deb-server-arm64
 # Build debian client amd64 installation package.
 .PHONY: deb-client-amd64
 deb-client-amd64: client-linux-amd64
-	if [ ! -z $$(command -v dpkg-deb) ] && [ ! -z $$(command -v fakeroot) ]; then\
-		rm -rf build/package/mieru/amd64/debian/usr/bin;\
-		mkdir -p build/package/mieru/amd64/debian/usr/bin;\
-		cp release/linux/amd64/mieru build/package/mieru/amd64/debian/usr/bin/;\
-		cd build/package/mieru/amd64;\
-		fakeroot dpkg-deb -Zxz --build debian .;\
-		cd "${ROOT}";\
-		mv build/package/mieru/amd64/mieru_${VERSION}_amd64.deb release/;\
-		cd release;\
-		sha256sum mieru_${VERSION}_amd64.deb > mieru_${VERSION}_amd64.deb.sha256.txt;\
+	if [ ! -z $$(command -v dpkg-deb) ] && [ ! -z $$(command -v fakeroot) ]; then
+		rm -rf build/package/mieru/amd64/debian/usr/bin
+		mkdir -p build/package/mieru/amd64/debian/usr/bin
+		cp release/linux/amd64/mieru build/package/mieru/amd64/debian/usr/bin/
+		cd build/package/mieru/amd64
+		fakeroot dpkg-deb -Zxz --build debian .
+		cd "${ROOT}"
+		mv build/package/mieru/amd64/mieru_${VERSION}_amd64.deb release/
+		cd release
+		sha256sum mieru_${VERSION}_amd64.deb > mieru_${VERSION}_amd64.deb.sha256.txt
 	fi
 
 # Build debian client arm64 installation package.
 .PHONY: deb-client-arm64
 deb-client-arm64: client-linux-arm64
-	if [ ! -z $$(command -v dpkg-deb) ] && [ ! -z $$(command -v fakeroot) ]; then\
-		rm -rf build/package/mieru/arm64/debian/usr/bin;\
-		mkdir -p build/package/mieru/arm64/debian/usr/bin;\
-		cp release/linux/arm64/mieru build/package/mieru/arm64/debian/usr/bin/;\
-		cd build/package/mieru/arm64;\
-		fakeroot dpkg-deb -Zxz --build debian .;\
-		cd "${ROOT}";\
-		mv build/package/mieru/arm64/mieru_${VERSION}_arm64.deb release/;\
-		cd release;\
-		sha256sum mieru_${VERSION}_arm64.deb > mieru_${VERSION}_arm64.deb.sha256.txt;\
+	if [ ! -z $$(command -v dpkg-deb) ] && [ ! -z $$(command -v fakeroot) ]; then
+		rm -rf build/package/mieru/arm64/debian/usr/bin
+		mkdir -p build/package/mieru/arm64/debian/usr/bin
+		cp release/linux/arm64/mieru build/package/mieru/arm64/debian/usr/bin/
+		cd build/package/mieru/arm64
+		fakeroot dpkg-deb -Zxz --build debian .
+		cd "${ROOT}"
+		mv build/package/mieru/arm64/mieru_${VERSION}_arm64.deb release/
+		cd release
+		sha256sum mieru_${VERSION}_arm64.deb > mieru_${VERSION}_arm64.deb.sha256.txt
 	fi
 
 # Build debian server amd64 installation package.
 .PHONY: deb-server-amd64
 deb-server-amd64: server-linux-amd64
-	if [ ! -z $$(command -v dpkg-deb) ] && [ ! -z $$(command -v fakeroot) ]; then\
-		rm -rf build/package/mita/amd64/debian/usr/bin;\
-		mkdir -p build/package/mita/amd64/debian/usr/bin;\
-		cp release/linux/amd64/mita build/package/mita/amd64/debian/usr/bin/;\
-		cd build/package/mita/amd64;\
-		fakeroot dpkg-deb -Zxz --build debian .;\
-		cd "${ROOT}";\
-		mv build/package/mita/amd64/mita_${VERSION}_amd64.deb release/;\
-		cd release;\
-		sha256sum mita_${VERSION}_amd64.deb > mita_${VERSION}_amd64.deb.sha256.txt;\
+	if [ ! -z $$(command -v dpkg-deb) ] && [ ! -z $$(command -v fakeroot) ]; then
+		rm -rf build/package/mita/amd64/debian/usr/bin
+		mkdir -p build/package/mita/amd64/debian/usr/bin
+		cp release/linux/amd64/mita build/package/mita/amd64/debian/usr/bin/
+		cd build/package/mita/amd64
+		fakeroot dpkg-deb -Zxz --build debian .
+		cd "${ROOT}"
+		mv build/package/mita/amd64/mita_${VERSION}_amd64.deb release/
+		cd release
+		sha256sum mita_${VERSION}_amd64.deb > mita_${VERSION}_amd64.deb.sha256.txt
 	fi
 
 # Build debian server arm64 installation package.
 .PHONY: deb-server-arm64
 deb-server-arm64: server-linux-arm64
-	if [ ! -z $$(command -v dpkg-deb) ] && [ ! -z $$(command -v fakeroot) ]; then\
-		rm -rf build/package/mita/arm64/debian/usr/bin;\
-		mkdir -p build/package/mita/arm64/debian/usr/bin;\
-		cp release/linux/arm64/mita build/package/mita/arm64/debian/usr/bin/;\
-		cd build/package/mita/arm64;\
-		fakeroot dpkg-deb -Zxz --build debian .;\
-		cd "${ROOT}";\
-		mv build/package/mita/arm64/mita_${VERSION}_arm64.deb release/;\
-		cd release;\
-		sha256sum mita_${VERSION}_arm64.deb > mita_${VERSION}_arm64.deb.sha256.txt;\
+	if [ ! -z $$(command -v dpkg-deb) ] && [ ! -z $$(command -v fakeroot) ]; then
+		rm -rf build/package/mita/arm64/debian/usr/bin
+		mkdir -p build/package/mita/arm64/debian/usr/bin
+		cp release/linux/arm64/mita build/package/mita/arm64/debian/usr/bin/
+		cd build/package/mita/arm64
+		fakeroot dpkg-deb -Zxz --build debian .
+		cd "${ROOT}"
+		mv build/package/mita/arm64/mita_${VERSION}_arm64.deb release/
+		cd release
+		sha256sum mita_${VERSION}_arm64.deb > mita_${VERSION}_arm64.deb.sha256.txt
 	fi
 
 # Build RPM installation packages.
@@ -301,57 +305,57 @@ rpm: rpm-client-amd64 rpm-client-arm64 rpm-server-amd64 rpm-server-arm64
 # Build RPM client amd64 installation package.
 .PHONY: rpm-client-amd64
 rpm-client-amd64: client-linux-amd64
-	if [ ! -z $$(command -v rpmbuild) ]; then\
-		rm -rf build/package/mieru/amd64/rpm/mieru;\
-		cp release/linux/amd64/mieru build/package/mieru/amd64/rpm/;\
-		cd build/package/mieru/amd64/rpm;\
-		rpmbuild -bb --target x86_64 --build-in-place --define "_topdir $$(pwd)" mieru.spec;\
-		cd "${ROOT}";\
-		mv build/package/mieru/amd64/rpm/RPMS/x86_64/mieru-${VERSION}-1.x86_64.rpm release/;\
-		cd release;\
-		sha256sum mieru-${VERSION}-1.x86_64.rpm > mieru-${VERSION}-1.x86_64.rpm.sha256.txt;\
+	if [ ! -z $$(command -v rpmbuild) ]; then
+		rm -rf build/package/mieru/amd64/rpm/mieru
+		cp release/linux/amd64/mieru build/package/mieru/amd64/rpm/
+		cd build/package/mieru/amd64/rpm
+		rpmbuild -bb --target x86_64 --build-in-place --define "_topdir $$(pwd)" mieru.spec
+		cd "${ROOT}"
+		mv build/package/mieru/amd64/rpm/RPMS/x86_64/mieru-${VERSION}-1.x86_64.rpm release/
+		cd release
+		sha256sum mieru-${VERSION}-1.x86_64.rpm > mieru-${VERSION}-1.x86_64.rpm.sha256.txt
 	fi
 
 # Build RPM client arm64 installation package.
 .PHONY: rpm-client-arm64
 rpm-client-arm64: client-linux-arm64
-	if [ ! -z $$(command -v rpmbuild) ]; then\
-		rm -rf build/package/mieru/arm64/rpm/mieru;\
-		cp release/linux/arm64/mieru build/package/mieru/arm64/rpm/;\
-		cd build/package/mieru/arm64/rpm;\
-		rpmbuild -bb --target aarch64 --build-in-place --define "_topdir $$(pwd)" mieru.spec;\
-		cd "${ROOT}";\
-		mv build/package/mieru/arm64/rpm/RPMS/aarch64/mieru-${VERSION}-1.aarch64.rpm release/;\
-		cd release;\
-		sha256sum mieru-${VERSION}-1.aarch64.rpm > mieru-${VERSION}-1.aarch64.rpm.sha256.txt;\
+	if [ ! -z $$(command -v rpmbuild) ]; then
+		rm -rf build/package/mieru/arm64/rpm/mieru
+		cp release/linux/arm64/mieru build/package/mieru/arm64/rpm/
+		cd build/package/mieru/arm64/rpm
+		rpmbuild -bb --target aarch64 --build-in-place --define "_topdir $$(pwd)" mieru.spec
+		cd "${ROOT}"
+		mv build/package/mieru/arm64/rpm/RPMS/aarch64/mieru-${VERSION}-1.aarch64.rpm release/
+		cd release
+		sha256sum mieru-${VERSION}-1.aarch64.rpm > mieru-${VERSION}-1.aarch64.rpm.sha256.txt
 	fi
 
 # Build RPM server amd64 installation package.
 .PHONY: rpm-server-amd64
 rpm-server-amd64: server-linux-amd64
-	if [ ! -z $$(command -v rpmbuild) ]; then\
-		rm -rf build/package/mita/amd64/rpm/mita;\
-		cp release/linux/amd64/mita build/package/mita/amd64/rpm/;\
-		cd build/package/mita/amd64/rpm;\
-		rpmbuild -bb --target x86_64 --build-in-place --define "_topdir $$(pwd)" mita.spec;\
-		cd "${ROOT}";\
-		mv build/package/mita/amd64/rpm/RPMS/x86_64/mita-${VERSION}-1.x86_64.rpm release/;\
-		cd release;\
-		sha256sum mita-${VERSION}-1.x86_64.rpm > mita-${VERSION}-1.x86_64.rpm.sha256.txt;\
+	if [ ! -z $$(command -v rpmbuild) ]; then
+		rm -rf build/package/mita/amd64/rpm/mita
+		cp release/linux/amd64/mita build/package/mita/amd64/rpm/
+		cd build/package/mita/amd64/rpm
+		rpmbuild -bb --target x86_64 --build-in-place --define "_topdir $$(pwd)" mita.spec
+		cd "${ROOT}"
+		mv build/package/mita/amd64/rpm/RPMS/x86_64/mita-${VERSION}-1.x86_64.rpm release/
+		cd release
+		sha256sum mita-${VERSION}-1.x86_64.rpm > mita-${VERSION}-1.x86_64.rpm.sha256.txt
 	fi
 
 # Build RPM server arm64 installation package.
 .PHONY: rpm-server-arm64
 rpm-server-arm64: server-linux-arm64
-	if [ ! -z $$(command -v rpmbuild) ]; then\
-		rm -rf build/package/mita/arm64/rpm/mita;\
-		cp release/linux/arm64/mita build/package/mita/arm64/rpm/;\
-		cd build/package/mita/arm64/rpm;\
-		rpmbuild -bb --target aarch64 --build-in-place --define "_topdir $$(pwd)" mita.spec;\
-		cd "${ROOT}";\
-		mv build/package/mita/arm64/rpm/RPMS/aarch64/mita-${VERSION}-1.aarch64.rpm release/;\
-		cd release;\
-		sha256sum mita-${VERSION}-1.aarch64.rpm > mita-${VERSION}-1.aarch64.rpm.sha256.txt;\
+	if [ ! -z $$(command -v rpmbuild) ]; then
+		rm -rf build/package/mita/arm64/rpm/mita
+		cp release/linux/arm64/mita build/package/mita/arm64/rpm/
+		cd build/package/mita/arm64/rpm
+		rpmbuild -bb --target aarch64 --build-in-place --define "_topdir $$(pwd)" mita.spec
+		cd "${ROOT}"
+		mv build/package/mita/arm64/rpm/RPMS/aarch64/mita-${VERSION}-1.aarch64.rpm release/
+		cd release
+		sha256sum mita-${VERSION}-1.aarch64.rpm > mita-${VERSION}-1.aarch64.rpm.sha256.txt
 	fi
 
 # Build binaries used in integration tests.
@@ -370,18 +374,18 @@ test-binary:
 # Build a docker image to run integration tests.
 .PHONY: test-container
 test-container: test-binary
-	if [ ! -z $$(command -v docker) ]; then\
-		docker build -t mieru_httptest:${SHORT_SHA} -f test/deploy/httptest/Dockerfile .;\
-		docker build -t mieru_proxychain:${SHORT_SHA} -f test/deploy/proxychain/Dockerfile .;\
+	if [ ! -z $$(command -v docker) ]; then
+		docker build -t mieru_httptest:${SHORT_SHA} -f test/deploy/httptest/Dockerfile .
+		docker build -t mieru_proxychain:${SHORT_SHA} -f test/deploy/proxychain/Dockerfile .
 	fi
 	rm -f exampleapiclient mieru mieru2 mita mita2 httpserver sockshttpclient socksudpclient udpserver
 
 # Run docker integration tests.
 .PHONY: run-container-test
 run-container-test: test-container
-	if [ ! -z $$(command -v docker) ]; then\
-		docker run mieru_httptest:${SHORT_SHA};\
-		docker run mieru_proxychain:${SHORT_SHA};\
+	if [ ! -z $$(command -v docker) ]; then
+		docker run mieru_httptest:${SHORT_SHA}
+		docker run mieru_proxychain:${SHORT_SHA}
 	fi
 
 # Generate source code from protobuf.
@@ -396,19 +400,19 @@ endif
 .PHONY: protobuf
 protobuf:
 	# Download location: https://github.com/protocolbuffers/protobuf/releases
-	if [ ! -x "${ROOT}/tools/build/protoc" ]; then\
-		curl -o "${ROOT}/tools/build/protoc" https://raw.githubusercontent.com/enfein/buildtools/main/protoc/22.3/linux_${PROTOC_ARCH}/bin/protoc;\
-		chmod 755 "${ROOT}/tools/build/protoc";\
+	if [ ! -x "${ROOT}/tools/build/protoc" ]; then
+		curl -o "${ROOT}/tools/build/protoc" https://raw.githubusercontent.com/enfein/buildtools/main/protoc/22.3/linux_${PROTOC_ARCH}/bin/protoc
+		chmod 755 "${ROOT}/tools/build/protoc"
 	fi
 	# Download location: https://github.com/protocolbuffers/protobuf-go/releases
-	if [ ! -x "${ROOT}/tools/build/protoc-gen-go" ]; then\
-		curl -o "${ROOT}/tools/build/protoc-gen-go" https://raw.githubusercontent.com/enfein/buildtools/main/protoc-gen-go/1.30.0/linux_${PROTOC_ARCH}/protoc-gen-go;\
-		chmod 755 "${ROOT}/tools/build/protoc-gen-go";\
+	if [ ! -x "${ROOT}/tools/build/protoc-gen-go" ]; then
+		curl -o "${ROOT}/tools/build/protoc-gen-go" https://raw.githubusercontent.com/enfein/buildtools/main/protoc-gen-go/1.30.0/linux_${PROTOC_ARCH}/protoc-gen-go
+		chmod 755 "${ROOT}/tools/build/protoc-gen-go"
 	fi
 	# Download location: https://github.com/grpc/grpc-go/releases
-	if [ ! -x "${ROOT}/tools/build/protoc-gen-go-grpc" ]; then\
-		curl -o "${ROOT}/tools/build/protoc-gen-go-grpc" https://raw.githubusercontent.com/enfein/buildtools/main/protoc-gen-go-grpc/1.3.0/linux_${PROTOC_ARCH}/protoc-gen-go-grpc;\
-		chmod 755 "${ROOT}/tools/build/protoc-gen-go-grpc";\
+	if [ ! -x "${ROOT}/tools/build/protoc-gen-go-grpc" ]; then
+		curl -o "${ROOT}/tools/build/protoc-gen-go-grpc" https://raw.githubusercontent.com/enfein/buildtools/main/protoc-gen-go-grpc/1.3.0/linux_${PROTOC_ARCH}/protoc-gen-go-grpc
+		chmod 755 "${ROOT}/tools/build/protoc-gen-go-grpc"
 	fi
 
 	PATH=${PATH}:"${ROOT}/tools/build" ${ROOT}/tools/build/protoc -I="${ROOT}/pkg" \
@@ -434,8 +438,11 @@ protobuf:
 # Package source code.
 .PHONY: src
 src: clean
-	cd ..; tar --exclude="${PROJECT_NAME}/.git" -zcvf source.tar.gz "${PROJECT_NAME}"; zip -r source.zip "${PROJECT_NAME}" -x \*.git\*
-	mkdir -p release; mv ../source.tar.gz release; mv ../source.zip release
+	(cd ..; tar --exclude="${PROJECT_NAME}/.git" -zcvf source.tar.gz "${PROJECT_NAME}")
+	(cd ..; zip -r source.zip "${PROJECT_NAME}" -x "${PROJECT_NAME}/.git/*")
+	mkdir -p release
+	mv ../source.tar.gz release
+	mv ../source.zip release
 
 # Clean all the files outside the git repository.
 .PHONY: clean
