@@ -1,0 +1,28 @@
+{
+    "portBindings": [
+        {
+            "portRange": "8964-8965",
+            "protocol": "TCP"
+        },
+        {
+            "port": 9648,
+            "protocol": "TCP"
+        },
+        {
+            "port": 6489,
+            "protocol": "TCP"
+        },
+        {
+            "port": 4896,
+            "protocol": "TCP"
+        }
+    ],
+    "users": [
+        {
+            "name": "baozi",
+            "password": "manlianpenfen",
+            "allowLoopbackIP": true
+        }
+    ],
+    "loggingLevel": "INFO"
+}

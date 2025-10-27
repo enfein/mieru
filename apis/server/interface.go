@@ -70,9 +70,9 @@ type ServerLifecycleService interface {
 
 type ServerNetworkService interface {
 	// Accept accepts a new proxy connection from a client.
-	// It returns the proxy connection and the network address of the destination.
-	// Handshake is completed before this method returns.
-	Accept() (net.Conn, model.NetAddrSpec, error)
+	// It returns the proxy connection and the socks5 request sent by the client.
+	// Additional handshake is required with the returned proxy connection.
+	Accept() (net.Conn, *model.Request, error)
 }
 
 // ServerConfig stores proxy server configuration.
@@ -84,4 +84,11 @@ type ServerConfig struct {
 	//
 	// If this field is not set, a default listener factory is used.
 	ListenerFactory apicommon.ListenerFactory
+}
+
+// NewServer creates a blank mieru server with no server config.
+func NewServer() Server {
+	ms := &mieruServer{}
+	ms.initOnce()
+	return ms
 }

@@ -49,6 +49,8 @@ func NewEarlyConn(conn net.Conn) *EarlyConn {
 	}
 }
 
+// SetRequest sets the lazy request to be sent to the peer.
+// It is used by client application.
 func (c *EarlyConn) SetRequest(request *model.Request) {
 	if c.response.Load() != nil {
 		panic("can't set request when response is not empty")
@@ -61,6 +63,8 @@ func (c *EarlyConn) SetRequest(request *model.Request) {
 	}
 }
 
+// SetResponse sets the lazy response to be sent to the peer.
+// It is used by server application.
 func (c *EarlyConn) SetResponse(response *model.Response) {
 	if c.request.Load() != nil {
 		panic("can't set response when request is not empty")
@@ -122,8 +126,12 @@ func (c *EarlyConn) NeedHandshake() bool {
 }
 
 // PeerResponse returns the response from the peer.
+// It is used by client application.
 // It returns nil if the handshake has not been performed yet.
 func (c *EarlyConn) PeerResponse() *model.Response {
+	if c.request.Load() == nil {
+		panic("can't get peer response when request is not set")
+	}
 	return c.peerResponse.Load()
 }
 

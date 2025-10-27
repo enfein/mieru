@@ -86,8 +86,6 @@ func ValidateClientConfigSingleProfile(profile *pb.ClientProfile) error {
 func NewClientMuxFromProfile(activeProfile *pb.ClientProfile, dialer apicommon.Dialer, resolver apicommon.DNSResolver) (*protocol.Mux, error) {
 	var err error
 	mux := protocol.NewMux(true)
-
-	// Set dialer.
 	if dialer != nil {
 		mux.SetDialer(dialer)
 	}

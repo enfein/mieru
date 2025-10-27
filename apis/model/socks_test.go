@@ -86,6 +86,66 @@ func TestRequestReadWrite(t *testing.T) {
 	}
 }
 
+func TestRequestToNetAddrSpec(t *testing.T) {
+	addr := AddrSpec{
+		FQDN: "example.com",
+		Port: 80,
+	}
+	testCases := []struct {
+		name    string
+		req     Request
+		want    NetAddrSpec
+		wantErr bool
+	}{
+		{
+			name: "connect command",
+			req: Request{
+				Command: constant.Socks5ConnectCmd,
+				DstAddr: addr,
+			},
+			want: NetAddrSpec{
+				AddrSpec: addr,
+				Net:      "tcp",
+			},
+			wantErr: false,
+		},
+		{
+			name: "udp associate command",
+			req: Request{
+				Command: constant.Socks5UDPAssociateCmd,
+				DstAddr: addr,
+			},
+			want: NetAddrSpec{
+				AddrSpec: addr,
+				Net:      "udp",
+			},
+			wantErr: false,
+		},
+		{
+			name: "unsupported command",
+			req: Request{
+				Command: constant.Socks5BindCmd,
+				DstAddr: addr,
+			},
+			want:    NetAddrSpec{},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := tc.req.ToNetAddrSpec()
+			if (err != nil) != tc.wantErr {
+				t.Errorf("ToNetAddrSpec() error = %v, wantErr %v", err, tc.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("ToNetAddrSpec() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestResponseReadWrite(t *testing.T) {
 	testCases := []struct {
 		input    []byte

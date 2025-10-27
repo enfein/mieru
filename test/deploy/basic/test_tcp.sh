@@ -21,10 +21,10 @@
 # Load test library.
 source ./libtest.sh
 
-# Update mieru server with UDP config.
-./mita apply config server_udp.json
+# Update mieru server with TCP config.
+./mita apply config server_tcp.json
 if [[ "$?" -ne 0 ]]; then
-    echo "command 'mita apply config server_udp.json' failed"
+    echo "command 'mita apply config server_tcp.json' failed"
     exit 1
 fi
 echo "mieru server config:"
@@ -36,12 +36,12 @@ if [[ "$?" -ne 0 ]]; then
     echo "command 'mita start' failed"
     exit 1
 fi
-./mita profile cpu start /test/mita.udp.cpu.gz
+./mita profile cpu start /test/mita.tcp.cpu.gz
 
-# Update mieru client with UDP config.
-./mieru apply config client_udp.json
+# Update mieru client with TCP config.
+./mieru apply config client_tcp.json
 if [[ "$?" -ne 0 ]]; then
-    echo "command 'mieru apply config client_udp.json' failed"
+    echo "command 'mieru apply config client_tcp.json' failed"
     exit 1
 fi
 echo "mieru client config:"
@@ -53,11 +53,11 @@ if [[ "$?" -ne 0 ]]; then
     echo "command 'mieru start' failed"
     exit 1
 fi
-./mieru profile cpu start /test/mieru.udp.cpu.gz
+./mieru profile cpu start /test/mieru.tcp.cpu.gz
 
 # Start testing.
 sleep 2
-echo ">>> socks5 - new connections - UDP <<<"
+echo ">>> socks5 - new connections - TCP <<<"
 ./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
   -local_proxy_host=127.0.0.1 -local_proxy_port=1080 \
   -test_case=new_conn -num_request=3000
@@ -65,22 +65,12 @@ if [ "$?" -ne "0" ]; then
     print_mieru_client_log
     print_mieru_client_thread_dump
     print_mieru_server_thread_dump
-    echo "UDP - test socks5 new_conn failed."
+    echo "TCP - test socks5 new_conn failed."
     exit 1
 fi
 
 sleep 1
-echo ">>> socks5 - new connections with API client - UDP <<<"
-./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
-  -local_proxy_host=127.0.0.1 -local_proxy_port=1082 \
-  -test_case=new_conn -num_request=3000
-if [ "$?" -ne "0" ]; then
-    echo "UDP - test socks5 new_conn with API client failed."
-    exit 1
-fi
-
-sleep 1
-echo ">>> http - new connections - UDP <<<"
+echo ">>> http - new connections - TCP <<<"
 ./sockshttpclient -proxy_mode=http -dst_host=127.0.0.1 -dst_port=8080 \
   -local_http_host=127.0.0.1 -local_http_port=8808 \
   -test_case=new_conn -num_request=1000
@@ -88,12 +78,12 @@ if [ "$?" -ne "0" ]; then
     print_mieru_client_log
     print_mieru_client_thread_dump
     print_mieru_server_thread_dump
-    echo "UDP - test HTTP new_conn failed."
+    echo "TCP - test HTTP new_conn failed."
     exit 1
 fi
 
 sleep 1
-echo ">>> socks5 - reuse one connection - UDP <<<"
+echo ">>> socks5 - reuse one connection - TCP <<<"
 ./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
   -local_proxy_host=127.0.0.1 -local_proxy_port=1080 \
   -test_case=reuse_conn -test_time_sec=30
@@ -101,15 +91,15 @@ if [ "$?" -ne "0" ]; then
     print_mieru_client_log
     print_mieru_client_thread_dump
     print_mieru_server_thread_dump
-    echo "UDP - test socks5 reuse_conn failed."
+    echo "TCP - test socks5 reuse_conn failed."
     exit 1
 fi
 
-# Collect profile with UDP.
+# Collect profile with TCP.
 ./mieru profile cpu stop
 ./mita profile cpu stop
-./mieru get heap-profile /test/mieru.udp.heap.gz
-./mita get heap-profile /test/mita.udp.heap.gz
+./mieru get heap-profile /test/mieru.tcp.heap.gz
+./mita get heap-profile /test/mita.tcp.heap.gz
 
 # Print metrics and memory statistics.
 ./mita get users
@@ -131,10 +121,10 @@ print_mieru_client_log
 delete_mieru_client_log
 sleep 1
 
-# Update mieru client with UDP config handshake no wait mode.
-./mieru apply config client_udp_no_wait.json
+# Update mieru client with TCP config handshake no wait mode.
+./mieru apply config client_tcp_no_wait.json
 if [[ "$?" -ne 0 ]]; then
-    echo "command 'mieru apply config client_udp_no_wait.json' failed"
+    echo "command 'mieru apply config client_tcp_no_wait.json' failed"
     exit 1
 fi
 echo "mieru client config:"
@@ -149,7 +139,7 @@ fi
 
 # Start testing.
 sleep 2
-echo ">>> socks5 - new connections - UDP - handshake no wait <<<"
+echo ">>> socks5 - new connections - TCP - handshake no wait <<<"
 ./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
   -local_proxy_host=127.0.0.1 -local_proxy_port=1080 \
   -test_case=new_conn -num_request=3000
@@ -157,17 +147,7 @@ if [ "$?" -ne "0" ]; then
     print_mieru_client_log
     print_mieru_client_thread_dump
     print_mieru_server_thread_dump
-    echo "UDP - test socks5 new_conn (handshake no wait) failed."
-    exit 1
-fi
-
-sleep 1
-echo ">>> socks5 - new connections with API client - UDP - handshake no wait <<<"
-./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
-  -local_proxy_host=127.0.0.1 -local_proxy_port=1084 \
-  -test_case=new_conn -num_request=3000
-if [ "$?" -ne "0" ]; then
-    echo "UDP - test socks5 new_conn (handshake no wait) with API client failed."
+    echo "TCP - test socks5 new_conn (handshake no wait) failed."
     exit 1
 fi
 

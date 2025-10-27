@@ -69,6 +69,24 @@ func (r *Request) WriteToSocks5(writer io.Writer) error {
 	return err
 }
 
+// ToNetAddrSpec converts a socks5 request to a NetAddrSpec object.
+func (r Request) ToNetAddrSpec() (NetAddrSpec, error) {
+	switch r.Command {
+	case constant.Socks5ConnectCmd:
+		return NetAddrSpec{
+			AddrSpec: r.DstAddr,
+			Net:      "tcp",
+		}, nil
+	case constant.Socks5UDPAssociateCmd:
+		return NetAddrSpec{
+			AddrSpec: r.DstAddr,
+			Net:      "udp",
+		}, nil
+	default:
+		return NetAddrSpec{}, fmt.Errorf("unsupported socks5 command: %d", r.Command)
+	}
+}
+
 type Response struct {
 	// Reply code.
 	Reply uint8

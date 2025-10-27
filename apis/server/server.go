@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlcommon"
@@ -80,7 +81,11 @@ func (ms *mieruServer) Start() error {
 		return ErrNoServerConfig
 	}
 
-	ms.mux = protocol.NewMux(false).SetServerUsers(appctlcommon.UserListToMap(ms.config.Config.GetUsers()))
+	ms.mux = protocol.NewMux(false)
+	if ms.config.ListenerFactory != nil {
+		ms.mux.SetListenerFactory(ms.config.ListenerFactory)
+	}
+	ms.mux.SetServerUsers(appctlcommon.UserListToMap(ms.config.Config.GetUsers()))
 	mtu := common.DefaultMTU
 	if ms.config.Config.GetMtu() != 0 {
 		mtu = int(ms.config.Config.GetMtu())
@@ -114,13 +119,21 @@ func (ms *mieruServer) IsRunning() bool {
 	return ms.running
 }
 
-func (ms *mieruServer) Accept() (net.Conn, model.NetAddrSpec, error) {
+func (ms *mieruServer) Accept() (net.Conn, *model.Request, error) {
 	conn, err := ms.mux.Accept()
 	if err != nil {
-		return nil, model.NetAddrSpec{}, err
+		return nil, nil, err
 	}
-	// TODO: complete handshake and return the network address of the destination.
-	return conn, model.NetAddrSpec{}, nil
+
+	common.SetReadTimeout(conn, 10*time.Second)
+	defer func() {
+		common.SetReadTimeout(conn, 0)
+	}()
+	req := &model.Request{}
+	if err := req.ReadFromSocks5(conn); err != nil {
+		return nil, nil, err
+	}
+	return conn, req, nil
 }
 
 func validateServerConfig(config *appctlpb.ServerConfig) error {

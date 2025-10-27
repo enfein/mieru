@@ -157,6 +157,15 @@ func (m *Mux) SetResolver(resolver apicommon.DNSResolver) *Mux {
 	return m
 }
 
+// SetListenerFactory updates the network listener factory used by the mux.
+func (m *Mux) SetListenerFactory(listenerFactory apicommon.ListenerFactory) *Mux {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.listenerFactory = listenerFactory
+	log.Infof("Mux listener factory has been updated")
+	return m
+}
+
 // SetClientUserNamePassword panics if the mux is already started.
 func (m *Mux) SetClientUserNamePassword(username string, password []byte) *Mux {
 	m.mu.Lock()

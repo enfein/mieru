@@ -21,12 +21,12 @@ WORKDIR /test
 
 # Copy binaries, data and test script into the container.
 COPY exampleapiclient mieru mita httpserver sockshttpclient socksudpclient udpserver \
-    test/deploy/httptest/client_mix.json test/deploy/httptest/server_mix.json \
-    test/deploy/httptest/client_tcp.json test/deploy/httptest/client_tcp_no_wait.json test/deploy/httptest/server_tcp.json \
-    test/deploy/httptest/client_udp.json test/deploy/httptest/client_udp_no_wait.json test/deploy/httptest/server_udp.json \
-    test/deploy/httptest/libtest.sh test/deploy/httptest/test_mix_udp_associate.sh \
-    test/deploy/httptest/test_tcp.sh test/deploy/httptest/test_udp.sh \
-    test/deploy/httptest/test.sh /test/
+    test/deploy/basic/client_mix.json test/deploy/basic/server_mix.json \
+    test/deploy/basic/client_tcp.json test/deploy/basic/client_tcp_no_wait.json test/deploy/basic/server_tcp.json \
+    test/deploy/basic/client_udp.json test/deploy/basic/client_udp_no_wait.json test/deploy/basic/server_udp.json \
+    test/deploy/basic/libtest.sh test/deploy/basic/test_mix_udp_associate.sh \
+    test/deploy/basic/test_tcp.sh test/deploy/basic/test_udp.sh \
+    test/deploy/basic/test.sh /test/
 
 # Create mita user and server config directory.
 RUN /usr/sbin/useradd --no-create-home --user-group mita && \

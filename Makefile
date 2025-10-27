@@ -371,20 +371,35 @@ test-binary:
 	CGO_ENABLED=0 go build test/cmd/socksudpclient/socksudpclient.go
 	CGO_ENABLED=0 go build test/cmd/udpserver/udpserver.go
 
-# Build a docker image to run integration tests.
-.PHONY: test-container
-test-container: test-binary
+# Build docker images to run integration tests.
+.PHONY: test-container-image
+test-container-image: test-binary
 	if [ ! -z $$(command -v docker) ]; then
-		docker build -t mieru_httptest:${SHORT_SHA} -f test/deploy/httptest/Dockerfile .
+		docker build -t mieru_basic:${SHORT_SHA} -f test/deploy/basic/Dockerfile .
+		docker build -t mieru_apiclient:${SHORT_SHA} -f test/deploy/apiclient/Dockerfile .
 		docker build -t mieru_proxychain:${SHORT_SHA} -f test/deploy/proxychain/Dockerfile .
 	fi
 	rm -f exampleapiclient mieru mieru2 mita mita2 httpserver sockshttpclient socksudpclient udpserver
 
 # Run docker integration tests.
 .PHONY: run-container-test
-run-container-test: test-container
+run-container-test: run-container-test-basic run-container-test-apiclient run-container-test-proxychain
+
+.PHONY: run-container-test-basic
+run-container-test-basic: test-container-image
 	if [ ! -z $$(command -v docker) ]; then
-		docker run mieru_httptest:${SHORT_SHA}
+		docker run mieru_basic:${SHORT_SHA}
+	fi
+
+.PHONY: run-container-test-apiclient
+run-container-test-apiclient: test-container-image
+	if [ ! -z $$(command -v docker) ]; then
+		docker run mieru_apiclient:${SHORT_SHA}
+	fi
+
+.PHONY: run-container-test-proxychain
+run-container-test-proxychain: test-container-image
+	if [ ! -z $$(command -v docker) ]; then
 		docker run mieru_proxychain:${SHORT_SHA}
 	fi
 
