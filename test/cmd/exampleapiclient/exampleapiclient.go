@@ -125,6 +125,7 @@ func main() {
 		panic(err)
 	}
 	fmt.Printf("API client is listening to %v\n", l.Addr())
+
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -146,32 +147,30 @@ func handleOneSocks5Conn(c client.Client, conn net.Conn) {
 	}
 
 	// Find destination.
-	socks5Header := make([]byte, 3)
-	if _, err := io.ReadFull(conn, socks5Header); err != nil {
-		panic(fmt.Sprintf("Read socks5 header failed: %v", err))
-	}
-	netAddr := model.NetAddrSpec{}
-	var isTCP, isUDP bool
-	if socks5Header[1] == constant.Socks5ConnectCmd {
-		netAddr.Net = "tcp"
-		isTCP = true
-	} else if socks5Header[1] == constant.Socks5UDPAssociateCmd {
-		netAddr.Net = "udp"
-		isUDP = true
-	} else {
-		panic(fmt.Sprintf("Socks5 command %d is invalid", socks5Header[1]))
-	}
-	if err := netAddr.ReadFromSocks5(conn); err != nil {
+	var req model.Request
+	if err := req.ReadFromSocks5(conn); err != nil {
 		panic(fmt.Sprintf("ReadFromSocks5() failed: %v", err))
 	}
+	var isTCP, isUDP bool
+	switch req.Command {
+	case constant.Socks5ConnectCmd:
+		isTCP = true
+	case constant.Socks5UDPAssociateCmd:
+		isUDP = true
+	default:
+		panic(fmt.Sprintf("Invalid socks5 command %d", req.Command))
+	}
+	netAddr, err := req.ToNetAddrSpec()
+	if err != nil {
+		panic(fmt.Sprintf("ToNetAddrSpec() failed: %v", err))
+	}
 	if *debug {
-		fmt.Printf("Destination network: %v, address: %v\n", netAddr.Network(), netAddr.String())
+		fmt.Printf("Destination address: %v\n", req.DstAddr)
 	}
 
 	// Dial to proxy server and do handshake.
 	ctx := context.Background()
 	var proxyConn net.Conn
-	var err error
 	proxyConn, err = c.DialContext(ctx, netAddr)
 	if err != nil {
 		panic(fmt.Sprintf("DialContext() failed: %v", err))

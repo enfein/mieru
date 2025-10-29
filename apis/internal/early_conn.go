@@ -30,7 +30,7 @@ import (
 // EarlyConn implements net.Conn interface.
 // When the Write() method on the net.Conn is called for the first time,
 // it performs the initial handshake and writes
-// the request or response to the peer.
+// the request or response to the peer within the same network packet.
 type EarlyConn struct {
 	net.Conn
 	request       atomic.Pointer[model.Request]

@@ -366,6 +366,7 @@ test-binary:
 	CGO_ENABLED=1 go build -race -ldflags="-X 'github.com/enfein/mieru/v3/pkg/log.LogPrefix=C2'" -o mieru2 cmd/mieru/mieru.go
 	CGO_ENABLED=1 go build -race -ldflags="-X 'github.com/enfein/mieru/v3/pkg/log.LogPrefix=S2'" -o mita2 cmd/mita/mita.go
 	CGO_ENABLED=0 go build test/cmd/exampleapiclient/exampleapiclient.go
+	CGO_ENABLED=0 go build test/cmd/exampleapiserver/exampleapiserver.go
 	CGO_ENABLED=0 go build test/cmd/httpserver/httpserver.go
 	CGO_ENABLED=0 go build test/cmd/sockshttpclient/sockshttpclient.go
 	CGO_ENABLED=0 go build test/cmd/socksudpclient/socksudpclient.go
@@ -379,7 +380,7 @@ test-container-image: test-binary
 		docker build -t mieru_apiclient:${SHORT_SHA} -f test/deploy/apiclient/Dockerfile .
 		docker build -t mieru_proxychain:${SHORT_SHA} -f test/deploy/proxychain/Dockerfile .
 	fi
-	rm -f exampleapiclient mieru mieru2 mita mita2 httpserver sockshttpclient socksudpclient udpserver
+	rm -f exampleapiclient exampleapiserver mieru mieru2 mita mita2 httpserver sockshttpclient socksudpclient udpserver
 
 # Run docker integration tests.
 .PHONY: run-container-test
