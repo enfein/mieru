@@ -3,7 +3,7 @@ on: [push, pull_request, workflow_dispatch]
 jobs:
   run-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4

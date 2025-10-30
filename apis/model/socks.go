@@ -32,6 +32,10 @@ type Request struct {
 	Raw []byte
 }
 
+func (r Request) String() string {
+	return fmt.Sprintf("Request{command=%d, destination=%v}", r.Command, r.DstAddr)
+}
+
 // ReadFromSocks5 reads a socks5 request.
 func (r *Request) ReadFromSocks5(reader io.Reader) error {
 	var buf bytes.Buffer
@@ -94,6 +98,10 @@ type Response struct {
 	BindAddr AddrSpec
 	// Raw response bytes.
 	Raw []byte
+}
+
+func (r Response) String() string {
+	return fmt.Sprintf("Response{reply=%d, bind=%v}", r.Reply, r.BindAddr)
 }
 
 // ReadFromSocks5 reads a socks5 response.

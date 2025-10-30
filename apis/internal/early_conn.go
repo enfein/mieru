@@ -30,11 +30,10 @@ import (
 // EarlyConn implements net.Conn interface.
 // When the Write() method on the net.Conn is called for the first time,
 // it performs the initial handshake and writes
-// the request or response to the peer within the same network packet.
+// the request to the peer within the same network packet.
 type EarlyConn struct {
 	net.Conn
 	request       atomic.Pointer[model.Request]
-	response      atomic.Pointer[model.Response]
 	peerResponse  atomic.Pointer[model.Response]
 	handshakeOnce sync.Once
 	handshakeErr  error
@@ -50,30 +49,12 @@ func NewEarlyConn(conn net.Conn) *EarlyConn {
 }
 
 // SetRequest sets the lazy request to be sent to the peer.
-// It is used by client application.
 func (c *EarlyConn) SetRequest(request *model.Request) {
-	if c.response.Load() != nil {
-		panic("can't set request when response is not empty")
-	}
 	select {
 	case <-c.handshaked:
 		panic("can't set request when handshake already done")
 	default:
 		c.request.Store(request)
-	}
-}
-
-// SetResponse sets the lazy response to be sent to the peer.
-// It is used by server application.
-func (c *EarlyConn) SetResponse(response *model.Response) {
-	if c.request.Load() != nil {
-		panic("can't set response when request is not empty")
-	}
-	select {
-	case <-c.handshaked:
-		panic("can't set response when handshake already done")
-	default:
-		c.response.Store(response)
 	}
 }
 
@@ -138,17 +119,12 @@ func (c *EarlyConn) PeerResponse() *model.Response {
 func (c *EarlyConn) doHandshakeAndWrite(b []byte) error {
 	var buf bytes.Buffer
 	request := c.request.Load()
-	response := c.response.Load()
 	if request != nil {
 		if err := request.WriteToSocks5(&buf); err != nil {
 			return err
 		}
-	} else if response != nil {
-		if err := response.WriteToSocks5(&buf); err != nil {
-			return err
-		}
 	} else {
-		return fmt.Errorf("no request or response set")
+		return fmt.Errorf("request is not set")
 	}
 	if len(b) > 0 {
 		buf.Write(b)
@@ -157,19 +133,17 @@ func (c *EarlyConn) doHandshakeAndWrite(b []byte) error {
 		return fmt.Errorf("failed to write socks5 object to the connection: %w", err)
 	}
 
-	// If this is a request, read the response.
-	if request != nil {
-		c.Conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-		defer c.Conn.SetReadDeadline(time.Time{})
+	// Read the response.
+	c.Conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+	defer c.Conn.SetReadDeadline(time.Time{})
 
-		var resp model.Response
-		if err := resp.ReadFromSocks5(c.Conn); err != nil {
-			return fmt.Errorf("failed to read socks5 response from the server: %w", err)
-		}
-		if resp.Reply != constant.Socks5ReplySuccess {
-			return fmt.Errorf("server returned socks5 error code %d", resp.Reply)
-		}
-		c.peerResponse.Store(&resp)
+	var resp model.Response
+	if err := resp.ReadFromSocks5(c.Conn); err != nil {
+		return fmt.Errorf("failed to read socks5 response from the server: %w", err)
 	}
+	if resp.Reply != constant.Socks5ReplySuccess {
+		return fmt.Errorf("server returned socks5 error code %d", resp.Reply)
+	}
+	c.peerResponse.Store(&resp)
 	return nil
 }

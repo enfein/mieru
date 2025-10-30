@@ -107,14 +107,14 @@ func main() {
 			HandshakeMode: &handshakeModeConfig,
 		},
 	}); err != nil {
-		panic(err)
+		panic(fmt.Sprintf("Store() failed: %v", err))
 	}
 	if _, err := c.Load(); err != nil {
-		panic(err)
+		panic(fmt.Sprintf("Load() failed: %v", err))
 	}
 
 	if err := c.Start(); err != nil {
-		panic(err)
+		panic(fmt.Sprintf("Start() failed: %v", err))
 	}
 	if !c.IsRunning() {
 		panic("client is not running after start")
@@ -122,14 +122,14 @@ func main() {
 
 	l, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: *port})
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("net.ListenTCP() failed: %v", err))
 	}
 	fmt.Printf("API client is listening to %v\n", l.Addr())
 
 	for {
 		conn, err := l.Accept()
 		if err != nil {
-			panic(err)
+			panic(fmt.Sprintf("Accept() failed: %v", err))
 		}
 		go handleOneSocks5Conn(c, conn)
 	}
@@ -142,8 +142,8 @@ func handleOneSocks5Conn(c client.Client, conn net.Conn) {
 	defer conn.Close()
 
 	// Handle socks5 authentication.
-	if err := socks5ClientHandshake(conn); err != nil {
-		panic(fmt.Sprintf("socks5ClientHandshake() failed: %v", err))
+	if err := socks5AuthHandshake(conn); err != nil {
+		panic(fmt.Sprintf("socks5AuthHandshake() failed: %v", err))
 	}
 
 	// Find destination.
@@ -179,16 +179,15 @@ func handleOneSocks5Conn(c client.Client, conn net.Conn) {
 
 	// Send the connect response back to the application
 	// and start bi-direction copy.
-	var resp bytes.Buffer
-	resp.Write([]byte{constant.Socks5Version, 0, 0})
 	if isTCP {
 		// The actual server bound address can't be collected
 		// from the API. Send a fake server bound address back to client.
-		if err := netAddr.WriteToSocks5(&resp); err != nil {
-			panic(fmt.Sprintf("WriteToSocks5() failed: %v", err))
+		resp := &model.Response{
+			Reply:    constant.Socks5ReplySuccess,
+			BindAddr: netAddr.AddrSpec,
 		}
-		if _, err := conn.Write(resp.Bytes()); err != nil {
-			panic(fmt.Sprintf("Write socks5 response failed: %v", err))
+		if err := resp.WriteToSocks5(conn); err != nil {
+			panic(fmt.Sprintf("WriteToSocks5() failed: %v", err))
 		}
 
 		common.BidiCopy(conn, proxyConn)
@@ -199,6 +198,7 @@ func handleOneSocks5Conn(c client.Client, conn net.Conn) {
 			panic(fmt.Sprintf("net.ListenUDP() failed: %v", err))
 		}
 		defer udpConn.Close()
+
 		_, udpPortStr, err := net.SplitHostPort(udpConn.LocalAddr().String())
 		if err != nil {
 			panic(fmt.Sprintf("net.SplitHostPort() failed: %v", err))
@@ -208,11 +208,12 @@ func handleOneSocks5Conn(c client.Client, conn net.Conn) {
 			panic(fmt.Sprintf("strconv.Atoi() failed: %v", err))
 		}
 		udpBindAddr := model.AddrSpec{IP: net.IP{0, 0, 0, 0}, Port: udpPort}
-		if err := udpBindAddr.WriteToSocks5(&resp); err != nil {
-			panic(fmt.Sprintf("WriteToSocks5() failed: %v", err))
+		resp := &model.Response{
+			Reply:    constant.Socks5ReplySuccess,
+			BindAddr: udpBindAddr,
 		}
-		if _, err := conn.Write(resp.Bytes()); err != nil {
-			panic(fmt.Sprintf("Write socks5 response failed: %v", err))
+		if err := resp.WriteToSocks5(conn); err != nil {
+			panic(fmt.Sprintf("WriteToSocks5() failed: %v", err))
 		}
 
 		tunnel := apicommon.NewPacketOverStreamTunnel(proxyConn)
@@ -220,7 +221,7 @@ func handleOneSocks5Conn(c client.Client, conn net.Conn) {
 	}
 }
 
-func socks5ClientHandshake(conn net.Conn) error {
+func socks5AuthHandshake(conn net.Conn) error {
 	// Only accept socks5 with no authentication.
 	socks5Header := make([]byte, 3)
 	if _, err := io.ReadFull(conn, socks5Header); err != nil {

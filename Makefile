@@ -375,34 +375,31 @@ test-binary:
 # Build docker images to run integration tests.
 .PHONY: test-container-image
 test-container-image: test-binary
-	if [ ! -z $$(command -v docker) ]; then
-		docker build -t mieru_basic:${SHORT_SHA} -f test/deploy/basic/Dockerfile .
-		docker build -t mieru_apiclient:${SHORT_SHA} -f test/deploy/apiclient/Dockerfile .
-		docker build -t mieru_proxychain:${SHORT_SHA} -f test/deploy/proxychain/Dockerfile .
-	fi
+	docker build -t mieru_basic:${SHORT_SHA} -f test/deploy/basic/Dockerfile .
+	docker build -t mieru_apiclient:${SHORT_SHA} -f test/deploy/apiclient/Dockerfile .
+	docker build -t mieru_apiserver:${SHORT_SHA} -f test/deploy/apiserver/Dockerfile .
+	docker build -t mieru_proxychain:${SHORT_SHA} -f test/deploy/proxychain/Dockerfile .
 	rm -f exampleapiclient exampleapiserver mieru mieru2 mita mita2 httpserver sockshttpclient socksudpclient udpserver
 
 # Run docker integration tests.
 .PHONY: run-container-test
-run-container-test: run-container-test-basic run-container-test-apiclient run-container-test-proxychain
+run-container-test: run-container-test-basic run-container-test-apiclient run-container-test-apiserver run-container-test-proxychain
 
 .PHONY: run-container-test-basic
 run-container-test-basic: test-container-image
-	if [ ! -z $$(command -v docker) ]; then
-		docker run mieru_basic:${SHORT_SHA}
-	fi
+	docker run mieru_basic:${SHORT_SHA}
 
 .PHONY: run-container-test-apiclient
 run-container-test-apiclient: test-container-image
-	if [ ! -z $$(command -v docker) ]; then
-		docker run mieru_apiclient:${SHORT_SHA}
-	fi
+	docker run mieru_apiclient:${SHORT_SHA}
+
+.PHONY: run-container-test-apiserver
+run-container-test-apiserver: test-container-image
+	docker run mieru_apiserver:${SHORT_SHA}
 
 .PHONY: run-container-test-proxychain
 run-container-test-proxychain: test-container-image
-	if [ ! -z $$(command -v docker) ]; then
-		docker run mieru_proxychain:${SHORT_SHA}
-	fi
+	docker run mieru_proxychain:${SHORT_SHA}
 
 # Generate source code from protobuf.
 # Call this after proto files are changed.

@@ -20,20 +20,11 @@ FROM ubuntu:24.04
 WORKDIR /test
 
 # Copy binaries, data and test script into the container.
-COPY exampleapiclient mita httpserver sockshttpclient socksudpclient udpserver \
-    test/deploy/apiclient/server_mix.json \
-    test/deploy/apiclient/test.sh /test/
-
-# Create mita user and server config directory.
-RUN /usr/sbin/useradd --no-create-home --user-group mita && \
-    mkdir -p /etc/mita && \
-    chown -R mita:mita /etc/mita && \
-    chmod 775 /etc/mita && \
-    mkdir -p /var/lib/mita && \
-    chown -R mita:mita /var/lib/mita && \
-    chmod 775 /var/lib/mita && \
-    mkdir -p /var/run/mita && \
-    chown -R mita:mita /var/run/mita && \
-    chmod 775 /var/run/mita
+COPY exampleapiserver mieru httpserver sockshttpclient socksudpclient udpserver \
+    test/deploy/apiserver/client_tcp_no_wait.json \
+    test/deploy/apiserver/client_tcp.json \
+    test/deploy/apiserver/client_udp_no_wait.json \
+    test/deploy/apiserver/client_udp.json \
+    test/deploy/apiserver/test.sh /test/
 
 CMD ["/test/test.sh"]

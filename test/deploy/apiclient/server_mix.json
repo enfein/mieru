@@ -2,11 +2,11 @@
     "portBindings": [
         {
             "portRange": "8964-8965",
-            "protocol": "UDP"
+            "protocol": "TCP"
         },
         {
             "port": 9648,
-            "protocol": "UDP"
+            "protocol": "TCP"
         },
         {
             "port": 6489,
@@ -24,6 +24,5 @@
             "allowLoopbackIP": true
         }
     ],
-    "loggingLevel": "INFO",
-    "mtu": 1400
+    "loggingLevel": "INFO"
 }
