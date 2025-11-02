@@ -30,7 +30,6 @@ import (
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 	"github.com/enfein/mieru/v3/pkg/replay"
-	"github.com/enfein/mieru/v3/pkg/sockopts"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
 
@@ -67,7 +66,7 @@ var _ Underlay = &PacketUnderlay{}
 // "block" is the block encryption algorithm to encrypt packets.
 //
 // This function is only used by proxy client.
-func NewPacketUnderlay(ctx context.Context, network, addr string, mtu int, block cipher.BlockCipher, resolver apicommon.DNSResolver) (*PacketUnderlay, error) {
+func NewPacketUnderlay(ctx context.Context, packetListenerFactory apicommon.PacketListenerFactory, network, addr string, mtu int, block cipher.BlockCipher, resolver apicommon.DNSResolver) (*PacketUnderlay, error) {
 	switch network {
 	case "udp", "udp4", "udp6":
 	default:
@@ -82,12 +81,9 @@ func NewPacketUnderlay(ctx context.Context, network, addr string, mtu int, block
 		return nil, fmt.Errorf("ResolveUDPAddr() failed: %w", err)
 	}
 
-	conn, err := net.ListenUDP(network, localAddr)
+	conn, err := packetListenerFactory.ListenPacket(ctx, network, localAddr.String())
 	if err != nil {
-		return nil, fmt.Errorf("net.ListenUDP() failed: %w", err)
-	}
-	if err := sockopts.ApplyUDPControl(conn, sockopts.DefaultDialerControl()); err != nil {
-		return nil, fmt.Errorf("ApplyUDPControl() failed: %w", err)
+		return nil, fmt.Errorf("ListenPacket() failed: %w", err)
 	}
 	u := &PacketUnderlay{
 		baseUnderlay:       *newBaseUnderlay(true, mtu),

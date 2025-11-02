@@ -82,8 +82,11 @@ func (ms *mieruServer) Start() error {
 	}
 
 	ms.mux = protocol.NewMux(false)
-	if ms.config.ListenerFactory != nil {
-		ms.mux.SetListenerFactory(ms.config.ListenerFactory)
+	if ms.config.StreamListenerFactory != nil {
+		ms.mux.SetStreamListenerFactory(ms.config.StreamListenerFactory)
+	}
+	if ms.config.PacketListenerFactory != nil {
+		ms.mux.SetPacketListenerFactory(ms.config.PacketListenerFactory)
 	}
 	ms.mux.SetServerUsers(appctlcommon.UserListToMap(ms.config.Config.GetUsers()))
 	mtu := common.DefaultMTU

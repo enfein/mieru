@@ -20,10 +20,15 @@ import (
 	"net"
 )
 
-// ListenerFactory provides a way to create network listeners.
-type ListenerFactory interface {
+// StreamListenerFactory provides a way to create stream-oriented network listeners.
+type StreamListenerFactory interface {
 	Listen(ctx context.Context, network, address string) (net.Listener, error)
+}
+
+// PacketListenerFactory provides a way to create packet-oriented network listeners.
+type PacketListenerFactory interface {
 	ListenPacket(ctx context.Context, network, address string) (net.PacketConn, error)
 }
 
-var _ ListenerFactory = (*net.ListenConfig)(nil)
+var _ StreamListenerFactory = (*net.ListenConfig)(nil)
+var _ PacketListenerFactory = (*net.ListenConfig)(nil)

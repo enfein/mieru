@@ -80,10 +80,15 @@ type ServerConfig struct {
 	// Main configuration.
 	Config *appctlpb.ServerConfig
 
-	// A listener factory to create network listeners.
+	// A listener factory to create stream-oriented network listeners.
 	//
 	// If this field is not set, a default listener factory is used.
-	ListenerFactory apicommon.ListenerFactory
+	StreamListenerFactory apicommon.StreamListenerFactory
+
+	// A listener factory to create packet-oriented network listeners.
+	//
+	// If this field is not set, a default listener factory is used.
+	PacketListenerFactory apicommon.PacketListenerFactory
 }
 
 // NewServer creates a blank mieru server with no server config.

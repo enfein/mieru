@@ -71,10 +71,9 @@ func main() {
 			},
 			Users: []*appctlpb.User{
 				{
-					Name:            username,
-					Password:        password,
-					AllowPrivateIP:  proto.Bool(true),
-					AllowLoopbackIP: proto.Bool(true),
+					Name:     username,
+					Password: password,
+					// AllowPrivateIP and AllowLoopbackIP are not used by API.
 				},
 			},
 		},
