@@ -31,7 +31,7 @@ function delete_mieru_client_log() {
 }
 
 function run_new_conn_test() {
-    config="$1"
+    local config="$1"
     sleep 1
     echo ">>> socks5 - new connections with API server - $config <<<"
     ./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
@@ -45,7 +45,7 @@ function run_new_conn_test() {
 }
 
 function run_udp_associate_test() {
-    config="$1"
+    local config="$1"
     sleep 1
     echo ">>> socks5 UDP associate - with API server - $config <<<"
     ./socksudpclient -dst_host=127.0.0.1 -dst_port=9090 \

@@ -21,11 +21,11 @@ WORKDIR /test
 
 # Copy binaries, data and test script into the container.
 COPY mihomo mita httpserver sockshttpclient socksudpclient udpserver \
-    test/deploy/mihomo/mihomo-config.yaml \
-    test/deploy/mihomo/mihomo-config-no-wait.yaml \
+    test/deploy/mihomo/mihomo-client-tcp.yaml \
+    test/deploy/mihomo/mihomo-client-tcp-no-wait.yaml \
     test/deploy/mihomo/server_tcp.json \
     test/deploy/mihomo/libtest.sh \
-    test/deploy/mihomo/test_tcp.sh \
+    test/deploy/mihomo/test_client_tcp.sh \
     test/deploy/mihomo/test.sh /test/
 
 # Create mita user and server config directory.

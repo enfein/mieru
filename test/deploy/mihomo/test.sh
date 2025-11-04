@@ -37,7 +37,7 @@ sleep 1
 
 # Run TCP test.
 echo "========== BEGIN OF TCP TEST =========="
-./test_tcp.sh
+./test_client_tcp.sh
 echo "==========  END OF TCP TEST  =========="
 
 echo "Test is successful."
