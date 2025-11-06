@@ -20,12 +20,18 @@ FROM ubuntu:24.04
 WORKDIR /test
 
 # Copy binaries, data and test script into the container.
-COPY mihomo mita httpserver sockshttpclient socksudpclient udpserver \
+COPY mihomo mieru mita httpserver sockshttpclient socksudpclient udpserver \
     test/deploy/mihomo/mihomo-client-tcp.yaml \
     test/deploy/mihomo/mihomo-client-tcp-no-wait.yaml \
+    test/deploy/mihomo/mihomo-server.yaml \
+    test/deploy/mihomo/client_tcp_no_wait.json \
+    test/deploy/mihomo/client_tcp.json \
+    test/deploy/mihomo/client_udp_no_wait.json \
+    test/deploy/mihomo/client_udp.json \
     test/deploy/mihomo/server_tcp.json \
     test/deploy/mihomo/libtest.sh \
     test/deploy/mihomo/test_client_tcp.sh \
+    test/deploy/mihomo/test_server.sh \
     test/deploy/mihomo/test.sh /test/
 
 # Create mita user and server config directory.

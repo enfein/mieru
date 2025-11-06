@@ -1,0 +1,16 @@
+log-level: warning
+listeners:
+  - name: mieru-tcp
+    type: mieru
+    port: 8966
+    listen: 127.0.0.1
+    transport: TCP
+    users:
+      baozi: manlianpenfen
+  - name: mieru-udp
+    type: mieru
+    port: 8966
+    listen: 127.0.0.1
+    transport: UDP
+    users:
+      baozi: manlianpenfen
