@@ -3,7 +3,7 @@ on: [workflow_dispatch]
 jobs:
   mihomo-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Check out mieru repository code
         uses: actions/checkout@v4

@@ -70,7 +70,7 @@ function test_mieru_with_config() {
 
     # Start testing.
     run_new_conn_test "$config"
-    # run_udp_associate_test "$config"
+    run_udp_associate_test "$config"
 
     # Stop mieru client.
     ./mieru stop

@@ -143,6 +143,8 @@ func (u *PacketUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
 		return err
 	}
 	s.conn = u // override base underlay
+	s.transportProtocol = u.TransportProtocol()
+	s.forwardStateTo(sessionAttached)
 	close(s.ready)
 	log.Debugf("Adding session %d to %v", s.id, u)
 

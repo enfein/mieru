@@ -83,17 +83,33 @@ func TransceiveUDPPacket(conn *net.UDPConn, proxyAddr, dstAddr *net.UDPAddr, pay
 		// We don't compare the IP address because a wildcard address like 0.0.0.0 can be used.
 		return nil, fmt.Errorf("unexpected read from a different address")
 	}
-	if n <= 10 {
+	if n < 4 {
 		return nil, fmt.Errorf("UDP associate response is too short")
 	}
 	if buf[3] == constant.Socks5IPv4Address {
+		if n <= 10 {
+			return nil, fmt.Errorf("UDP associate response is too short for IPv4 address")
+		}
 		// Header length is 10 bytes.
 		return buf[10:n], nil
 	} else if buf[3] == constant.Socks5IPv6Address {
+		if n <= 22 {
+			return nil, fmt.Errorf("UDP associate response is too short for IPv6 address")
+		}
 		// Header length is 22 bytes.
 		return buf[22:n], nil
+	} else if buf[3] == constant.Socks5FQDNAddress {
+		if n < 5 {
+			return nil, fmt.Errorf("UDP associate response is too short for FQDN address")
+		}
+		domainLen := int(buf[4])
+		headerLen := 7 + domainLen
+		if n <= headerLen {
+			return nil, fmt.Errorf("UDP associate response is too short for FQDN address")
+		}
+		return buf[headerLen:n], nil
 	} else {
-		return nil, fmt.Errorf("UDP assciate unsupport address type")
+		return nil, fmt.Errorf("UDP associate unsupported address type: %d", buf[3])
 	}
 }
 

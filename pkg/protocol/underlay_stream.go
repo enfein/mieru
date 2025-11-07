@@ -134,6 +134,8 @@ func (t *StreamUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
 		return err
 	}
 	s.conn = t // override base underlay
+	s.transportProtocol = t.TransportProtocol()
+	s.forwardStateTo(sessionAttached)
 	close(s.ready)
 	log.Debugf("Adding session %d to %v", s.id, t)
 

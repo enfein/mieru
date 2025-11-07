@@ -89,12 +89,13 @@ type Session struct {
 	conn  Underlay                           // underlay connection
 	block atomic.Pointer[cipher.BlockCipher] // cipher to decrypt data
 
-	id         uint32       // session ID number
-	isClient   bool         // if this session is owned by client
-	mtu        int          // L2 maxinum transmission unit
-	remoteAddr net.Addr     // specify remote network address, used by UDP
-	state      sessionState // session state
-	status     statusCode   // session status
+	id                uint32                   // session ID number
+	isClient          bool                     // if this session is owned by client
+	mtu               int                      // L2 maxinum transmission unit
+	transportProtocol common.TransportProtocol // transport protocol of underlay connection
+	remoteAddr        net.Addr                 // specify remote network address, used by UDP
+	state             sessionState             // session state
+	status            statusCode               // session status
 
 	users    map[string]*appctlpb.User // all registered users, only used by server
 	userName string                    // user that owns this session, only used by server
@@ -302,7 +303,7 @@ func (s *Session) Write(b []byte) (n int, err error) {
 				sessionID: s.id,
 				seq:       s.nextSend,
 			},
-			transport: s.conn.TransportProtocol(),
+			transport: s.transportProtocol,
 		}
 		s.nextSend++
 		// Allow open session request to carry payload.
@@ -351,14 +352,20 @@ func (s *Session) Close() error {
 }
 
 func (s *Session) LocalAddr() net.Addr {
-	return s.conn.LocalAddr()
+	if s.conn != nil {
+		return s.conn.LocalAddr()
+	}
+	return common.NilNetAddr()
 }
 
 func (s *Session) RemoteAddr() net.Addr {
 	if !common.IsNilNetAddr(s.remoteAddr) {
 		return s.remoteAddr
 	}
-	return s.conn.RemoteAddr()
+	if s.conn != nil {
+		return s.conn.RemoteAddr()
+	}
+	return common.NilNetAddr()
 }
 
 // SetDeadline implements net.Conn.
@@ -480,7 +487,7 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 
 	// Determine number of fragments to write.
 	nFragment := 1
-	fragmentSize := MaxFragmentSize(s.mtu, s.conn.TransportProtocol())
+	fragmentSize := MaxFragmentSize(s.mtu, s.transportProtocol)
 	if len(b) > fragmentSize {
 		nFragment = (len(b)-1)/fragmentSize + 1
 	}
@@ -533,7 +540,7 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 				payloadLen: uint16(partLen),
 			},
 			payload:   make([]byte, partLen),
-			transport: s.conn.TransportProtocol(),
+			transport: s.transportProtocol,
 		}
 		copy(seg.payload, part)
 		s.nextSend++
@@ -595,7 +602,7 @@ func (s *Session) runInputLoop(ctx context.Context) error {
 }
 
 func (s *Session) runOutputLoop(ctx context.Context) error {
-	switch s.conn.TransportProtocol() {
+	switch s.transportProtocol {
 	case common.StreamTransport:
 		for {
 			select {
@@ -622,7 +629,7 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 			s.runOutputOncePacket()
 		}
 	default:
-		err := fmt.Errorf("unsupported transport protocol %v", s.conn.TransportProtocol())
+		err := fmt.Errorf("unsupported transport protocol %v", s.transportProtocol)
 		log.Debugf("%v %v", s, err)
 		if s.outputHasErr.CompareAndSwap(false, true) {
 			close(s.outputErr)
@@ -808,8 +815,7 @@ func (s *Session) runOutputOncePacket() {
 				unAckSeq:   s.nextRecv,
 				windowSize: uint16(mathext.Max(0, int(s.legacysendAlgorithm.CongestionWindowSize())-s.recvBuf.Len())),
 			},
-			transport: s.conn.TransportProtocol(),
-		}
+			transport: s.transportProtocol}
 		if err := s.output(ackSeg, s.RemoteAddr()); err != nil {
 			s.oLock.Unlock()
 			err = fmt.Errorf("output() failed: %w", err)
@@ -897,7 +903,7 @@ func (s *Session) input(seg *segment) error {
 }
 
 func (s *Session) inputData(seg *segment) error {
-	switch s.conn.TransportProtocol() {
+	switch s.transportProtocol {
 	case common.StreamTransport:
 		// Deliver the segment directly to recvQueue.
 		for {
@@ -983,7 +989,7 @@ func (s *Session) inputData(seg *segment) error {
 		}
 		s.ackOnDataRecv.Store(true)
 	default:
-		return fmt.Errorf("unsupported transport protocol %v", s.conn.TransportProtocol())
+		return fmt.Errorf("unsupported transport protocol %v", s.transportProtocol)
 	}
 
 	if !s.isClient && seg.metadata.Protocol() == openSessionRequest {
@@ -1012,7 +1018,7 @@ func (s *Session) inputData(seg *segment) error {
 					sessionID: s.id,
 					seq:       s.nextSend,
 				},
-				transport: s.conn.TransportProtocol(),
+				transport: s.transportProtocol,
 			}
 			s.nextSend++
 			if log.IsLevelEnabled(log.TraceLevel) {
@@ -1031,7 +1037,7 @@ func (s *Session) inputData(seg *segment) error {
 }
 
 func (s *Session) inputAck(seg *segment) error {
-	switch s.conn.TransportProtocol() {
+	switch s.transportProtocol {
 	case common.StreamTransport:
 		// Do nothing when receive ACK from TCP protocol.
 		return nil
@@ -1080,7 +1086,7 @@ func (s *Session) inputAck(seg *segment) error {
 		})
 		return nil
 	default:
-		return fmt.Errorf("unsupported transport protocol %v", s.conn.TransportProtocol())
+		return fmt.Errorf("unsupported transport protocol %v", s.transportProtocol)
 	}
 }
 
@@ -1098,7 +1104,7 @@ func (s *Session) inputClose(seg *segment) error {
 				statusCode: uint8(statusOK),
 				payloadLen: 0,
 			},
-			transport: s.conn.TransportProtocol(),
+			transport: s.transportProtocol,
 		}
 		s.nextSend++
 		// The response will not retry if it is not delivered.
@@ -1124,7 +1130,7 @@ func (s *Session) inputClose(seg *segment) error {
 }
 
 func (s *Session) output(seg *segment, remoteAddr net.Addr) error {
-	switch s.conn.TransportProtocol() {
+	switch s.transportProtocol {
 	case common.StreamTransport:
 		if err := s.conn.(*StreamUnderlay).writeOneSegment(seg); err != nil {
 			return fmt.Errorf("TCPUnderlay.writeOneSegment() failed: %v", err)
@@ -1141,7 +1147,7 @@ func (s *Session) output(seg *segment, remoteAddr net.Addr) error {
 			return nil
 		}
 	default:
-		return fmt.Errorf("unsupported transport protocol %v", s.conn.TransportProtocol())
+		return fmt.Errorf("unsupported transport protocol %v", s.transportProtocol)
 	}
 	s.lastSend, _ = seg.Seq()
 	s.lastTXTime = time.Now()
@@ -1175,7 +1181,7 @@ func (s *Session) closeWithError(err error) error {
 				seq:        closeRequestSeq,
 				statusCode: uint8(s.status),
 			},
-			transport: s.conn.TransportProtocol(),
+			transport: s.transportProtocol,
 		}
 		s.nextSend++
 

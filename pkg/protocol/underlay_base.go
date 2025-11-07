@@ -138,7 +138,6 @@ func (b *baseUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
 	}
 	s.conn = b
 	s.remoteAddr = remoteAddr
-	s.forwardStateTo(sessionAttached)
 
 	if s.isClient {
 		metrics.ActiveOpens.Add(1)
