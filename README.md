@@ -20,7 +20,11 @@ The mieru proxy software suite consists of two parts, a client software called m
 1. Supports multiple users sharing a single proxy server.
 1. Supports both IPv4 and IPv6.
 
-## Third Party Clients
+## Third Party Server Software
+
+- [mihomo](https://github.com/MetaCubeX/mihomo)
+
+## Third Party Client Software
 
 - Desktop (Windows, MacOS, Linux)
   - [Clash Verge Rev](https://www.clashverge.dev/)

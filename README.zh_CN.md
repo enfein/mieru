@@ -18,7 +18,11 @@ mieru 代理软件由称为 mieru【見える】的客户端软件和称为 mita
 1. 支持多个用户共享代理服务器。
 1. 支持 IPv4 和 IPv6。
 
-## 第三方客户端
+## 第三方服务器软件
+
+- [mihomo](https://github.com/MetaCubeX/mihomo)
+
+## 第三方客户端软件
 
 - 桌面 (Windows, MacOS, Linux)
   - [Clash Verge Rev](https://www.clashverge.dev/)
