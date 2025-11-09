@@ -36,9 +36,9 @@ sleep 1
 sleep 1
 
 # Run server test.
-# echo "========== BEGIN OF SERVER TEST =========="
-# ./test_server.sh
-# echo "==========  END OF SERVER TEST  =========="
+echo "========== BEGIN OF SERVER TEST =========="
+./test_server.sh
+echo "==========  END OF SERVER TEST  =========="
 
 # Run client TCP test.
 echo "========== BEGIN OF CLIENT TCP TEST =========="
