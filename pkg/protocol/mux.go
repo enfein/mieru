@@ -128,9 +128,12 @@ func (m *Mux) SetEndpoints(endpoints []UnderlayProperties) *Mux {
 			case <-m.done:
 				log.Infof("Unable to add new endpoint after multiplexer is closed")
 			default:
+				var wg sync.WaitGroup
 				for _, p := range new {
-					go m.acceptUnderlayLoop(m.ctx, p)
+					wg.Add(1)
+					go m.acceptUnderlayLoop(m.ctx, p, &wg)
 				}
+				wg.Wait()
 				m.endpoints = endpoints
 			}
 		} else {
@@ -289,9 +292,12 @@ func (m *Mux) Start() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.used = true
+	var wg sync.WaitGroup
 	for _, p := range m.endpoints {
-		go m.acceptUnderlayLoop(m.ctx, p)
+		wg.Add(1)
+		go m.acceptUnderlayLoop(m.ctx, p, &wg)
 	}
+	wg.Wait()
 	return nil
 }
 
@@ -379,13 +385,14 @@ func (m *Mux) newEndpoints(old, new []UnderlayProperties) []UnderlayProperties {
 	return newEndpoints
 }
 
-func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayProperties) {
+func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayProperties, wg *sync.WaitGroup) {
 	laddr := properties.LocalAddr().String()
 	if laddr == "" {
 		log.Errorf("Underlay local address is empty")
 		if m.acceptHasErr.CompareAndSwap(false, true) {
 			close(m.acceptErr)
 		}
+		wg.Done()
 		return
 	}
 
@@ -398,6 +405,7 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 			if m.acceptHasErr.CompareAndSwap(false, true) {
 				close(m.acceptErr)
 			}
+			wg.Done()
 			return
 		}
 		rawListener, err := m.streamListenerFactory.Listen(ctx, tcpAddr.Network(), tcpAddr.String())
@@ -406,8 +414,10 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 			if m.acceptHasErr.CompareAndSwap(false, true) {
 				close(m.acceptErr)
 			}
+			wg.Done()
 			return
 		}
+		wg.Done()
 		log.Infof("Mux is listening to endpoint %s %s", network, laddr)
 
 		// Close the rawListener if the master context is canceled.
@@ -471,6 +481,7 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 			if m.acceptHasErr.CompareAndSwap(false, true) {
 				close(m.acceptErr)
 			}
+			wg.Done()
 			return
 		}
 		conn, err := m.packetListenerFactory.ListenPacket(ctx, udpAddr.Network(), udpAddr.String())
@@ -479,9 +490,12 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 			if m.acceptHasErr.CompareAndSwap(false, true) {
 				close(m.acceptErr)
 			}
+			wg.Done()
 			return
 		}
+		wg.Done()
 		log.Infof("Mux is listening to endpoint %s %s", network, laddr)
+
 		underlay := &PacketUnderlay{
 			baseUnderlay:       *newBaseUnderlay(false, properties.MTU()),
 			conn:               conn,
@@ -531,6 +545,7 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 		if m.acceptHasErr.CompareAndSwap(false, true) {
 			close(m.acceptErr)
 		}
+		wg.Done()
 	}
 }
 
