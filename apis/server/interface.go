@@ -82,12 +82,12 @@ type ServerConfig struct {
 
 	// A listener factory to create stream-oriented network listeners.
 	//
-	// If this field is not set, a default listener factory is used.
+	// If this field is not set, a default stream listener factory is used.
 	StreamListenerFactory apicommon.StreamListenerFactory
 
 	// A listener factory to create packet-oriented network listeners.
 	//
-	// If this field is not set, a default listener factory is used.
+	// If this field is not set, a default packet listener factory is used.
 	PacketListenerFactory apicommon.PacketListenerFactory
 }
 

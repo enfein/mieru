@@ -20,9 +20,17 @@ import (
 	"net"
 )
 
-// Dial provides methods to establish stream oriented connections.
+// Dial provides methods to create stream oriented connections.
 type Dialer interface {
+	// It is recommended to use IP and port in address string.
 	DialContext(ctx context.Context, network, address string) (net.Conn, error)
 }
 
 var _ Dialer = (*net.Dialer)(nil)
+
+// PacketDialer provides methods to create packet oriented connections.
+type PacketDialer interface {
+	// It is recommended to use IP and port in laddr and raddr string.
+	// If laddr is an empty string, it will listen to a random port.
+	ListenPacket(ctx context.Context, network, laddr, raddr string) (net.PacketConn, error)
+}

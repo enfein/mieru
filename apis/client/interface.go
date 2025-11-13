@@ -92,10 +92,15 @@ type ClientConfig struct {
 	// Main configuration.
 	Profile *appctlpb.ClientProfile
 
-	// A dialer to connect to proxy server via stream-oriented network connections.
+	// A dialer to connect to proxy server via stream oriented network connections.
 	//
 	// If this field is not set, a default dialer is used.
 	Dialer apicommon.Dialer
+
+	// A dialer to connect to proxy server via packet oriented network connections.
+	//
+	// If this field is not set, a default dialer is used.
+	PacketDialer apicommon.PacketDialer
 
 	// If set, the resolver translates proxy server domain name into IP addresses.
 	//

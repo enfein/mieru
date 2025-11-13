@@ -48,6 +48,7 @@ type Mux struct {
 	endpoints             []UnderlayProperties
 	underlays             []Underlay
 	dialer                apicommon.Dialer
+	packetDialer          apicommon.PacketDialer
 	resolver              apicommon.DNSResolver
 	streamListenerFactory apicommon.StreamListenerFactory
 	packetListenerFactory apicommon.PacketListenerFactory
@@ -83,6 +84,7 @@ func NewMux(isClinet bool) *Mux {
 		isClient:              isClinet,
 		underlays:             make([]Underlay, 0),
 		dialer:                &net.Dialer{Timeout: 10 * time.Second, Control: sockopts.DefaultDialerControl()},
+		packetDialer:          common.UDPDialer{Control: sockopts.DefaultDialerControl()},
 		resolver:              &net.Resolver{},
 		streamListenerFactory: &net.ListenConfig{Control: sockopts.DefaultListenerControl()},
 		packetListenerFactory: &net.ListenConfig{Control: sockopts.DefaultListenerControl()},
@@ -153,6 +155,15 @@ func (m *Mux) SetDialer(dialer apicommon.Dialer) *Mux {
 	return m
 }
 
+// SetPacketDialer updates the packet dialer used by the mux.
+func (m *Mux) SetPacketDialer(packetDialer apicommon.PacketDialer) *Mux {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.packetDialer = packetDialer
+	log.Infof("Mux packet dialer has been updated")
+	return m
+}
+
 // SetResolver updates the DNS resolver used by the mux.
 func (m *Mux) SetResolver(resolver apicommon.DNSResolver) *Mux {
 	m.mu.Lock()
@@ -162,7 +173,7 @@ func (m *Mux) SetResolver(resolver apicommon.DNSResolver) *Mux {
 	return m
 }
 
-// SetStreamListenerFactory updates the stream-oriented network listener factory used by the mux.
+// SetStreamListenerFactory updates the stream oriented network listener factory used by the mux.
 func (m *Mux) SetStreamListenerFactory(listenerFactory apicommon.StreamListenerFactory) *Mux {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -171,7 +182,7 @@ func (m *Mux) SetStreamListenerFactory(listenerFactory apicommon.StreamListenerF
 	return m
 }
 
-// SetPacketListenerFactory updates the packet-oriented network listener factory used by the mux.
+// SetPacketListenerFactory updates the packet oriented network listener factory used by the mux.
 func (m *Mux) SetPacketListenerFactory(listenerFactory apicommon.PacketListenerFactory) *Mux {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -618,7 +629,7 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 		block.SetBlockContext(cipher.BlockContext{
 			UserName: m.username,
 		})
-		underlay, err = NewPacketUnderlay(ctx, m.packetListenerFactory, p.RemoteAddr().Network(), p.RemoteAddr().String(), p.MTU(), block, m.resolver)
+		underlay, err = NewPacketUnderlay(ctx, m.packetDialer, p.RemoteAddr().Network(), p.RemoteAddr().String(), p.MTU(), block, m.resolver)
 		if err != nil {
 			return nil, fmt.Errorf("NewUDPUnderlay() failed: %v", err)
 		}

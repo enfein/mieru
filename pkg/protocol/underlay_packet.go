@@ -66,7 +66,7 @@ var _ Underlay = &PacketUnderlay{}
 // "block" is the block encryption algorithm to encrypt packets.
 //
 // This function is only used by proxy client.
-func NewPacketUnderlay(ctx context.Context, packetListenerFactory apicommon.PacketListenerFactory, network, addr string, mtu int, block cipher.BlockCipher, resolver apicommon.DNSResolver) (*PacketUnderlay, error) {
+func NewPacketUnderlay(ctx context.Context, packetDialer apicommon.PacketDialer, network, addr string, mtu int, block cipher.BlockCipher, resolver apicommon.DNSResolver) (*PacketUnderlay, error) {
 	switch network {
 	case "udp", "udp4", "udp6":
 	default:
@@ -75,13 +75,12 @@ func NewPacketUnderlay(ctx context.Context, packetListenerFactory apicommon.Pack
 	if !block.IsStateless() {
 		return nil, fmt.Errorf("packet underlay block cipher must be stateless")
 	}
-	localAddr := &net.UDPAddr{}
 	remoteAddr, err := apicommon.ResolveUDPAddr(resolver, "udp", addr)
 	if err != nil {
 		return nil, fmt.Errorf("ResolveUDPAddr() failed: %w", err)
 	}
 
-	conn, err := packetListenerFactory.ListenPacket(ctx, network, localAddr.String())
+	conn, err := packetDialer.ListenPacket(ctx, network, "", remoteAddr.String())
 	if err != nil {
 		return nil, fmt.Errorf("ListenPacket() failed: %w", err)
 	}

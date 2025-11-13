@@ -527,7 +527,7 @@ var clientRunFunc = func(s []string) error {
 	if err != nil {
 		return fmt.Errorf(stderror.ClientGetActiveProfileFailedErr, err)
 	}
-	mux, err := appctlcommon.NewClientMuxFromProfile(activeProfile, nil, resolver)
+	mux, err := appctlcommon.NewClientMuxFromProfile(activeProfile, nil, nil, resolver)
 	if err != nil {
 		return err
 	}

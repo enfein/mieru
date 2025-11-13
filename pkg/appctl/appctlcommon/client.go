@@ -83,11 +83,14 @@ func ValidateClientConfigSingleProfile(profile *pb.ClientProfile) error {
 	return nil
 }
 
-func NewClientMuxFromProfile(activeProfile *pb.ClientProfile, dialer apicommon.Dialer, resolver apicommon.DNSResolver) (*protocol.Mux, error) {
+func NewClientMuxFromProfile(activeProfile *pb.ClientProfile, dialer apicommon.Dialer, packetDialer apicommon.PacketDialer, resolver apicommon.DNSResolver) (*protocol.Mux, error) {
 	var err error
 	mux := protocol.NewMux(true)
 	if dialer != nil {
 		mux.SetDialer(dialer)
+	}
+	if packetDialer != nil {
+		mux.SetPacketDialer(packetDialer)
 	}
 
 	// Set DNS resolver.
