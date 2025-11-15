@@ -67,7 +67,7 @@ func TestRTO(t *testing.T) {
 
 	// Reset measurement.
 	s.Reset()
-	if s.RTO() != 1000*time.Millisecond {
-		t.Errorf("RTO() = %v, want %v", s.RTO(), 1000*time.Millisecond)
+	if s.RTO() != 2000*time.Millisecond {
+		t.Errorf("RTO() = %v, want %v", s.RTO(), 2000*time.Millisecond)
 	}
 }

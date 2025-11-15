@@ -35,7 +35,7 @@ const (
 	oneMinusAlpha     = 1 - rttAlpha
 	rttBeta           = 0.25
 	oneMinusBeta      = 1 - rttBeta
-	defaultInitialRTT = 500 * time.Millisecond
+	defaultInitialRTT = time.Second
 	infDuration       = time.Duration(math.MaxInt64)
 )
 

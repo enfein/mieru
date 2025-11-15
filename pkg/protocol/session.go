@@ -57,7 +57,7 @@ const (
 	// Number of ack to trigger early retransmission.
 	earlyRetransmission = 3
 	// Maximum number of early retransmission attempt.
-	earlyRetransmissionLimit = 2
+	earlyRetransmissionLimit = 1
 	// Send timeout back off multiplier.
 	txTimeoutBackOff = 1.25
 	// Maximum back off multiplier.
@@ -685,6 +685,8 @@ func (s *Session) runOutputOncePacket() {
 	// Iterate all the segments in sendBuf to calculate bytesInFlight,
 	// but only resend segments if needed.
 	//
+	// Retransmission is not limited by window.
+	//
 	// To avoid deadlock, session can't be closed inside Ascend().
 	s.oLock.Lock()
 	totalTransmissionCount := 0
@@ -702,13 +704,6 @@ func (s *Session) runOutputOncePacket() {
 		}
 		satisfyEarlyRetransmission := iter.ackCount >= earlyRetransmission && iter.txCount <= earlyRetransmissionLimit
 		if satisfyEarlyRetransmission || time.Since(iter.txTime) > iter.txTimeout {
-			bbrCanSend := s.bbrSendAlgorithm.CanSend(bytesInFlight, int64(packetOverhead+len(iter.payload)))
-			congestionWindowCanSend := totalTransmissionCount < s.sendWindowSize()
-			if (!bbrCanSend) || (!congestionWindowCanSend) {
-				// Can't do more retransmission.
-				skipSendNewSegment = true
-				return false
-			}
 			if satisfyEarlyRetransmission {
 				hasLoss = true
 			} else {
@@ -733,11 +728,6 @@ func (s *Session) runOutputOncePacket() {
 			}
 			bytesInFlight += int64(packetOverhead + len(iter.payload))
 			totalTransmissionCount++
-			if totalTransmissionCount >= s.sendWindowSize() {
-				// Can't do more transmission.
-				skipSendNewSegment = true
-				return false
-			}
 			return true
 		}
 		return true
@@ -753,6 +743,7 @@ func (s *Session) runOutputOncePacket() {
 	}
 
 	// Send new segments in sendQueue.
+	skipSendNewSegment = skipSendNewSegment || totalTransmissionCount >= s.sendWindowSize()
 	if s.sendQueue.Len() > 0 && !skipSendNewSegment {
 		s.oLock.Lock()
 		for {
@@ -763,7 +754,7 @@ func (s *Session) runOutputOncePacket() {
 
 			seg, deleted := s.sendQueue.DeleteMinIf(func(iter *segment) bool {
 				bbrCanSend := s.bbrSendAlgorithm.CanSend(bytesInFlight, int64(packetOverhead+len(iter.payload)))
-				congestionWindowCanSend := totalTransmissionCount < int(s.remoteWindowSize)
+				congestionWindowCanSend := totalTransmissionCount < s.sendWindowSize()
 				return bbrCanSend && congestionWindowCanSend
 			})
 			if !deleted {
@@ -850,13 +841,7 @@ func (s *Session) runOutputOncePacket() {
 		} else {
 			seq, err := ackSeg.Seq()
 			if err != nil {
-				s.oLock.Unlock()
-				err = fmt.Errorf("failed to get sequence number from %v: %w", ackSeg, err)
-				log.Debugf("%v %v", s, err)
-				if s.outputHasErr.CompareAndSwap(false, true) {
-					close(s.outputErr)
-				}
-				s.closeWithError(err)
+				panic(fmt.Sprintf("failed to get sequence number from ack segment %v: %v", ackSeg, err))
 			} else {
 				s.oLock.Unlock()
 				newBytesInFlight := int64(packetOverhead + len(ackSeg.payload))
@@ -1247,7 +1232,7 @@ func (s *Session) closeWithError(err error) error {
 
 // sendWindowSize determines how many packets this session can send.
 func (s *Session) sendWindowSize() int {
-	return mathext.Min(int(s.cubicSendAlgorithm.CongestionWindowSize()), int(s.remoteWindowSize))
+	return mathext.Max(0, mathext.Min(int(s.cubicSendAlgorithm.CongestionWindowSize()), int(s.remoteWindowSize)))
 }
 
 // receiveWindowSize determines how many packets this session can receive.
