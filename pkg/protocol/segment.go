@@ -17,6 +17,7 @@ package protocol
 
 import (
 	"fmt"
+	"net"
 	"sync"
 	"time"
 
@@ -124,6 +125,12 @@ func (s *segment) String() string {
 
 func segmentLessFunc(a, b *segment) bool {
 	return a.Less(b)
+}
+
+// bufferWithAddr associate a raw network packet payload with a remote network address.
+type bufferWithAddr struct {
+	b    []byte
+	addr net.Addr
 }
 
 // segmentIterator processes the given segment.

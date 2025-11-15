@@ -49,6 +49,9 @@ type PacketUnderlay struct {
 	baseUnderlay
 	conn net.PacketConn
 
+	// packetQueue stores raw network packets payload not parsed to segments.
+	packetQueue chan bufferWithAddr
+
 	sessionCleanTicker *time.Ticker
 
 	// ---- client fields ----
@@ -87,6 +90,7 @@ func NewPacketUnderlay(ctx context.Context, packetDialer apicommon.PacketDialer,
 	u := &PacketUnderlay{
 		baseUnderlay:       *newBaseUnderlay(true, mtu),
 		conn:               conn,
+		packetQueue:        make(chan bufferWithAddr, packetChanCapacityClient),
 		sessionCleanTicker: time.NewTicker(sessionCleanInterval),
 		serverAddr:         remoteAddr,
 		block:              block,
@@ -168,6 +172,28 @@ func (u *PacketUnderlay) RunEventLoop(ctx context.Context) error {
 		return stderror.ErrNullPointer
 	}
 
+	// OS has limited buffer to store received UDP packets.
+	// Move the received UDP packets to user space as quickly as possible,
+	// so we can process them later at a slower pace.
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-u.done:
+				return
+			default:
+			}
+			if err := u.readOneSegment(); err != nil {
+				if stderror.IsTimeout(err) {
+					continue
+				}
+				log.Debugf("%v readOneSegment() failed: %v", u, err)
+				return
+			}
+		}
+	}()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -180,12 +206,9 @@ func (u *PacketUnderlay) RunEventLoop(ctx context.Context) error {
 			u.cleanSessions()
 		default:
 		}
-		seg, addr, err := u.readOneSegment()
+		seg, addr, err := u.parseOneSegment()
 		if err != nil {
-			if stderror.IsTimeout(err) {
-				continue
-			}
-			return fmt.Errorf("readOneSegment() failed: %w", err)
+			return fmt.Errorf("parseOneSegment() failed: %w", err)
 		}
 		if log.IsLevelEnabled(log.TraceLevel) {
 			log.Tracef("%v received %v from peer %v", u, seg, addr)
@@ -294,28 +317,29 @@ func (u *PacketUnderlay) onCloseSession(seg *segment) error {
 	return nil
 }
 
-func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
+func (u *PacketUnderlay) readOneSegment() error {
 	var n int
 	var addr net.Addr
 	var err error
 	for {
 		select {
 		case <-u.done:
-			return nil, nil, io.ErrClosedPipe
+			return io.ErrClosedPipe
 		default:
 		}
 
 		common.SetReadTimeout(u.conn, readOneSegmentTimeout)
 		defer common.SetReadTimeout(u.conn, 0)
+
 		// Peer may select a different MTU.
 		// Use the largest possible value here to avoid error.
 		b := make([]byte, 1500)
 		n, addr, err = u.conn.ReadFrom(b)
 		if err != nil {
 			if stderror.IsTimeout(err) {
-				return nil, nil, stderror.ErrTimeout
+				return stderror.ErrTimeout
 			}
-			return nil, nil, fmt.Errorf("ReadFrom() failed: %w", err)
+			return fmt.Errorf("ReadFrom() failed: %w", err)
 		}
 		if u.isClient && addr.String() != u.serverAddr.String() {
 			UnderlayUnsolicitedUDP.Add(1)
@@ -337,153 +361,171 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 		} else {
 			metrics.UploadBytes.Add(int64(n))
 		}
-
-		// Read encrypted metadata.
-		encryptedMeta := b[:packetNonHeaderPosition]
-		isNewSessionReplay := false
-		if packetReplayCache.IsDuplicate(encryptedMeta[:cipher.DefaultOverhead], addr.String()) {
-			replay.NewSession.Add(1)
-			isNewSessionReplay = true
+		u.packetQueue <- bufferWithAddr{
+			b:    b,
+			addr: addr,
 		}
-		nonce := encryptedMeta[:cipher.DefaultNonceSize]
+		return nil
+	}
+}
 
-		// Decrypt metadata.
-		var decryptedMeta []byte
-		var blockCipher cipher.BlockCipher
-		if u.isClient {
-			decryptedMeta, err = u.block.Decrypt(encryptedMeta)
-			cipher.ClientDirectDecrypt.Add(1)
-			if err != nil {
-				cipher.ClientFailedDirectDecrypt.Add(1)
-				if log.IsLevelEnabled(log.TraceLevel) {
-					log.Tracef("%v Decrypt() failed with packet from %v", u, addr)
-				}
-				continue
+func (u *PacketUnderlay) parseOneSegment() (*segment, net.Addr, error) {
+	var err error
+	for {
+		select {
+		case <-u.done:
+			return nil, nil, io.ErrClosedPipe
+		case raw := <-u.packetQueue:
+			b := raw.b
+			addr := raw.addr
+
+			// Read encrypted metadata.
+			encryptedMeta := b[:packetNonHeaderPosition]
+			isNewSessionReplay := false
+			if packetReplayCache.IsDuplicate(encryptedMeta[:cipher.DefaultOverhead], addr.String()) {
+				replay.NewSession.Add(1)
+				isNewSessionReplay = true
 			}
-		} else {
-			var decrypted bool
-			var err error
-			// Try existing sessions.
-			cipher.ServerIterateDecrypt.Add(1)
-			u.sessionMap.Range(func(k, v any) bool {
-				session := v.(*Session)
-				if session.block.Load() != nil && session.RemoteAddr().String() == addr.String() {
-					decryptedMeta, err = (*session.block.Load()).Decrypt(encryptedMeta)
-					if err == nil {
-						decrypted = true
-						blockCipher = *session.block.Load()
-						return false
+			nonce := encryptedMeta[:cipher.DefaultNonceSize]
+
+			// Decrypt metadata.
+			var decryptedMeta []byte
+			var blockCipher cipher.BlockCipher
+			if u.isClient {
+				decryptedMeta, err = u.block.Decrypt(encryptedMeta)
+				cipher.ClientDirectDecrypt.Add(1)
+				if err != nil {
+					cipher.ClientFailedDirectDecrypt.Add(1)
+					if log.IsLevelEnabled(log.TraceLevel) {
+						log.Tracef("%v Decrypt() failed with packet from %v", u, addr)
+					}
+					continue
+				}
+			} else {
+				var decrypted bool
+				var err error
+				// Try existing sessions.
+				cipher.ServerIterateDecrypt.Add(1)
+				u.sessionMap.Range(func(k, v any) bool {
+					session := v.(*Session)
+					if session.block.Load() != nil && session.RemoteAddr().String() == addr.String() {
+						decryptedMeta, err = (*session.block.Load()).Decrypt(encryptedMeta)
+						if err == nil {
+							decrypted = true
+							blockCipher = *session.block.Load()
+							return false
+						}
+					}
+					return true
+				})
+				if !decrypted {
+					// This is a new session. Try all registered users.
+					for _, user := range u.users {
+						var password []byte
+						password, err = hex.DecodeString(user.GetHashedPassword())
+						if err != nil {
+							log.Debugf("Unable to decode hashed password %q from user %q", user.GetHashedPassword(), user.GetName())
+							continue
+						}
+						if len(password) == 0 {
+							password = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
+						}
+						blockCipher, decryptedMeta, err = cipher.TryDecrypt(encryptedMeta, password, true)
+						if err == nil {
+							decrypted = true
+							blockCipher.SetBlockContext(cipher.BlockContext{
+								UserName: user.GetName(),
+							})
+							break
+						}
 					}
 				}
-				return true
-			})
-			if !decrypted {
-				// This is a new session. Try all registered users.
-				for _, user := range u.users {
-					var password []byte
-					password, err = hex.DecodeString(user.GetHashedPassword())
-					if err != nil {
-						log.Debugf("Unable to decode hashed password %q from user %q", user.GetHashedPassword(), user.GetName())
+				if !decrypted {
+					cipher.ServerFailedIterateDecrypt.Add(1)
+					if isNewSessionReplay {
+						log.Debugf("found possible replay attack in %v from %v", u, addr)
+					} else if log.IsLevelEnabled(log.TraceLevel) {
+						log.Tracef("%v TryDecrypt() failed with packet from %v", u, addr)
+					}
+					continue
+				} else {
+					if blockCipher == nil {
+						panic("PacketUnderlay parseOneSegment(): block cipher is nil after decryption is successful")
+					}
+					if isNewSessionReplay {
+						replay.NewSessionDecrypted.Add(1)
+						log.Debugf("found possible replay attack with payload decrypted in %v from %v", u, addr)
 						continue
 					}
-					if len(password) == 0 {
-						password = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
-					}
-					blockCipher, decryptedMeta, err = cipher.TryDecrypt(encryptedMeta, password, true)
-					if err == nil {
-						decrypted = true
-						blockCipher.SetBlockContext(cipher.BlockContext{
-							UserName: user.GetName(),
-						})
-						break
-					}
 				}
 			}
-			if !decrypted {
-				cipher.ServerFailedIterateDecrypt.Add(1)
-				if isNewSessionReplay {
-					log.Debugf("found possible replay attack in %v from %v", u, addr)
-				} else if log.IsLevelEnabled(log.TraceLevel) {
-					log.Tracef("%v TryDecrypt() failed with packet from %v", u, addr)
-				}
+			if len(decryptedMeta) != MetadataLength {
+				log.Debugf("decrypted metadata size %d is unexpected", len(decryptedMeta))
 				continue
-			} else {
-				if blockCipher == nil {
-					panic("PacketUnderlay readOneSegment(): block cipher is nil after decryption is successful")
-				}
-				if isNewSessionReplay {
-					replay.NewSessionDecrypted.Add(1)
-					log.Debugf("found possible replay attack with payload decrypted in %v from %v", u, addr)
-					continue
-				}
 			}
-		}
-		if len(decryptedMeta) != MetadataLength {
-			log.Debugf("decrypted metadata size %d is unexpected", len(decryptedMeta))
-			continue
-		}
 
-		// Read payload and construct segment.
-		var seg *segment
-		p := decryptedMeta[0]
-		if isSessionProtocol(protocolType(p)) {
-			ss := &sessionStruct{}
-			if err := ss.Unmarshal(decryptedMeta); err != nil {
-				if u.isClient {
-					return nil, nil, fmt.Errorf("Unmarshal() to sessionStruct failed: %w", err)
-				} else {
-					log.Debugf("%v Unmarshal() to sessionStruct failed: %v", u, err)
-					continue
+			// Read payload and construct segment.
+			var seg *segment
+			p := decryptedMeta[0]
+			if isSessionProtocol(protocolType(p)) {
+				ss := &sessionStruct{}
+				if err := ss.Unmarshal(decryptedMeta); err != nil {
+					if u.isClient {
+						return nil, nil, fmt.Errorf("Unmarshal() to sessionStruct failed: %w", err)
+					} else {
+						log.Debugf("%v Unmarshal() to sessionStruct failed: %v", u, err)
+						continue
+					}
 				}
-			}
-			seg, err = u.readSessionSegment(ss, nonce, b[packetNonHeaderPosition:], blockCipher)
-			if err != nil {
-				if u.isClient {
-					return nil, nil, err
-				} else {
-					log.Debugf("%v readSessionSegment() failed: %v", u, err)
-					continue
+				seg, err = u.parseSessionSegment(ss, nonce, b[packetNonHeaderPosition:], blockCipher)
+				if err != nil {
+					if u.isClient {
+						return nil, nil, err
+					} else {
+						log.Debugf("%v parseSessionSegment() failed: %v", u, err)
+						continue
+					}
 				}
-			}
-			if blockCipher != nil {
-				seg.block = blockCipher
-			}
-			return seg, addr, nil
-		} else if isDataAckProtocol(protocolType(p)) {
-			das := &dataAckStruct{}
-			if err := das.Unmarshal(decryptedMeta); err != nil {
-				if u.isClient {
-					return nil, nil, fmt.Errorf("Unmarshal() to dataAckStruct failed: %w", err)
-				} else {
-					log.Debugf("%v Unmarshal() to dataAckStruct failed: %v", u, err)
-					continue
+				if blockCipher != nil {
+					seg.block = blockCipher
 				}
-			}
-			seg, err = u.readDataAckSegment(das, nonce, b[packetNonHeaderPosition:], blockCipher)
-			if err != nil {
-				if u.isClient {
-					return nil, nil, err
-				} else {
-					log.Debugf("%v readDataAckSegment() failed: %v", u, err)
-					continue
+				return seg, addr, nil
+			} else if isDataAckProtocol(protocolType(p)) {
+				das := &dataAckStruct{}
+				if err := das.Unmarshal(decryptedMeta); err != nil {
+					if u.isClient {
+						return nil, nil, fmt.Errorf("Unmarshal() to dataAckStruct failed: %w", err)
+					} else {
+						log.Debugf("%v Unmarshal() to dataAckStruct failed: %v", u, err)
+						continue
+					}
 				}
-			}
-			if blockCipher != nil {
-				seg.block = blockCipher
-			}
-			return seg, addr, nil
-		} else {
-			if u.isClient {
-				return nil, nil, fmt.Errorf("unable to handle protocol %d", p)
+				seg, err = u.parseDataAckSegment(das, nonce, b[packetNonHeaderPosition:], blockCipher)
+				if err != nil {
+					if u.isClient {
+						return nil, nil, err
+					} else {
+						log.Debugf("%v parseDataAckSegment() failed: %v", u, err)
+						continue
+					}
+				}
+				if blockCipher != nil {
+					seg.block = blockCipher
+				}
+				return seg, addr, nil
 			} else {
-				log.Debugf("%v unable to handle protocol %d", u, p)
-				continue
+				if u.isClient {
+					return nil, nil, fmt.Errorf("unable to handle protocol %d", p)
+				} else {
+					log.Debugf("%v unable to handle protocol %d", u, p)
+					continue
+				}
 			}
 		}
 	}
 }
 
-func (u *PacketUnderlay) readSessionSegment(ss *sessionStruct, nonce, remaining []byte, blockCipher cipher.BlockCipher) (*segment, error) {
+func (u *PacketUnderlay) parseSessionSegment(ss *sessionStruct, nonce, remaining []byte, blockCipher cipher.BlockCipher) (*segment, error) {
 	var decryptedPayload []byte
 	var err error
 
@@ -529,7 +571,7 @@ func (u *PacketUnderlay) readSessionSegment(ss *sessionStruct, nonce, remaining 
 	}, nil
 }
 
-func (u *PacketUnderlay) readDataAckSegment(das *dataAckStruct, nonce, remaining []byte, blockCipher cipher.BlockCipher) (*segment, error) {
+func (u *PacketUnderlay) parseDataAckSegment(das *dataAckStruct, nonce, remaining []byte, blockCipher cipher.BlockCipher) (*segment, error) {
 	var decryptedPayload []byte
 	var err error
 

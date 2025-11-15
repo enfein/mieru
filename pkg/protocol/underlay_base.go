@@ -30,8 +30,14 @@ import (
 )
 
 const (
-	sessionChanCapacity  = 64
+	// Number of ready sessions before they are consumed by Accept().
+	sessionChanCapacity = 64
+
 	sessionCleanInterval = 5 * time.Second
+
+	// Buffer received network packets before they are dropped by OS kernel.
+	packetChanCapacityClient = 4 * 1024
+	packetChanCapacityServer = 16 * 1024
 )
 
 // baseUnderlay contains a partial implementation of underlay.

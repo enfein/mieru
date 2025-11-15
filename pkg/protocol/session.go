@@ -54,11 +54,14 @@ const (
 	serverRespTimeout        = 10 * time.Second
 	sessionHeartbeatInterval = 5 * time.Second
 
-	earlyRetransmission        = 3    // number of ack to trigger early retransmission
-	earlyRetransmissionLimit   = 2    // maximum number of early retransmission attempt
-	maxRetransmissionBatchSize = 16   // maximum number of segments in a retransmission batch
-	txTimeoutBackOff           = 1.25 // tx timeout back off multiplier
-	maxBackOffMultiplier       = 20.0 // maximum back off multiplier
+	// Number of ack to trigger early retransmission.
+	earlyRetransmission = 3
+	// Maximum number of early retransmission attempt.
+	earlyRetransmissionLimit = 2
+	// Send timeout back off multiplier.
+	txTimeoutBackOff = 1.25
+	// Maximum back off multiplier.
+	maxBackOffMultiplier = 20.0
 )
 
 type sessionState byte
@@ -127,10 +130,10 @@ type Session struct {
 	uploadBytes   metrics.Metric // number of bytes from client to server, only used by server
 	downloadBytes metrics.Metric // number of bytes from server to client, only used by server
 
-	rttStat             *congestion.RTTStats
-	legacysendAlgorithm *congestion.CubicSendAlgorithm
-	sendAlgorithm       *congestion.BBRSender
-	remoteWindowSize    uint16
+	rttStat            *congestion.RTTStats
+	cubicSendAlgorithm *congestion.CubicSendAlgorithm
+	bbrSendAlgorithm   *congestion.BBRSender
+	remoteWindowSize   uint16
 
 	wg    sync.WaitGroup
 	rLock sync.Mutex // serialize application read
@@ -153,31 +156,31 @@ func NewSession(id uint32, isClient bool, mtu int, users map[string]*appctlpb.Us
 	rttStat.SetMaxAckDelay(periodicOutputInterval)
 	rttStat.SetRTOMultiplier(txTimeoutBackOff)
 	return &Session{
-		conn:                nil,
-		block:               atomic.Pointer[cipher.BlockCipher]{},
-		id:                  id,
-		isClient:            isClient,
-		mtu:                 mtu,
-		state:               sessionInit,
-		status:              statusOK,
-		users:               users,
-		ready:               make(chan struct{}),
-		closedChan:          make(chan struct{}),
-		readDeadline:        time.Time{},
-		writeDeadline:       time.Time{},
-		inputErr:            make(chan error),
-		outputErr:           make(chan error),
-		sendQueue:           newSegmentTree(segmentTreeCapacity),
-		sendBuf:             newSegmentTree(segmentTreeCapacity),
-		recvBuf:             newSegmentTree(segmentTreeCapacity),
-		recvQueue:           newSegmentTree(segmentTreeRecvQueueCapacity),
-		recvChan:            make(chan *segment, segmentChanCapacity),
-		lastRXTime:          time.Now(),
-		lastTXTime:          time.Now(),
-		rttStat:             rttStat,
-		legacysendAlgorithm: congestion.NewCubicSendAlgorithm(minWindowSize, maxWindowSize),
-		sendAlgorithm:       congestion.NewBBRSender(fmt.Sprintf("%d", id), rttStat),
-		remoteWindowSize:    minWindowSize,
+		conn:               nil,
+		block:              atomic.Pointer[cipher.BlockCipher]{},
+		id:                 id,
+		isClient:           isClient,
+		mtu:                mtu,
+		state:              sessionInit,
+		status:             statusOK,
+		users:              users,
+		ready:              make(chan struct{}),
+		closedChan:         make(chan struct{}),
+		readDeadline:       time.Time{},
+		writeDeadline:      time.Time{},
+		inputErr:           make(chan error),
+		outputErr:          make(chan error),
+		sendQueue:          newSegmentTree(segmentTreeCapacity),
+		sendBuf:            newSegmentTree(segmentTreeCapacity),
+		recvBuf:            newSegmentTree(segmentTreeCapacity),
+		recvQueue:          newSegmentTree(segmentTreeRecvQueueCapacity),
+		recvChan:           make(chan *segment, segmentChanCapacity),
+		lastRXTime:         time.Now(),
+		lastTXTime:         time.Now(),
+		rttStat:            rttStat,
+		cubicSendAlgorithm: congestion.NewCubicSendAlgorithm(minWindowSize, maxWindowSize),
+		bbrSendAlgorithm:   congestion.NewBBRSender(fmt.Sprintf("%d", id), rttStat),
+		remoteWindowSize:   minWindowSize,
 	}
 }
 
@@ -535,7 +538,7 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 				sessionID:  s.id,
 				seq:        s.nextSend,
 				unAckSeq:   s.nextRecv,
-				windowSize: uint16(mathext.Max(0, int(s.legacysendAlgorithm.CongestionWindowSize())-s.recvBuf.Len())),
+				windowSize: uint16(s.receiveWindowSize()),
 				fragment:   uint8(i),
 				payloadLen: uint16(partLen),
 			},
@@ -680,11 +683,12 @@ func (s *Session) runOutputOncePacket() {
 	// Resend segments in sendBuf.
 	//
 	// Iterate all the segments in sendBuf to calculate bytesInFlight,
-	// but only resend first a few segments if needed.
+	// but only resend segments if needed.
 	//
 	// To avoid deadlock, session can't be closed inside Ascend().
 	s.oLock.Lock()
-	retransmissionCount := 0
+	totalTransmissionCount := 0
+	skipSendNewSegment := s.sendWindowSize() <= 0
 	s.sendBuf.Ascend(func(iter *segment) bool {
 		bytesInFlight += int64(packetOverhead + len(iter.payload))
 		if iter.txCount >= txCountLimit {
@@ -696,8 +700,16 @@ func (s *Session) runOutputOncePacket() {
 			closeSessionReason = err
 			return false
 		}
-		if retransmissionCount <= maxRetransmissionBatchSize && ((iter.ackCount >= earlyRetransmission && iter.txCount <= earlyRetransmissionLimit) || time.Since(iter.txTime) > iter.txTimeout) {
-			if iter.ackCount >= earlyRetransmission {
+		satisfyEarlyRetransmission := iter.ackCount >= earlyRetransmission && iter.txCount <= earlyRetransmissionLimit
+		if satisfyEarlyRetransmission || time.Since(iter.txTime) > iter.txTimeout {
+			bbrCanSend := s.bbrSendAlgorithm.CanSend(bytesInFlight, int64(packetOverhead+len(iter.payload)))
+			congestionWindowCanSend := totalTransmissionCount < s.sendWindowSize()
+			if (!bbrCanSend) || (!congestionWindowCanSend) {
+				// Can't do more retransmission.
+				skipSendNewSegment = true
+				return false
+			}
+			if satisfyEarlyRetransmission {
 				hasLoss = true
 			} else {
 				hasTimeout = true
@@ -720,7 +732,12 @@ func (s *Session) runOutputOncePacket() {
 				return false
 			}
 			bytesInFlight += int64(packetOverhead + len(iter.payload))
-			retransmissionCount++
+			totalTransmissionCount++
+			if totalTransmissionCount >= s.sendWindowSize() {
+				// Can't do more transmission.
+				skipSendNewSegment = true
+				return false
+			}
 			return true
 		}
 		return true
@@ -729,12 +746,14 @@ func (s *Session) runOutputOncePacket() {
 	if closeSessionReason != nil {
 		s.closeWithError(closeSessionReason)
 	}
-	if hasLoss || hasTimeout {
-		s.legacysendAlgorithm.OnLoss() // OnTimeout() is too aggressive.
+	if hasTimeout {
+		s.cubicSendAlgorithm.OnTimeout()
+	} else if hasLoss {
+		s.cubicSendAlgorithm.OnLoss()
 	}
 
 	// Send new segments in sendQueue.
-	if s.sendQueue.Len() > 0 {
+	if s.sendQueue.Len() > 0 && !skipSendNewSegment {
 		s.oLock.Lock()
 		for {
 			if s.sendBuf.Remaining() <= 1 {
@@ -743,7 +762,9 @@ func (s *Session) runOutputOncePacket() {
 			}
 
 			seg, deleted := s.sendQueue.DeleteMinIf(func(iter *segment) bool {
-				return s.sendAlgorithm.CanSend(bytesInFlight, int64(packetOverhead+len(iter.payload)))
+				bbrCanSend := s.bbrSendAlgorithm.CanSend(bytesInFlight, int64(packetOverhead+len(iter.payload)))
+				congestionWindowCanSend := totalTransmissionCount < int(s.remoteWindowSize)
+				return bbrCanSend && congestionWindowCanSend
 			})
 			if !deleted {
 				s.oLock.Unlock()
@@ -789,15 +810,17 @@ func (s *Session) runOutputOncePacket() {
 					break
 				}
 				newBytesInFlight := int64(packetOverhead + len(seg.payload))
-				s.sendAlgorithm.OnPacketSent(time.Now(), bytesInFlight, int64(seq), newBytesInFlight, true)
+				s.bbrSendAlgorithm.OnPacketSent(time.Now(), bytesInFlight, int64(seq), newBytesInFlight, true)
 				bytesInFlight += newBytesInFlight
+				totalTransmissionCount++
 			}
 		}
 	} else {
-		s.sendAlgorithm.OnApplicationLimited(bytesInFlight)
+		s.bbrSendAlgorithm.OnApplicationLimited(bytesInFlight)
 	}
 
 	// Send ACK or heartbeat if needed.
+	// ACK is not limited by window.
 	exceedHeartbeatInterval := time.Since(s.lastTXTime) > sessionHeartbeatInterval
 	if s.ackOnDataRecv.Load() || exceedHeartbeatInterval {
 		baseStruct := baseStruct{}
@@ -813,7 +836,7 @@ func (s *Session) runOutputOncePacket() {
 				sessionID:  s.id,
 				seq:        uint32(mathext.Max(0, int(s.nextSend)-1)),
 				unAckSeq:   s.nextRecv,
-				windowSize: uint16(mathext.Max(0, int(s.legacysendAlgorithm.CongestionWindowSize())-s.recvBuf.Len())),
+				windowSize: uint16(s.receiveWindowSize()),
 			},
 			transport: s.transportProtocol}
 		if err := s.output(ackSeg, s.RemoteAddr()); err != nil {
@@ -837,7 +860,7 @@ func (s *Session) runOutputOncePacket() {
 			} else {
 				s.oLock.Unlock()
 				newBytesInFlight := int64(packetOverhead + len(ackSeg.payload))
-				s.sendAlgorithm.OnPacketSent(time.Now(), bytesInFlight, int64(seq), newBytesInFlight, true)
+				s.bbrSendAlgorithm.OnPacketSent(time.Now(), bytesInFlight, int64(seq), newBytesInFlight, true)
 				bytesInFlight += newBytesInFlight
 			}
 		}
@@ -936,7 +959,7 @@ func (s *Session) inputData(seg *segment) error {
 					break
 				}
 				s.rttStat.UpdateRTT(time.Since(seg2.txTime))
-				s.legacysendAlgorithm.OnAck()
+				s.cubicSendAlgorithm.OnAck()
 				seq, _ := seg2.Seq()
 				ackedPackets = append(ackedPackets, congestion.AckedPacketInfo{
 					PacketNumber:     int64(seq),
@@ -945,7 +968,7 @@ func (s *Session) inputData(seg *segment) error {
 				})
 			}
 			if len(ackedPackets) > 0 {
-				s.sendAlgorithm.OnCongestionEvent(priorInFlight, time.Now(), ackedPackets, nil)
+				s.bbrSendAlgorithm.OnCongestionEvent(priorInFlight, time.Now(), ackedPackets, nil)
 			}
 			s.remoteWindowSize = das.windowSize
 		}
@@ -1060,7 +1083,7 @@ func (s *Session) inputAck(seg *segment) error {
 				break
 			}
 			s.rttStat.UpdateRTT(time.Since(seg2.txTime))
-			s.legacysendAlgorithm.OnAck()
+			s.cubicSendAlgorithm.OnAck()
 			seq, _ := seg2.Seq()
 			ackedPackets = append(ackedPackets, congestion.AckedPacketInfo{
 				PacketNumber:     int64(seq),
@@ -1069,7 +1092,7 @@ func (s *Session) inputAck(seg *segment) error {
 			})
 		}
 		if len(ackedPackets) > 0 {
-			s.sendAlgorithm.OnCongestionEvent(priorInFlight, time.Now(), ackedPackets, nil)
+			s.bbrSendAlgorithm.OnCongestionEvent(priorInFlight, time.Now(), ackedPackets, nil)
 		}
 		s.remoteWindowSize = das.windowSize
 
@@ -1220,6 +1243,24 @@ func (s *Session) closeWithError(err error) error {
 	log.Debugf("Closed %v", s)
 	metrics.CurrEstablished.Add(-1)
 	return nil
+}
+
+// sendWindowSize determines how many packets this session can send.
+func (s *Session) sendWindowSize() int {
+	return mathext.Min(int(s.cubicSendAlgorithm.CongestionWindowSize()), int(s.remoteWindowSize))
+}
+
+// receiveWindowSize determines how many packets this session can receive.
+func (s *Session) receiveWindowSize() int {
+	var underlayWaitingPackets int
+	if s.conn != nil {
+		packetUnderlay, ok := s.conn.(*PacketUnderlay)
+		if ok {
+			// Other packets sharing the same UDP socket reduce the congestion window.
+			underlayWaitingPackets = len(packetUnderlay.packetQueue)
+		}
+	}
+	return mathext.Max(0, int(s.cubicSendAlgorithm.CongestionWindowSize())-s.recvBuf.Len()-underlayWaitingPackets)
 }
 
 func (s *Session) checkQuota(userName string) (ok bool, err error) {

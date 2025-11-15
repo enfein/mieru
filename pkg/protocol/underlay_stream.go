@@ -46,7 +46,7 @@ type StreamUnderlay struct {
 	send cipher.BlockCipher
 	recv cipher.BlockCipher
 
-	// Candidates are block ciphers that can be used to encrypt or decrypt data.
+	// candidates are block ciphers that can be used to encrypt or decrypt data.
 	// When isClient is true, there must be exactly 1 element in the slice.
 	candidates []cipher.BlockCipher
 
