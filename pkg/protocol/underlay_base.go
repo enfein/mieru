@@ -37,7 +37,7 @@ const (
 
 	// Buffer received network packets before they are dropped by OS kernel.
 	packetChanCapacityClient = 4 * 1024
-	packetChanCapacityServer = 16 * 1024
+	packetChanCapacityServer = 4 * 1024
 )
 
 // baseUnderlay contains a partial implementation of underlay.

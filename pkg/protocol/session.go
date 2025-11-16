@@ -59,9 +59,9 @@ const (
 	// Maximum number of early retransmission attempt.
 	earlyRetransmissionLimit = 1
 	// Send timeout back off multiplier.
-	txTimeoutBackOff = 1.25
+	txTimeoutBackOff = 1.5
 	// Maximum back off multiplier.
-	maxBackOffMultiplier = 20.0
+	maxBackOffDuration = 10 * time.Second
 )
 
 type sessionState byte
@@ -690,7 +690,6 @@ func (s *Session) runOutputOncePacket() {
 	// To avoid deadlock, session can't be closed inside Ascend().
 	s.oLock.Lock()
 	totalTransmissionCount := 0
-	skipSendNewSegment := s.sendWindowSize() <= 0
 	s.sendBuf.Ascend(func(iter *segment) bool {
 		bytesInFlight += int64(packetOverhead + len(iter.payload))
 		if iter.txCount >= txCountLimit {
@@ -712,7 +711,7 @@ func (s *Session) runOutputOncePacket() {
 			iter.ackCount = 0
 			iter.txCount++
 			iter.txTime = time.Now()
-			iter.txTimeout = s.rttStat.RTO() * time.Duration(mathext.Min(math.Pow(txTimeoutBackOff, float64(iter.txCount)), maxBackOffMultiplier))
+			iter.txTimeout = mathext.Min(s.rttStat.RTO()*time.Duration(math.Pow(txTimeoutBackOff, float64(iter.txCount))), maxBackOffDuration)
 			if isDataAckProtocol(iter.metadata.Protocol()) {
 				das, _ := toDataAckStruct(iter.metadata)
 				das.unAckSeq = s.nextRecv
@@ -743,7 +742,7 @@ func (s *Session) runOutputOncePacket() {
 	}
 
 	// Send new segments in sendQueue.
-	skipSendNewSegment = skipSendNewSegment || totalTransmissionCount >= s.sendWindowSize()
+	skipSendNewSegment := s.sendWindowSize() <= 0
 	if s.sendQueue.Len() > 0 && !skipSendNewSegment {
 		s.oLock.Lock()
 		for {
@@ -764,7 +763,7 @@ func (s *Session) runOutputOncePacket() {
 
 			seg.txCount++
 			seg.txTime = time.Now()
-			seg.txTimeout = s.rttStat.RTO() * time.Duration(mathext.Min(math.Pow(txTimeoutBackOff, float64(seg.txCount)), maxBackOffMultiplier))
+			seg.txTimeout = mathext.Min(s.rttStat.RTO()*time.Duration(math.Pow(txTimeoutBackOff, float64(seg.txCount))), maxBackOffDuration)
 			if isDataAckProtocol(seg.metadata.Protocol()) {
 				das, _ := toDataAckStruct(seg.metadata)
 				das.unAckSeq = s.nextRecv
@@ -1230,12 +1229,12 @@ func (s *Session) closeWithError(err error) error {
 	return nil
 }
 
-// sendWindowSize determines how many packets this session can send.
+// sendWindowSize determines how many more packets this session can send.
 func (s *Session) sendWindowSize() int {
-	return mathext.Max(0, mathext.Min(int(s.cubicSendAlgorithm.CongestionWindowSize()), int(s.remoteWindowSize)))
+	return mathext.Max(0, mathext.Min(int(s.cubicSendAlgorithm.CongestionWindowSize())-s.sendBuf.Len(), int(s.remoteWindowSize)))
 }
 
-// receiveWindowSize determines how many packets this session can receive.
+// receiveWindowSize determines how many more packets this session can receive.
 func (s *Session) receiveWindowSize() int {
 	var underlayWaitingPackets int
 	if s.conn != nil {
