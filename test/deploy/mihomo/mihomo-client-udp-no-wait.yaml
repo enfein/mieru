@@ -1,0 +1,19 @@
+dns:
+  enable: true
+  nameserver:
+    - 8.8.8.8
+log-level: warning
+mixed-port: 1084
+mode: rule
+proxies:
+  - name: mieru
+    type: mieru
+    server: 127.0.0.1
+    port-range: 8964-8965
+    transport: UDP
+    udp: true
+    username: baozi
+    password: manlianpenfen
+    handshake-mode: HANDSHAKE_NO_WAIT
+rules:
+  - MATCH,mieru

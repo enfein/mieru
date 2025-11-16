@@ -36,8 +36,8 @@ const (
 	sessionCleanInterval = 5 * time.Second
 
 	// Buffer received network packets before they are dropped by OS kernel.
-	packetChanCapacityClient = 4 * 1024
-	packetChanCapacityServer = 4 * 1024
+	packetChanCapacityClient = segmentTreeCapacity
+	packetChanCapacityServer = segmentTreeCapacity
 )
 
 // baseUnderlay contains a partial implementation of underlay.

@@ -54,6 +54,14 @@ const (
 	serverRespTimeout        = 10 * time.Second
 	sessionHeartbeatInterval = 5 * time.Second
 
+	// periodicOutputInterval triggers periodic output of packet transport,
+	// even if there is no new data to send.
+	periodicOutputInterval = 1 * time.Millisecond
+
+	// backPressureDelay is a short sleep to add back pressure
+	// to the writer.
+	backPressureDelay = 100 * time.Microsecond
+
 	// Number of ack to trigger early retransmission.
 	earlyRetransmission = 3
 	// Maximum number of early retransmission attempt.
@@ -1236,15 +1244,7 @@ func (s *Session) sendWindowSize() int {
 
 // receiveWindowSize determines how many more packets this session can receive.
 func (s *Session) receiveWindowSize() int {
-	var underlayWaitingPackets int
-	if s.conn != nil {
-		packetUnderlay, ok := s.conn.(*PacketUnderlay)
-		if ok {
-			// Other packets sharing the same UDP socket reduce the congestion window.
-			underlayWaitingPackets = len(packetUnderlay.packetQueue)
-		}
-	}
-	return mathext.Max(0, int(s.cubicSendAlgorithm.CongestionWindowSize())-s.recvBuf.Len()-underlayWaitingPackets)
+	return mathext.Max(0, int(s.cubicSendAlgorithm.CongestionWindowSize())-s.recvBuf.Len())
 }
 
 func (s *Session) checkQuota(userName string) (ok bool, err error) {

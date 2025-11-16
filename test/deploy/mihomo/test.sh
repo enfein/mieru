@@ -40,10 +40,10 @@ echo "========== BEGIN OF SERVER TEST =========="
 ./test_server.sh
 echo "==========  END OF SERVER TEST  =========="
 
-# Run client TCP test.
-echo "========== BEGIN OF CLIENT TCP TEST =========="
-./test_client_tcp.sh
-echo "==========  END OF CLIENT TCP TEST  =========="
+# Run client test.
+echo "========== BEGIN OF CLIENT TEST =========="
+./test_client.sh
+echo "==========  END OF CLIENT TEST  =========="
 
 echo "Test is successful."
 sleep 1

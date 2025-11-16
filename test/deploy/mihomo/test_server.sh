@@ -23,10 +23,12 @@ source ./libtest.sh
 
 function run_new_conn_test() {
     local config="$1"
+    local port="$2"
+
     sleep 1
     echo ">>> socks5 - new connections with mihomo server - $config <<<"
     ./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
-      -local_proxy_host=127.0.0.1 -local_proxy_port=1082 \
+      -local_proxy_host=127.0.0.1 -local_proxy_port=${port} \
       -test_case=new_conn -num_request=3000
     if [ "$?" -ne "0" ]; then
         print_mieru_client_log
@@ -37,10 +39,12 @@ function run_new_conn_test() {
 
 function run_udp_associate_test() {
     local config="$1"
+    local port="$2"
+
     sleep 1
     echo ">>> socks5 UDP associate - with mihomo server - $config <<<"
     ./socksudpclient -dst_host=127.0.0.1 -dst_port=9090 \
-      -local_proxy_host=127.0.0.1 -local_proxy_port=1082 \
+      -local_proxy_host=127.0.0.1 -local_proxy_port=${port} \
       -interval_ms=10 -num_request=100 -num_conn=30
     if [ "$?" -ne "0" ]; then
         print_mieru_client_log
@@ -50,7 +54,8 @@ function run_udp_associate_test() {
 }
 
 function test_mieru_with_config() {
-    config="$1"
+    local config="$1"
+    local port="$2"
 
     # Update mieru client with TCP config.
     ./mieru apply config $config
@@ -69,8 +74,8 @@ function test_mieru_with_config() {
     fi
 
     # Start testing.
-    run_new_conn_test "$config"
-    run_udp_associate_test "$config"
+    run_new_conn_test "${config}" "${port}"
+    run_udp_associate_test "${config}" "${port}"
 
     # Stop mieru client.
     ./mieru stop
@@ -87,11 +92,12 @@ function test_mieru_with_config() {
 ./mihomo -f mihomo-server.yaml &
 sleep 1
 
-test_mieru_with_config client_tcp.json
-test_mieru_with_config client_tcp_no_wait.json
-test_mieru_with_config client_udp.json
-test_mieru_with_config client_udp_no_wait.json
+echo "========== BEGIN OF SERVER TCP TEST =========="
+test_mieru_with_config client_tcp.json 1082
+test_mieru_with_config client_tcp_no_wait.json 1082
+echo "==========  END OF SERVER TCP TEST  =========="
 
-echo "Test is successful."
-sleep 1
-exit 0
+echo "========== BEGIN OF SERVER UDP TEST =========="
+test_mieru_with_config client_udp.json 1085
+test_mieru_with_config client_udp_no_wait.json 1085
+echo "==========  END OF SERVER UDP TEST  =========="
