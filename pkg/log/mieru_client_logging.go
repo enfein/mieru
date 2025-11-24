@@ -37,13 +37,6 @@ const maxClientLogFiles = 25
 // In Windows, it is typically C:\Users\<user>\AppData\Local\mieru
 var cachedClientLogDir string
 
-// init modifies the global logger instance with the desired output file (stdout)
-// and customized formatter.
-func init() {
-	SetOutput(os.Stdout)
-	SetFormatter(&CliFormatter{})
-}
-
 // NewClientLogFile returns a file handler for mieru client to write logs.
 func NewClientLogFile() (io.WriteCloser, error) {
 	if err := prepareClientLogDir(); err != nil {

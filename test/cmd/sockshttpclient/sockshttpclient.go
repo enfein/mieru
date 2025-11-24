@@ -208,13 +208,15 @@ func CreateNewConnAndDoRequest(seq int, proxyMode string) {
 	var client *http.Client
 	var err error
 	for {
-		if proxyMode == Socks5ProxyMode {
+		switch proxyMode {
+		case Socks5ProxyMode:
 			socksDialer := socks5.DialSocks5Proxy(&socks5.Client{
 				Host:    *localProxyHost + ":" + strconv.Itoa(*localProxyPort),
+				Timeout: 10 * time.Second,
 				CmdType: constant.Socks5ConnectCmd,
 			})
 			conn, _, _, err = socksDialer("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
-		} else if proxyMode == HTTPProxyMode {
+		case HTTPProxyMode:
 			tr := &http.Transport{
 				Proxy: socks5.HTTPTransportProxyFunc("http://" + *localHTTPHost + ":" + strconv.Itoa(*localHTTPPort)),
 			}
@@ -225,16 +227,19 @@ func CreateNewConnAndDoRequest(seq int, proxyMode string) {
 				},
 				Timeout: 10 * time.Second,
 			}
-		} else if proxyMode == NoProxyMode {
+		case NoProxyMode:
 			conn, err = net.Dial("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
 		}
+
 		if err == nil {
 			break
 		}
 		if !errors.Is(err, io.EOF) {
 			log.Fatalf("dial failed: %v", err)
 		}
+		time.Sleep(time.Millisecond)
 	}
+
 	if client != nil {
 		defer client.CloseIdleConnections()
 		DoRequestWithExistingHTTPClient(client, seq)

@@ -103,6 +103,63 @@ func TestDaemonFormatter(t *testing.T) {
 	buf.Reset()
 }
 
+func TestDaemonFormatterOptions(t *testing.T) {
+	t.Run("NoPrefix", func(t *testing.T) {
+		// Set a log prefix to test that it's not printed
+		oldPrefix := LogPrefix
+		LogPrefix = "[TEST_PREFIX] "
+		defer func() {
+			LogPrefix = oldPrefix
+		}()
+
+		SetFormatter(&DaemonFormatter{NoPrefix: true})
+		SetLevel("INFO")
+		var buf bytes.Buffer
+		SetOutput(&buf)
+		defer func() {
+			SetFormatter(&CliFormatter{})
+			SetLevel("INFO")
+			SetOutput(os.Stdout)
+		}()
+
+		Infof("This is a test message")
+		msg := buf.String()
+		if strings.Contains(msg, "[TEST_PREFIX]") {
+			t.Errorf("Log prefix should not be printed with NoPrefix: %q", msg)
+		}
+		if !strings.Contains(msg, "This is a test message") {
+			t.Errorf("Log message should still be printed: %q", msg)
+		}
+	})
+
+	t.Run("NoLevel", func(t *testing.T) {
+		SetFormatter(&DaemonFormatter{NoLevel: true})
+		SetLevel("INFO")
+		var buf bytes.Buffer
+		SetOutput(&buf)
+		defer func() {
+			SetFormatter(&CliFormatter{})
+			SetLevel("INFO")
+			SetOutput(os.Stdout)
+		}()
+
+		Infof("This is a test message")
+		msg := buf.String()
+		checkLogLevel(t, msg, "INFO", false)
+		if !strings.Contains(msg, "This is a test message") {
+			t.Errorf("Log message should still be printed: %q", msg)
+		}
+		buf.Reset()
+
+		Errorf("This is a test message")
+		msg = buf.String()
+		checkLogLevel(t, msg, "ERROR", false)
+		if !strings.Contains(msg, "This is a test message") {
+			t.Errorf("Log message should still be printed: %q", msg)
+		}
+	})
+}
+
 func TestNilFormatter(t *testing.T) {
 	SetFormatter(&NilFormatter{})
 	SetLevel("TRACE")

@@ -9,26 +9,22 @@ import (
 	"time"
 )
 
-// LogFunction For big messages, it can be more efficient to pass a function
-// and only call it if the log level is actually enables rather than
-// generating the log message and then checking if the level is enabled
-type LogFunction func() []interface{}
-
 type Logger struct {
 	// The logs are `io.Copy`'d to this in a mutex. It's common to set this to a
 	// file, or leave it default which is `os.Stderr`. You can also set this to
 	// something more adventurous, such as logging to Kafka.
 	Out io.Writer
 
-	// All log entries pass through the formatter before logged to Out. The
-	// included formatters are `TextFormatter` and `JSONFormatter` for which
-	// TextFormatter is the default. In development (when a TTY is attached) it
-	// logs with colors, but to a file it wouldn't. You can easily implement your
-	// own that implements the `Formatter` interface, see the `README` or included
-	// formatters for examples.
+	// All log entries pass through the formatter before logged to Out.
 	Formatter Formatter
 
-	// Flag for whether to log caller info (off by default)
+	// An optional callback function for each log message.
+	Callback Callback
+
+	// A formatter to generate log message passed to callback function.
+	CallbackFormatter Formatter
+
+	// Flag for whether to log caller info (off by default).
 	ReportCaller bool
 
 	// The logging level the logger should log at. This is typically (and defaults
@@ -36,18 +32,19 @@ type Logger struct {
 	// logged.
 	Level Level
 
-	// Used to sync writing to the log. Locking is enabled by Default
-	mu MutexWrap
-
-	// Reusable empty entry
-	entryPool sync.Pool
-
-	// Function to exit the application, defaults to `os.Exit()`
+	// Function to exit the application, defaults to `os.Exit()`.
+	// This can be useful in testing.
 	ExitFunc exitFunc
 
 	// The buffer pool used to format the log. If it is nil, the default global
 	// buffer pool will be used.
 	BufferPool BufferPool
+
+	// Used to sync writing to the log. Locking is enabled by Default.
+	mu MutexWrap
+
+	// Reusable empty entry.
+	entryPool sync.Pool
 }
 
 type exitFunc func(int)
@@ -76,11 +73,12 @@ func (mw *MutexWrap) Disable() {
 // Creates a new logger with default configuration.
 func New() *Logger {
 	return &Logger{
-		Out:          os.Stderr,
-		Formatter:    new(CliFormatter),
-		Level:        InfoLevel,
-		ExitFunc:     os.Exit,
-		ReportCaller: false,
+		Out:               os.Stderr,
+		Formatter:         &CliFormatter{},
+		CallbackFormatter: &DaemonFormatter{NoTimestamp: true, NoLevel: true},
+		Level:             InfoLevel,
+		ExitFunc:          os.Exit,
+		ReportCaller:      false,
 	}
 }
 
@@ -263,6 +261,13 @@ func (logger *Logger) IsLevelEnabled(level Level) bool {
 	return logger.level() >= level
 }
 
+// SetOutput sets the logger output.
+func (logger *Logger) SetOutput(output io.Writer) {
+	logger.mu.Lock()
+	defer logger.mu.Unlock()
+	logger.Out = output
+}
+
 // SetFormatter sets the logger formatter.
 func (logger *Logger) SetFormatter(formatter Formatter) {
 	logger.mu.Lock()
@@ -270,11 +275,11 @@ func (logger *Logger) SetFormatter(formatter Formatter) {
 	logger.Formatter = formatter
 }
 
-// SetOutput sets the logger output.
-func (logger *Logger) SetOutput(output io.Writer) {
+// SetCallback sets the logger callback function.
+func (logger *Logger) SetCallback(callback Callback) {
 	logger.mu.Lock()
 	defer logger.mu.Unlock()
-	logger.Out = output
+	logger.Callback = callback
 }
 
 func (logger *Logger) SetReportCaller(reportCaller bool) {

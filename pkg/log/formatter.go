@@ -58,7 +58,9 @@ func (f *CliFormatter) Format(entry *Entry) ([]byte, error) {
 // DaemonFormatter is the a log formatter that is suitable for daemon.
 // FATAL log is also printed to stderr.
 type DaemonFormatter struct {
+	NoPrefix    bool
 	NoTimestamp bool
+	NoLevel     bool
 }
 
 func (f *DaemonFormatter) Format(entry *Entry) ([]byte, error) {
@@ -77,7 +79,9 @@ func (f *DaemonFormatter) Format(entry *Entry) ([]byte, error) {
 	if !f.NoTimestamp {
 		orderedKeys = append(orderedKeys, FieldKeyTime)
 	}
-	orderedKeys = append(orderedKeys, FieldKeyLevel)
+	if !f.NoLevel {
+		orderedKeys = append(orderedKeys, FieldKeyLevel)
+	}
 	orderedKeys = append(orderedKeys, FieldKeyMsg)
 	if entry.HasCaller() {
 		fileInfo = fmt.Sprintf("%s:%d", entry.Caller.File, entry.Caller.Line)
@@ -95,7 +99,9 @@ func (f *DaemonFormatter) Format(entry *Entry) ([]byte, error) {
 		buf = &bytes.Buffer{}
 	}
 
-	buf.WriteString(LogPrefix)
+	if !f.NoPrefix {
+		buf.WriteString(LogPrefix)
+	}
 	for _, key := range orderedKeys {
 		var value string
 		switch {

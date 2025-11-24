@@ -26,6 +26,11 @@ func SetFormatter(formatter Formatter) {
 	std.SetFormatter(formatter)
 }
 
+// SetCallback sets the standard logger callback function.
+func SetCallback(callback Callback) {
+	std.SetCallback(callback)
+}
+
 // SetReportCaller sets whether the standard logger will include the calling
 // method as a field.
 func SetReportCaller(include bool) {
@@ -33,22 +38,29 @@ func SetReportCaller(include bool) {
 }
 
 // SetLevel sets the standard logger level.
-func SetLevel(level string) {
+func SetLevel(level string) (ok bool) {
 	level = strings.ToUpper(level)
 	switch level {
 	case "FATAL":
 		std.SetLevel(FatalLevel)
+		return true
 	case "ERROR":
 		std.SetLevel(ErrorLevel)
-	case "WARN":
+		return true
+	case "WARN", "WARNING":
 		std.SetLevel(WarnLevel)
+		return true
 	case "INFO":
 		std.SetLevel(InfoLevel)
+		return true
 	case "DEBUG":
 		std.SetLevel(DebugLevel)
+		return true
 	case "TRACE":
 		std.SetLevel(TraceLevel)
+		return true
 	default:
+		return false
 	}
 }
 

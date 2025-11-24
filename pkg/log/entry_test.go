@@ -222,25 +222,6 @@ func TestEntryPanic(t *testing.T) {
 	entry.WithField("err", errBoom).Panic("kaboom")
 }
 
-const (
-	badMessage   = "this is going to panic"
-	panicMessage = "this is broken"
-)
-
-type panickyHook struct{}
-
-func (p *panickyHook) Levels() []Level {
-	return []Level{InfoLevel}
-}
-
-func (p *panickyHook) Fire(entry *Entry) error {
-	if entry.Message == badMessage {
-		panic(panicMessage)
-	}
-
-	return nil
-}
-
 func TestEntryWithIncorrectField(t *testing.T) {
 
 	fn := func() {}
@@ -283,6 +264,42 @@ func TestEntryLogfLevel(t *testing.T) {
 	entry.Logf(WarnLevel, "%s", "warn")
 	if !strings.Contains(buffer.String(), "warn") {
 		t.FailNow()
+	}
+}
+
+func TestEntryCallback(t *testing.T) {
+	logger := New()
+	logger.Out = &bytes.Buffer{}
+	logger.SetLevel(InfoLevel)
+
+	// Track whether callback was invoked.
+	callbackInvoked := false
+	var capturedLevel string
+	var capturedMessage string
+	logger.SetCallback(func(msg LogMessage) {
+		callbackInvoked = true
+		capturedLevel = msg.Level
+		capturedMessage = msg.Message
+	})
+
+	// Test callback should be invoked.
+	entry := NewEntry(logger)
+	entry.Infof("test message")
+	if !callbackInvoked {
+		t.Fatal("callback was not invoked")
+	}
+	if capturedLevel != "info" {
+		t.Fatalf("expected level 'info', got '%s'", capturedLevel)
+	}
+	if !strings.Contains(capturedMessage, "test message") {
+		t.Fatalf("expected message to contain 'test message', got '%s'", capturedMessage)
+	}
+
+	// Test callback should not be invoked.
+	callbackInvoked = false
+	entry.Debugf("debug message")
+	if callbackInvoked {
+		t.Fatal("callback should not be invoked for debug level when logger is set to info")
 	}
 }
 
