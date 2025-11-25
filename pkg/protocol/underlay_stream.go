@@ -305,6 +305,7 @@ func (t *StreamUnderlay) readOneSegment() (*segment, error) {
 		err = fmt.Errorf("metadata: read %d bytes from StreamUnderlay failed: %w", readLen, err)
 		return nil, stderror.WrapErrorWithType(err, stderror.NETWORK_ERROR)
 	}
+	t.inBytes.Add(int64(len(encryptedMeta)))
 	if t.isClient {
 		metrics.DownloadBytes.Add(int64(len(encryptedMeta)))
 	} else {
@@ -398,6 +399,7 @@ func (t *StreamUnderlay) readSessionSegment(ss *sessionStruct) (*segment, error)
 			err = fmt.Errorf("payload: read %d bytes from StreamUnderlay failed: %w", ss.payloadLen+cipher.DefaultOverhead, err)
 			return nil, stderror.WrapErrorWithType(err, stderror.NETWORK_ERROR)
 		}
+		t.inBytes.Add(int64(len(encryptedPayload)))
 		if t.isClient {
 			metrics.DownloadBytes.Add(int64(len(encryptedPayload)))
 		} else {
@@ -428,6 +430,7 @@ func (t *StreamUnderlay) readSessionSegment(ss *sessionStruct) (*segment, error)
 			err = fmt.Errorf("padding: read %d bytes from StreamUnderlay failed: %w", ss.suffixLen, err)
 			return nil, stderror.WrapErrorWithType(err, stderror.NETWORK_ERROR)
 		}
+		t.inBytes.Add(int64(len(padding)))
 		if t.isClient {
 			metrics.DownloadBytes.Add(int64(len(padding)))
 		} else {
@@ -453,6 +456,7 @@ func (t *StreamUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error
 			err = fmt.Errorf("padding: read %d bytes from StreamUnderlay failed: %w", das.prefixLen, err)
 			return nil, stderror.WrapErrorWithType(err, stderror.NETWORK_ERROR)
 		}
+		t.inBytes.Add(int64(len(padding1)))
 		if t.isClient {
 			metrics.DownloadBytes.Add(int64(len(padding1)))
 		} else {
@@ -465,6 +469,7 @@ func (t *StreamUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error
 			err = fmt.Errorf("payload: read %d bytes from StreamUnderlay failed: %w", das.payloadLen+cipher.DefaultOverhead, err)
 			return nil, stderror.WrapErrorWithType(err, stderror.NETWORK_ERROR)
 		}
+		t.inBytes.Add(int64(len(encryptedPayload)))
 		if t.isClient {
 			metrics.DownloadBytes.Add(int64(len(encryptedPayload)))
 		} else {
@@ -495,6 +500,7 @@ func (t *StreamUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error
 			err = fmt.Errorf("padding: read %d bytes from StreamUnderlay failed: %w", das.suffixLen, err)
 			return nil, stderror.WrapErrorWithType(err, stderror.NETWORK_ERROR)
 		}
+		t.inBytes.Add(int64(len(padding2)))
 		if t.isClient {
 			metrics.DownloadBytes.Add(int64(len(padding2)))
 		} else {
@@ -549,6 +555,7 @@ func (t *StreamUnderlay) writeOneSegment(seg *segment) error {
 		if _, err := t.conn.Write(dataToSend); err != nil {
 			return fmt.Errorf("Write() failed: %w", err)
 		}
+		t.outBytes.Add(int64(len(dataToSend)))
 		if t.isClient {
 			metrics.UploadBytes.Add(int64(len(dataToSend)))
 		} else {
@@ -590,6 +597,7 @@ func (t *StreamUnderlay) writeOneSegment(seg *segment) error {
 		if _, err := t.conn.Write(dataToSend); err != nil {
 			return fmt.Errorf("Write() failed: %w", err)
 		}
+		t.outBytes.Add(int64(len(dataToSend)))
 		if t.isClient {
 			metrics.UploadBytes.Add(int64(len(dataToSend)))
 		} else {

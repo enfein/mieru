@@ -72,6 +72,12 @@ type Underlay interface {
 	// Returns detailed information of all the sessions.
 	SessionInfos() []*appctlpb.SessionInfo
 
+	// Number of bytes received from the network.
+	InBytes() int64
+
+	// Number of bytes sent to the network.
+	OutBytes() int64
+
 	// Run event loop.
 	// The underlay needs to be closed when this returns.
 	RunEventLoop(context.Context) error

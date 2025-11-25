@@ -683,7 +683,7 @@ func (m *Mux) maybePickExistingUnderlay() Underlay {
 
 // cleanUnderlay removes closed underlays.
 // This method MUST be called only when holding the mu lock.
-func (m *Mux) cleanUnderlay(alsoDisableIdleUnderlay bool) {
+func (m *Mux) cleanUnderlay(alsoDisableIdleOrOverloadUnderlay bool) {
 	remaining := make([]Underlay, 0)
 	disable := 0
 	close := 0
@@ -691,11 +691,24 @@ func (m *Mux) cleanUnderlay(alsoDisableIdleUnderlay bool) {
 		select {
 		case <-underlay.Done():
 		default:
-			if alsoDisableIdleUnderlay && underlay.SessionCount() == 0 {
-				if underlay.Scheduler().TryDisable() {
+			if alsoDisableIdleOrOverloadUnderlay {
+				// Disable idle underlay.
+				if underlay.SessionCount() == 0 {
+					if underlay.Scheduler().TryDisableIdle() {
+						disable++
+					}
+				}
+
+				// Disable overloaded underlay.
+				// If multiplexFactor is 1, the limit is 1 GiB.
+				var trafficVolumeLimit int64 = 512 * 1024 * 1024 << m.multiplexFactor
+				if underlay.Scheduler().DisableTime().IsZero() && (underlay.InBytes() > trafficVolumeLimit || underlay.OutBytes() > trafficVolumeLimit) {
+					underlay.Scheduler().SetRemainingTime(0)
 					disable++
 				}
 			}
+
+			// Close idle underlay.
 			if underlay.SessionCount() == 0 && underlay.Scheduler().Idle() {
 				underlay.Close()
 				close++

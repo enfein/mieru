@@ -21,6 +21,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
@@ -51,6 +52,9 @@ type baseUnderlay struct {
 
 	sendMutex  sync.Mutex // protect writing data to the connection
 	closeMutex sync.Mutex // protect closing the connection
+
+	inBytes  atomic.Int64
+	outBytes atomic.Int64
 
 	// ---- client fields ----
 	scheduler *ScheduleController
@@ -191,6 +195,14 @@ func (b *baseUnderlay) SessionInfos() []*appctlpb.SessionInfo {
 		return true
 	})
 	return res
+}
+
+func (b *baseUnderlay) InBytes() int64 {
+	return b.inBytes.Load()
+}
+
+func (b *baseUnderlay) OutBytes() int64 {
+	return b.outBytes.Load()
 }
 
 func (b *baseUnderlay) RunEventLoop(ctx context.Context) error {

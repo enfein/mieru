@@ -356,6 +356,7 @@ func (u *PacketUnderlay) readOneSegment() error {
 			continue
 		}
 		b = b[:n]
+		u.inBytes.Add(int64(n))
 		if u.isClient {
 			metrics.DownloadBytes.Add(int64(n))
 		} else {
@@ -692,6 +693,7 @@ func (u *PacketUnderlay) writeOneSegment(seg *segment, addr net.Addr) error {
 		if _, err := u.conn.WriteTo(dataToSend, addr); err != nil {
 			return fmt.Errorf("WriteTo() failed: %w", err)
 		}
+		u.outBytes.Add(int64(len(dataToSend)))
 		if u.isClient {
 			metrics.UploadBytes.Add(int64(len(dataToSend)))
 		} else {
@@ -731,6 +733,7 @@ func (u *PacketUnderlay) writeOneSegment(seg *segment, addr net.Addr) error {
 		if _, err := u.conn.WriteTo(dataToSend, addr); err != nil {
 			return fmt.Errorf("WriteTo() failed: %w", err)
 		}
+		u.outBytes.Add(int64(len(dataToSend)))
 		if u.isClient {
 			metrics.UploadBytes.Add(int64(len(dataToSend)))
 		} else {
