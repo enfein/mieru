@@ -510,7 +510,6 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 		underlay := &PacketUnderlay{
 			baseUnderlay:       *newBaseUnderlay(false, properties.MTU()),
 			conn:               conn,
-			packetQueue:        make(chan bufferWithAddr, packetChanCapacityServer),
 			sessionCleanTicker: time.NewTicker(sessionCleanInterval),
 			users:              m.users,
 		}

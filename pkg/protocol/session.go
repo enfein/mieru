@@ -127,13 +127,14 @@ type Session struct {
 	recvQueue *segmentTree  // segments waiting to be read by application
 	recvChan  chan *segment // channel to receive segments from underlay
 
-	nextSend      uint32      // next sequence number to send a segment
-	nextRecv      uint32      // next sequence number to receive
-	lastSend      uint32      // last segment sequence number sent
-	lastRXTime    time.Time   // last timestamp when a segment is received
-	lastTXTime    time.Time   // last timestamp when a segment is sent
-	ackOnDataRecv atomic.Bool // whether ack should be sent due to receive of new data
-	unreadBuf     []byte      // payload removed from the recvQueue that haven't been read by application
+	nextSend               uint32      // next sequence number to send a segment
+	nextRecv               uint32      // next sequence number to receive
+	lastSend               uint32      // last segment sequence number sent
+	lastRXTime             time.Time   // last timestamp when a segment is received
+	lastTXTime             time.Time   // last timestamp when a segment is sent
+	nextRetransmissionTime time.Time   // time that need to retransmit a segment in sendBuf
+	ackOnDataRecv          atomic.Bool // whether ack should be sent due to receive of new data
+	unreadBuf              []byte      // payload removed from the recvQueue that haven't been read by application
 
 	uploadBytes   metrics.Metric // number of bytes from client to server, only used by server
 	downloadBytes metrics.Metric // number of bytes from server to client, only used by server
@@ -687,66 +688,78 @@ func (s *Session) runOutputOncePacket() {
 	hasLoss := false
 	hasTimeout := false
 	var bytesInFlight int64
-
-	// Resend segments in sendBuf.
-	//
-	// Iterate all the segments in sendBuf to calculate bytesInFlight,
-	// but only resend segments if needed.
-	//
-	// Retransmission is not limited by window.
-	//
-	// To avoid deadlock, session can't be closed inside Ascend().
-	s.oLock.Lock()
 	totalTransmissionCount := 0
-	s.sendBuf.Ascend(func(iter *segment) bool {
-		bytesInFlight += int64(packetOverhead + len(iter.payload))
-		if iter.txCount >= txCountLimit {
-			err := fmt.Errorf("too many retransmission of %v", iter)
-			log.Debugf("%v is unhealthy: %v", s, err)
-			if s.outputHasErr.CompareAndSwap(false, true) {
-				close(s.outputErr)
-			}
-			closeSessionReason = err
-			return false
-		}
-		satisfyEarlyRetransmission := iter.ackCount >= earlyRetransmission && iter.txCount <= earlyRetransmissionLimit
-		if satisfyEarlyRetransmission || time.Since(iter.txTime) > iter.txTimeout {
-			if satisfyEarlyRetransmission {
-				hasLoss = true
-			} else {
-				hasTimeout = true
-			}
-			iter.ackCount = 0
-			iter.txCount++
-			iter.txTime = time.Now()
-			iter.txTimeout = mathext.Min(s.rttStat.RTO()*time.Duration(math.Pow(txTimeoutBackOff, float64(iter.txCount))), maxBackOffDuration)
-			if isDataAckProtocol(iter.metadata.Protocol()) {
-				das, _ := toDataAckStruct(iter.metadata)
-				das.unAckSeq = s.nextRecv
-			}
-			if err := s.output(iter, s.RemoteAddr()); err != nil {
-				err = fmt.Errorf("output() failed: %w", err)
-				log.Debugf("%v %v", s, err)
+
+	if time.Since(s.nextRetransmissionTime) >= 0 {
+		// Resend segments in sendBuf.
+		//
+		// Iterate all the segments in sendBuf to calculate bytesInFlight and
+		// update nextRetransmissionTime, but only resend segments if needed.
+		//
+		// Retransmission is not limited by window.
+		//
+		// To avoid deadlock, session can't be closed inside Ascend().
+		s.oLock.Lock()
+		var nextTX int64 = math.MaxInt64
+		s.sendBuf.Ascend(func(iter *segment) bool {
+			bytesInFlight += int64(packetOverhead + len(iter.payload))
+			nextTX = mathext.Min(nextTX, iter.txTime.Add(iter.txTimeout).UnixMicro())
+
+			if iter.txCount >= txCountLimit {
+				err := fmt.Errorf("too many retransmission of %v", iter)
+				log.Debugf("%v is unhealthy: %v", s, err)
 				if s.outputHasErr.CompareAndSwap(false, true) {
 					close(s.outputErr)
 				}
 				closeSessionReason = err
 				return false
 			}
-			bytesInFlight += int64(packetOverhead + len(iter.payload))
-			totalTransmissionCount++
+
+			satisfyEarlyRetransmission := iter.ackCount >= earlyRetransmission && iter.txCount <= earlyRetransmissionLimit
+			if satisfyEarlyRetransmission || time.Since(iter.txTime) > iter.txTimeout {
+				if satisfyEarlyRetransmission {
+					hasLoss = true
+				} else {
+					hasTimeout = true
+				}
+				iter.ackCount = 0
+				iter.txCount++
+				iter.txTime = time.Now()
+				iter.txTimeout = mathext.Min(s.rttStat.RTO()*time.Duration(math.Pow(txTimeoutBackOff, float64(iter.txCount))), maxBackOffDuration)
+				if isDataAckProtocol(iter.metadata.Protocol()) {
+					das, _ := toDataAckStruct(iter.metadata)
+					das.unAckSeq = s.nextRecv
+				}
+				if err := s.output(iter, s.RemoteAddr()); err != nil {
+					err = fmt.Errorf("output() failed: %w", err)
+					log.Debugf("%v %v", s, err)
+					if s.outputHasErr.CompareAndSwap(false, true) {
+						close(s.outputErr)
+					}
+					closeSessionReason = err
+					return false
+				}
+				bytesInFlight += int64(packetOverhead + len(iter.payload))
+				totalTransmissionCount++
+				return true
+			}
 			return true
+		})
+		if nextTX != math.MaxInt64 {
+			s.nextRetransmissionTime = time.UnixMicro(nextTX)
+		} else {
+			// Account for new segments to be sent below.
+			s.nextRetransmissionTime = time.Now().Add(10 * time.Millisecond)
 		}
-		return true
-	})
-	s.oLock.Unlock()
-	if closeSessionReason != nil {
-		s.closeWithError(closeSessionReason)
-	}
-	if hasTimeout {
-		s.cubicSendAlgorithm.OnTimeout()
-	} else if hasLoss {
-		s.cubicSendAlgorithm.OnLoss()
+		s.oLock.Unlock()
+		if closeSessionReason != nil {
+			s.closeWithError(closeSessionReason)
+		}
+		if hasTimeout {
+			s.cubicSendAlgorithm.OnTimeout()
+		} else if hasLoss {
+			s.cubicSendAlgorithm.OnLoss()
+		}
 	}
 
 	// Send new segments in sendQueue.

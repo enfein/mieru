@@ -36,3 +36,17 @@ function print_mieru_client_thread_dump() {
     ./mieru get thread-dump
     echo "==========  END OF MIERU CLIENT THREAD DUMP  =========="
 }
+
+function print_mieru_client_metrics() {
+    echo "========== BEGIN OF MIERU CLIENT METRICS =========="
+    ./mieru get metrics
+    ./mieru get memory-statistics
+    echo "==========  END OF MIERU CLIENT METRICS  =========="
+}
+
+function print_mieru_server_metrics() {
+    echo "========== BEGIN OF MIERU SERVER METRICS =========="
+    ./mita get metrics
+    ./mita get memory-statistics
+    echo "==========  END OF MIERU SERVER METRICS  =========="
+}

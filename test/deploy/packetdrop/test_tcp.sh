@@ -73,6 +73,14 @@ if [ "$?" -ne "0" ]; then
     exit 1
 fi
 
+# Print metrics and memory statistics.
+./mita get users
+sleep 1
+print_mieru_client_metrics
+sleep 1
+print_mieru_server_metrics
+sleep 1
+
 # Stop mieru client.
 ./mieru stop
 if [[ "$?" -ne 0 ]]; then
