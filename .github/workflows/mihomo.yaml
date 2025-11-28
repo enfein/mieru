@@ -3,7 +3,7 @@ on: [workflow_dispatch]
 jobs:
   mihomo-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Check out mieru repository code
         uses: actions/checkout@v4
@@ -28,11 +28,14 @@ jobs:
       - name: Show go mod diff
         working-directory: mihomo
         run: git --no-pager diff
+      - name: Run mihomo unit test
+        working-directory: mihomo
+        run: make vet
       - name: Build mihomo
         working-directory: mihomo
-        run: make linux-amd64-compatible
+        run: make linux-amd64-v1
       - name: Copy mihomo binary
-        run: cp mihomo/bin/mihomo-linux-amd64-compatible mieru/mihomo
+        run: cp mihomo/bin/mihomo-linux-amd64-v1 mieru/mihomo
       - name: Build mieru test binaries
         working-directory: mieru
         run: make test-binary
