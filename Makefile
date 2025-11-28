@@ -32,7 +32,7 @@ PROJECT_NAME=$(shell basename "${ROOT}")
 # - pkg/version/current.go
 #
 # Use `tools/bump_version.sh` script to change all those files at one shot.
-VERSION="3.24.0"
+VERSION="3.24.1"
 
 # With .ONESHELL, each recipe is executed in a single shell instance.
 # This allows `cd` to affect subsequent commands in the same recipe.
