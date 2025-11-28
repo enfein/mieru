@@ -96,7 +96,6 @@ func (b *baseUnderlay) Close() error {
 		s = nil
 		return true
 	})
-	b.sessionMap = sync.Map{}
 	close(b.done)
 	UnderlayCurrEstablished.Add(-1)
 	return nil
