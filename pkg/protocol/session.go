@@ -127,14 +127,14 @@ type Session struct {
 	recvQueue *segmentTree  // segments waiting to be read by application
 	recvChan  chan *segment // channel to receive segments from underlay
 
-	nextSend               uint32      // next sequence number to send a segment
-	nextRecv               uint32      // next sequence number to receive
-	lastSend               uint32      // last segment sequence number sent
-	lastRXTime             time.Time   // last timestamp when a segment is received
-	lastTXTime             time.Time   // last timestamp when a segment is sent
-	nextRetransmissionTime time.Time   // time that need to retransmit a segment in sendBuf
-	ackOnDataRecv          atomic.Bool // whether ack should be sent due to receive of new data
-	unreadBuf              []byte      // payload removed from the recvQueue that haven't been read by application
+	nextSend               atomic.Uint32 // next sequence number to send a segment
+	nextRecv               atomic.Uint32 // next sequence number to receive
+	lastSend               atomic.Uint32 // last segment sequence number sent
+	lastRXTime             time.Time     // last timestamp when a segment is received
+	lastTXTime             time.Time     // last timestamp when a segment is sent
+	nextRetransmissionTime time.Time     // time that need to retransmit a segment in sendBuf
+	ackOnDataRecv          atomic.Bool   // whether ack should be sent due to receive of new data
+	unreadBuf              []byte        // payload removed from the recvQueue that haven't been read by application
 
 	uploadBytes   metrics.Metric // number of bytes from client to server, only used by server
 	downloadBytes metrics.Metric // number of bytes from server to client, only used by server
@@ -142,7 +142,7 @@ type Session struct {
 	rttStat            *congestion.RTTStats
 	cubicSendAlgorithm *congestion.CubicSendAlgorithm
 	bbrSendAlgorithm   *congestion.BBRSender
-	remoteWindowSize   uint16
+	remoteWindowSize   atomic.Uint32
 
 	wg    sync.WaitGroup
 	rLock sync.Mutex // serialize application read
@@ -164,7 +164,7 @@ func NewSession(id uint32, isClient bool, mtu int, users map[string]*appctlpb.Us
 	rttStat := congestion.NewRTTStats()
 	rttStat.SetMaxAckDelay(periodicOutputInterval)
 	rttStat.SetRTOMultiplier(txTimeoutBackOff)
-	return &Session{
+	s := &Session{
 		conn:               nil,
 		block:              atomic.Pointer[cipher.BlockCipher]{},
 		id:                 id,
@@ -189,8 +189,9 @@ func NewSession(id uint32, isClient bool, mtu int, users map[string]*appctlpb.Us
 		rttStat:            rttStat,
 		cubicSendAlgorithm: congestion.NewCubicSendAlgorithm(minWindowSize, maxWindowSize),
 		bbrSendAlgorithm:   congestion.NewBBRSender(fmt.Sprintf("%d", id), rttStat),
-		remoteWindowSize:   minWindowSize,
 	}
+	s.remoteWindowSize.Store(minWindowSize)
+	return s
 }
 
 func (s *Session) String() string {
@@ -313,11 +314,11 @@ func (s *Session) Write(b []byte) (n int, err error) {
 					protocol: uint8(openSessionRequest),
 				},
 				sessionID: s.id,
-				seq:       s.nextSend,
+				seq:       s.nextSend.Load(),
 			},
 			transport: s.transportProtocol,
 		}
-		s.nextSend++
+		s.nextSend.Add(1)
 		// Allow open session request to carry payload.
 		if len(b) <= MaxSessionOpenPayload {
 			seg.metadata.(*sessionStruct).payloadLen = uint16(len(b))
@@ -433,7 +434,7 @@ func (s *Session) ToSessionInfo() *appctlpb.SessionInfo {
 				Seconds: s.lastRXTime.Unix(),
 				Nanos:   int32(s.lastRXTime.Nanosecond()),
 			}
-			info.LastRecvSeq = proto.Uint32(uint32(mathext.Max(0, int(s.nextRecv)-1)))
+			info.LastRecvSeq = proto.Uint32(uint32(mathext.Max(0, int(s.nextRecv.Load())-1)))
 		} else {
 			info.Protocol = proto.String("UNKNOWN")
 		}
@@ -441,7 +442,7 @@ func (s *Session) ToSessionInfo() *appctlpb.SessionInfo {
 			Seconds: s.lastTXTime.Unix(),
 			Nanos:   int32(s.lastTXTime.Nanosecond()),
 		}
-		info.LastSendSeq = proto.Uint32(uint32(mathext.Max(0, int(s.nextSend)-1)))
+		info.LastSendSeq = proto.Uint32(uint32(mathext.Max(0, int(s.nextSend.Load())-1)))
 	}
 	return info
 }
@@ -545,8 +546,8 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 					protocol: protocol,
 				},
 				sessionID:  s.id,
-				seq:        s.nextSend,
-				unAckSeq:   s.nextRecv,
+				seq:        s.nextSend.Load(),
+				unAckSeq:   s.nextRecv.Load(),
 				windowSize: uint16(s.receiveWindowSize()),
 				fragment:   uint8(i),
 				payloadLen: uint16(partLen),
@@ -555,7 +556,7 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 			transport: s.transportProtocol,
 		}
 		copy(seg.payload, part)
-		s.nextSend++
+		s.nextSend.Add(1)
 		if !s.sendQueue.Insert(seg) {
 			s.oLock.Unlock()
 			return 0, fmt.Errorf("insert %v to send queue failed", seg)
@@ -728,7 +729,7 @@ func (s *Session) runOutputOncePacket() {
 				iter.txTimeout = mathext.Min(s.rttStat.RTO()*time.Duration(math.Pow(txTimeoutBackOff, float64(iter.txCount))), maxBackOffDuration)
 				if isDataAckProtocol(iter.metadata.Protocol()) {
 					das, _ := toDataAckStruct(iter.metadata)
-					das.unAckSeq = s.nextRecv
+					das.unAckSeq = s.nextRecv.Load()
 				}
 				if err := s.output(iter, s.RemoteAddr()); err != nil {
 					err = fmt.Errorf("output() failed: %w", err)
@@ -787,7 +788,7 @@ func (s *Session) runOutputOncePacket() {
 			seg.txTimeout = mathext.Min(s.rttStat.RTO()*time.Duration(math.Pow(txTimeoutBackOff, float64(seg.txCount))), maxBackOffDuration)
 			if isDataAckProtocol(seg.metadata.Protocol()) {
 				das, _ := toDataAckStruct(seg.metadata)
-				das.unAckSeq = s.nextRecv
+				das.unAckSeq = s.nextRecv.Load()
 			}
 			if !s.sendBuf.Insert(seg) {
 				s.oLock.Unlock()
@@ -845,8 +846,8 @@ func (s *Session) runOutputOncePacket() {
 			metadata: &dataAckStruct{
 				baseStruct: baseStruct,
 				sessionID:  s.id,
-				seq:        uint32(mathext.Max(0, int(s.nextSend)-1)),
-				unAckSeq:   s.nextRecv,
+				seq:        uint32(mathext.Max(0, int(s.nextSend.Load())-1)),
+				unAckSeq:   s.nextRecv.Load(),
 				windowSize: uint16(s.receiveWindowSize()),
 			},
 			transport: s.transportProtocol}
@@ -975,7 +976,7 @@ func (s *Session) inputData(seg *segment) error {
 			if len(ackedPackets) > 0 {
 				s.bbrSendAlgorithm.OnCongestionEvent(priorInFlight, time.Now(), ackedPackets, nil)
 			}
-			s.remoteWindowSize = das.windowSize
+			s.remoteWindowSize.Store(uint32(das.windowSize))
 		}
 
 		// Deliver the segment to recvBuf.
@@ -998,20 +999,20 @@ func (s *Session) inputData(seg *segment) error {
 
 			seg3, deleted := s.recvBuf.DeleteMinIf(func(iter *segment) bool {
 				seq, _ := iter.Seq()
-				return seq <= s.nextRecv
+				return seq <= s.nextRecv.Load()
 			})
 			if seg3 == nil || !deleted {
 				break
 			}
 			seq, _ := seg3.Seq()
-			if seq == s.nextRecv {
+			if seq == s.nextRecv.Load() {
 				if !s.recvQueue.Insert(seg3) {
 					return fmt.Errorf("inputData() failed: insert %v to receive queue failed", seg3)
 				}
-				s.nextRecv++
+				s.nextRecv.Add(1)
 				das, ok := seg3.metadata.(*dataAckStruct)
 				if ok {
-					s.remoteWindowSize = das.windowSize
+					s.remoteWindowSize.Store(uint32(das.windowSize))
 				}
 			}
 		}
@@ -1044,11 +1045,11 @@ func (s *Session) inputData(seg *segment) error {
 						protocol: uint8(openSessionResponse),
 					},
 					sessionID: s.id,
-					seq:       s.nextSend,
+					seq:       s.nextSend.Load(),
 				},
 				transport: s.transportProtocol,
 			}
-			s.nextSend++
+			s.nextSend.Add(1)
 			if log.IsLevelEnabled(log.TraceLevel) {
 				log.Tracef("%v writing open session response", s)
 			}
@@ -1099,7 +1100,7 @@ func (s *Session) inputAck(seg *segment) error {
 		if len(ackedPackets) > 0 {
 			s.bbrSendAlgorithm.OnCongestionEvent(priorInFlight, time.Now(), ackedPackets, nil)
 		}
-		s.remoteWindowSize = das.windowSize
+		s.remoteWindowSize.Store(uint32(das.windowSize))
 
 		// Update acknowledge count.
 		s.sendBuf.Ascend(func(iter *segment) bool {
@@ -1128,13 +1129,13 @@ func (s *Session) inputClose(seg *segment) error {
 					protocol: uint8(closeSessionResponse),
 				},
 				sessionID:  s.id,
-				seq:        s.nextSend,
+				seq:        s.nextSend.Load(),
 				statusCode: uint8(statusOK),
 				payloadLen: 0,
 			},
 			transport: s.transportProtocol,
 		}
-		s.nextSend++
+		s.nextSend.Add(1)
 		// The response will not retry if it is not delivered.
 		if err := s.output(seg2, s.RemoteAddr()); err != nil {
 			s.oLock.Unlock()
@@ -1177,7 +1178,8 @@ func (s *Session) output(seg *segment, remoteAddr net.Addr) error {
 	default:
 		return fmt.Errorf("unsupported transport protocol %v", s.transportProtocol)
 	}
-	s.lastSend, _ = seg.Seq()
+	seq, _ := seg.Seq()
+	s.lastSend.Store(seq)
 	s.lastTXTime = time.Now()
 	return nil
 }
@@ -1199,7 +1201,7 @@ func (s *Session) closeWithError(err error) error {
 		// Send closeSessionRequest, but don't wait for closeSessionResponse,
 		// because the underlay connection may be already broken.
 		s.oLock.Lock()
-		closeRequestSeq := s.nextSend
+		closeRequestSeq := s.nextSend.Load()
 		seg := &segment{
 			metadata: &sessionStruct{
 				baseStruct: baseStruct{
@@ -1211,7 +1213,7 @@ func (s *Session) closeWithError(err error) error {
 			},
 			transport: s.transportProtocol,
 		}
-		s.nextSend++
+		s.nextSend.Add(1)
 
 		var gracefulCloseSuccess bool
 		if gracefulClose {
@@ -1221,7 +1223,7 @@ func (s *Session) closeWithError(err error) error {
 				s.oLock.Unlock()
 				for i := 0; i < 1000; i++ {
 					time.Sleep(time.Millisecond)
-					if s.lastSend >= closeRequestSeq {
+					if s.lastSend.Load() >= closeRequestSeq {
 						gracefulCloseSuccess = true
 						break
 					}
@@ -1252,7 +1254,7 @@ func (s *Session) closeWithError(err error) error {
 
 // sendWindowSize determines how many more packets this session can send.
 func (s *Session) sendWindowSize() int {
-	return mathext.Max(0, mathext.Min(int(s.cubicSendAlgorithm.CongestionWindowSize())-s.sendBuf.Len(), int(s.remoteWindowSize)))
+	return mathext.Max(0, mathext.Min(int(s.cubicSendAlgorithm.CongestionWindowSize())-s.sendBuf.Len(), int(s.remoteWindowSize.Load())))
 }
 
 // receiveWindowSize determines how many more packets this session can receive.
