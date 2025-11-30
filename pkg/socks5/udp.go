@@ -16,6 +16,7 @@
 package socks5
 
 import (
+	"context"
 	"encoding/binary"
 	"net"
 	"strconv"
@@ -101,7 +102,7 @@ func RunUDPAssociateLoop(udpConn *net.UDPConn, conn *apicommon.PacketOverStreamT
 			case constant.Socks5FQDNAddress:
 				fqdnLen := buf[4]
 				fqdn := string(buf[5 : 5+fqdnLen])
-				dstAddr, err := apicommon.ResolveUDPAddr(resolver, "udp", fqdn+":"+strconv.Itoa(int(buf[5+fqdnLen])<<8+int(buf[6+fqdnLen])))
+				dstAddr, err := apicommon.ResolveUDPAddr(context.Background(), resolver, "udp", fqdn+":"+strconv.Itoa(int(buf[5+fqdnLen])<<8+int(buf[6+fqdnLen])))
 				if err != nil {
 					log.Debugf("UDP associate %v ResolveUDPAddr() failed: %v", udpConn.LocalAddr(), err)
 					UDPAssociateErrors.Add(1)

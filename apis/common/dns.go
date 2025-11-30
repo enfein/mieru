@@ -40,8 +40,17 @@ func (r NilDNSResolver) LookupIP(ctx context.Context, network, host string) ([]n
 
 var _ DNSResolver = NilDNSResolver{}
 
+// ClientDNSConfig provides DNS configurations used by proxy client.
+type ClientDNSConfig struct {
+	// If enabled, when creating a stream oriented network connection,
+	// Resolver is not used. The proxy server endpoint is passed to Dialer as is.
+	//
+	// You may enable this when Dialer has an internal mechanism to resolve DNS.
+	BypassDialerDNS bool
+}
+
 // ResolveTCPAddr returns a TCP address using the DNSResolver.
-func ResolveTCPAddr(r DNSResolver, network, address string) (*net.TCPAddr, error) {
+func ResolveTCPAddr(ctx context.Context, r DNSResolver, network, address string) (*net.TCPAddr, error) {
 	dnsQueryNetwork := "ip"
 	switch network {
 	case "tcp":
@@ -67,7 +76,7 @@ func ResolveTCPAddr(r DNSResolver, network, address string) (*net.TCPAddr, error
 		return &net.TCPAddr{IP: ip, Port: port}, nil
 	}
 
-	ips, err := r.LookupIP(context.Background(), dnsQueryNetwork, host)
+	ips, err := r.LookupIP(ctx, dnsQueryNetwork, host)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +88,7 @@ func ResolveTCPAddr(r DNSResolver, network, address string) (*net.TCPAddr, error
 }
 
 // ResolveUDPAddr returns a UDP address using the DNSResolver.
-func ResolveUDPAddr(r DNSResolver, network, address string) (*net.UDPAddr, error) {
+func ResolveUDPAddr(ctx context.Context, r DNSResolver, network, address string) (*net.UDPAddr, error) {
 	dnsQueryNetwork := "ip"
 	switch network {
 	case "udp":
@@ -105,7 +114,7 @@ func ResolveUDPAddr(r DNSResolver, network, address string) (*net.UDPAddr, error
 		return &net.UDPAddr{IP: ip, Port: port}, nil
 	}
 
-	ips, err := r.LookupIP(context.Background(), dnsQueryNetwork, host)
+	ips, err := r.LookupIP(ctx, dnsQueryNetwork, host)
 	if err != nil {
 		return nil, err
 	}

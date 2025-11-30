@@ -89,7 +89,7 @@ func (mc *mieruClient) Start() error {
 		return ErrNoClientConfig
 	}
 
-	mux, err := appctlcommon.NewClientMuxFromProfile(mc.config.Profile, mc.config.Dialer, mc.config.PacketDialer, mc.config.Resolver)
+	mux, err := appctlcommon.NewClientMuxFromProfile(mc.config.Profile, mc.config.Dialer, mc.config.PacketDialer, mc.config.Resolver, mc.config.DNSConfig)
 	if err != nil {
 		return err
 	}

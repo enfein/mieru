@@ -63,7 +63,7 @@ var _ Underlay = &StreamUnderlay{}
 // "block" is the block encryption algorithm to encrypt packets.
 //
 // This function is only used by proxy client.
-func NewStreamUnderlay(ctx context.Context, dialer apicommon.Dialer, resolver apicommon.DNSResolver, network, addr string, mtu int, block cipher.BlockCipher) (*StreamUnderlay, error) {
+func NewStreamUnderlay(ctx context.Context, dialer apicommon.Dialer, resolver apicommon.DNSResolver, dnsConfig *apicommon.ClientDNSConfig, network, addr string, mtu int, block cipher.BlockCipher) (*StreamUnderlay, error) {
 	switch network {
 	case "tcp", "tcp4", "tcp6":
 	default:
@@ -72,12 +72,16 @@ func NewStreamUnderlay(ctx context.Context, dialer apicommon.Dialer, resolver ap
 	if block.IsStateless() {
 		return nil, fmt.Errorf("stream underlay block cipher must be stateful")
 	}
-	remoteAddr, err := apicommon.ResolveTCPAddr(resolver, network, addr)
-	if err != nil {
-		return nil, fmt.Errorf("ResolveTCPAddr() failed: %w", err)
+	remote := addr
+	if dnsConfig == nil || (!dnsConfig.BypassDialerDNS) {
+		remoteTCPAddr, err := apicommon.ResolveTCPAddr(ctx, resolver, network, addr)
+		if err != nil {
+			return nil, fmt.Errorf("ResolveTCPAddr() failed: %w", err)
+		}
+		remote = remoteTCPAddr.String()
 	}
 
-	conn, err := dialer.DialContext(ctx, network, remoteAddr.String())
+	conn, err := dialer.DialContext(ctx, network, remote)
 	if err != nil {
 		return nil, fmt.Errorf("DialContext() failed: %w", err)
 	}

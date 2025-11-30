@@ -50,6 +50,7 @@ type Mux struct {
 	dialer                apicommon.Dialer
 	packetDialer          apicommon.PacketDialer
 	resolver              apicommon.DNSResolver
+	clientDNSConfig       *apicommon.ClientDNSConfig
 	streamListenerFactory apicommon.StreamListenerFactory
 	packetListenerFactory apicommon.PacketListenerFactory
 	chAccept              chan net.Conn
@@ -86,6 +87,7 @@ func NewMux(isClinet bool) *Mux {
 		dialer:                &net.Dialer{Timeout: 10 * time.Second, Control: sockopts.DefaultDialerControl()},
 		packetDialer:          common.UDPDialer{Control: sockopts.DefaultDialerControl()},
 		resolver:              &net.Resolver{},
+		clientDNSConfig:       &apicommon.ClientDNSConfig{},
 		streamListenerFactory: &net.ListenConfig{Control: sockopts.DefaultListenerControl()},
 		packetListenerFactory: &net.ListenConfig{Control: sockopts.DefaultListenerControl()},
 		chAccept:              make(chan net.Conn, sessionChanCapacity),
@@ -170,6 +172,15 @@ func (m *Mux) SetResolver(resolver apicommon.DNSResolver) *Mux {
 	defer m.mu.Unlock()
 	m.resolver = resolver
 	log.Infof("Mux DNS resolver has been updated")
+	return m
+}
+
+// SetClientDNSConfig updates the client DNS configuration used by the mux.
+func (m *Mux) SetClientDNSConfig(clientDNSConfig *apicommon.ClientDNSConfig) *Mux {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.clientDNSConfig = clientDNSConfig
+	log.Infof("Mux client DNS configuration has been updated")
 	return m
 }
 
@@ -410,7 +421,7 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 	network := properties.LocalAddr().Network()
 	switch network {
 	case "tcp", "tcp4", "tcp6":
-		tcpAddr, err := apicommon.ResolveTCPAddr(m.resolver, "tcp", laddr)
+		tcpAddr, err := apicommon.ResolveTCPAddr(ctx, m.resolver, "tcp", laddr)
 		if err != nil {
 			log.Errorf("ResolveTCPAddr() failed: %v", err)
 			if m.acceptHasErr.CompareAndSwap(false, true) {
@@ -486,7 +497,7 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 			}(ctx, underlay)
 		}
 	case "udp", "udp4", "udp6":
-		udpAddr, err := apicommon.ResolveUDPAddr(m.resolver, "udp", laddr)
+		udpAddr, err := apicommon.ResolveUDPAddr(ctx, m.resolver, "udp", laddr)
 		if err != nil {
 			log.Errorf("ResolveUDPAddr() failed: %v", err)
 			if m.acceptHasErr.CompareAndSwap(false, true) {
@@ -617,7 +628,7 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 		block.SetBlockContext(cipher.BlockContext{
 			UserName: m.username,
 		})
-		underlay, err = NewStreamUnderlay(ctx, m.dialer, m.resolver, p.RemoteAddr().Network(), p.RemoteAddr().String(), p.MTU(), block)
+		underlay, err = NewStreamUnderlay(ctx, m.dialer, m.resolver, m.clientDNSConfig, p.RemoteAddr().Network(), p.RemoteAddr().String(), p.MTU(), block)
 		if err != nil {
 			return nil, fmt.Errorf("NewTCPUnderlay() failed: %v", err)
 		}

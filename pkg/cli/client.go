@@ -496,7 +496,7 @@ var clientRunFunc = func(s []string) error {
 		wg.Add(1)
 		go func() {
 			rpcAddr := "localhost:" + strconv.Itoa(int(config.GetRpcPort()))
-			rpcTCPAddr, err := apicommon.ResolveTCPAddr(resolver, "tcp", rpcAddr)
+			rpcTCPAddr, err := apicommon.ResolveTCPAddr(context.Background(), resolver, "tcp", rpcAddr)
 			if err != nil {
 				log.Fatalf("Resolve RPC address %q failed: %v", rpcAddr, err)
 			}
@@ -527,7 +527,7 @@ var clientRunFunc = func(s []string) error {
 	if err != nil {
 		return fmt.Errorf(stderror.ClientGetActiveProfileFailedErr, err)
 	}
-	mux, err := appctlcommon.NewClientMuxFromProfile(activeProfile, nil, nil, resolver)
+	mux, err := appctlcommon.NewClientMuxFromProfile(activeProfile, nil, nil, resolver, nil)
 	if err != nil {
 		return err
 	}
@@ -569,7 +569,7 @@ var clientRunFunc = func(s []string) error {
 	}
 	wg.Add(1)
 	go func(socks5Addr string) {
-		socks5TCPAddr, err := apicommon.ResolveTCPAddr(resolver, "tcp", socks5Addr)
+		socks5TCPAddr, err := apicommon.ResolveTCPAddr(context.Background(), resolver, "tcp", socks5Addr)
 		if err != nil {
 			log.Fatalf("Resolve socks5 address %q failed: %v", socks5Addr, err)
 		}

@@ -16,6 +16,7 @@
 package common
 
 import (
+	"context"
 	"net"
 	"testing"
 )
@@ -72,7 +73,7 @@ func TestResolveTCPAddr(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			addr, err := ResolveTCPAddr(resolver, tc.network, tc.address)
+			addr, err := ResolveTCPAddr(context.Background(), resolver, tc.network, tc.address)
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("ResolveTCPAddr() error = %v, wantErr %v", err, tc.wantErr)
 			}
@@ -140,7 +141,7 @@ func TestResolveUDPAddr(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			addr, err := ResolveUDPAddr(resolver, tc.network, tc.address)
+			addr, err := ResolveUDPAddr(context.Background(), resolver, tc.network, tc.address)
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("ResolveUDPAddr() error = %v, wantErr %v", err, tc.wantErr)
 			}

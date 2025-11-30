@@ -58,10 +58,10 @@ sleep 1
   -server_ip=127.0.0.1 -server_port=6489 -server_protocol=UDP &
 sleep 1
 ./exampleapiclient -port=1083 -username=baozi -password=manlianpenfen \
-  -server_ip=127.0.0.1 -server_port=8964 -server_protocol=TCP -handshake_mode=HANDSHAKE_NO_WAIT &
+  -server_ip=127.0.0.1 -server_port=8964 -server_protocol=TCP -handshake_mode=HANDSHAKE_NO_WAIT -bypass_dns &
 sleep 1
 ./exampleapiclient -port=1084 -username=baozi -password=manlianpenfen \
-  -server_ip=127.0.0.1 -server_port=6489 -server_protocol=UDP -handshake_mode=HANDSHAKE_NO_WAIT &
+  -server_ip=127.0.0.1 -server_port=6489 -server_protocol=UDP -handshake_mode=HANDSHAKE_NO_WAIT -bypass_dns &
 sleep 1
 
 echo "========== BEGIN OF TCP TEST =========="

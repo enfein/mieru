@@ -134,10 +134,10 @@ func (s *Server) handleBind(_ context.Context, _ *model.Request, conn net.Conn) 
 }
 
 // handleAssociate is used to handle a associate command.
-func (s *Server) handleAssociate(_ context.Context, _ *model.Request, conn net.Conn) error {
+func (s *Server) handleAssociate(ctx context.Context, _ *model.Request, conn net.Conn) error {
 	// Create a UDP listener on a random port.
 	// All the requests associated to this connection will go through this port.
-	udpListenerAddr, err := apicommon.ResolveUDPAddr(s.config.Resolver, "udp", common.MaybeDecorateIPv6(common.AllIPAddr())+":0")
+	udpListenerAddr, err := apicommon.ResolveUDPAddr(ctx, s.config.Resolver, "udp", common.MaybeDecorateIPv6(common.AllIPAddr())+":0")
 	if err != nil {
 		UDPAssociateErrors.Add(1)
 		return fmt.Errorf("failed to resolve UDP address: %w", err)

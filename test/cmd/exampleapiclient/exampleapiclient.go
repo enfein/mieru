@@ -42,6 +42,7 @@ var (
 	serverPort     = flag.Int("server_port", 0, "Port number of mieru proxy server")
 	serverProtocol = flag.String("server_protocol", "TCP", "Transport protocol: TCP or UDP")
 	handshakeMode  = flag.String("handshake_mode", "HANDSHAKE_STANDARD", "Handshake mode: HANDSHAKE_STANDARD or HANDSHAKE_NO_WAIT")
+	bypassDNS      = flag.Bool("bypass_dns", false, "Bypass proxy server DNS resolution")
 	debug          = flag.Bool("debug", false, "Display debug messages")
 )
 
@@ -83,6 +84,12 @@ func main() {
 	default:
 		panic(fmt.Sprintf("Handshake mode %q is invalid", *handshakeMode))
 	}
+	var dnsConfig *apicommon.ClientDNSConfig
+	if *bypassDNS {
+		dnsConfig = &apicommon.ClientDNSConfig{
+			BypassDialerDNS: true,
+		}
+	}
 
 	c := client.NewClient()
 	if err := c.Store(&client.ClientConfig{
@@ -106,6 +113,7 @@ func main() {
 			Mtu:           proto.Int32(1400),
 			HandshakeMode: &handshakeModeConfig,
 		},
+		DNSConfig: dnsConfig,
 	}); err != nil {
 		panic(fmt.Sprintf("Store() failed: %v", err))
 	}

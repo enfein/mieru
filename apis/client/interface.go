@@ -104,10 +104,12 @@ type ClientConfig struct {
 
 	// If set, the resolver translates proxy server domain name into IP addresses.
 	//
-	// This field is not required, if Dialer or PacketDialer is able to do DNS,
-	// or proxy server endpoints are IP addresses rather than domain names.
-	// Otherwise, the proxy server won't be reachable.
+	// This field is not required if proxy server endpoints are IP addresses
+	// rather than domain names. Otherwise, the proxy server may not be reachable.
 	Resolver apicommon.DNSResolver
+
+	// Optional DNS configurations.
+	DNSConfig *apicommon.ClientDNSConfig
 }
 
 // NewClient creates a blank mieru client with no client config.

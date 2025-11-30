@@ -75,12 +75,12 @@ func NewPacketUnderlay(ctx context.Context, packetDialer apicommon.PacketDialer,
 	if !block.IsStateless() {
 		return nil, fmt.Errorf("packet underlay block cipher must be stateless")
 	}
-	remoteAddr, err := apicommon.ResolveUDPAddr(resolver, network, addr)
+	remoteUDPAddr, err := apicommon.ResolveUDPAddr(ctx, resolver, network, addr)
 	if err != nil {
 		return nil, fmt.Errorf("ResolveUDPAddr() failed: %w", err)
 	}
 
-	conn, err := packetDialer.ListenPacket(ctx, network, "", remoteAddr.String())
+	conn, err := packetDialer.ListenPacket(ctx, network, "", remoteUDPAddr.String())
 	if err != nil {
 		return nil, fmt.Errorf("ListenPacket() failed: %w", err)
 	}
@@ -88,9 +88,10 @@ func NewPacketUnderlay(ctx context.Context, packetDialer apicommon.PacketDialer,
 		baseUnderlay:       *newBaseUnderlay(true, mtu),
 		conn:               conn,
 		sessionCleanTicker: time.NewTicker(sessionCleanInterval),
-		serverAddr:         remoteAddr,
+		serverAddr:         remoteUDPAddr,
 		block:              block,
 	}
+
 	// The block cipher expires after this time.
 	u.scheduler.SetRemainingTime(cipher.KeyRefreshInterval / 2)
 	return u, nil
