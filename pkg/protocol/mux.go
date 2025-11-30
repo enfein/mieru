@@ -617,7 +617,7 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 		block.SetBlockContext(cipher.BlockContext{
 			UserName: m.username,
 		})
-		underlay, err = NewStreamUnderlay(ctx, m.dialer, p.RemoteAddr().Network(), p.RemoteAddr().String(), p.MTU(), block)
+		underlay, err = NewStreamUnderlay(ctx, m.dialer, m.resolver, p.RemoteAddr().Network(), p.RemoteAddr().String(), p.MTU(), block)
 		if err != nil {
 			return nil, fmt.Errorf("NewTCPUnderlay() failed: %v", err)
 		}
@@ -629,7 +629,7 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 		block.SetBlockContext(cipher.BlockContext{
 			UserName: m.username,
 		})
-		underlay, err = NewPacketUnderlay(ctx, m.packetDialer, p.RemoteAddr().Network(), p.RemoteAddr().String(), p.MTU(), block, m.resolver)
+		underlay, err = NewPacketUnderlay(ctx, m.packetDialer, m.resolver, p.RemoteAddr().Network(), p.RemoteAddr().String(), p.MTU(), block)
 		if err != nil {
 			return nil, fmt.Errorf("NewUDPUnderlay() failed: %v", err)
 		}

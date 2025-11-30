@@ -8,7 +8,7 @@ mode: rule
 proxies:
   - name: mieru
     type: mieru
-    server: 127.0.0.1
+    server: localhost
     port-range: 8964-8965
     transport: UDP
     udp: true

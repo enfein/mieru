@@ -18,8 +18,6 @@ package common
 import (
 	"context"
 	"io"
-	"net"
-	"sync"
 	"time"
 )
 
@@ -61,58 +59,4 @@ func RoundTrip(ctx context.Context, rw io.ReadWriter, req []byte, maxRespSize in
 	n, err = rw.Read(resp)
 	resp = resp[:n]
 	return
-}
-
-// HierarchyConn closes sub-connections when this connection is closed.
-type HierarchyConn interface {
-	net.Conn
-
-	// AddSubConnection attach a child connection to this connection.
-	// The child connection is closed when this connection close.
-	AddSubConnection(conn net.Conn)
-}
-
-type hierarchyConn struct {
-	net.Conn
-	subConnetions []HierarchyConn
-	mu            sync.Mutex
-}
-
-var (
-	_ HierarchyConn = (*hierarchyConn)(nil)
-	_ UserContext   = (*hierarchyConn)(nil)
-)
-
-func (h *hierarchyConn) Close() error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	for _, sub := range h.subConnetions {
-		if sub != nil {
-			sub.Close()
-		}
-	}
-	return h.Conn.Close()
-}
-
-func (h *hierarchyConn) AddSubConnection(conn net.Conn) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if h.subConnetions == nil {
-		h.subConnetions = make([]HierarchyConn, 0)
-	}
-	h.subConnetions = append(h.subConnetions, WrapHierarchyConn(conn))
-}
-
-func (h *hierarchyConn) UserName() string {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if userCtx, ok := h.Conn.(UserContext); ok {
-		return userCtx.UserName()
-	}
-	return ""
-}
-
-// WrapHierarchyConn wraps an existing connection with HierarchyConn.
-func WrapHierarchyConn(conn net.Conn) HierarchyConn {
-	return &hierarchyConn{Conn: conn}
 }

@@ -25,6 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
 	"github.com/enfein/mieru/v3/pkg/common"
@@ -109,7 +110,7 @@ type Session struct {
 	status            statusCode               // session status
 
 	users    map[string]*appctlpb.User // all registered users, only used by server
-	userName string                    // user that owns this session, only used by server
+	userName atomic.Pointer[string]    // user that owns this session, only used by server
 
 	ready          chan struct{} // indicate the session is ready to use
 	closeRequested atomic.Bool   // the session is being closed or has been closed
@@ -155,8 +156,8 @@ var (
 	// Session implements net.Conn interface.
 	_ net.Conn = (*Session)(nil)
 
-	// Session implements common.UserContext interface.
-	_ common.UserContext = (*Session)(nil)
+	// Session implements UserContext interface.
+	_ apicommon.UserContext = (*Session)(nil)
 )
 
 // NewSession creates a new session.
@@ -403,7 +404,10 @@ func (s *Session) SetWriteDeadline(t time.Time) error {
 // UserName returns the user that owns this session,
 // only if this is a server session.
 func (s *Session) UserName() string {
-	return s.userName
+	if p := s.userName.Load(); p != nil {
+		return *p
+	}
+	return ""
 }
 
 // ToSessionInfo creates related SessionInfo protobuf object.
@@ -905,8 +909,9 @@ func (s *Session) input(seg *segment) error {
 		}
 
 		s.block.Store(&seg.block)
-		if s.userName == "" && seg.block.BlockContext().UserName != "" {
-			s.userName = seg.block.BlockContext().UserName
+		if s.UserName() == "" && seg.block.BlockContext().UserName != "" {
+			userName := seg.block.BlockContext().UserName
+			s.userName.Store(&userName)
 		}
 
 		// Register server per user metrics.
@@ -1026,14 +1031,14 @@ func (s *Session) inputData(seg *segment) error {
 			// Server needs to send open session response.
 			// Check user quota if we can identify the user.
 			s.oLock.Lock()
-			if s.userName != "" {
-				quotaOK, err := s.checkQuota(s.userName)
+			if userName := s.UserName(); userName != "" {
+				quotaOK, err := s.checkQuota(userName)
 				if err != nil {
 					log.Debugf("%v checkQuota() failed: %v", s, err)
 				}
 				if !quotaOK {
 					s.status = statusQuotaExhausted
-					log.Debugf("Closing %v because user %s used all the quota", s, s.userName)
+					log.Debugf("Closing %v because user %s used all the quota", s, userName)
 					s.oLock.Unlock()
 					s.Close()
 					return nil

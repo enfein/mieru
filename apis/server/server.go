@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlcommon"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
@@ -126,6 +127,9 @@ func (ms *mieruServer) Accept() (net.Conn, *model.Request, error) {
 	conn, err := ms.mux.Accept()
 	if err != nil {
 		return nil, nil, err
+	}
+	if _, ok := conn.(apicommon.UserContext); !ok {
+		return nil, nil, fmt.Errorf("internal error: connection doesn't implement UserContext interface")
 	}
 
 	common.SetReadTimeout(conn, 10*time.Second)

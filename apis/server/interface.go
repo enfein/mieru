@@ -72,6 +72,8 @@ type ServerNetworkService interface {
 	// Accept accepts a new proxy connection from a client.
 	// It returns the proxy connection and the socks5 request sent by the client.
 	// Additional handshake is required with the returned proxy connection.
+	//
+	// The returned proxy connection implements UserContext interface.
 	Accept() (net.Conn, *model.Request, error)
 }
 

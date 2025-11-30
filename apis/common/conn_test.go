@@ -1,4 +1,4 @@
-// Copyright (C) 2022  mieru authors
+// Copyright (C) 2025  mieru authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -13,26 +13,31 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package common
+package common_test
 
 import (
-	"bytes"
-	crand "crypto/rand"
-	"io"
-	mrand "math/rand"
+	"net"
 	"testing"
+
+	"github.com/enfein/mieru/v3/apis/common"
 )
 
-func TestReadAllAndDiscard(t *testing.T) {
-	n := mrand.Int63n(1024*1024) + 1
-	buf := bytes.NewBuffer(make([]byte, n))
-	if _, err := io.CopyN(buf, crand.Reader, n); err != nil {
-		t.Fatalf("Generating random data failed: %v", err)
-	}
+type counterCloser struct {
+	net.Conn
+	Counter *int
+}
 
-	ReadAllAndDiscard(buf)
+func (cc counterCloser) Close() error {
+	*cc.Counter = *cc.Counter + 1
+	return nil
+}
 
-	if buf.Len() != 0 {
-		t.Errorf("buf.Len() = %d, want 0", buf.Len())
+func TestHierarchyConn(t *testing.T) {
+	counter := 0
+	parent := common.WrapHierarchyConn(counterCloser{Conn: nil, Counter: &counter})
+	parent.Add(counterCloser{Conn: nil, Counter: &counter})
+	parent.Close()
+	if counter != 2 {
+		t.Errorf("counter = %d, want %d", counter, 2)
 	}
 }

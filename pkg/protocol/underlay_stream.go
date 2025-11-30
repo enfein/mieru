@@ -63,7 +63,7 @@ var _ Underlay = &StreamUnderlay{}
 // "block" is the block encryption algorithm to encrypt packets.
 //
 // This function is only used by proxy client.
-func NewStreamUnderlay(ctx context.Context, dialer apicommon.Dialer, network, addr string, mtu int, block cipher.BlockCipher) (*StreamUnderlay, error) {
+func NewStreamUnderlay(ctx context.Context, dialer apicommon.Dialer, resolver apicommon.DNSResolver, network, addr string, mtu int, block cipher.BlockCipher) (*StreamUnderlay, error) {
 	switch network {
 	case "tcp", "tcp4", "tcp6":
 	default:
@@ -72,7 +72,12 @@ func NewStreamUnderlay(ctx context.Context, dialer apicommon.Dialer, network, ad
 	if block.IsStateless() {
 		return nil, fmt.Errorf("stream underlay block cipher must be stateful")
 	}
-	conn, err := dialer.DialContext(ctx, network, addr)
+	remoteAddr, err := apicommon.ResolveTCPAddr(resolver, network, addr)
+	if err != nil {
+		return nil, fmt.Errorf("ResolveTCPAddr() failed: %w", err)
+	}
+
+	conn, err := dialer.DialContext(ctx, network, remoteAddr.String())
 	if err != nil {
 		return nil, fmt.Errorf("DialContext() failed: %w", err)
 	}

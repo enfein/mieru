@@ -160,7 +160,7 @@ func (s *Server) Serve(l net.Listener) error {
 
 // ServeConn is used to serve a single connection.
 func (s *Server) ServeConn(conn net.Conn) error {
-	conn = common.WrapHierarchyConn(conn)
+	conn = apicommon.WrapHierarchyConn(conn)
 	defer conn.Close()
 	log.Debugf("socks5 server starts to serve connection [%v - %v]", conn.LocalAddr(), conn.RemoteAddr())
 
@@ -227,7 +227,7 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 		return common.BidiCopy(conn, proxyConn)
 	}
 	log.Debugf("UDP association is listening on %v", udpAssociateConn.LocalAddr())
-	conn.(common.HierarchyConn).AddSubConnection(udpAssociateConn)
+	conn.(apicommon.HierarchyConn).Add(udpAssociateConn)
 	go func() {
 		common.ReadAllAndDiscard(conn)
 		conn.Close()
@@ -262,18 +262,15 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 		Protocol: appctlpb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL,
 		Data:     request.Raw,
 	}
-	if userCtx, ok := conn.(common.UserContext); ok {
-		userName := userCtx.UserName()
-		if userName == "" {
-			log.Debugf("Failed to determine user name from the connection")
-		} else {
-			log.Debugf("User %q initiated the connection", userName)
-			egressInput.Env = map[string]string{
-				"user": userName,
-			}
-		}
+	userCtx := conn.(apicommon.UserContext)
+	userName := userCtx.UserName()
+	if userName == "" {
+		log.Debugf("Failed to determine user name from the connection")
 	} else {
-		log.Errorf("%T doesn't implement common.UserContext interface", conn)
+		log.Debugf("User %q initiated the connection", userName)
+		egressInput.Env = map[string]string{
+			"user": userName,
+		}
 	}
 	action := s.FindAction(ctx, egressInput)
 	if action.Action == appctlpb.EgressAction_PROXY {

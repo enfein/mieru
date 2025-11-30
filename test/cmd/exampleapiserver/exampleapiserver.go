@@ -102,10 +102,15 @@ func main() {
 }
 
 func handleOneProxyConn(proxyConn net.Conn, req *model.Request) {
-	if *debug {
-		fmt.Printf("Received %v\n", req)
-	}
 	defer proxyConn.Close()
+
+	userCtx := proxyConn.(apicommon.UserContext)
+	if userCtx.UserName() == "" {
+		panic("User name is empty")
+	}
+	if *debug {
+		fmt.Printf("Received %v from %s\n", req, userCtx.UserName())
+	}
 
 	var isTCP, isUDP bool
 	switch req.Command {

@@ -16,7 +16,6 @@
 package appctlcommon
 
 import (
-	"context"
 	"encoding/hex"
 	"fmt"
 	"net"
@@ -96,10 +95,7 @@ func NewClientMuxFromProfile(activeProfile *pb.ClientProfile, dialer apicommon.D
 	// Set DNS resolver.
 	// If DNS resolver is not provided, disable DNS resolution.
 	// Connection to a domain name endpoint may fail.
-	enableDNS := false
-	if resolver != nil {
-		enableDNS = true
-	} else {
+	if resolver == nil {
 		resolver = apicommon.NilDNSResolver{}
 	}
 	mux.SetResolver(resolver)
@@ -142,16 +138,6 @@ func NewClientMuxFromProfile(activeProfile *pb.ClientProfile, dialer apicommon.D
 		var proxyIP net.IP
 		if serverInfo.GetDomainName() != "" {
 			proxyHost = serverInfo.GetDomainName()
-			if enableDNS {
-				proxyIPs, err := resolver.LookupIP(context.Background(), "ip", proxyHost)
-				if err != nil {
-					return nil, fmt.Errorf(stderror.LookupIPFailedErr, err)
-				}
-				if len(proxyIPs) == 0 {
-					return nil, fmt.Errorf(stderror.IPAddressNotFound, proxyHost)
-				}
-				proxyIP = proxyIPs[0]
-			}
 		} else {
 			proxyHost = serverInfo.GetIpAddress()
 			proxyIP = net.ParseIP(proxyHost)

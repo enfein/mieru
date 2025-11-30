@@ -8,7 +8,7 @@
             },
             "servers": [
                 {
-                    "domainName": "localhost",
+                    "ipAddress": "127.0.0.1",
                     "portBindings": [
                         {
                             "port": 8966,
