@@ -1,0 +1,53 @@
+name: 'sing-box test'
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: 'sing-box repository (e.g. SagerNet/sing-box)'
+        required: true
+        default: 'enfein/mbox'
+      branch:
+        description: 'Branch to checkout'
+        required: true
+        default: 'mieru'
+jobs:
+  sing-box-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out mieru repository code
+        uses: actions/checkout@v4
+        with:
+          path: mieru
+      - name: Check out sing-box repository code
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.branch }}
+          path: sing-box
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: sing-box/go.mod
+      - name: Update mieru reference
+        working-directory: sing-box
+        run: echo "replace github.com/enfein/mieru/v3 => ../mieru" >> go.mod
+      - name: Run go mod tidy
+        working-directory: sing-box
+        run: go mod tidy
+      - name: Show go mod diff
+        working-directory: sing-box
+        run: git --no-pager diff
+      - name: Build sing-box
+        working-directory: sing-box
+        run: make build
+      - name: Copy sing-box binary
+        run: cp sing-box/sing-box mieru/sing-box
+      - name: Build mieru test binaries
+        working-directory: mieru
+        run: make test-binary
+      - name: Build mieru test docker image
+        working-directory: mieru
+        run: docker build -t singbox:latest -f test/deploy/singbox/Dockerfile .
+      - name: Run mieru test
+        run: docker run singbox:latest

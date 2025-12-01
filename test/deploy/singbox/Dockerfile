@@ -21,10 +21,12 @@ WORKDIR /test
 
 # Copy binaries, data and test script into the container.
 COPY sing-box mita httpserver sockshttpclient socksudpclient udpserver \
-    test/deploy/singbox/singbox-config.json \
+    test/deploy/singbox/singbox-config-tcp.json \
+    test/deploy/singbox/singbox-config-udp.json \
     test/deploy/singbox/server_tcp.json \
+    test/deploy/singbox/server_udp.json \
     test/deploy/singbox/libtest.sh \
-    test/deploy/singbox/test_tcp.sh \
+    test/deploy/singbox/test_client.sh \
     test/deploy/singbox/test.sh /test/
 
 # Create mita user and server config directory.

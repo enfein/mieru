@@ -35,10 +35,10 @@ sleep 1
 ./mita run &
 sleep 1
 
-# Run TCP test.
-echo "========== BEGIN OF TCP TEST =========="
-./test_tcp.sh
-echo "==========  END OF TCP TEST  =========="
+# Run client test.
+echo "========== BEGIN OF CLIENT TEST =========="
+./test_client.sh
+echo "==========  END OF CLIENT TEST  =========="
 
 echo "Test is successful."
 sleep 1
