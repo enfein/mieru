@@ -142,27 +142,27 @@ if [[ "$?" -ne 0 ]]; then
 fi
 echo "==========  END OF CLIENT TCP TEST  =========="
 
-# echo "========== BEGIN OF CLIENT UDP TEST =========="
-# ./mita apply config server_udp.json
-# if [[ "$?" -ne 0 ]]; then
-#     echo "command 'mita apply config server_udp.json' failed"
-#     exit 1
-# fi
-# echo "mieru server config:"
-# ./mita describe config
-# ./mita start
-# if [[ "$?" -ne 0 ]]; then
-#     echo "command 'mita start' failed"
-#     exit 1
-# fi
-# ./sing-box run -c singbox-config-udp.json &
-# sleep 1
-# run_udp_tests 1083
-# print_mieru_server_metrics
-# sleep 1
-# ./mita stop
-# if [[ "$?" -ne 0 ]]; then
-#     echo "command 'mita stop' failed"
-#     exit 1
-# fi
-# echo "==========  END OF CLIENT UDP TEST  =========="
+echo "========== BEGIN OF CLIENT UDP TEST =========="
+./mita apply config server_udp.json
+if [[ "$?" -ne 0 ]]; then
+    echo "command 'mita apply config server_udp.json' failed"
+    exit 1
+fi
+echo "mieru server config:"
+./mita describe config
+./mita start
+if [[ "$?" -ne 0 ]]; then
+    echo "command 'mita start' failed"
+    exit 1
+fi
+./sing-box run -c singbox-config-udp.json &
+sleep 1
+run_udp_tests 1083
+print_mieru_server_metrics
+sleep 1
+./mita stop
+if [[ "$?" -ne 0 ]]; then
+    echo "command 'mita stop' failed"
+    exit 1
+fi
+echo "==========  END OF CLIENT UDP TEST  =========="
