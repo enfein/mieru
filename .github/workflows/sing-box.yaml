@@ -41,11 +41,11 @@ jobs:
       - name: Build sing-box
         working-directory: sing-box
         run: make build
-      - name: Copy sing-box binary
-        run: cp sing-box/sing-box mieru/sing-box
       - name: Build mieru test binaries
         working-directory: mieru
         run: make test-binary
+      - name: Copy sing-box binary
+        run: cp sing-box/sing-box mieru/bin/sing-box
       - name: Build mieru test docker image
         working-directory: mieru
         run: docker build -t singbox:latest -f test/deploy/singbox/Dockerfile .

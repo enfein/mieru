@@ -34,11 +34,11 @@ jobs:
       - name: Build mihomo
         working-directory: mihomo
         run: make linux-amd64-v1
-      - name: Copy mihomo binary
-        run: cp mihomo/bin/mihomo-linux-amd64-v1 mieru/mihomo
       - name: Build mieru test binaries
         working-directory: mieru
         run: make test-binary
+      - name: Copy mihomo binary
+        run: cp mihomo/bin/mihomo-linux-amd64-v1 mieru/bin/mihomo
       - name: Build mieru test docker image
         working-directory: mieru
         run: docker build -t mihomo:latest -f test/deploy/mihomo/Dockerfile .
