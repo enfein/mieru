@@ -361,16 +361,17 @@ rpm-server-arm64: server-linux-arm64
 # Build binaries used in integration tests.
 .PHONY: test-binary
 test-binary:
-	CGO_ENABLED=0 go build -ldflags="-X 'github.com/enfein/mieru/v3/pkg/log.LogPrefix=C'" -o mieru cmd/mieru/mieru.go
-	CGO_ENABLED=0 go build -ldflags="-X 'github.com/enfein/mieru/v3/pkg/log.LogPrefix=S'" -o mita cmd/mita/mita.go
-	CGO_ENABLED=1 go build -race -ldflags="-X 'github.com/enfein/mieru/v3/pkg/log.LogPrefix=C2'" -o mieru2 cmd/mieru/mieru.go
-	CGO_ENABLED=1 go build -race -ldflags="-X 'github.com/enfein/mieru/v3/pkg/log.LogPrefix=S2'" -o mita2 cmd/mita/mita.go
-	CGO_ENABLED=0 go build test/cmd/exampleapiclient/exampleapiclient.go
-	CGO_ENABLED=0 go build test/cmd/exampleapiserver/exampleapiserver.go
-	CGO_ENABLED=0 go build test/cmd/httpserver/httpserver.go
-	CGO_ENABLED=0 go build test/cmd/sockshttpclient/sockshttpclient.go
-	CGO_ENABLED=0 go build test/cmd/socksudpclient/socksudpclient.go
-	CGO_ENABLED=0 go build test/cmd/udpserver/udpserver.go
+	mkdir -p bin
+	CGO_ENABLED=0 go build -ldflags="-X 'github.com/enfein/mieru/v3/pkg/log.LogPrefix=C'" -o bin/mieru cmd/mieru/mieru.go
+	CGO_ENABLED=0 go build -ldflags="-X 'github.com/enfein/mieru/v3/pkg/log.LogPrefix=S'" -o bin/mita cmd/mita/mita.go
+	CGO_ENABLED=1 go build -race -ldflags="-X 'github.com/enfein/mieru/v3/pkg/log.LogPrefix=C2'" -o bin/mieru2 cmd/mieru/mieru.go
+	CGO_ENABLED=1 go build -race -ldflags="-X 'github.com/enfein/mieru/v3/pkg/log.LogPrefix=S2'" -o bin/mita2 cmd/mita/mita.go
+	CGO_ENABLED=0 go build -o bin/exampleapiclient test/cmd/exampleapiclient/exampleapiclient.go
+	CGO_ENABLED=0 go build -o bin/exampleapiserver test/cmd/exampleapiserver/exampleapiserver.go
+	CGO_ENABLED=0 go build -o bin/httpserver test/cmd/httpserver/httpserver.go
+	CGO_ENABLED=0 go build -o bin/sockshttpclient test/cmd/sockshttpclient/sockshttpclient.go
+	CGO_ENABLED=0 go build -o bin/socksudpclient test/cmd/socksudpclient/socksudpclient.go
+	CGO_ENABLED=0 go build -o bin/udpserver test/cmd/udpserver/udpserver.go
 
 # Build docker images to run integration tests.
 .PHONY: test-container-image
@@ -379,7 +380,6 @@ test-container-image: test-binary
 	docker build -t mieru_apiclient:${SHORT_SHA} -f test/deploy/apiclient/Dockerfile .
 	docker build -t mieru_apiserver:${SHORT_SHA} -f test/deploy/apiserver/Dockerfile .
 	docker build -t mieru_proxychain:${SHORT_SHA} -f test/deploy/proxychain/Dockerfile .
-	rm -f exampleapiclient exampleapiserver mieru mieru2 mita mita2 httpserver sockshttpclient socksudpclient udpserver
 
 # Run docker integration tests.
 .PHONY: run-container-test

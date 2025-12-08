@@ -2,6 +2,7 @@
 /vendor
 
 # binaries
+/bin
 /release
 *.exe
 *.dll

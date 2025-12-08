@@ -20,7 +20,7 @@ FROM ubuntu:24.04
 WORKDIR /test
 
 # Copy binaries, data and test script into the container.
-COPY exampleapiclient mita httpserver sockshttpclient socksudpclient udpserver \
+COPY bin/exampleapiclient bin/mita bin/httpserver bin/sockshttpclient bin/socksudpclient bin/udpserver \
     test/deploy/apiclient/server_mix.json \
     test/deploy/apiclient/test.sh /test/
 

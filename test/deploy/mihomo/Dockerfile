@@ -20,7 +20,7 @@ FROM ubuntu:24.04
 WORKDIR /test
 
 # Copy binaries, data and test script into the container.
-COPY mihomo mieru mita httpserver sockshttpclient socksudpclient udpserver \
+COPY bin/mihomo bin/mieru bin/mita bin/httpserver bin/sockshttpclient bin/socksudpclient bin/udpserver \
     test/deploy/mihomo/mihomo-client-tcp.yaml \
     test/deploy/mihomo/mihomo-client-tcp-no-wait.yaml \
     test/deploy/mihomo/mihomo-client-udp.yaml \
