@@ -131,9 +131,9 @@ type Session struct {
 	nextSend               atomic.Uint32 // next sequence number to send a segment
 	nextRecv               atomic.Uint32 // next sequence number to receive
 	lastSend               atomic.Uint32 // last segment sequence number sent
-	lastRXTime             time.Time     // last timestamp when a segment is received
-	lastTXTime             time.Time     // last timestamp when a segment is sent
-	nextRetransmissionTime time.Time     // time that need to retransmit a segment in sendBuf
+	lastRXTime             atomic.Int64  // last timestamp when a segment is received, in microseconds since Unix epoch
+	lastTXTime             atomic.Int64  // last timestamp when a segment is sent, in microseconds since Unix epoch
+	nextRetransmissionTime atomic.Int64  // time that need to retransmit a segment in sendBuf, in microseconds since Unix epoch
 	ackOnDataRecv          atomic.Bool   // whether ack should be sent due to receive of new data
 	unreadBuf              []byte        // payload removed from the recvQueue that haven't been read by application
 
@@ -185,12 +185,13 @@ func NewSession(id uint32, isClient bool, mtu int, users map[string]*appctlpb.Us
 		recvBuf:            newSegmentTree(segmentTreeCapacity),
 		recvQueue:          newSegmentTree(segmentTreeRecvQueueCapacity),
 		recvChan:           make(chan *segment, segmentChanCapacity),
-		lastRXTime:         time.Now(),
-		lastTXTime:         time.Now(),
 		rttStat:            rttStat,
 		cubicSendAlgorithm: congestion.NewCubicSendAlgorithm(minWindowSize, maxWindowSize),
 		bbrSendAlgorithm:   congestion.NewBBRSender(fmt.Sprintf("%d", id), rttStat),
 	}
+	now := time.Now().UnixMicro()
+	s.lastRXTime.Store(now)
+	s.lastTXTime.Store(now)
 	s.remoteWindowSize.Store(minWindowSize)
 	return s
 }
@@ -427,24 +428,27 @@ func (s *Session) ToSessionInfo() *appctlpb.SessionInfo {
 		info.RemoteAddr = proto.String(s.conn.RemoteAddr().String())
 		if _, ok := s.conn.(*StreamUnderlay); ok {
 			info.Protocol = proto.String("TCP")
+			lastRXTime := time.UnixMicro(s.lastRXTime.Load())
 			info.LastRecvTime = &timestamppb.Timestamp{
-				Seconds: s.lastRXTime.Unix(),
-				Nanos:   int32(s.lastRXTime.Nanosecond()),
+				Seconds: lastRXTime.Unix(),
+				Nanos:   int32(lastRXTime.Nanosecond()),
 			}
 			// TCP info.LastRecvSeq is not available.
 		} else if _, ok := s.conn.(*PacketUnderlay); ok {
 			info.Protocol = proto.String("UDP")
+			lastRXTime := time.UnixMicro(s.lastRXTime.Load())
 			info.LastRecvTime = &timestamppb.Timestamp{
-				Seconds: s.lastRXTime.Unix(),
-				Nanos:   int32(s.lastRXTime.Nanosecond()),
+				Seconds: lastRXTime.Unix(),
+				Nanos:   int32(lastRXTime.Nanosecond()),
 			}
 			info.LastRecvSeq = proto.Uint32(uint32(mathext.Max(0, int(s.nextRecv.Load())-1)))
 		} else {
 			info.Protocol = proto.String("UNKNOWN")
 		}
+		lastTXTime := time.UnixMicro(s.lastTXTime.Load())
 		info.LastSendTime = &timestamppb.Timestamp{
-			Seconds: s.lastTXTime.Unix(),
-			Nanos:   int32(s.lastTXTime.Nanosecond()),
+			Seconds: lastTXTime.Unix(),
+			Nanos:   int32(lastTXTime.Nanosecond()),
 		}
 		info.LastSendSeq = proto.Uint32(uint32(mathext.Max(0, int(s.nextSend.Load())-1)))
 	}
@@ -695,7 +699,7 @@ func (s *Session) runOutputOncePacket() {
 	var bytesInFlight int64
 	totalTransmissionCount := 0
 
-	if time.Since(s.nextRetransmissionTime) >= 0 {
+	if time.Now().UnixMicro() >= s.nextRetransmissionTime.Load() {
 		// Resend segments in sendBuf.
 		//
 		// Iterate all the segments in sendBuf to calculate bytesInFlight and
@@ -708,7 +712,7 @@ func (s *Session) runOutputOncePacket() {
 		var nextTX int64 = math.MaxInt64
 		s.sendBuf.Ascend(func(iter *segment) bool {
 			bytesInFlight += int64(packetOverhead + len(iter.payload))
-			nextTX = mathext.Min(nextTX, iter.txTime.Add(iter.txTimeout).UnixMicro())
+			nextTX = mathext.Min(nextTX, iter.txTime+iter.txTimeout.Microseconds())
 
 			if iter.txCount >= txCountLimit {
 				err := fmt.Errorf("too many retransmission of %v", iter)
@@ -721,7 +725,7 @@ func (s *Session) runOutputOncePacket() {
 			}
 
 			satisfyEarlyRetransmission := iter.ackCount >= earlyRetransmission && iter.txCount <= earlyRetransmissionLimit
-			if satisfyEarlyRetransmission || time.Since(iter.txTime) > iter.txTimeout {
+			if satisfyEarlyRetransmission || time.Now().UnixMicro()-iter.txTime > iter.txTimeout.Microseconds() {
 				if satisfyEarlyRetransmission {
 					hasLoss = true
 				} else {
@@ -729,7 +733,7 @@ func (s *Session) runOutputOncePacket() {
 				}
 				iter.ackCount = 0
 				iter.txCount++
-				iter.txTime = time.Now()
+				iter.txTime = time.Now().UnixMicro()
 				iter.txTimeout = mathext.Min(s.rttStat.RTO()*time.Duration(math.Pow(txTimeoutBackOff, float64(iter.txCount))), maxBackOffDuration)
 				if isDataAckProtocol(iter.metadata.Protocol()) {
 					das, _ := toDataAckStruct(iter.metadata)
@@ -751,10 +755,10 @@ func (s *Session) runOutputOncePacket() {
 			return true
 		})
 		if nextTX != math.MaxInt64 {
-			s.nextRetransmissionTime = time.UnixMicro(nextTX)
+			s.nextRetransmissionTime.Store(nextTX)
 		} else {
 			// Account for new segments to be sent below.
-			s.nextRetransmissionTime = time.Now().Add(10 * time.Millisecond)
+			s.nextRetransmissionTime.Store(time.Now().UnixMicro() + 10000)
 		}
 		s.oLock.Unlock()
 		if closeSessionReason != nil {
@@ -788,7 +792,7 @@ func (s *Session) runOutputOncePacket() {
 			}
 
 			seg.txCount++
-			seg.txTime = time.Now()
+			seg.txTime = time.Now().UnixMicro()
 			seg.txTimeout = mathext.Min(s.rttStat.RTO()*time.Duration(math.Pow(txTimeoutBackOff, float64(seg.txCount))), maxBackOffDuration)
 			if isDataAckProtocol(seg.metadata.Protocol()) {
 				das, _ := toDataAckStruct(seg.metadata)
@@ -837,7 +841,7 @@ func (s *Session) runOutputOncePacket() {
 
 	// Send ACK or heartbeat if needed.
 	// ACK is not limited by window.
-	exceedHeartbeatInterval := time.Since(s.lastTXTime) > sessionHeartbeatInterval
+	exceedHeartbeatInterval := time.Now().UnixMicro()-s.lastTXTime.Load() > sessionHeartbeatInterval.Microseconds()
 	if s.ackOnDataRecv.Load() || exceedHeartbeatInterval {
 		baseStruct := baseStruct{}
 		if s.isClient {
@@ -925,7 +929,7 @@ func (s *Session) input(seg *segment) error {
 		}
 	}
 
-	s.lastRXTime = time.Now()
+	s.lastRXTime.Store(time.Now().UnixMicro())
 	if protocol == openSessionRequest || protocol == openSessionResponse || protocol == dataServerToClient || protocol == dataClientToServer {
 		return s.inputData(seg)
 	} else if protocol == ackServerToClient || protocol == ackClientToServer {
@@ -969,7 +973,7 @@ func (s *Session) inputData(seg *segment) error {
 				if !deleted {
 					break
 				}
-				s.rttStat.UpdateRTT(time.Since(seg2.txTime))
+				s.rttStat.UpdateRTT(time.Duration(time.Now().UnixMicro()-seg2.txTime) * time.Microsecond)
 				s.cubicSendAlgorithm.OnAck()
 				seq, _ := seg2.Seq()
 				ackedPackets = append(ackedPackets, congestion.AckedPacketInfo{
@@ -1093,7 +1097,7 @@ func (s *Session) inputAck(seg *segment) error {
 			if !deleted {
 				break
 			}
-			s.rttStat.UpdateRTT(time.Since(seg2.txTime))
+			s.rttStat.UpdateRTT(time.Duration(time.Now().UnixMicro()-seg2.txTime) * time.Microsecond)
 			s.cubicSendAlgorithm.OnAck()
 			seq, _ := seg2.Seq()
 			ackedPackets = append(ackedPackets, congestion.AckedPacketInfo{
@@ -1185,7 +1189,7 @@ func (s *Session) output(seg *segment, remoteAddr net.Addr) error {
 	}
 	seq, _ := seg.Seq()
 	s.lastSend.Store(seq)
-	s.lastTXTime = time.Now()
+	s.lastTXTime.Store(time.Now().UnixMicro())
 	return nil
 }
 

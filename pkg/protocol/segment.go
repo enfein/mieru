@@ -58,7 +58,7 @@ type segment struct {
 	transport common.TransportProtocol // transport protocol
 	ackCount  byte                     // number of acknowledges before the next transmission
 	txCount   byte                     // number of transmission times
-	txTime    time.Time                // most recent transmission time
+	txTime    int64                    // most recent transmission time in microseconds since Unix epoch
 	txTimeout time.Duration            // need to receive ACK within this duration
 	block     cipher.BlockCipher       // cipher block to encrypt or decrypt the payload
 }
@@ -117,8 +117,8 @@ func (s *segment) Less(other *segment) bool {
 }
 
 func (s *segment) String() string {
-	if s.transport == common.PacketTransport && (!s.txTime.IsZero() || s.txTimeout != 0) {
-		return fmt.Sprintf("segment{metadata=%v, realPayloadLen=%v, ackCount=%v, txCount=%v, txTime=%v, txTimeout=%v}", s.metadata, len(s.payload), s.ackCount, s.txCount, s.txTime.Format(segmentTimeFormat), s.txTimeout)
+	if s.transport == common.PacketTransport && (s.txTime != 0 || s.txTimeout != 0) {
+		return fmt.Sprintf("segment{metadata=%v, realPayloadLen=%v, ackCount=%v, txCount=%v, txTime=%v, txTimeout=%v}", s.metadata, len(s.payload), s.ackCount, s.txCount, time.UnixMicro(s.txTime).Format(segmentTimeFormat), s.txTimeout)
 	}
 	return fmt.Sprintf("segment{metadata=%v, realPayloadLen=%v}", s.metadata, len(s.payload))
 }
