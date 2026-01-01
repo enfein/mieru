@@ -115,8 +115,8 @@ type Session struct {
 	ready          chan struct{} // indicate the session is ready to use
 	closeRequested atomic.Bool   // the session is being closed or has been closed
 	closedChan     chan struct{} // indicate the session is closed
-	readDeadline   time.Time     // read deadline
-	writeDeadline  time.Time     // write deadline
+	readDeadline   atomic.Int64  // read deadline, in microseconds since Unix epoch
+	writeDeadline  atomic.Int64  // write deadline, in microseconds since Unix epoch
 	inputHasErr    atomic.Bool   // input has error
 	inputErr       chan error    // this channel is closed when input has error
 	outputHasErr   atomic.Bool   // output has error
@@ -176,8 +176,6 @@ func NewSession(id uint32, isClient bool, mtu int, users map[string]*appctlpb.Us
 		users:              users,
 		ready:              make(chan struct{}),
 		closedChan:         make(chan struct{}),
-		readDeadline:       time.Time{},
-		writeDeadline:      time.Time{},
 		inputErr:           make(chan error),
 		outputErr:          make(chan error),
 		sendQueue:          newSegmentTree(segmentTreeCapacity),
@@ -210,7 +208,7 @@ func (s *Session) Read(b []byte) (n int, err error) {
 	defer s.rLock.Unlock()
 
 	defer func() {
-		s.readDeadline = time.Time{}
+		s.readDeadline.Store(0)
 	}()
 	if log.IsLevelEnabled(log.TraceLevel) {
 		log.Tracef("%v trying to read %d bytes", s, len(b))
@@ -235,8 +233,8 @@ func (s *Session) Read(b []byte) (n int, err error) {
 
 	// Stop reading when deadline is reached.
 	var timeC <-chan time.Time
-	if !s.readDeadline.IsZero() {
-		timeC = time.After(time.Until(s.readDeadline))
+	if readDeadline := s.readDeadline.Load(); readDeadline != 0 {
+		timeC = time.After(time.Until(time.UnixMicro(readDeadline)))
 	}
 
 	for {
@@ -304,7 +302,7 @@ func (s *Session) Write(b []byte) (n int, err error) {
 		return 0, io.ErrClosedPipe
 	}
 	defer func() {
-		s.writeDeadline = time.Time{}
+		s.writeDeadline.Store(0)
 	}()
 
 	// Before the first write, client needs to send open session request.
@@ -385,20 +383,32 @@ func (s *Session) RemoteAddr() net.Addr {
 
 // SetDeadline implements net.Conn.
 func (s *Session) SetDeadline(t time.Time) error {
-	s.readDeadline = t
-	s.writeDeadline = t
+	micros := t.UnixMicro()
+	if t.IsZero() {
+		micros = 0
+	}
+	s.readDeadline.Store(micros)
+	s.writeDeadline.Store(micros)
 	return nil
 }
 
 // SetReadDeadline implements net.Conn.
 func (s *Session) SetReadDeadline(t time.Time) error {
-	s.readDeadline = t
+	micros := t.UnixMicro()
+	if t.IsZero() {
+		micros = 0
+	}
+	s.readDeadline.Store(micros)
 	return nil
 }
 
 // SetWriteDeadline implements net.Conn.
 func (s *Session) SetWriteDeadline(t time.Time) error {
-	s.writeDeadline = t
+	micros := t.UnixMicro()
+	if t.IsZero() {
+		micros = 0
+	}
+	s.writeDeadline.Store(micros)
 	return nil
 }
 
@@ -500,8 +510,8 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 
 	// Stop writing when deadline is reached.
 	var timeC <-chan time.Time
-	if !s.writeDeadline.IsZero() {
-		timeC = time.After(time.Until(s.writeDeadline))
+	if writeDeadline := s.writeDeadline.Load(); writeDeadline != 0 {
+		timeC = time.After(time.Until(time.UnixMicro(writeDeadline)))
 	}
 
 	seqBeforeWrite, _ := s.sendQueue.MinSeq()
@@ -596,7 +606,7 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 	}
 
 	if s.isClient {
-		s.readDeadline = time.Now().Add(serverRespTimeout)
+		s.readDeadline.Store(time.Now().Add(serverRespTimeout).UnixMicro())
 	}
 	return len(b), nil
 }
