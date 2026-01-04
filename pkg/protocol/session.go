@@ -112,15 +112,16 @@ type Session struct {
 	users    map[string]*appctlpb.User // all registered users, only used by server
 	userName atomic.Pointer[string]    // user that owns this session, only used by server
 
-	ready          chan struct{} // indicate the session is ready to use
-	closeRequested atomic.Bool   // the session is being closed or has been closed
-	closedChan     chan struct{} // indicate the session is closed
-	readDeadline   atomic.Int64  // read deadline, in microseconds since Unix epoch
-	writeDeadline  atomic.Int64  // write deadline, in microseconds since Unix epoch
-	inputHasErr    atomic.Bool   // input has error
-	inputErr       chan error    // this channel is closed when input has error
-	outputHasErr   atomic.Bool   // output has error
-	outputErr      chan error    // this channel is closed when output has error
+	ready                  chan struct{} // indicate the session is ready to use
+	openSessionRequestSent atomic.Bool   // whether open session request has been sent, only used by client
+	closeRequested         atomic.Bool   // the session is being closed or has been closed
+	closedChan             chan struct{} // indicate the session is closed
+	readDeadline           atomic.Int64  // read deadline, in microseconds since Unix epoch
+	writeDeadline          atomic.Int64  // write deadline, in microseconds since Unix epoch
+	inputHasErr            atomic.Bool   // input has error
+	inputErr               chan error    // this channel is closed when input has error
+	outputHasErr           atomic.Bool   // output has error
+	outputErr              chan error    // this channel is closed when output has error
 
 	sendQueue *segmentTree  // segments waiting to send
 	sendBuf   *segmentTree  // segments sent but not acknowledged
@@ -306,7 +307,8 @@ func (s *Session) Write(b []byte) (n int, err error) {
 	}()
 
 	// Before the first write, client needs to send open session request.
-	if s.isClient && s.isState(sessionAttached) {
+	// Open session request is sent only once. Underlay may retry if the packet is lost.
+	if s.isClient && s.isState(sessionAttached) && !s.openSessionRequestSent.Swap(true) {
 		s.oLock.Lock()
 		seg := &segment{
 			metadata: &sessionStruct{
