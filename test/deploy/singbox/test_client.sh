@@ -130,7 +130,7 @@ if [[ "$?" -ne 0 ]]; then
     echo "command 'mita start' failed"
     exit 1
 fi
-./sing-box run -c singbox-config-tcp.json &
+./sing-box run -c singbox-client-config-tcp.json &
 sleep 1
 run_tcp_tests 1080
 print_mieru_server_metrics
@@ -155,7 +155,7 @@ if [[ "$?" -ne 0 ]]; then
     echo "command 'mita start' failed"
     exit 1
 fi
-./sing-box run -c singbox-config-udp.json &
+./sing-box run -c singbox-client-config-udp.json &
 sleep 1
 run_udp_tests 1083
 print_mieru_server_metrics
