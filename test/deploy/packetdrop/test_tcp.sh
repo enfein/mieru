@@ -24,16 +24,16 @@ export PATH_PREFIX="test/deploy/packetdrop"
 source ./${PATH_PREFIX}/libtest.sh
 
 # Update mieru server with TCP config.
-./mita apply config ${PATH_PREFIX}/server_tcp.json
+./bin/mita apply config ${PATH_PREFIX}/server_tcp.json
 if [[ "$?" -ne 0 ]]; then
     echo "command 'mita apply config server_tcp.json' failed"
     exit 1
 fi
 echo "mieru server config:"
-./mita describe config
+./bin/mita describe config
 
 # Start mieru server proxy.
-./mita start
+./bin/mita start
 if [[ "$?" -ne 0 ]]; then
     echo "command 'mita start' failed"
     exit 1
@@ -45,16 +45,16 @@ if [[ -z "${MIERU_HANDSHAKE_NO_WAIT}" ]]; then
 else
   CLIENT_CONFIG="${PATH_PREFIX}/client_tcp_handshake_no_wait.json"
 fi
-./mieru apply config ${CLIENT_CONFIG}
+./bin/mieru apply config ${CLIENT_CONFIG}
 if [[ "$?" -ne 0 ]]; then
     echo "command 'mieru apply config ${CLIENT_CONFIG}' failed"
     exit 1
 fi
 echo "mieru client config:"
-./mieru describe config
+./bin/mieru describe config
 
 # Start mieru client.
-./mieru start
+./bin/mieru start
 if [[ "$?" -ne 0 ]]; then
     echo "command 'mieru start' failed"
     exit 1
@@ -62,7 +62,7 @@ fi
 
 # Start testing.
 sleep 2
-./sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
+./bin/sockshttpclient -dst_host=127.0.0.1 -dst_port=8080 \
   -local_proxy_host=192.168.234.1 -local_proxy_port=1080 \
   -test_case=reuse_conn -interval_ms=1000 -print_speed=1 -test_time_sec=900
 if [ "$?" -ne "0" ]; then
@@ -74,7 +74,7 @@ if [ "$?" -ne "0" ]; then
 fi
 
 # Print metrics and memory statistics.
-./mita get users
+./bin/mita get users
 sleep 1
 print_mieru_client_metrics
 sleep 1
@@ -82,7 +82,7 @@ print_mieru_server_metrics
 sleep 1
 
 # Stop mieru client.
-./mieru stop
+./bin/mieru stop
 if [[ "$?" -ne 0 ]]; then
     echo "command 'mieru stop' failed"
     exit 1
@@ -90,7 +90,7 @@ fi
 sleep 1
 
 # Stop mieru server proxy.
-./mita stop
+./bin/mita stop
 if [[ "$?" -ne 0 ]]; then
     echo "command 'mita stop' failed"
     exit 1

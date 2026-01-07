@@ -24,32 +24,32 @@ export PATH_PREFIX="test/deploy/externalconnect"
 source ./${PATH_PREFIX}/libtest.sh
 
 # Update mieru server with UDP config.
-./mita apply config ${PATH_PREFIX}/server_udp.json
+./bin/mita apply config ${PATH_PREFIX}/server_udp.json
 if [[ "$?" -ne 0 ]]; then
     echo "command 'mita apply config server_udp.json' failed"
     exit 1
 fi
 echo "mieru server config:"
-./mita describe config
+./bin/mita describe config
 
 # Start mieru server proxy.
-./mita start
+./bin/mita start
 if [[ "$?" -ne 0 ]]; then
     echo "command 'mita start' failed"
     exit 1
 fi
 
 # Update mieru client with UDP config.
-./mieru apply config ${PATH_PREFIX}/client_udp.json
+./bin/mieru apply config ${PATH_PREFIX}/client_udp.json
 if [[ "$?" -ne 0 ]]; then
     echo "command 'mieru apply config client_udp.json' failed"
     exit 1
 fi
 echo "mieru client config:"
-./mieru describe config
+./bin/mieru describe config
 
 # Start mieru client.
-./mieru start
+./bin/mieru start
 if [[ "$?" -ne 0 ]]; then
     echo "command 'mieru start' failed"
     exit 1
@@ -68,7 +68,7 @@ if [[ "$?" -ne 0 ]]; then
 fi
 
 # Stop mieru client.
-./mieru stop
+./bin/mieru stop
 if [[ "$?" -ne 0 ]]; then
     echo "command 'mieru stop' failed"
     exit 1
@@ -76,7 +76,7 @@ fi
 sleep 1
 
 # Stop mieru server proxy.
-./mita stop
+./bin/mita stop
 if [[ "$?" -ne 0 ]]; then
     echo "command 'mita stop' failed"
     exit 1

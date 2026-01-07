@@ -20,7 +20,7 @@ function run_external_connect_test() {
     failure_count=0
 
     for i in {1..1000}; do
-        ./mieru test
+        ./bin/mieru test
         if [[ "$?" -ne 0 ]]; then
             ((failure_count++))
             echo "Failed $failure_count times with $i runs."
@@ -49,14 +49,14 @@ function delete_mieru_client_log() {
 
 function print_mieru_client_metrics() {
     echo "========== BEGIN OF MIERU CLIENT METRICS =========="
-    ./mieru get metrics
-    ./mieru get memory-statistics
+    ./bin/mieru get metrics
+    ./bin/mieru get memory-statistics
     echo "==========  END OF MIERU CLIENT METRICS  =========="
 }
 
 function print_mieru_server_metrics() {
     echo "========== BEGIN OF MIERU SERVER METRICS =========="
-    ./mita get metrics
-    ./mita get memory-statistics
+    ./bin/mita get metrics
+    ./bin/mita get memory-statistics
     echo "==========  END OF MIERU SERVER METRICS  =========="
 }

@@ -54,7 +54,7 @@ echo 1 > /proc/sys/net/ipv4/ip_forward
 cd "$(git rev-parse --show-toplevel)"
 
 # Start http server.
-ip netns exec sim ./httpserver -huge &
+ip netns exec sim ./bin/httpserver -huge &
 sleep 2
 
 # Start mieru server daemon.
@@ -62,7 +62,7 @@ mkdir -p /etc/mita
 mkdir -p /var/lib/mita
 mkdir -p /var/run/mita
 export MITA_INSECURE_UDS=1
-ip netns exec sim ./mita run &
+ip netns exec sim ./bin/mita run &
 sleep 1
 
 # Add 100ms delay.

@@ -27,26 +27,26 @@ function delete_mieru_client_log() {
 
 function print_mieru_server_thread_dump() {
     echo "========== BEGIN OF MIERU SERVER THREAD DUMP =========="
-    ./mita get thread-dump
+    ./bin/mita get thread-dump
     echo "==========  END OF MIERU SERVER THREAD DUMP  =========="
 }
 
 function print_mieru_client_thread_dump() {
     echo "========== BEGIN OF MIERU CLIENT THREAD DUMP =========="
-    ./mieru get thread-dump
+    ./bin/mieru get thread-dump
     echo "==========  END OF MIERU CLIENT THREAD DUMP  =========="
 }
 
 function print_mieru_client_metrics() {
     echo "========== BEGIN OF MIERU CLIENT METRICS =========="
-    ./mieru get metrics
-    ./mieru get memory-statistics
+    ./bin/mieru get metrics
+    ./bin/mieru get memory-statistics
     echo "==========  END OF MIERU CLIENT METRICS  =========="
 }
 
 function print_mieru_server_metrics() {
     echo "========== BEGIN OF MIERU SERVER METRICS =========="
-    ./mita get metrics
-    ./mita get memory-statistics
+    ./bin/mita get metrics
+    ./bin/mita get memory-statistics
     echo "==========  END OF MIERU SERVER METRICS  =========="
 }

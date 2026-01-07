@@ -32,7 +32,7 @@ mkdir -p /etc/mita
 mkdir -p /var/lib/mita
 mkdir -p /var/run/mita
 export MITA_INSECURE_UDS=1
-./mita run &
+./bin/mita run &
 sleep 1
 
 # Run UDP test.
