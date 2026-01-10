@@ -1,0 +1,35 @@
+{
+    "inbounds": [
+        {
+            "type": "mieru",
+            "tag": "mieru-tcp",
+            "listen": "127.0.0.1",
+            "listen_port": 8966,
+            "transport": "TCP",
+            "users": [
+                {
+                    "name": "baozi",
+                    "password": "manlianpenfen"
+                }
+            ]
+        },
+        {
+            "type": "mieru",
+            "tag": "mieru-udp",
+            "listen": "127.0.0.1",
+            "listen_port": 8966,
+            "transport": "UDP",
+            "users": [
+                {
+                    "name": "baozi",
+                    "password": "manlianpenfen"
+                }
+            ]
+        }
+    ],
+    "outbounds": [],
+    "route": {},
+    "log": {
+        "level": "warn"
+    }
+}

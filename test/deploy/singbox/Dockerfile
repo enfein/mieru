@@ -21,8 +21,13 @@ WORKDIR /test
 
 # Copy binaries, data and test script into the container.
 COPY bin/sing-box bin/mita bin/httpserver bin/sockshttpclient bin/socksudpclient bin/udpserver \
+    test/deploy/singbox/client_tcp.json \
+    test/deploy/singbox/client_tcp_no_wait.json \
+    test/deploy/singbox/client_udp.json \
+    test/deploy/singbox/client_udp_no_wait.json \
     test/deploy/singbox/singbox-client-config-tcp.json \
     test/deploy/singbox/singbox-client-config-udp.json \
+    test/deploy/singbox/singbox-server-config.json \
     test/deploy/singbox/server_tcp.json \
     test/deploy/singbox/server_udp.json \
     test/deploy/singbox/libtest.sh \
