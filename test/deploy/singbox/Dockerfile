@@ -20,7 +20,7 @@ FROM ubuntu:24.04
 WORKDIR /test
 
 # Copy binaries, data and test script into the container.
-COPY bin/sing-box bin/mita bin/httpserver bin/sockshttpclient bin/socksudpclient bin/udpserver \
+COPY bin/sing-box bin/mieru bin/mita bin/httpserver bin/sockshttpclient bin/socksudpclient bin/udpserver \
     test/deploy/singbox/client_tcp.json \
     test/deploy/singbox/client_tcp_no_wait.json \
     test/deploy/singbox/client_udp.json \
@@ -32,6 +32,7 @@ COPY bin/sing-box bin/mita bin/httpserver bin/sockshttpclient bin/socksudpclient
     test/deploy/singbox/server_udp.json \
     test/deploy/singbox/libtest.sh \
     test/deploy/singbox/test_client.sh \
+    test/deploy/singbox/test_server.sh \
     test/deploy/singbox/test.sh /test/
 
 # Create mita user and server config directory.

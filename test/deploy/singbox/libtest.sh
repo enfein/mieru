@@ -27,3 +27,13 @@ function print_mieru_server_metrics() {
     ./mita get memory-statistics
     echo "==========  END OF MIERU SERVER METRICS  =========="
 }
+
+function print_mieru_client_log() {
+    echo "========== BEGIN OF MIERU CLIENT LOG =========="
+    cat $HOME/.cache/mieru/*.log
+    echo "==========  END OF MIERU CLIENT LOG  =========="
+}
+
+function delete_mieru_client_log() {
+    rm -rf $HOME/.cache/mieru/*.log
+}
