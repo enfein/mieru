@@ -35,15 +35,15 @@ sleep 1
 ./mita run &
 sleep 1
 
-# Run server test.
-# echo "========== BEGIN OF SERVER TEST =========="
-# ./test_server.sh
-# echo "==========  END OF SERVER TEST  =========="
-
 # Run client test.
 echo "========== BEGIN OF CLIENT TEST =========="
 ./test_client.sh
 echo "==========  END OF CLIENT TEST  =========="
+
+# Run server test.
+echo "========== BEGIN OF SERVER TEST =========="
+./test_server.sh
+echo "==========  END OF SERVER TEST  =========="
 
 echo "Test is successful."
 sleep 1
