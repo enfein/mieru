@@ -103,7 +103,7 @@ type Session struct {
 
 	id                uint32                   // session ID number
 	isClient          bool                     // if this session is owned by client
-	mtu               int                      // L2 maxinum transmission unit
+	mtu               int                      // Underlay maxinum transmission unit
 	transportProtocol common.TransportProtocol // transport protocol of underlay connection
 	remoteAddr        net.Addr                 // specify remote network address, used by UDP
 	state             sessionState             // session state
@@ -143,7 +143,6 @@ type Session struct {
 
 	rttStat            *congestion.RTTStats
 	cubicSendAlgorithm *congestion.CubicSendAlgorithm
-	bbrSendAlgorithm   *congestion.BBRSender
 	remoteWindowSize   atomic.Uint32
 
 	wg    sync.WaitGroup
@@ -186,7 +185,6 @@ func NewSession(id uint32, isClient bool, mtu int, users map[string]*appctlpb.Us
 		recvChan:           make(chan *segment, segmentChanCapacity),
 		rttStat:            rttStat,
 		cubicSendAlgorithm: congestion.NewCubicSendAlgorithm(minWindowSize, maxWindowSize),
-		bbrSendAlgorithm:   congestion.NewBBRSender(fmt.Sprintf("%d", id), rttStat),
 	}
 	now := time.Now().UnixMicro()
 	s.lastRXTime.Store(now)
@@ -708,14 +706,13 @@ func (s *Session) runOutputOncePacket() {
 	var closeSessionReason error
 	hasLoss := false
 	hasTimeout := false
-	var bytesInFlight int64
 	totalTransmissionCount := 0
 
 	if time.Now().UnixMicro() >= s.nextRetransmissionTime.Load() {
 		// Resend segments in sendBuf.
 		//
-		// Iterate all the segments in sendBuf to calculate bytesInFlight and
-		// update nextRetransmissionTime, but only resend segments if needed.
+		// Iterate all the segments in sendBuf to update nextRetransmissionTime,
+		// but only resend segments if needed.
 		//
 		// Retransmission is not limited by window.
 		//
@@ -723,7 +720,6 @@ func (s *Session) runOutputOncePacket() {
 		s.oLock.Lock()
 		var nextTX int64 = math.MaxInt64
 		s.sendBuf.Ascend(func(iter *segment) bool {
-			bytesInFlight += int64(packetOverhead + len(iter.payload))
 			nextTX = mathext.Min(nextTX, iter.txTime+iter.txTimeout.Microseconds())
 
 			if iter.txCount >= txCountLimit {
@@ -760,7 +756,6 @@ func (s *Session) runOutputOncePacket() {
 					closeSessionReason = err
 					return false
 				}
-				bytesInFlight += int64(packetOverhead + len(iter.payload))
 				totalTransmissionCount++
 				return true
 			}
@@ -794,9 +789,7 @@ func (s *Session) runOutputOncePacket() {
 			}
 
 			seg, deleted := s.sendQueue.DeleteMinIf(func(iter *segment) bool {
-				bbrCanSend := s.bbrSendAlgorithm.CanSend(bytesInFlight, int64(packetOverhead+len(iter.payload)))
-				congestionWindowCanSend := totalTransmissionCount < s.sendWindowSize()
-				return bbrCanSend && congestionWindowCanSend
+				return totalTransmissionCount < s.sendWindowSize()
 			})
 			if !deleted {
 				s.oLock.Unlock()
@@ -830,25 +823,9 @@ func (s *Session) runOutputOncePacket() {
 				s.closeWithError(err)
 				break
 			} else {
-				seq, err := seg.Seq()
-				if err != nil {
-					s.oLock.Unlock()
-					err = fmt.Errorf("failed to get sequence number from %v: %w", seg, err)
-					log.Debugf("%v %v", s, err)
-					if s.outputHasErr.CompareAndSwap(false, true) {
-						close(s.outputErr)
-					}
-					s.closeWithError(err)
-					break
-				}
-				newBytesInFlight := int64(packetOverhead + len(seg.payload))
-				s.bbrSendAlgorithm.OnPacketSent(time.Now(), bytesInFlight, int64(seq), newBytesInFlight, true)
-				bytesInFlight += newBytesInFlight
 				totalTransmissionCount++
 			}
 		}
-	} else {
-		s.bbrSendAlgorithm.OnApplicationLimited(bytesInFlight)
 	}
 
 	// Send ACK or heartbeat if needed.
@@ -871,24 +848,15 @@ func (s *Session) runOutputOncePacket() {
 				windowSize: uint16(s.receiveWindowSize()),
 			},
 			transport: s.transportProtocol}
-		if err := s.output(ackSeg, s.RemoteAddr()); err != nil {
-			s.oLock.Unlock()
+		err := s.output(ackSeg, s.RemoteAddr())
+		s.oLock.Unlock()
+		if err != nil {
 			err = fmt.Errorf("output() failed: %w", err)
 			log.Debugf("%v %v", s, err)
 			if s.outputHasErr.CompareAndSwap(false, true) {
 				close(s.outputErr)
 			}
 			s.closeWithError(err)
-		} else {
-			seq, err := ackSeg.Seq()
-			if err != nil {
-				panic(fmt.Sprintf("failed to get sequence number from ack segment %v: %v", ackSeg, err))
-			} else {
-				s.oLock.Unlock()
-				newBytesInFlight := int64(packetOverhead + len(ackSeg.payload))
-				s.bbrSendAlgorithm.OnPacketSent(time.Now(), bytesInFlight, int64(seq), newBytesInFlight, true)
-				bytesInFlight += newBytesInFlight
-			}
 		}
 		s.ackOnDataRecv.Store(false)
 	}
@@ -976,7 +944,6 @@ func (s *Session) inputData(seg *segment) error {
 		das, ok := seg.metadata.(*dataAckStruct)
 		if ok {
 			unAckSeq := das.unAckSeq
-			ackedPackets := make([]congestion.AckedPacketInfo, 0)
 			for {
 				seg2, deleted := s.sendBuf.DeleteMinIf(func(iter *segment) bool {
 					seq, _ := iter.Seq()
@@ -987,15 +954,6 @@ func (s *Session) inputData(seg *segment) error {
 				}
 				s.rttStat.UpdateRTT(time.Duration(time.Now().UnixMicro()-seg2.txTime) * time.Microsecond)
 				s.cubicSendAlgorithm.OnAck()
-				seq, _ := seg2.Seq()
-				ackedPackets = append(ackedPackets, congestion.AckedPacketInfo{
-					PacketNumber:     int64(seq),
-					BytesAcked:       int64(packetOverhead + len(seg2.payload)),
-					ReceiveTimestamp: time.Now(),
-				})
-			}
-			if len(ackedPackets) > 0 {
-				s.bbrSendAlgorithm.OnCongestionEvent(priorInFlight, time.Now(), ackedPackets, nil)
 			}
 			s.remoteWindowSize.Store(uint32(das.windowSize))
 		}
@@ -1100,7 +1058,6 @@ func (s *Session) inputAck(seg *segment) error {
 		})
 		das := seg.metadata.(*dataAckStruct)
 		unAckSeq := das.unAckSeq
-		ackedPackets := make([]congestion.AckedPacketInfo, 0)
 		for {
 			seg2, deleted := s.sendBuf.DeleteMinIf(func(iter *segment) bool {
 				seq, _ := iter.Seq()
@@ -1111,15 +1068,6 @@ func (s *Session) inputAck(seg *segment) error {
 			}
 			s.rttStat.UpdateRTT(time.Duration(time.Now().UnixMicro()-seg2.txTime) * time.Microsecond)
 			s.cubicSendAlgorithm.OnAck()
-			seq, _ := seg2.Seq()
-			ackedPackets = append(ackedPackets, congestion.AckedPacketInfo{
-				PacketNumber:     int64(seq),
-				BytesAcked:       int64(packetOverhead + len(seg2.payload)),
-				ReceiveTimestamp: time.Now(),
-			})
-		}
-		if len(ackedPackets) > 0 {
-			s.bbrSendAlgorithm.OnCongestionEvent(priorInFlight, time.Now(), ackedPackets, nil)
 		}
 		s.remoteWindowSize.Store(uint32(das.windowSize))
 
