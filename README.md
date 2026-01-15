@@ -23,13 +23,14 @@ The mieru proxy software suite consists of two parts, a client software called m
 ## Third Party Server Software
 
 - [mihomo](https://github.com/MetaCubeX/mihomo)
+- [enfein/mbox](https://github.com/enfein/mbox) - a fork of sing-box
 
 ## Third Party Client Software
 
 - Desktop (Windows, MacOS, Linux)
   - [Clash Verge Rev](https://www.clashverge.dev/)
   - [Mihomo Party](https://mihomo.party/)
-  - [NekoBox => qr243vbi_Box](https://qr243vbi.github.io/nekobox/#/)
+  - [qr243vbi_Box](https://qr243vbi.github.io/nekobox/#/) - a fork of NekoBox
 - Android
   - [ClashMetaForAndroid](https://github.com/MetaCubeX/ClashMetaForAndroid)
   - [ClashMi](https://clashmi.app/)
