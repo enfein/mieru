@@ -28,7 +28,7 @@ mieru 代理软件由称为 mieru【見える】的客户端软件和称为 mita
 - 桌面 (Windows, MacOS, Linux)
   - [Clash Verge Rev](https://www.clashverge.dev/)
   - [Mihomo Party](https://mihomo.party/)
-  - [qr243vbi_Box](https://qr243vbi.github.io/nekobox/#/) - 一个 NekoBox 分支项目
+  - [NyameBox](https://qr243vbi.github.io/nekobox/#/) - 一个 NekoBox 分支项目
 - 安卓
   - [ClashMetaForAndroid](https://github.com/MetaCubeX/ClashMetaForAndroid)
   - [ClashMi](https://clashmi.app/)
