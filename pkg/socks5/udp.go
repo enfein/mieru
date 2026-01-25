@@ -29,8 +29,8 @@ import (
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
 
-// RunUDPAssociateLoop exchange UDP packets based on requests sent by proxy client
-// via the PacketOverStreamTunnel.
+// RunUDPAssociateLoop exchanges socks5 UDP packets between a socks5 proxy client and a mieru proxy server,
+// the proxy server is connected via the PacketOverStreamTunnel.
 func RunUDPAssociateLoop(udpConn *net.UDPConn, conn *apicommon.PacketOverStreamTunnel, resolver apicommon.DNSResolver) error {
 	var udpErr atomic.Value
 
@@ -40,7 +40,7 @@ func RunUDPAssociateLoop(udpConn *net.UDPConn, conn *apicommon.PacketOverStreamT
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	// Send UDP packets to destinations.
+	// Packets from socks5 proxy client -> mieru proxy server.
 	go func() {
 		defer wg.Done()
 		defer udpConn.Close()
@@ -135,7 +135,7 @@ func RunUDPAssociateLoop(udpConn *net.UDPConn, conn *apicommon.PacketOverStreamT
 		}
 	}()
 
-	// Receive UDP packets from destinations.
+	// Packets from mieru proxy server -> socks5 proxy client.
 	go func() {
 		defer wg.Done()
 		buf := make([]byte, 1<<16)
@@ -178,6 +178,88 @@ func RunUDPAssociateLoop(udpConn *net.UDPConn, conn *apicommon.PacketOverStreamT
 
 	wg.Wait()
 	return udpErr.Load().(error)
+}
+
+// RunUDPForwardingLoop exchanges socks5 UDP packets between a mieru proxy client and a socks5 proxy server,
+// the proxy client is connected via the PacketOverStreamTunnel.
+func RunUDPForwardingLoop(udpConn *net.UDPConn, conn *apicommon.PacketOverStreamTunnel, downstreamAddr *net.UDPAddr, ctrlConn net.Conn) error {
+	var udpErr atomic.Value
+
+	var wg sync.WaitGroup
+	wg.Add(3)
+
+	// Monitor TCP connection for closure (signals end of socks5 UDP association).
+	go func() {
+		defer wg.Done()
+		buf := make([]byte, 1)
+		_, err := ctrlConn.Read(buf)
+		if err != nil {
+			if udpErr.Load() == nil {
+				udpErr.Store(err)
+			}
+		}
+		udpConn.Close()
+		conn.Close()
+	}()
+
+	// Packets from mieru proxy client -> socks5 proxy server.
+	go func() {
+		defer wg.Done()
+		defer udpConn.Close()
+		buf := make([]byte, 1<<16)
+		for {
+			n, err := conn.Read(buf)
+			if err != nil {
+				if udpErr.Load() == nil {
+					udpErr.Store(err)
+				}
+				return
+			}
+			ws, err := udpConn.WriteToUDP(buf[:n], downstreamAddr)
+			if err != nil {
+				log.Debugf("UDP forwarding [%v - %v] WriteToUDP() failed: %v", udpConn.LocalAddr(), downstreamAddr, err)
+				UDPAssociateErrors.Add(1)
+			} else {
+				UDPAssociateUploadPackets.Add(1)
+				UDPAssociateUploadBytes.Add(int64(ws))
+			}
+		}
+	}()
+
+	// Packets from socks5 proxy server -> mieru proxy client.
+	go func() {
+		defer wg.Done()
+		buf := make([]byte, 1<<16)
+		for {
+			n, _, err := udpConn.ReadFromUDP(buf)
+			if err != nil {
+				if !stderror.IsEOF(err) && !stderror.IsClosed(err) {
+					log.Debugf("UDP forwarding %v ReadFromUDP() failed: %v", udpConn.LocalAddr(), err)
+				}
+				if udpErr.Load() == nil {
+					udpErr.Store(err)
+				}
+				return
+			}
+			_, err = conn.Write(buf[:n])
+			if err != nil {
+				log.Debugf("UDP forwarding %v Write() to client failed: %v", udpConn.LocalAddr(), err)
+				if udpErr.Load() == nil {
+					udpErr.Store(err)
+				}
+				return
+			}
+			UDPAssociateDownloadPackets.Add(1)
+			UDPAssociateDownloadBytes.Add(int64(n))
+		}
+	}()
+
+	wg.Wait()
+	ctrlConn.Close()
+	if err := udpErr.Load(); err != nil {
+		return err.(error)
+	}
+	return nil
 }
 
 // udpAddrToHeader returns a UDP associate header with the given

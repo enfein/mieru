@@ -48,6 +48,10 @@ function print_mieru_client_thread_dump() {
 ./httpserver -port=6000 &
 sleep 2
 
+# Start UDP server.
+./udpserver -port=7000 &
+sleep 1
+
 # Start server 2.
 MITA_UDS_PATH=/var/run/mita2.sock MITA_CONFIG_JSON_FILE=/test/server2.json ./mita2 run &
 sleep 1
@@ -74,6 +78,19 @@ if [ "$?" -ne "0" ]; then
     print_mieru_client_thread_dump
     print_mieru_server_thread_dump
     echo "Test socks5 new_conn failed."
+    exit 1
+fi
+
+sleep 1
+echo ">>> socks5 UDP associate <<<"
+./socksudpclient -dst_host=127.0.0.1 -dst_port=7000 \
+  -local_proxy_host=127.0.0.1 -local_proxy_port=2000 \
+  -interval_ms=10 -num_request=100 -num_conn=60
+if [ "$?" -ne "0" ]; then
+    print_mieru_client_log
+    print_mieru_client_thread_dump
+    print_mieru_server_thread_dump
+    echo "Test UDP associate failed."
     exit 1
 fi
 
