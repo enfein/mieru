@@ -26,7 +26,7 @@ const (
 
 	// Common64Set contains 64 selected common characters.
 	// This value can change in different software releases.
-	Common64Set = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/"
+	Common64Set = "!@#$%^&*()ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz<>"
 )
 
 var (
