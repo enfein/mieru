@@ -57,19 +57,6 @@ enum DualStack {
     ONLY_IPv6 = 4;
 }
 
-message ServerEndpoint {
-    // String representation of IP address.
-    // It can be either IPv4 or IPv6.
-    optional string ipAddress = 1;
-
-    // Server's full qualified domain name.
-    // When this is set, the `ipAddress` field is ignored.
-    optional string domainName = 2;
-
-    // Server's port-protocol bindings.
-    repeated PortBinding portBindings = 3;
-}
-
 message PortBinding {
     // A single port number.
     // This field can't be set with portRange at the same time.
@@ -133,4 +120,70 @@ message Auth {
 
     // Password used for authentication.
     optional string password = 2;
+}
+
+message TrafficPattern {
+
+    // Pin traffic patterns that are not explictly set.
+    // If seed is not set, traffic patterns that are not set can change.
+    optional int32 seed = 1;
+
+    // Split TCP packets by fragmentation.
+    optional TCPFragment tcpFragment = 2;
+
+    // Manipulate nonce prefix.
+    optional NoncePattern nonce = 3;
+}
+
+message TCPFragment {
+
+    // Enable additional TCP fragmentation.
+    optional bool enable = 1;
+
+    // Max sleep time in milliseconds between sending two fragments.
+    // If not set, a reasonable value is used.
+    optional int32 maxSleepMs = 2;
+}
+
+message NoncePattern {
+
+    // Strategy to manipulate nonce.
+    optional NonceType type = 1;
+
+    // If the pattern applies to each UDP packet,
+    // or only applies to UDP packets used to manage a session.
+    optional bool applyToAllUDPPacket = 2;
+
+    // Minimum number of bytes to manipulate.
+    optional int32 minLen = 3;
+
+    // Maximum number of bytes to manipulate.
+    // This value can't exceed 12.
+    optional int32 maxLen = 4;
+
+    // A list of hex string (without 0x) that represent customized
+    // nonce prefix to use. For example, string "00010203"
+    // represent a 4 bytes nonce prefix [0, 1, 2, 3].
+    //
+    // Each nonce prefix can't exceed 12 bytes.
+    //
+    // When multiple strings are provided, a random one is used each time.
+    //
+    // It has no effect when NonceType is not NONCE_TYPE_FIXED.
+    repeated string customHexStrings = 5;
+}
+
+enum NonceType {
+
+    // No change to the original random nonce.
+    NONCE_TYPE_RANDOM = 0;
+
+    // Use printable ASCII characters from 0x20 to 0x7E.
+    NONCE_TYPE_PRINTABLE = 1;
+
+    // Use a pre-defined subset of printable ASCII characters.
+    NONCE_TYPE_PRINTABLE_SUBSET = 2;
+
+    // Use a customized nonce prefix.
+    NONCE_TYPE_FIXED = 3;
 }

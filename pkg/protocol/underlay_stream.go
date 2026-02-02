@@ -643,18 +643,18 @@ func (t *StreamUnderlay) maybeInitSendBlockCipher() error {
 func (t *StreamUnderlay) drainAfterError() {
 	// Set read deadline to avoid being blocked forever.
 	timeoutMillis := rng.IntRange(1000, 10000)
-	timeoutMillis += rng.FixedIntPerHost(50000) // Maximum 60 seconds.
+	timeoutMillis += rng.FixedIntVH(50000) // Maximum 60 seconds.
 	t.conn.SetReadDeadline(time.Now().Add(time.Duration(timeoutMillis) * time.Millisecond))
 
 	// Determine the read buffer size.
-	bufSizeType := rng.FixedIntPerHost(4)
+	bufSizeType := rng.FixedIntVH(4)
 	bufSize := 1 << (12 + bufSizeType) // 4, 8, 16, 32 KB
 	buf := make([]byte, bufSize)
 
 	// Determine the number of bytes to read.
 	// Minimum 2 bytes, maximum bufSize bytes.
 	minRead := rng.IntRange(2, bufSize-254)
-	minRead += rng.FixedIntPerHost(256)
+	minRead += rng.FixedIntVH(256)
 
 	n, err := io.ReadAtLeast(t.conn, buf, minRead)
 	if err != nil {

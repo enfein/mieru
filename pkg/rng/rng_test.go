@@ -43,10 +43,18 @@ func TestRandTime(t *testing.T) {
 	}
 }
 
+func TestFixedInt(t *testing.T) {
+	v := FixedInt(256, "test")
+	v2 := FixedInt(256, "test")
+	if v2 != v {
+		t.Errorf("FixedInt() = %d, want %d", v2, v)
+	}
+}
+
 func TestFixedIntPerHost(t *testing.T) {
 	cacheSize := func() int {
 		size := 0
-		fixedValues.Range(func(key, value any) bool {
+		fixedV.Range(func(key, value any) bool {
 			size++
 			return true
 		})
@@ -54,8 +62,8 @@ func TestFixedIntPerHost(t *testing.T) {
 	}
 
 	prevSize := cacheSize()
-	v := FixedIntPerHost(256)
-	v2 := FixedIntPerHost(256)
+	v := FixedIntVH(256)
+	v2 := FixedIntVH(256)
 	if v2 != v {
 		t.Errorf("FixedIntPerHost() = %d, want %d", v2, v)
 	}

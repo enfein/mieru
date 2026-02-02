@@ -27,7 +27,8 @@ import (
 	"github.com/enfein/mieru/v3/pkg/version"
 )
 
-var fixedValues sync.Map
+var fixed sync.Map
+var fixedV sync.Map
 
 // Intn returns a random int from [0, n) with scale down distribution.
 func Intn(n int) int {
@@ -59,32 +60,53 @@ func RandTime(begin, end time.Time) time.Time {
 	return time.Unix(randSec, randNano)
 }
 
-// FixedInt returns an integer in [0, n) that stays the same
-// if the same hint is provided.
+// FixedInt returns an integer in [0, n) that always stays the same.
 //
-// This fixed integer may change in different mieru versions.
+// The returned value is not bigger than math.MaxInt32.
 //
 // This function uses an internal hint cache to accelerate look up.
 func FixedInt(n int, hint string) int {
 	if n <= 0 {
 		return 0
 	}
-	v, ok := fixedValues.Load(hint)
+	v, ok := fixed.Load(hint)
+	if !ok {
+		b := sha256.Sum256([]byte(hint))
+		b[0] = b[0] & 0b01111111
+		v = int(binary.BigEndian.Uint32(b[:4]))
+		fixed.Store(hint, v)
+	}
+	return v.(int) % n
+}
+
+// FixedIntV returns an integer in [0, n) that stays the same
+// if the same hint is provided in the same mieru version.
+//
+// The returned value is not bigger than math.MaxInt32.
+//
+// This function uses an internal hint cache to accelerate look up.
+func FixedIntV(n int, hint string) int {
+	if n <= 0 {
+		return 0
+	}
+	v, ok := fixedV.Load(hint)
 	if !ok {
 		seed := hint + " " + version.AppVersion
 		b := sha256.Sum256([]byte(seed))
 		b[0] = b[0] & 0b01111111
 		v = int(binary.BigEndian.Uint32(b[:4]))
-		fixedValues.Store(hint, v)
+		fixedV.Store(hint, v)
 	}
 	return v.(int) % n
 }
 
-// FixedIntPerHost returns an integer in [0, n) that stays the same
-// on the same host.
-func FixedIntPerHost(n int) int {
+// FixedIntVH returns an integer in [0, n) that stays the same
+// on the same host in the same mieru version.
+//
+// The returned value is not bigger than math.MaxInt32.
+func FixedIntVH(n int) int {
 	hostName, _ := os.Hostname()
-	return FixedInt(n, hostName)
+	return FixedIntV(n, hostName)
 }
 
 // scaleDown returns a random number from [0.0, 1.0), where

@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	recommendedConsecutiveASCIILen = 24 + rng.FixedIntPerHost(17)
+	recommendedConsecutiveASCIILen = 24 + rng.FixedIntVH(17)
 	recommendedTargetProbability   = 0.325
 )
 
@@ -74,7 +74,7 @@ func MaxPaddingSize(mtu int, transport common.TransportProtocol, fragmentSize in
 
 func buildRecommendedPaddingOpts(maxLen, randomDataLen int, strategySource string) paddingOpts {
 	// strategySource decides the padding strategy.
-	strategy := rng.FixedInt(2, strategySource)
+	strategy := rng.FixedIntV(2, strategySource)
 	if strategy == 0 {
 		// Use ASCII.
 		return paddingOpts{

@@ -75,6 +75,19 @@ message ClientProfile {
     optional HandshakeMode handshakeMode = 6;
 }
 
+message ServerEndpoint {
+    // String representation of IP address.
+    // It can be either IPv4 or IPv6.
+    optional string ipAddress = 1;
+
+    // Server's full qualified domain name.
+    // When this is set, the `ipAddress` field is ignored.
+    optional string domainName = 2;
+
+    // Server's port-protocol bindings.
+    repeated PortBinding portBindings = 3;
+}
+
 message MultiplexingConfig {
     // How frequent a network connection is reused.
     optional MultiplexingLevel level = 1;
