@@ -19,5 +19,8 @@
         }
     ],
     "loggingLevel": "DEBUG",
-    "mtu": 1300
+    "mtu": 1300,
+    "trafficPattern": {
+        "seed": 1
+    }
 }

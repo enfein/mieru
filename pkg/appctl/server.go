@@ -573,6 +573,7 @@ func DeleteServerUsers(names []string) error {
 // 5.2. each domain name is not empty, and does not begin or end with a dot
 // 5.3. if the action is "PROXY", the proxy is defined
 // 6. if set, metrics logging interval is valid, and it is not less than 1 second
+// 7. if set, traffic pattern is valid
 func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 	if _, err := appctlcommon.FlatPortBindings(patch.GetPortBindings()); err != nil {
 		return err
@@ -654,6 +655,9 @@ func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 		if d < time.Second {
 			return fmt.Errorf("metrics logging interval %q is less than 1 second", patch.GetAdvancedSettings().GetMetricsLoggingInterval())
 		}
+	}
+	if err := appctlcommon.ValidateTrafficPattern(patch.GetTrafficPattern()); err != nil {
+		return fmt.Errorf("invalid traffic pattern: %w", err)
 	}
 	return nil
 }
@@ -763,6 +767,12 @@ func mergeServerConfig(dst, src *pb.ServerConfig) error {
 	} else {
 		dns = dst.GetDns()
 	}
+	var trafficPattern *pb.TrafficPattern
+	if src.TrafficPattern != nil {
+		trafficPattern = src.GetTrafficPattern()
+	} else {
+		trafficPattern = dst.GetTrafficPattern()
+	}
 
 	proto.Reset(dst)
 	dst.PortBindings = portBindings
@@ -772,6 +782,7 @@ func mergeServerConfig(dst, src *pb.ServerConfig) error {
 	dst.Mtu = proto.Int32(mtu)
 	dst.Egress = egress
 	dst.Dns = dns
+	dst.TrafficPattern = trafficPattern
 	return nil
 }
 

@@ -73,6 +73,9 @@ message ClientProfile {
 
     // Handshake mode when client open a connection.
     optional HandshakeMode handshakeMode = 6;
+
+    // Fine tune traffic behaviors.
+    optional TrafficPattern trafficPattern = 7;
 }
 
 message ServerEndpoint {

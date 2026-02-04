@@ -37,6 +37,9 @@
             "mtu": 1350,
             "multiplexing": {
                 "level": "MULTIPLEXING_HIGH"
+            },
+            "trafficPattern": {
+                "seed": 2
             }
         },
         {

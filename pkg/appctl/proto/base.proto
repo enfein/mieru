@@ -124,15 +124,21 @@ message Auth {
 
 message TrafficPattern {
 
-    // Pin traffic patterns that are not explictly set.
-    // If seed is not set, traffic patterns that are not set can change.
+    // Generate stable implicit traffic patterns that are not explictly set.
+    // Generated traffic patterns are also influenced by "unlockAll" below.
     optional int32 seed = 1;
 
+    // If true, implicit traffic patterns can use all possible options,
+    // which may not be desired. Otherwise, implicit traffic patterns
+    // only use limited options.
+    // All explicitly set traffic patterns are available regardless of this.
+    optional bool unlockAll = 2;
+
     // Split TCP packets by fragmentation.
-    optional TCPFragment tcpFragment = 2;
+    optional TCPFragment tcpFragment = 3;
 
     // Manipulate nonce prefix.
-    optional NoncePattern nonce = 3;
+    optional NoncePattern nonce = 4;
 }
 
 message TCPFragment {
@@ -141,7 +147,8 @@ message TCPFragment {
     optional bool enable = 1;
 
     // Max sleep time in milliseconds between sending two fragments.
-    // If not set, a reasonable value is used.
+    // This value can't exceed 100.
+    // If not set, a reasonable default value is used.
     optional int32 maxSleepMs = 2;
 }
 
@@ -155,10 +162,12 @@ message NoncePattern {
     optional bool applyToAllUDPPacket = 2;
 
     // Minimum number of bytes to manipulate.
+    // It is ignored when NonceType is NONCE_TYPE_RANDOM or NONCE_TYPE_FIXED.
     optional int32 minLen = 3;
 
     // Maximum number of bytes to manipulate.
     // This value can't exceed 12.
+    // It is ignored when NonceType is NONCE_TYPE_RANDOM or NONCE_TYPE_FIXED.
     optional int32 maxLen = 4;
 
     // A list of hex string (without 0x) that represent customized
@@ -175,7 +184,7 @@ message NoncePattern {
 
 enum NonceType {
 
-    // No change to the original random nonce.
+    // Do not make change to the original random nonce.
     NONCE_TYPE_RANDOM = 0;
 
     // Use printable ASCII characters from 0x20 to 0x7E.

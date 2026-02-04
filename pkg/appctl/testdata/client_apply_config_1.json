@@ -21,7 +21,10 @@
             "multiplexing": {
                 "level": "MULTIPLEXING_LOW"
             },
-            "handshakeMode": "HANDSHAKE_STANDARD"
+            "handshakeMode": "HANDSHAKE_STANDARD",
+            "trafficPattern": {
+                "seed": 1
+            }
         }
     ],
     "activeProfile": "default",

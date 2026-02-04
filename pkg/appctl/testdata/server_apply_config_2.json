@@ -70,5 +70,8 @@
     },
     "dns": {
         "dualStack": "PREFER_IPv4"
+    },
+    "trafficPattern": {
+        "seed": 2
     }
 }

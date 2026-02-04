@@ -42,6 +42,7 @@ import (
 // 5.2. if set, server's IP address is parsable
 // 5.3. the server has at least 1 port binding, and all port bindings are valid
 // 6. if set, MTU is valid
+// 7. if set, traffic pattern is valid
 func ValidateClientConfigSingleProfile(profile *pb.ClientProfile) error {
 	name := profile.GetProfileName()
 	if name == "" {
@@ -78,6 +79,9 @@ func ValidateClientConfigSingleProfile(profile *pb.ClientProfile) error {
 	}
 	if profile.GetMtu() != 0 && (profile.GetMtu() < 1280 || profile.GetMtu() > 1500) {
 		return fmt.Errorf("MTU value %d is out of range, valid range is [1280, 1500]", profile.GetMtu())
+	}
+	if err := ValidateTrafficPattern(profile.GetTrafficPattern()); err != nil {
+		return fmt.Errorf("invalid traffic pattern: %w", err)
 	}
 	return nil
 }

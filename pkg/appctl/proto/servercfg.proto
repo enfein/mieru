@@ -44,6 +44,9 @@ message ServerConfig {
     // How to resolve IP address when the client send a request
     // with a domain name.
     optional DNS dns = 7;
+
+    // Fine tune traffic behaviors.
+    optional TrafficPattern trafficPattern = 8;
 }
 
 message ServerAdvancedSettings {
