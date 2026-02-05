@@ -21,15 +21,14 @@ import (
 	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 )
 
-// ValidateServerConfigSingleUser validates
-// a single server config user.
+// ValidateServerConfigSingleUser validates a single server config user.
 //
-// It validates
-// 1. user name is not empty
-// 2. user has either a password or a hashed password
-// 3. for each quota
-// 3.1. number of days is valid
-// 3.2. traffic volume in megabyte is valid
+// It validates:
+//   - user name is not empty
+//   - user has either a password or a hashed password
+//   - for each quota:
+//     1. number of days is valid
+//     2. traffic volume in megabyte is valid
 func ValidateServerConfigSingleUser(user *pb.User) error {
 	if user.GetName() == "" {
 		return fmt.Errorf("user name is not set")

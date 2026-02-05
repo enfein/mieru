@@ -29,20 +29,19 @@ import (
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
 
-// ValidateClientConfigSingleProfile validates
-// a single client config profile.
+// ValidateClientConfigSingleProfile validates a single client config profile.
 //
-// It validates
-// 1. profile name is not empty
-// 2. user name is not empty
-// 3. user has either a password or a hashed password
-// 4. user has no quota
-// 5. it has at least 1 server, and for each server
-// 5.1. the server has either IP address or domain name
-// 5.2. if set, server's IP address is parsable
-// 5.3. the server has at least 1 port binding, and all port bindings are valid
-// 6. if set, MTU is valid
-// 7. if set, traffic pattern is valid
+// It validates:
+//   - profile name is not empty
+//   - user name is not empty
+//   - user has either a password or a hashed password
+//   - user has no quota
+//   - it has at least 1 server, and for each server:
+//     1. the server has either IP address or domain name
+//     2. if set, server's IP address is parsable
+//     3. the server has at least 1 port binding, and all port bindings are valid
+//   - if set, MTU is valid
+//   - if set, traffic pattern is valid
 func ValidateClientConfigSingleProfile(profile *pb.ClientProfile) error {
 	name := profile.GetProfileName()
 	if name == "" {
