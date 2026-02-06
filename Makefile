@@ -180,7 +180,7 @@ client-mac-arm64:
 
 # Build windows clients.
 .PHONY: client-windows
-client-windows: client-windows-x86 client-windows-amd64
+client-windows: client-windows-x86 client-windows-amd64 client-windows-arm64
 
 # Build windows x86 client.
 .PHONY: client-windows-x86
@@ -205,6 +205,18 @@ client-windows-amd64:
 	sha256sum mieru_${VERSION}_windows_amd64.zip > mieru_${VERSION}_windows_amd64.zip.sha256.txt
 	mv mieru_${VERSION}_windows_amd64.zip ../../
 	mv mieru_${VERSION}_windows_amd64.zip.sha256.txt ../../
+
+# Build windows arm64 client.
+.PHONY: client-windows-arm64
+client-windows-arm64:
+	mkdir -p release/windows/arm64
+	env GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/windows/arm64/mieru.exe cmd/mieru/mieru.go
+	cd release/windows/arm64
+	sha256sum mieru.exe > mieru_${VERSION}_windows_arm64.exe.sha256.txt
+	zip -r mieru_${VERSION}_windows_arm64.zip mieru.exe
+	sha256sum mieru_${VERSION}_windows_arm64.zip > mieru_${VERSION}_windows_arm64.zip.sha256.txt
+	mv mieru_${VERSION}_windows_arm64.zip ../../
+	mv mieru_${VERSION}_windows_arm64.zip.sha256.txt ../../
 
 # Build linux servers.
 .PHONY: server-linux
