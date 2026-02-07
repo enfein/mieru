@@ -17,6 +17,7 @@ package trafficpattern
 
 import (
 	mrand "math/rand"
+	"strings"
 	"testing"
 
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
@@ -207,5 +208,248 @@ func TestMinLenMaxLen(t *testing.T) {
 				t.Errorf("seed=%d, unlockAll=%v: minLen (%d) > maxLen (%d)", seed, unlockAll, minLen, maxLen)
 			}
 		}
+	}
+}
+
+func TestEncodeDecode(t *testing.T) {
+	origin := &appctlpb.TrafficPattern{
+		UnlockAll: proto.Bool(true),
+		TcpFragment: &appctlpb.TCPFragment{
+			Enable:     proto.Bool(true),
+			MaxSleepMs: proto.Int32(50),
+		},
+		Nonce: &appctlpb.NoncePattern{
+			Type:                appctlpb.NonceType_NONCE_TYPE_PRINTABLE.Enum(),
+			ApplyToAllUDPPacket: proto.Bool(true),
+			MinLen:              proto.Int32(6),
+			MaxLen:              proto.Int32(8),
+		},
+	}
+
+	encoded := Encode(origin)
+
+	if encoded == "" {
+		t.Fatal("Encode() returned empty string")
+	}
+	t.Logf("Encoded traffic pattern: %s", encoded)
+
+	restored, err := Decode(encoded)
+	if err != nil {
+		t.Fatalf("Decode() failed: %v", err)
+	}
+
+	// Verify restored values match effective config
+	if restored.GetSeed() != origin.GetSeed() {
+		t.Errorf("seed mismatch: expected %d, got %d", origin.GetSeed(), restored.GetSeed())
+	}
+	if restored.GetUnlockAll() != origin.GetUnlockAll() {
+		t.Errorf("unlockAll mismatch: expected %v, got %v", origin.GetUnlockAll(), restored.GetUnlockAll())
+	}
+	if restored.TcpFragment.GetEnable() != origin.TcpFragment.GetEnable() {
+		t.Errorf("tcpFragment.enable mismatch: expected %v, got %v", origin.TcpFragment.GetEnable(), restored.TcpFragment.GetEnable())
+	}
+	if restored.TcpFragment.GetMaxSleepMs() != origin.TcpFragment.GetMaxSleepMs() {
+		t.Errorf("tcpFragment.maxSleepMs mismatch: expected %d, got %d", origin.TcpFragment.GetMaxSleepMs(), restored.TcpFragment.GetMaxSleepMs())
+	}
+	if restored.Nonce.GetType() != origin.Nonce.GetType() {
+		t.Errorf("nonce.type mismatch: expected %v, got %v", origin.Nonce.GetType(), restored.Nonce.GetType())
+	}
+	if restored.Nonce.GetApplyToAllUDPPacket() != origin.Nonce.GetApplyToAllUDPPacket() {
+		t.Errorf("nonce.applyToAllUDPPacket mismatch: expected %v, got %v", origin.Nonce.GetApplyToAllUDPPacket(), restored.Nonce.GetApplyToAllUDPPacket())
+	}
+	if restored.Nonce.GetMinLen() != origin.Nonce.GetMinLen() {
+		t.Errorf("nonce.minLen mismatch: expected %d, got %d", origin.Nonce.GetMinLen(), restored.Nonce.GetMinLen())
+	}
+	if restored.Nonce.GetMaxLen() != origin.Nonce.GetMaxLen() {
+		t.Errorf("nonce.maxLen mismatch: expected %d, got %d", origin.Nonce.GetMaxLen(), restored.Nonce.GetMaxLen())
+	}
+}
+
+func TestValidateTrafficPattern(t *testing.T) {
+	cases := []struct {
+		name          string
+		pattern       *appctlpb.TrafficPattern
+		wantErrString string
+	}{
+		{
+			name:          "nil_pattern",
+			pattern:       nil,
+			wantErrString: "",
+		},
+		{
+			name:          "empty_pattern",
+			pattern:       &appctlpb.TrafficPattern{},
+			wantErrString: "",
+		},
+		{
+			name: "valid_tcp_fragment",
+			pattern: &appctlpb.TrafficPattern{
+				TcpFragment: &appctlpb.TCPFragment{
+					Enable:     proto.Bool(true),
+					MaxSleepMs: proto.Int32(100),
+				},
+			},
+			wantErrString: "",
+		},
+		{
+			name: "tcp_fragment_max_sleep_exceeds_100",
+			pattern: &appctlpb.TrafficPattern{
+				TcpFragment: &appctlpb.TCPFragment{
+					Enable:     proto.Bool(true),
+					MaxSleepMs: proto.Int32(101),
+				},
+			},
+			wantErrString: "exceeds maximum value 100",
+		},
+		{
+			name: "tcp_fragment_max_sleep_negative",
+			pattern: &appctlpb.TrafficPattern{
+				TcpFragment: &appctlpb.TCPFragment{
+					MaxSleepMs: proto.Int32(-1),
+				},
+			},
+			wantErrString: "is negative",
+		},
+		{
+			name: "valid_nonce_pattern",
+			pattern: &appctlpb.TrafficPattern{
+				Nonce: &appctlpb.NoncePattern{
+					MinLen: proto.Int32(12),
+					MaxLen: proto.Int32(12),
+				},
+			},
+			wantErrString: "",
+		},
+		{
+			name: "nonce_max_len_exceeds_12",
+			pattern: &appctlpb.TrafficPattern{
+				Nonce: &appctlpb.NoncePattern{
+					MaxLen: proto.Int32(13),
+				},
+			},
+			wantErrString: "maxLen 13 exceeds maximum value 12",
+		},
+		{
+			name: "nonce_min_len_exceeds_12",
+			pattern: &appctlpb.TrafficPattern{
+				Nonce: &appctlpb.NoncePattern{
+					MinLen: proto.Int32(13),
+				},
+			},
+			wantErrString: "minLen 13 exceeds maximum value 12",
+		},
+		{
+			name: "nonce_max_len_negative",
+			pattern: &appctlpb.TrafficPattern{
+				Nonce: &appctlpb.NoncePattern{
+					MaxLen: proto.Int32(-1),
+				},
+			},
+			wantErrString: "maxLen -1 is negative",
+		},
+		{
+			name: "nonce_min_len_negative",
+			pattern: &appctlpb.TrafficPattern{
+				Nonce: &appctlpb.NoncePattern{
+					MinLen: proto.Int32(-1),
+				},
+			},
+			wantErrString: "minLen -1 is negative",
+		},
+		{
+			name: "nonce_min_len_greater_than_max_len",
+			pattern: &appctlpb.TrafficPattern{
+				Nonce: &appctlpb.NoncePattern{
+					MinLen: proto.Int32(8),
+					MaxLen: proto.Int32(4),
+				},
+			},
+			wantErrString: "minLen 8 is greater than maxLen 4",
+		},
+		{
+			name: "valid_custom_hex_strings",
+			pattern: &appctlpb.TrafficPattern{
+				Nonce: &appctlpb.NoncePattern{
+					Type:             appctlpb.NonceType_NONCE_TYPE_FIXED.Enum(),
+					CustomHexStrings: []string{"00010203", "aabbccdd"},
+				},
+			},
+			wantErrString: "",
+		},
+		{
+			name: "valid_custom_hex_strings_max_length",
+			pattern: &appctlpb.TrafficPattern{
+				Nonce: &appctlpb.NoncePattern{
+					Type:             appctlpb.NonceType_NONCE_TYPE_FIXED.Enum(),
+					CustomHexStrings: []string{"000102030405060708090a0b"},
+				},
+			},
+			wantErrString: "",
+		},
+		{
+			name: "custom_hex_string_exceeds_12_bytes",
+			pattern: &appctlpb.TrafficPattern{
+				Nonce: &appctlpb.NoncePattern{
+					Type:             appctlpb.NonceType_NONCE_TYPE_FIXED.Enum(),
+					CustomHexStrings: []string{"000102030405060708090a0b0c"},
+				},
+			},
+			wantErrString: "exceeds maximum 12 bytes",
+		},
+		{
+			name: "custom_hex_string_invalid",
+			pattern: &appctlpb.TrafficPattern{
+				Nonce: &appctlpb.NoncePattern{
+					Type:             appctlpb.NonceType_NONCE_TYPE_FIXED.Enum(),
+					CustomHexStrings: []string{"not_valid_hex"},
+				},
+			},
+			wantErrString: "is not a valid hex string",
+		},
+		{
+			name: "custom_hex_string_odd_length",
+			pattern: &appctlpb.TrafficPattern{
+				Nonce: &appctlpb.NoncePattern{
+					Type:             appctlpb.NonceType_NONCE_TYPE_FIXED.Enum(),
+					CustomHexStrings: []string{"abc"},
+				},
+			},
+			wantErrString: "is not a valid hex string",
+		},
+		{
+			name: "valid_full_pattern",
+			pattern: &appctlpb.TrafficPattern{
+				Seed: proto.Int32(12345),
+				TcpFragment: &appctlpb.TCPFragment{
+					Enable:     proto.Bool(true),
+					MaxSleepMs: proto.Int32(50),
+				},
+				Nonce: &appctlpb.NoncePattern{
+					Type:                appctlpb.NonceType_NONCE_TYPE_FIXED.Enum(),
+					ApplyToAllUDPPacket: proto.Bool(true),
+					MinLen:              proto.Int32(4),
+					MaxLen:              proto.Int32(8),
+					CustomHexStrings:    []string{"00010203"},
+				},
+			},
+			wantErrString: "",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			err := Validate(c.pattern)
+			if c.wantErrString == "" {
+				if err != nil {
+					t.Errorf("Validate() returned unexpected error: %v", err)
+				}
+			} else {
+				if err == nil {
+					t.Errorf("Validate() expected error to contain %q, got nil", c.wantErrString)
+				} else if !strings.Contains(err.Error(), c.wantErrString) {
+					t.Errorf("Validate() error = %q, want error to contain %q", err.Error(), c.wantErrString)
+				}
+			}
+		})
 	}
 }

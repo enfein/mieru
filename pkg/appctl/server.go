@@ -36,6 +36,7 @@ import (
 	"github.com/enfein/mieru/v3/pkg/protocol"
 	"github.com/enfein/mieru/v3/pkg/socks5"
 	"github.com/enfein/mieru/v3/pkg/stderror"
+	"github.com/enfein/mieru/v3/pkg/trafficpattern"
 	"github.com/enfein/mieru/v3/pkg/version"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -656,7 +657,7 @@ func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 			return fmt.Errorf("metrics logging interval %q is less than 1 second", patch.GetAdvancedSettings().GetMetricsLoggingInterval())
 		}
 	}
-	if err := appctlcommon.ValidateTrafficPattern(patch.GetTrafficPattern()); err != nil {
+	if err := trafficpattern.Validate(patch.GetTrafficPattern()); err != nil {
 		return fmt.Errorf("invalid traffic pattern: %w", err)
 	}
 	return nil
