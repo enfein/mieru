@@ -22,8 +22,10 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/common"
 	"golang.org/x/crypto/chacha20poly1305"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -52,6 +54,7 @@ type AEADBlockCipher struct {
 	implicitNonce       []byte
 	mu                  sync.Mutex
 	ctx                 BlockContext
+	noncePattern        *appctlpb.NoncePattern
 }
 
 // newAESGCMBlockCipher creates a new AES-GCM cipher with the supplied key.
@@ -261,6 +264,7 @@ func (c *AEADBlockCipher) Clone() BlockCipher {
 		copy(newCipher.implicitNonce, c.implicitNonce)
 	}
 	newCipher.ctx = c.ctx
+	newCipher.noncePattern = proto.Clone(c.noncePattern).(*appctlpb.NoncePattern)
 	return newCipher
 }
 
@@ -289,6 +293,18 @@ func (c *AEADBlockCipher) SetBlockContext(bc BlockContext) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.ctx = bc
+}
+
+func (c *AEADBlockCipher) NoncePattern() *appctlpb.NoncePattern {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return proto.Clone(c.noncePattern).(*appctlpb.NoncePattern)
+}
+
+func (c *AEADBlockCipher) SetNoncePattern(pattern *appctlpb.NoncePattern) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.noncePattern = proto.Clone(pattern).(*appctlpb.NoncePattern)
 }
 
 // newNonce generates a new nonce.

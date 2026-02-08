@@ -19,6 +19,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 
+	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 )
 
@@ -100,6 +101,12 @@ type BlockCipher interface {
 
 	// SetBlockContext sets the BlockContext.
 	SetBlockContext(bc BlockContext)
+
+	// NoncePattern returns a copy of NoncePattern associated with the cipher block.
+	NoncePattern() *appctlpb.NoncePattern
+
+	// SetNoncePattern sets the NoncePattern associated with the cipher block.
+	SetNoncePattern(pattern *appctlpb.NoncePattern)
 }
 
 // BlockContext contains optional context associated to a cipher block.

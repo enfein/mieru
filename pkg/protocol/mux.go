@@ -35,6 +35,7 @@ import (
 	"github.com/enfein/mieru/v3/pkg/mathext"
 	"github.com/enfein/mieru/v3/pkg/sockopts"
 	"github.com/enfein/mieru/v3/pkg/stderror"
+	"github.com/enfein/mieru/v3/pkg/trafficpattern"
 )
 
 const (
@@ -53,6 +54,7 @@ type Mux struct {
 	clientDNSConfig       *apicommon.ClientDNSConfig
 	streamListenerFactory apicommon.StreamListenerFactory
 	packetListenerFactory apicommon.PacketListenerFactory
+	trafficPattern        *trafficpattern.Config
 	chAccept              chan net.Conn
 	acceptHasErr          atomic.Bool
 	acceptErr             chan error // this channel is closed when accept has error
@@ -199,6 +201,15 @@ func (m *Mux) SetPacketListenerFactory(listenerFactory apicommon.PacketListenerF
 	defer m.mu.Unlock()
 	m.packetListenerFactory = listenerFactory
 	log.Infof("Mux packet listener factory has been updated")
+	return m
+}
+
+// SetTrafficPattern updates the traffic pattern configuration used by the mux.
+func (m *Mux) SetTrafficPattern(trafficPattern *trafficpattern.Config) *Mux {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.trafficPattern = trafficPattern
+	log.Infof("Mux traffic pattern has been updated")
 	return m
 }
 
