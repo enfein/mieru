@@ -18,10 +18,13 @@ package cipher
 import (
 	"bytes"
 	crand "crypto/rand"
+	"encoding/hex"
 	mrand "math/rand"
 	"testing"
 
+	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/common"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestDefaultNonceSize(t *testing.T) {
@@ -216,40 +219,177 @@ func TestAEADBlockCipherNewNonce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newXChaCha20Poly1305BlockCipher() failed: %v", err)
 	}
-	s := make(map[byte]struct{})
-	for _, c := range []byte(common.Common64Set) {
-		s[c] = struct{}{}
-	}
-	distribution := make(map[byte]int32)
-	for i := 0; i < 100000; i++ {
+	for i := 0; i < 10; i++ {
 		nonce, err := c.newNonce()
 		if err != nil {
 			t.Fatalf("newNonce() failed: %v", err)
 		}
-		for j, b := range nonce {
-			if j >= nonceRewritePrefixLen {
+		if len(nonce) != c.NonceSize() {
+			t.Fatalf("nonce size = %d, want %d", len(nonce), c.NonceSize())
+		}
+	}
+}
+
+func TestNewNonceTypePrintable(t *testing.T) {
+	key := make([]byte, 32)
+	if _, err := crand.Read(key); err != nil {
+		t.Fatalf("fail to generate key: %v", err)
+	}
+	c, err := newXChaCha20Poly1305BlockCipher(key)
+	if err != nil {
+		t.Fatalf("newXChaCha20Poly1305BlockCipher() failed: %v", err)
+	}
+	nonceType := appctlpb.NonceType_NONCE_TYPE_PRINTABLE
+	minLen := int32(8)
+	maxLen := int32(12)
+	c.SetNoncePattern(&appctlpb.NoncePattern{
+		Type:                &nonceType,
+		ApplyToAllUDPPacket: proto.Bool(true),
+		MinLen:              &minLen,
+		MaxLen:              &maxLen,
+	})
+	for i := 0; i < 10; i++ {
+		nonce, err := c.newNonce()
+		if err != nil {
+			t.Fatalf("newNonce() failed: %v", err)
+		}
+		// At least minLen bytes must be printable.
+		for j := 0; j < int(minLen); j++ {
+			if nonce[j] < common.PrintableCharSub || nonce[j] > common.PrintableCharSup {
+				t.Fatalf("byte %d at position %d is not printable", nonce[j], j)
+			}
+		}
+	}
+}
+
+func TestNewNonceTypePrintableSubset(t *testing.T) {
+	key := make([]byte, 32)
+	if _, err := crand.Read(key); err != nil {
+		t.Fatalf("fail to generate key: %v", err)
+	}
+	c, err := newXChaCha20Poly1305BlockCipher(key)
+	if err != nil {
+		t.Fatalf("newXChaCha20Poly1305BlockCipher() failed: %v", err)
+	}
+	nonceType := appctlpb.NonceType_NONCE_TYPE_PRINTABLE_SUBSET
+	minLen := int32(8)
+	maxLen := int32(12)
+	c.SetNoncePattern(&appctlpb.NoncePattern{
+		Type:                &nonceType,
+		ApplyToAllUDPPacket: proto.Bool(true),
+		MinLen:              &minLen,
+		MaxLen:              &maxLen,
+	})
+	allowed := make(map[byte]struct{})
+	for _, b := range []byte(common.Common64Set) {
+		allowed[b] = struct{}{}
+	}
+	for i := 0; i < 10; i++ {
+		nonce, err := c.newNonce()
+		if err != nil {
+			t.Fatalf("newNonce() failed: %v", err)
+		}
+		for j := 0; j < int(minLen); j++ {
+			if _, ok := allowed[nonce[j]]; !ok {
+				t.Fatalf("byte %v at position %d is not in Common64Set", nonce[j], j)
+			}
+		}
+	}
+}
+
+func TestNewNonceTypeFixed(t *testing.T) {
+	key := make([]byte, 32)
+	if _, err := crand.Read(key); err != nil {
+		t.Fatalf("fail to generate key: %v", err)
+	}
+	c, err := newXChaCha20Poly1305BlockCipher(key)
+	if err != nil {
+		t.Fatalf("newXChaCha20Poly1305BlockCipher() failed: %v", err)
+	}
+	hexA := "0001020304050607"
+	hexB := "08090a0b0c0d0e0f"
+	nonceType := appctlpb.NonceType_NONCE_TYPE_FIXED
+	c.SetNoncePattern(&appctlpb.NoncePattern{
+		Type:                &nonceType,
+		ApplyToAllUDPPacket: proto.Bool(true),
+		CustomHexStrings:    []string{hexA, hexB},
+	})
+	prefixA, _ := hex.DecodeString(hexA)
+	prefixB, _ := hex.DecodeString(hexB)
+	sawA := false
+	sawB := false
+	for i := 0; i < 1000; i++ {
+		nonce, err := c.newNonce()
+		if err != nil {
+			t.Fatalf("newNonce() failed: %v", err)
+		}
+		prefix := nonce[:len(prefixA)]
+		if bytes.Equal(prefix, prefixA) {
+			sawA = true
+		} else if bytes.Equal(prefix, prefixB) {
+			sawB = true
+		} else {
+			t.Fatalf("nonce prefix %v matches neither %v nor %v", prefix, prefixA, prefixB)
+		}
+	}
+	if !sawA || !sawB {
+		t.Errorf("expected both prefixes to be used; sawA=%v, sawB=%v", sawA, sawB)
+	}
+}
+
+func TestNewNonceApplyOnce(t *testing.T) {
+	key := make([]byte, 32)
+	if _, err := crand.Read(key); err != nil {
+		t.Fatalf("fail to generate key: %v", err)
+	}
+	c, err := newXChaCha20Poly1305BlockCipher(key)
+	if err != nil {
+		t.Fatalf("newXChaCha20Poly1305BlockCipher() failed: %v", err)
+	}
+	nonceType := appctlpb.NonceType_NONCE_TYPE_PRINTABLE_SUBSET
+	minLen := int32(8)
+	maxLen := int32(12)
+	c.SetNoncePattern(&appctlpb.NoncePattern{
+		Type:                &nonceType,
+		ApplyToAllUDPPacket: proto.Bool(false),
+		MinLen:              &minLen,
+		MaxLen:              &maxLen,
+	})
+	allowed := make(map[byte]struct{})
+	for _, b := range []byte(common.Common64Set) {
+		allowed[b] = struct{}{}
+	}
+
+	// First call should apply the pattern.
+	nonce, err := c.newNonce()
+	if err != nil {
+		t.Fatalf("newNonce() failed: %v", err)
+	}
+	for j := 0; j < int(minLen); j++ {
+		if _, ok := allowed[nonce[j]]; !ok {
+			t.Fatalf("first nonce: byte %v at position %d is not in Common64Set", nonce[j], j)
+		}
+	}
+
+	// Subsequent calls should return plain random nonces (no guaranteed pattern).
+	foundNonPattern := false
+	for i := 0; i < 1000; i++ {
+		nonce, err = c.newNonce()
+		if err != nil {
+			t.Fatalf("newNonce() failed: %v", err)
+		}
+		for j := 0; j < int(minLen); j++ {
+			if _, ok := allowed[nonce[j]]; !ok {
+				foundNonPattern = true
 				break
 			}
-			if _, ok := s[b]; !ok {
-				t.Fatalf("Byte %v in position %d is not allowed", b, j)
-			}
-			distribution[b]++
+		}
+		if foundNonPattern {
+			break
 		}
 	}
-	var max int32 = 0
-	var min int32 = 0x7FFFFFFF
-	for _, val := range distribution {
-		if val > max {
-			max = val
-		}
-		if val < min {
-			min = val
-		}
-	}
-	ratio := float64(min) / float64(max)
-	t.Logf("Nonce random ratio is %f", ratio)
-	if ratio < 0.8 {
-		t.Errorf("Nonce random ratio %f is too low", ratio)
+	if !foundNonPattern {
+		t.Errorf("expected subsequent nonces to be plain random, but all matched the pattern")
 	}
 }
 

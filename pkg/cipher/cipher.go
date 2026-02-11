@@ -19,17 +19,15 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	crand "crypto/rand"
+	"encoding/hex"
 	"fmt"
+	mrand "math/rand"
 	"sync"
 
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/common"
 	"golang.org/x/crypto/chacha20poly1305"
 	"google.golang.org/protobuf/proto"
-)
-
-const (
-	nonceRewritePrefixLen = 8
 )
 
 type AEADType uint8
@@ -55,6 +53,7 @@ type AEADBlockCipher struct {
 	mu                  sync.Mutex
 	ctx                 BlockContext
 	noncePattern        *appctlpb.NoncePattern
+	noncePatternApplied bool
 }
 
 // newAESGCMBlockCipher creates a new AES-GCM cipher with the supplied key.
@@ -314,13 +313,62 @@ func (c *AEADBlockCipher) newNonce() ([]byte, error) {
 		return nil, err
 	}
 
-	// Adjust the nonce such that the first a few bytes are printable ASCII characters.
-	rewriteLen := nonceRewritePrefixLen
-	if rewriteLen > c.NonceSize() {
-		rewriteLen = c.NonceSize()
+	if c.noncePattern == nil {
+		return nonce, nil
 	}
-	common.ToCommon64Set(nonce, 0, rewriteLen)
+
+	// For UDP (stateless) cipher, if the pattern was already applied
+	// and applyToAllUDPPacket is false, don't change the nonce.
+	if !c.enableImplicitNonce && c.noncePatternApplied && !c.noncePattern.GetApplyToAllUDPPacket() {
+		return nonce, nil
+	}
+
+	switch c.noncePattern.GetType() {
+	case appctlpb.NonceType_NONCE_TYPE_RANDOM:
+		// No change to the nonce.
+	case appctlpb.NonceType_NONCE_TYPE_PRINTABLE:
+		rewriteLen := c.nonceRewriteLen()
+		common.ToPrintableChar(nonce, 0, rewriteLen)
+	case appctlpb.NonceType_NONCE_TYPE_PRINTABLE_SUBSET:
+		rewriteLen := c.nonceRewriteLen()
+		common.ToCommon64Set(nonce, 0, rewriteLen)
+	case appctlpb.NonceType_NONCE_TYPE_FIXED:
+		hexStrings := c.noncePattern.GetCustomHexStrings()
+		if len(hexStrings) > 0 {
+			idx := mrand.Intn(len(hexStrings))
+			prefix, err := hex.DecodeString(hexStrings[idx])
+			if err == nil {
+				copyLen := len(prefix)
+				if copyLen > c.NonceSize() {
+					copyLen = c.NonceSize()
+				}
+				copy(nonce[:copyLen], prefix[:copyLen])
+			} else {
+				panic(fmt.Errorf("fail to decode hex string: %w", err))
+			}
+		}
+		// If no hex strings are provided, use plain random nonce.
+	}
+
+	c.noncePatternApplied = true
 	return nonce, nil
+}
+
+// nonceRewriteLen returns a random length in [minLen, maxLen] clamped to the nonce size.
+func (c *AEADBlockCipher) nonceRewriteLen() int {
+	minLen := int(c.noncePattern.GetMinLen())
+	maxLen := int(c.noncePattern.GetMaxLen())
+	if maxLen > c.NonceSize() {
+		maxLen = c.NonceSize()
+	}
+	if minLen > maxLen {
+		minLen = maxLen
+	}
+	if minLen == maxLen {
+		return minLen
+	}
+	rangeSize := mrand.Intn(maxLen - minLen + 1)
+	return minLen + rangeSize
 }
 
 func (c *AEADBlockCipher) increaseNonce() {
