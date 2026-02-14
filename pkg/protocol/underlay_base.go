@@ -43,8 +43,9 @@ type baseUnderlay struct {
 	mtu      int
 	done     chan struct{} // if the underlay is closed
 
-	sessionMap    sync.Map      // Map<sessionID, *Session>
-	readySessions chan *Session // sessions that completed handshake and ready for consume
+	sessionMap     sync.Map      // Map<sessionID, *Session>
+	readySessions  chan *Session // sessions that completed handshake and ready for consume
+	trafficPattern *appctlpb.TrafficPattern
 
 	sendMutex  sync.Mutex // protect writing data to the connection
 	closeMutex sync.Mutex // protect closing the connection
@@ -60,13 +61,14 @@ var (
 	_ Underlay = &baseUnderlay{}
 )
 
-func newBaseUnderlay(isClient bool, mtu int) *baseUnderlay {
+func newBaseUnderlay(isClient bool, mtu int, trafficPattern *appctlpb.TrafficPattern) *baseUnderlay {
 	return &baseUnderlay{
-		isClient:      isClient,
-		mtu:           mtu,
-		done:          make(chan struct{}),
-		readySessions: make(chan *Session, sessionChanCapacity),
-		scheduler:     &ScheduleController{},
+		isClient:       isClient,
+		mtu:            mtu,
+		done:           make(chan struct{}),
+		readySessions:  make(chan *Session, sessionChanCapacity),
+		trafficPattern: trafficPattern,
+		scheduler:      &ScheduleController{},
 	}
 }
 

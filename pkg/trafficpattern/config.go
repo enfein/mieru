@@ -36,7 +36,8 @@ type Config struct {
 // It assumes the original protobuf message is valid.
 func NewConfig(original *appctlpb.TrafficPattern) *Config {
 	if original == nil {
-		panic("TrafficPattern is nil")
+		// Use an empty traffic pattern.
+		original = &appctlpb.TrafficPattern{}
 	}
 	c := &Config{
 		original:  original,

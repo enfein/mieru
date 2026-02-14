@@ -66,7 +66,7 @@ var _ Underlay = &PacketUnderlay{}
 // "block" is the block encryption algorithm to encrypt packets.
 //
 // This function is only used by proxy client.
-func NewPacketUnderlay(ctx context.Context, packetDialer apicommon.PacketDialer, resolver apicommon.DNSResolver, network, addr string, mtu int, block cipher.BlockCipher) (*PacketUnderlay, error) {
+func NewPacketUnderlay(ctx context.Context, packetDialer apicommon.PacketDialer, resolver apicommon.DNSResolver, network, addr string, mtu int, block cipher.BlockCipher, trafficPattern *appctlpb.TrafficPattern) (*PacketUnderlay, error) {
 	switch network {
 	case "udp", "udp4", "udp6":
 	default:
@@ -85,7 +85,7 @@ func NewPacketUnderlay(ctx context.Context, packetDialer apicommon.PacketDialer,
 		return nil, fmt.Errorf("ListenPacket() failed: %w", err)
 	}
 	u := &PacketUnderlay{
-		baseUnderlay:       *newBaseUnderlay(true, mtu),
+		baseUnderlay:       *newBaseUnderlay(true, mtu, trafficPattern),
 		conn:               conn,
 		sessionCleanTicker: time.NewTicker(sessionCleanInterval),
 		serverAddr:         remoteUDPAddr,
@@ -254,7 +254,7 @@ func (u *PacketUnderlay) onOpenSessionRequest(seg *segment, remoteAddr net.Addr)
 		log.Debugf("%v received open session request, but session ID %d is already used", u, sessionID)
 		return nil
 	}
-	session := NewSession(sessionID, false, u.MTU(), u.users)
+	session := NewSession(sessionID, false, u.MTU(), u.users, u.trafficPattern)
 	u.AddSession(session, remoteAddr)
 	session.recvChan <- seg
 	u.readySessions <- session
@@ -390,6 +390,9 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 						blockCipher.SetBlockContext(cipher.BlockContext{
 							UserName: user.GetName(),
 						})
+						if u.trafficPattern != nil {
+							blockCipher.SetNoncePattern(u.trafficPattern.GetNonce())
+						}
 						break
 					}
 				}

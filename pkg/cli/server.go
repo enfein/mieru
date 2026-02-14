@@ -39,6 +39,7 @@ import (
 	"github.com/enfein/mieru/v3/pkg/protocol"
 	"github.com/enfein/mieru/v3/pkg/socks5"
 	"github.com/enfein/mieru/v3/pkg/stderror"
+	"github.com/enfein/mieru/v3/pkg/trafficpattern"
 	"github.com/enfein/mieru/v3/pkg/version/updater"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -446,7 +447,9 @@ var serverRunFunc = func(s []string) error {
 	if err = appctl.ValidateFullServerConfig(config); err == nil {
 		appctl.SetAppStatus(appctlpb.AppStatus_STARTING)
 
-		mux := protocol.NewMux(false).SetServerUsers(appctlcommon.UserListToMap(config.GetUsers()))
+		mux := protocol.NewMux(false).
+			SetTrafficPattern(trafficpattern.NewConfig(config.TrafficPattern)).
+			SetServerUsers(appctlcommon.UserListToMap(config.GetUsers()))
 		appctl.SetServerMuxRef(mux)
 		mtu := common.DefaultMTU
 		if config.GetMtu() != 0 {

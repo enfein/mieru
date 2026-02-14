@@ -28,6 +28,7 @@ import (
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/protocol"
+	"github.com/enfein/mieru/v3/pkg/trafficpattern"
 )
 
 // This package should not depends on github.com/enfein/mieru/v3/pkg/appctl,
@@ -89,6 +90,7 @@ func (ms *mieruServer) Start() error {
 	if ms.config.PacketListenerFactory != nil {
 		ms.mux.SetPacketListenerFactory(ms.config.PacketListenerFactory)
 	}
+	ms.mux.SetTrafficPattern(trafficpattern.NewConfig(ms.config.Config.TrafficPattern))
 	ms.mux.SetServerUsers(appctlcommon.UserListToMap(ms.config.Config.GetUsers()))
 	mtu := common.DefaultMTU
 	if ms.config.Config.GetMtu() != 0 {
@@ -163,6 +165,9 @@ func validateServerConfig(config *appctlpb.ServerConfig) error {
 	}
 	if config.Egress != nil {
 		return fmt.Errorf("egress is not allowed")
+	}
+	if err := trafficpattern.Validate(config.TrafficPattern); err != nil {
+		return fmt.Errorf("invalid traffic pattern: %w", err)
 	}
 	return nil
 }

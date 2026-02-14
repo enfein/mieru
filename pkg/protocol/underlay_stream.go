@@ -63,7 +63,7 @@ var _ Underlay = &StreamUnderlay{}
 // "block" is the block encryption algorithm to encrypt packets.
 //
 // This function is only used by proxy client.
-func NewStreamUnderlay(ctx context.Context, dialer apicommon.Dialer, resolver apicommon.DNSResolver, dnsConfig *apicommon.ClientDNSConfig, network, addr string, mtu int, block cipher.BlockCipher) (*StreamUnderlay, error) {
+func NewStreamUnderlay(ctx context.Context, dialer apicommon.Dialer, resolver apicommon.DNSResolver, dnsConfig *apicommon.ClientDNSConfig, network, addr string, mtu int, block cipher.BlockCipher, trafficPattern *appctlpb.TrafficPattern) (*StreamUnderlay, error) {
 	switch network {
 	case "tcp", "tcp4", "tcp6":
 	default:
@@ -86,7 +86,7 @@ func NewStreamUnderlay(ctx context.Context, dialer apicommon.Dialer, resolver ap
 		return nil, fmt.Errorf("DialContext() failed: %w", err)
 	}
 	t := &StreamUnderlay{
-		baseUnderlay:       *newBaseUnderlay(true, mtu),
+		baseUnderlay:       *newBaseUnderlay(true, mtu, trafficPattern),
 		conn:               conn,
 		candidates:         []cipher.BlockCipher{block},
 		sessionCleanTicker: time.NewTicker(sessionCleanInterval),
@@ -260,7 +260,7 @@ func (t *StreamUnderlay) onOpenSessionRequest(seg *segment) error {
 	if found {
 		return fmt.Errorf("%v received open session request, but session ID %d is already used", t, sessionID)
 	}
-	session := NewSession(sessionID, false, t.MTU(), t.users)
+	session := NewSession(sessionID, false, t.MTU(), t.users, t.trafficPattern)
 	t.AddSession(session, nil)
 	session.recvChan <- seg
 	t.readySessions <- session

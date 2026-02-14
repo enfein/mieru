@@ -80,7 +80,7 @@ func ValidateClientConfigSingleProfile(profile *pb.ClientProfile) error {
 	if profile.GetMtu() != 0 && (profile.GetMtu() < 1280 || profile.GetMtu() > 1500) {
 		return fmt.Errorf("MTU value %d is out of range, valid range is [1280, 1500]", profile.GetMtu())
 	}
-	if err := trafficpattern.Validate(profile.GetTrafficPattern()); err != nil {
+	if err := trafficpattern.Validate(profile.TrafficPattern); err != nil {
 		return fmt.Errorf("invalid traffic pattern: %w", err)
 	}
 	return nil
@@ -110,6 +110,8 @@ func NewClientMuxFromProfile(activeProfile *pb.ClientProfile, dialer apicommon.D
 	if dnsConfig != nil {
 		mux.SetClientDNSConfig(dnsConfig)
 	}
+
+	mux.SetTrafficPattern(trafficpattern.NewConfig(activeProfile.TrafficPattern))
 
 	// Set user name and password.
 	user := activeProfile.GetUser()

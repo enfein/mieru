@@ -117,8 +117,9 @@ func (s *serverManagementService) Start(ctx context.Context, req *emptypb.Empty)
 
 	SetAppStatus(pb.AppStatus_STARTING)
 
-	mux := protocol.NewMux(false).SetServerUsers(appctlcommon.UserListToMap(config.GetUsers()))
-	SetServerMuxRef(mux)
+	mux := protocol.NewMux(false).
+		SetTrafficPattern(trafficpattern.NewConfig(config.TrafficPattern)).
+		SetServerUsers(appctlcommon.UserListToMap(config.GetUsers()))
 	mtu := common.DefaultMTU
 	if config.GetMtu() != 0 {
 		mtu = int(config.GetMtu())

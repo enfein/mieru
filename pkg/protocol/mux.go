@@ -382,7 +382,11 @@ func (m *Mux) DialContext(ctx context.Context) (net.Conn, error) {
 	defer func() {
 		underlay.Scheduler().DecPending()
 	}()
-	session := NewSession(mrand.Uint32(), true, underlay.MTU(), m.users)
+	var trafficPattern *appctlpb.TrafficPattern
+	if m.trafficPattern != nil {
+		trafficPattern = m.trafficPattern.Effective()
+	}
+	session := NewSession(mrand.Uint32(), true, underlay.MTU(), m.users, trafficPattern)
 	if err := underlay.AddSession(session, nil); err != nil {
 		return nil, fmt.Errorf("AddSession() failed: %v", err)
 	}
@@ -529,8 +533,12 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 		wg.Done()
 		log.Infof("Mux is listening to endpoint %s %s", network, laddr)
 
+		var trafficPattern *appctlpb.TrafficPattern
+		if m.trafficPattern != nil {
+			trafficPattern = m.trafficPattern.Effective()
+		}
 		underlay := &PacketUnderlay{
-			baseUnderlay:       *newBaseUnderlay(false, properties.MTU()),
+			baseUnderlay:       *newBaseUnderlay(false, properties.MTU(), trafficPattern),
 			conn:               conn,
 			sessionCleanTicker: time.NewTicker(sessionCleanInterval),
 			users:              m.users,
@@ -587,10 +595,14 @@ func (m *Mux) acceptTCPUnderlay(rawListener net.Listener, properties UnderlayPro
 	if err != nil {
 		return nil, fmt.Errorf("Accept() underlay failed: %w", err)
 	}
-	return m.serverWrapTCPConn(rawConn, properties.MTU(), m.users), nil
+	var trafficPattern *appctlpb.TrafficPattern
+	if m.trafficPattern != nil {
+		trafficPattern = m.trafficPattern.Effective()
+	}
+	return m.serverWrapTCPConn(rawConn, properties.MTU(), m.users, trafficPattern), nil
 }
 
-func (m *Mux) serverWrapTCPConn(rawConn net.Conn, mtu int, users map[string]*appctlpb.User) Underlay {
+func (m *Mux) serverWrapTCPConn(rawConn net.Conn, mtu int, users map[string]*appctlpb.User, trafficPattern *appctlpb.TrafficPattern) Underlay {
 	var err error
 	var blocks []cipher.BlockCipher
 	for _, user := range users {
@@ -612,11 +624,14 @@ func (m *Mux) serverWrapTCPConn(rawConn net.Conn, mtu int, users map[string]*app
 			block.SetBlockContext(cipher.BlockContext{
 				UserName: user.GetName(),
 			})
+			if trafficPattern != nil {
+				block.SetNoncePattern(trafficPattern.GetNonce())
+			}
 		}
 		blocks = append(blocks, blocksFromUser...)
 	}
 	return &StreamUnderlay{
-		baseUnderlay:       *newBaseUnderlay(false, mtu),
+		baseUnderlay:       *newBaseUnderlay(false, mtu, trafficPattern),
 		conn:               rawConn,
 		candidates:         blocks,
 		sessionCleanTicker: time.NewTicker(sessionCleanInterval),
@@ -630,6 +645,10 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 	var underlay Underlay
 	i := mrand.Intn(len(m.endpoints))
 	p := m.endpoints[i]
+	var trafficPattern *appctlpb.TrafficPattern
+	if m.trafficPattern != nil {
+		trafficPattern = m.trafficPattern.Effective()
+	}
 	switch p.TransportProtocol() {
 	case common.StreamTransport:
 		block, err := cipher.BlockCipherFromPassword(m.password, false)
@@ -639,7 +658,10 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 		block.SetBlockContext(cipher.BlockContext{
 			UserName: m.username,
 		})
-		underlay, err = NewStreamUnderlay(ctx, m.dialer, m.resolver, m.clientDNSConfig, p.RemoteAddr().Network(), p.RemoteAddr().String(), p.MTU(), block)
+		if trafficPattern != nil {
+			block.SetNoncePattern(trafficPattern.GetNonce())
+		}
+		underlay, err = NewStreamUnderlay(ctx, m.dialer, m.resolver, m.clientDNSConfig, p.RemoteAddr().Network(), p.RemoteAddr().String(), p.MTU(), block, trafficPattern)
 		if err != nil {
 			return nil, fmt.Errorf("NewTCPUnderlay() failed: %v", err)
 		}
@@ -651,7 +673,10 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 		block.SetBlockContext(cipher.BlockContext{
 			UserName: m.username,
 		})
-		underlay, err = NewPacketUnderlay(ctx, m.packetDialer, m.resolver, p.RemoteAddr().Network(), p.RemoteAddr().String(), p.MTU(), block)
+		if trafficPattern != nil {
+			block.SetNoncePattern(trafficPattern.GetNonce())
+		}
+		underlay, err = NewPacketUnderlay(ctx, m.packetDialer, m.resolver, p.RemoteAddr().Network(), p.RemoteAddr().String(), p.MTU(), block, trafficPattern)
 		if err != nil {
 			return nil, fmt.Errorf("NewUDPUnderlay() failed: %v", err)
 		}

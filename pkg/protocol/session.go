@@ -109,8 +109,9 @@ type Session struct {
 	state             sessionState             // session state
 	status            statusCode               // session status
 
-	users    map[string]*appctlpb.User // all registered users, only used by server
-	userName atomic.Pointer[string]    // user that owns this session, only used by server
+	users          map[string]*appctlpb.User // all registered users, only used by server
+	userName       atomic.Pointer[string]    // user that owns this session, only used by server
+	trafficPattern *appctlpb.TrafficPattern  // traffic pattern
 
 	ready                  chan struct{} // indicate the session is ready to use
 	openSessionRequestSent atomic.Bool   // whether open session request has been sent, only used by client
@@ -161,7 +162,7 @@ var (
 )
 
 // NewSession creates a new session.
-func NewSession(id uint32, isClient bool, mtu int, users map[string]*appctlpb.User) *Session {
+func NewSession(id uint32, isClient bool, mtu int, users map[string]*appctlpb.User, trafficPattern *appctlpb.TrafficPattern) *Session {
 	rttStat := congestion.NewRTTStats()
 	rttStat.SetMaxAckDelay(periodicOutputInterval)
 	rttStat.SetRTOMultiplier(txTimeoutBackOff)
@@ -174,6 +175,7 @@ func NewSession(id uint32, isClient bool, mtu int, users map[string]*appctlpb.Us
 		state:              sessionInit,
 		status:             statusOK,
 		users:              users,
+		trafficPattern:     trafficPattern,
 		ready:              make(chan struct{}),
 		closedChan:         make(chan struct{}),
 		inputErr:           make(chan error),
