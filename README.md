@@ -34,7 +34,7 @@ The mieru proxy software suite consists of two parts, a client software called m
 - Android
   - [ClashMetaForAndroid](https://github.com/MetaCubeX/ClashMetaForAndroid)
   - [ClashMi](https://clashmi.app/)
-  - [Exclave](https://github.com/dyhkwong/Exclave) + [mieru plugin](https://github.com/dyhkwong/Exclave/releases?q=mieru-plugin)
+  - [Exclave](https://github.com/dyhkwong/Exclave)
   - [husi](https://github.com/xchacha20-poly1305/husi) + [mieru plugin](https://github.com/xchacha20-poly1305/husi/releases?q=plugin-mieru)
   - [Karing](https://karing.app/)
   - [NekoBoxForAndroid](https://github.com/MatsuriDayo/NekoBoxForAndroid) + [mieru plugin](https://github.com/enfein/NekoBoxPlugins)
