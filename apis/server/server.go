@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
@@ -37,8 +38,8 @@ import (
 // mieruServer is the official implementation of mieru server APIs.
 type mieruServer struct {
 	initTask sync.Once
-	mu       sync.RWMutex
-	running  bool
+	mu       sync.Mutex
+	running  atomic.Bool
 
 	config *ServerConfig
 	mux    *protocol.Mux
@@ -104,7 +105,7 @@ func (ms *mieruServer) Start() error {
 	if err := ms.mux.Start(); err != nil {
 		return err
 	}
-	ms.running = true
+	ms.running.Store(true)
 	return nil
 }
 
@@ -112,7 +113,7 @@ func (ms *mieruServer) Stop() error {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 
-	ms.running = false
+	ms.running.Store(false)
 	if ms.mux != nil {
 		ms.mux.Close()
 	}
@@ -120,9 +121,7 @@ func (ms *mieruServer) Stop() error {
 }
 
 func (ms *mieruServer) IsRunning() bool {
-	ms.mu.RLock()
-	defer ms.mu.RUnlock()
-	return ms.running
+	return ms.running.Load()
 }
 
 func (ms *mieruServer) Accept() (net.Conn, *model.Request, error) {

@@ -21,6 +21,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/apis/internal"
@@ -37,8 +38,9 @@ import (
 // mieruClient is the official implementation of mieru client APIs.
 type mieruClient struct {
 	initTask sync.Once
-	mu       sync.RWMutex
-	running  bool
+	mu       sync.Mutex
+	netMu    sync.Mutex
+	running  atomic.Bool
 
 	config *ClientConfig
 	mux    *protocol.Mux
@@ -72,7 +74,7 @@ func (mc *mieruClient) Store(config *ClientConfig) error {
 	if config.Profile == nil {
 		return fmt.Errorf("%w: client config profile is nil", ErrInvalidClientConfig)
 	}
-	if mc.running {
+	if mc.running.Load() {
 		return ErrStoreClientConfigAfterStart
 	}
 	if err := appctlcommon.ValidateClientConfigSingleProfile(config.Profile); err != nil {
@@ -94,7 +96,7 @@ func (mc *mieruClient) Start() error {
 		return err
 	}
 	mc.mux = mux
-	mc.running = true
+	mc.running.Store(true)
 	return nil
 }
 
@@ -102,7 +104,7 @@ func (mc *mieruClient) Stop() error {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
 
-	mc.running = false
+	mc.running.Store(false)
 	if mc.mux != nil {
 		mc.mux.Close()
 	}
@@ -110,15 +112,13 @@ func (mc *mieruClient) Stop() error {
 }
 
 func (mc *mieruClient) IsRunning() bool {
-	mc.mu.RLock()
-	defer mc.mu.RUnlock()
-	return mc.running
+	return mc.running.Load()
 }
 
 func (mc *mieruClient) DialContext(ctx context.Context, addr net.Addr) (net.Conn, error) {
-	mc.mu.RLock()
-	defer mc.mu.RUnlock()
-	if !mc.running {
+	mc.netMu.Lock()
+	defer mc.netMu.Unlock()
+	if !mc.running.Load() {
 		return nil, ErrClientIsNotRunning
 	}
 
