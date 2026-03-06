@@ -183,6 +183,10 @@ func (c *Counter) doRollUp(fromLabel, toLabel pb.RollUpLabel, rollUpDuration, tr
 	for _, h := range c.history {
 		// case 1: h should not be rolled up
 		if h.GetRollUp() != fromLabel {
+			if last != nil {
+				newHistory = append(newHistory, last)
+				last = nil
+			}
 			newHistory = append(newHistory, h)
 			continue
 		}
