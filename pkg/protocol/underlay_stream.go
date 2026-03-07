@@ -125,8 +125,10 @@ func (t *StreamUnderlay) Close() error {
 
 	log.Debugf("Closing %v", t)
 	t.sessionCleanTicker.Stop()
+	// Unblock any pending I/O before closing sessions.
+	t.conn.SetDeadline(time.Now())
 	t.baseUnderlay.Close()
-	return t.conn.Close()
+	return nil
 }
 
 func (t *StreamUnderlay) Addr() net.Addr {
@@ -181,6 +183,7 @@ func (t *StreamUnderlay) RunEventLoop(ctx context.Context) error {
 	if t.conn == nil {
 		return stderror.ErrNullPointer
 	}
+	defer t.conn.Close()
 
 	for {
 		select {
@@ -196,6 +199,13 @@ func (t *StreamUnderlay) RunEventLoop(ctx context.Context) error {
 		}
 		seg, err := t.readOneSegment()
 		if err != nil {
+			// If the underlay is closing, return gracefully.
+			select {
+			case <-t.done:
+				t.cleanSessions()
+				return nil
+			default:
+			}
 			errType := stderror.GetErrorType(err)
 			if errType == stderror.NO_ERROR {
 				panic(fmt.Sprintf("%v error type is NO_ERROR while error is not nil", t))
@@ -207,6 +217,9 @@ func (t *StreamUnderlay) RunEventLoop(ctx context.Context) error {
 				t.drainAfterError()
 			}
 			return fmt.Errorf("readOneSegment() failed: %w", err)
+		} else if seg == nil {
+			// Timeout reading the segment, will try again later.
+			continue
 		}
 		if log.IsLevelEnabled(log.TraceLevel) {
 			log.Tracef("%v received %v", t, seg)
@@ -306,14 +319,15 @@ func (t *StreamUnderlay) onCloseSession(seg *segment) error {
 	}
 	s := session.(*Session)
 	s.recvChan <- seg
-	s.wg.Wait()
-	t.RemoveSession(s)
 	return nil
 }
 
 func (t *StreamUnderlay) readOneSegment() (*segment, error) {
 	var firstRead bool
 	var err error
+
+	common.SetReadTimeout(t.conn, readOneSegmentTimeout)
+	defer common.SetReadTimeout(t.conn, 0)
 
 	// Read encrypted metadata.
 	readLen := MetadataLength + cipher.DefaultOverhead
@@ -323,7 +337,11 @@ func (t *StreamUnderlay) readOneSegment() (*segment, error) {
 		readLen += cipher.DefaultNonceSize
 	}
 	encryptedMeta := make([]byte, readLen)
-	if _, err := io.ReadFull(t.conn, encryptedMeta); err != nil {
+	if n, err := io.ReadFull(t.conn, encryptedMeta); err != nil {
+		if stderror.IsTimeout(err) && n == 0 {
+			// No TCP data received. Caller will retry.
+			return nil, nil
+		}
 		err = fmt.Errorf("metadata: read %d bytes from StreamUnderlay failed: %w", readLen, err)
 		return nil, stderror.WrapErrorWithType(err, stderror.NETWORK_ERROR)
 	}
@@ -695,15 +713,17 @@ func (t *StreamUnderlay) drainAfterError() {
 	buf := make([]byte, bufSize)
 
 	// Determine the number of bytes to read.
-	// Minimum 2 bytes, maximum bufSize bytes.
-	minRead := rng.IntRange(2, bufSize-254)
+	// Minimum 0 bytes, maximum bufSize bytes.
+	minRead := rng.IntRange(0, bufSize-254)
 	minRead += rng.FixedIntVH(256)
 
-	n, err := io.ReadAtLeast(t.conn, buf, minRead)
-	if err != nil {
-		log.Debugf("%v read after stream error failed to complete: %v", t, err)
-	} else {
-		log.Debugf("%v read at least %d bytes after stream error", t, n)
+	if minRead > 0 {
+		n, err := io.ReadAtLeast(t.conn, buf, minRead)
+		if err != nil {
+			log.Debugf("%v read after stream error failed to complete: %v", t, err)
+		} else {
+			log.Debugf("%v read at least %d bytes after stream error", t, n)
+		}
 	}
 }
 

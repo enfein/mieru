@@ -38,8 +38,6 @@ const (
 	packetNonHeaderPosition = cipher.DefaultNonceSize + MetadataLength + cipher.DefaultOverhead
 
 	idleSessionTimeout = time.Minute
-
-	readOneSegmentTimeout = 5 * time.Second
 )
 
 var packetReplayCache = replay.NewCache(4*1024*1024, cipher.KeyRefreshInterval*3)
@@ -128,8 +126,10 @@ func (u *PacketUnderlay) Close() error {
 
 	log.Debugf("Closing %v", u)
 	u.sessionCleanTicker.Stop()
+	// Unblock any pending I/O before closing sessions.
+	u.conn.SetReadDeadline(time.Now())
 	u.baseUnderlay.Close()
-	return u.conn.Close()
+	return nil
 }
 
 func (u *PacketUnderlay) TransportProtocol() common.TransportProtocol {
@@ -177,6 +177,7 @@ func (u *PacketUnderlay) RunEventLoop(ctx context.Context) error {
 	if u.conn == nil {
 		return stderror.ErrNullPointer
 	}
+	defer u.conn.Close()
 
 	for {
 		select {
@@ -192,7 +193,17 @@ func (u *PacketUnderlay) RunEventLoop(ctx context.Context) error {
 		}
 		seg, addr, err := u.readOneSegment()
 		if err != nil {
+			// If the underlay is closing, return gracefully.
+			select {
+			case <-u.done:
+				u.cleanSessions()
+				return nil
+			default:
+			}
 			return fmt.Errorf("readOneSegment() failed: %w", err)
+		} else if seg == nil && addr == nil {
+			// Timeout reading the segment, will try again later.
+			continue
 		}
 		if log.IsLevelEnabled(log.TraceLevel) {
 			log.Tracef("%v received %v from peer %v", u, seg, addr)
@@ -296,8 +307,6 @@ func (u *PacketUnderlay) onCloseSession(seg *segment) error {
 	}
 	s := session.(*Session)
 	s.recvChan <- seg
-	s.wg.Wait()
-	u.RemoveSession(s)
 	return nil
 }
 
@@ -316,7 +325,13 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 		n, addr, err := u.conn.ReadFrom(b)
 		if err != nil {
 			if stderror.IsTimeout(err) {
-				continue
+				// No UDP packet received. Caller will retry.
+				return nil, nil, nil
+			}
+			select {
+			case <-u.done:
+				return nil, nil, io.ErrClosedPipe
+			default:
 			}
 			return nil, nil, fmt.Errorf("ReadFrom() failed: %w", err)
 		}

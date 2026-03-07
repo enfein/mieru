@@ -27,6 +27,7 @@ import (
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/metrics"
+	"github.com/enfein/mieru/v3/pkg/rng"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
 
@@ -35,6 +36,10 @@ const (
 	sessionChanCapacity = 64
 
 	sessionCleanInterval = 5 * time.Second
+)
+
+var (
+	readOneSegmentTimeout = time.Duration(60+rng.FixedIntVH(61)) * time.Second
 )
 
 // baseUnderlay contains a partial implementation of underlay.
@@ -94,8 +99,6 @@ func (b *baseUnderlay) Close() error {
 		s := v.(*Session)
 		s.Close()
 		s.wg.Wait()
-		s.conn = nil
-		s = nil
 		return true
 	})
 	close(b.done)
@@ -170,8 +173,6 @@ func (b *baseUnderlay) RemoveSession(s *Session) error {
 	b.sessionMap.Delete(s.id)
 	s.Close()
 	s.wg.Wait()
-	s.conn = nil
-	s = nil
 	return nil
 }
 
