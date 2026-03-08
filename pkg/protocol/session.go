@@ -73,7 +73,7 @@ const (
 	maxBackOffDuration = 10 * time.Second
 )
 
-type sessionState byte
+type sessionState int32
 
 const (
 	sessionInit        sessionState = 0
@@ -106,7 +106,7 @@ type Session struct {
 	mtu               int                      // Underlay maxinum transmission unit
 	transportProtocol common.TransportProtocol // transport protocol of underlay connection
 	remoteAddr        net.Addr                 // specify remote network address, used by UDP
-	state             sessionState             // session state
+	state             atomic.Int32             // session state
 	status            statusCode               // session status
 
 	users          map[string]*appctlpb.User // all registered users, only used by server
@@ -150,7 +150,6 @@ type Session struct {
 	rLock sync.Mutex // serialize application read
 	wLock sync.Mutex // serialize application write
 	oLock sync.Mutex // serialize the output sequence
-	sLock sync.Mutex // serialize the state transition
 }
 
 var (
@@ -172,7 +171,6 @@ func NewSession(id uint32, isClient bool, mtu int, users map[string]*appctlpb.Us
 		id:                 id,
 		isClient:           isClient,
 		mtu:                mtu,
-		state:              sessionInit,
 		status:             statusOK,
 		users:              users,
 		trafficPattern:     trafficPattern,
@@ -429,7 +427,7 @@ func (s *Session) ToSessionInfo() *appctlpb.SessionInfo {
 		Id:         proto.String(fmt.Sprintf("%d", s.id)),
 		LocalAddr:  proto.String("-"),
 		RemoteAddr: proto.String("-"),
-		State:      proto.String(s.state.String()),
+		State:      proto.String(sessionState(s.state.Load()).String()),
 		RecvQ:      proto.Uint32(uint32(s.recvQueue.Len())),
 		RecvBuf:    proto.Uint32(uint32(s.recvBuf.Len())),
 		SendQ:      proto.Uint32(uint32(s.sendQueue.Len())),
@@ -468,41 +466,40 @@ func (s *Session) ToSessionInfo() *appctlpb.SessionInfo {
 }
 
 func (s *Session) isState(target sessionState) bool {
-	s.sLock.Lock()
-	defer s.sLock.Unlock()
-	return s.state == target
+	return sessionState(s.state.Load()) == target
 }
 
 func (s *Session) isStateBefore(target sessionState, include bool) bool {
-	s.sLock.Lock()
-	defer s.sLock.Unlock()
+	state := sessionState(s.state.Load())
 	if include {
-		return s.state <= target
+		return state <= target
 	} else {
-		return s.state < target
+		return state < target
 	}
 }
 
 func (s *Session) isStateAfter(target sessionState, include bool) bool {
-	s.sLock.Lock()
-	defer s.sLock.Unlock()
+	state := sessionState(s.state.Load())
 	if include {
-		return s.state >= target
+		return state >= target
 	} else {
-		return s.state > target
+		return state > target
 	}
 }
 
-func (s *Session) forwardStateTo(new sessionState) {
-	s.sLock.Lock()
-	defer s.sLock.Unlock()
-	if new < s.state {
-		panic(fmt.Sprintf("Can't move state back from %v to %v", s.state, new))
+func (s *Session) forwardStateTo(next sessionState) {
+	for {
+		old := s.state.Load()
+		if int32(next) <= old {
+			return
+		}
+		if s.state.CompareAndSwap(old, int32(next)) {
+			if log.IsLevelEnabled(log.TraceLevel) {
+				log.Tracef("%v %v => %v", s, sessionState(old), next)
+			}
+			return
+		}
 	}
-	if log.IsLevelEnabled(log.TraceLevel) && s.state != new {
-		log.Tracef("%v %v => %v", s, s.state, new)
-	}
-	s.state = new
 }
 
 func (s *Session) writeChunk(b []byte) (n int, err error) {
