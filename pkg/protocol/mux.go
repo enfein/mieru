@@ -740,23 +740,6 @@ func (m *Mux) cleanUnderlay(alsoDisableIdleOrOverloadUnderlay bool) {
 		select {
 		case <-underlay.Done():
 		default:
-			if alsoDisableIdleOrOverloadUnderlay {
-				// Disable idle underlay.
-				if underlay.SessionCount() == 0 {
-					if underlay.Scheduler().TryDisableIdle() {
-						disable++
-					}
-				}
-
-				// Disable overloaded underlay.
-				// If multiplexFactor is 1, the limit is 1 GiB.
-				var trafficVolumeLimit int64 = 512 * 1024 * 1024 << m.multiplexFactor
-				if underlay.Scheduler().DisableTime().IsZero() && (underlay.InBytes() > trafficVolumeLimit || underlay.OutBytes() > trafficVolumeLimit) {
-					underlay.Scheduler().SetRemainingTime(0)
-					disable++
-				}
-			}
-
 			// Close idle underlay.
 			if underlay.SessionCount() == 0 && underlay.Scheduler().Idle() {
 				underlay.Close()
@@ -764,13 +747,30 @@ func (m *Mux) cleanUnderlay(alsoDisableIdleOrOverloadUnderlay bool) {
 			} else {
 				remaining = append(remaining, underlay)
 			}
+
+			if alsoDisableIdleOrOverloadUnderlay {
+				// Try disable scheduling in idle underlay.
+				if underlay.SessionCount() == 0 {
+					if underlay.Scheduler().TryDisableIdle() {
+						disable++
+					}
+				}
+
+				// Disable scheduling in overloaded underlay.
+				// If multiplexFactor is 1, the limit is 1 GiB.
+				var trafficVolumeLimit int64 = 512 * 1024 * 1024 << m.multiplexFactor
+				if underlay.Scheduler().DisableTime().IsZero() && (underlay.InBytes() > trafficVolumeLimit || underlay.OutBytes() > trafficVolumeLimit) {
+					underlay.Scheduler().SetRemainingTime(0)
+					disable++
+				}
+			}
 		}
 	}
 	m.underlays = remaining
-	if disable > 0 {
-		log.Debugf("Mux disabled scheduling from %d underlays", disable)
-	}
 	if close > 0 {
 		log.Debugf("Mux cleaned %d underlays", close)
+	}
+	if disable > 0 {
+		log.Debugf("Mux disabled scheduling from %d underlays", disable)
 	}
 }

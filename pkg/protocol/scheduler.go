@@ -19,13 +19,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/enfein/mieru/v3/pkg/cipher"
 	"github.com/enfein/mieru/v3/pkg/rng"
 )
 
 var (
 	// scheduleIdleTime determines when a underlay is considered idle.
-	// It takes 60 seconds to 120 seconds in different machines.
-	scheduleIdleTime = time.Duration(60+rng.FixedIntVH(61)) * time.Second
+	scheduleIdleTime = cipher.KeyRefreshInterval + time.Duration(rng.FixedIntVH(61))*time.Second
 )
 
 // ScheduleController controls scheduling a new client session to a underlay.

@@ -51,6 +51,7 @@ bin: lib client-android client-linux client-mac client-windows server-linux
 .PHONY: lib
 lib: fmt vet
 	CGO_ENABLED=0 go build -v ./...
+	go clean -testcache
 	CGO_ENABLED=0 go test -timeout=1m0s -coverprofile coverage.out ./...
 	go tool cover -html coverage.out -o coverage.html
 
@@ -72,6 +73,7 @@ lint:
 # Run benchmark.
 .PHONY: bench
 bench:
+	go clean -testcache
 	CGO_ENABLED=0 go test -bench=. -benchtime=5s ./pkg/cipher
 
 # Generate vendor directory.
@@ -426,17 +428,17 @@ endif
 protobuf:
 	# Download location: https://github.com/protocolbuffers/protobuf/releases
 	if [ ! -x "${ROOT}/tools/build/protoc" ]; then
-		curl -o "${ROOT}/tools/build/protoc" https://raw.githubusercontent.com/enfein/buildtools/main/protoc/22.3/linux_${PROTOC_ARCH}/bin/protoc
+		curl -o "${ROOT}/tools/build/protoc" https://raw.githubusercontent.com/enfein/buildtools/main/protoc/33.5/linux_${PROTOC_ARCH}/bin/protoc
 		chmod 755 "${ROOT}/tools/build/protoc"
 	fi
 	# Download location: https://github.com/protocolbuffers/protobuf-go/releases
 	if [ ! -x "${ROOT}/tools/build/protoc-gen-go" ]; then
-		curl -o "${ROOT}/tools/build/protoc-gen-go" https://raw.githubusercontent.com/enfein/buildtools/main/protoc-gen-go/1.30.0/linux_${PROTOC_ARCH}/protoc-gen-go
+		curl -o "${ROOT}/tools/build/protoc-gen-go" https://raw.githubusercontent.com/enfein/buildtools/main/protoc-gen-go/1.36.11/linux_${PROTOC_ARCH}/protoc-gen-go
 		chmod 755 "${ROOT}/tools/build/protoc-gen-go"
 	fi
 	# Download location: https://github.com/grpc/grpc-go/releases
 	if [ ! -x "${ROOT}/tools/build/protoc-gen-go-grpc" ]; then
-		curl -o "${ROOT}/tools/build/protoc-gen-go-grpc" https://raw.githubusercontent.com/enfein/buildtools/main/protoc-gen-go-grpc/1.3.0/linux_${PROTOC_ARCH}/protoc-gen-go-grpc
+		curl -o "${ROOT}/tools/build/protoc-gen-go-grpc" https://raw.githubusercontent.com/enfein/buildtools/main/protoc-gen-go-grpc/1.6.1/linux_${PROTOC_ARCH}/protoc-gen-go-grpc
 		chmod 755 "${ROOT}/tools/build/protoc-gen-go-grpc"
 	fi
 
