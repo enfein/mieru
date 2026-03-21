@@ -1,5 +1,15 @@
 name: 'mihomo test'
-on: [workflow_dispatch]
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: 'mihomo repository (e.g. MetaCubeX/mihomo)'
+        required: true
+        default: 'MetaCubeX/mihomo'
+      branch:
+        description: 'Branch to checkout'
+        required: true
+        default: 'Alpha'
 jobs:
   mihomo-test:
     runs-on: ubuntu-latest
@@ -12,8 +22,8 @@ jobs:
       - name: Check out mihomo repository code
         uses: actions/checkout@v6
         with:
-          repository: MetaCubeX/mihomo
-          ref: Alpha
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.branch }}
           path: mihomo
       - name: Set up Go
         uses: actions/setup-go@v6
