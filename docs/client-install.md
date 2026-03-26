@@ -155,7 +155,7 @@ proxies:
     multiplexing: MULTIPLEXING_HIGH
 ```
 
-Clash.Meta / mihomo only support mieru TCP proxy protocol. Use `udp: true` to allow socks5 UDP associate requests. You can't have both `port` and `port-range` properties in a single configuration.
+Use `udp: true` to allow socks5 UDP associate requests. You can't have both `port` and `port-range` properties in a single configuration.
 
 ## Advanced Settings
 
@@ -264,5 +264,7 @@ The simple sharing link above is equivalent to the following client configuratio
     "handshakeMode":  "HANDSHAKE_NO_WAIT"
 }
 ```
+
+You can decode the client configuration from a standard sharing link or a simple sharing link by running `mieru explain config <URL>` command.
 
 Note: a simple sharing link does not contain necessary client configurations such as `socks5Port`. Therefore, importing a simple sharing link on a brand new device will fail.

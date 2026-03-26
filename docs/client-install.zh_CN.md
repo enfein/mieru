@@ -155,7 +155,7 @@ proxies:
     multiplexing: MULTIPLEXING_HIGH
 ```
 
-Clash.Meta / mihomo 只支持 mieru TCP 代理协议。使用 `udp: true` 允许 socks5 UDP associate 请求。你不能在一条配置内同时使用 `port` 和 `port-range` 属性。
+使用 `udp: true` 允许 socks5 UDP associate 请求。你不能在一条配置内同时使用 `port` 和 `port-range` 属性。
 
 ## 高级设置
 
@@ -264,5 +264,7 @@ mierus://baozi:manlianpenfen@1.2.3.4?handshake-mode=HANDSHAKE_NO_WAIT&mtu=1400&m
     "handshakeMode":  "HANDSHAKE_NO_WAIT"
 }
 ```
+
+你可以运行 `mieru explain config <URL>` 指令，以解码标准分享链接或简单分享链接对应的客户端配置。
 
 注意，简单分享链接不含有 `socks5Port` 等必要的客户端配置。因此，在全新的设备上导入简单分享链接会失败。
