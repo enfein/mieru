@@ -392,6 +392,8 @@ func (m *Mux) DialContext(ctx context.Context) (net.Conn, error) {
 }
 
 func (m *Mux) ExportSessionInfoList() *appctlpb.SessionInfoList {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	items := make([]*appctlpb.SessionInfo, 0)
 	for _, underlay := range m.underlays {
 		items = append(items, underlay.SessionInfos()...)

@@ -270,7 +270,10 @@ func logMetricsLoop() {
 		select {
 		case <-logTicker.C:
 			LogMetricsNow()
-			if metricsDump {
+			logMutex.Lock()
+			shouldDump := metricsDump
+			logMutex.Unlock()
+			if shouldDump {
 				if err := DumpMetricsNow(); err != nil {
 					log.Warnf("DumpMetricsNow() failed: %v", err)
 				}
