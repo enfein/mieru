@@ -203,7 +203,7 @@ A standard sharing link starts with `mieru://` and uses base64 encoding for the 
 Use command `mieru export config simple` to generate human-readable simple sharing links. For example:
 
 ```
-mierus://baozi:manlianpenfen@1.2.3.4?handshake-mode=HANDSHAKE_NO_WAIT&mtu=1400&multiplexing=MULTIPLEXING_HIGH&port=6666&port=9998-9999&port=6489&port=4896&profile=default&protocol=TCP&protocol=TCP&protocol=UDP&protocol=UDP
+mierus://baozi:manlianpenfen@1.2.3.4?handshake-mode=HANDSHAKE_NO_WAIT&mtu=1400&multiplexing=MULTIPLEXING_HIGH&port=6666&port=9998-9999&port=6489&port=4896&profile=default&protocol=TCP&protocol=TCP&protocol=UDP&protocol=UDP&traffic-pattern=CCoQARoECAEQCiIYCAMQASoIMDAwMTAyMDMqCDA0MDUwNjA3
 ```
 
 The format of the simple sharing link is as follows:
@@ -220,10 +220,11 @@ The supported parameters are:
 - `mtu`
 - `multiplexing`
 - `handshake-mode`
+- `traffic-pattern`
 - `port`
 - `protocol`
 
-Among them, `profile` must appear once, `mtu`, `multiplexing` and `handshake-mode` can appear at most once, `port` and `protocol` can appear multiple times, and they must appear the same number of times, such that the `port` and `protocol` at the same position can be associated. Additionally, `port` can also be used to specify a port range.
+Among them, `profile` must appear once, `mtu`, `multiplexing`, `handshake-mode` and `traffic-pattern` can appear at most once, `port` and `protocol` can appear multiple times, and they must appear the same number of times, such that the `port` and `protocol` at the same position can be associated. Additionally, `port` can also be used to specify a port range. `traffic-pattern` uses base64 encoded protobuf format. Its value can be obtained from the `mieru export traffic-pattern` command.
 
 The simple sharing link above is equivalent to the following client configuration fragment:
 
@@ -261,7 +262,23 @@ The simple sharing link above is equivalent to the following client configuratio
     "multiplexing":  {
         "level":  "MULTIPLEXING_HIGH"
     },
-    "handshakeMode":  "HANDSHAKE_NO_WAIT"
+    "handshakeMode":  "HANDSHAKE_NO_WAIT",
+    "trafficPattern":  {
+        "seed":  42,
+        "unlockAll":  true,
+        "tcpFragment":  {
+            "enable":  true,
+            "maxSleepMs":  10
+        },
+        "nonce":  {
+            "type":  "NONCE_TYPE_FIXED",
+            "applyToAllUDPPacket":  true,
+            "customHexStrings":  [
+                "00010203",
+                "04050607"
+            ]
+        }
+    }
 }
 ```
 

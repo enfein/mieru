@@ -103,6 +103,19 @@ func TestClientProfileWithMultiURLs(t *testing.T) {
 			Level: pb.MultiplexingLevel_MULTIPLEXING_MIDDLE.Enum(),
 		},
 		HandshakeMode: pb.HandshakeMode_HANDSHAKE_NO_WAIT.Enum(),
+		TrafficPattern: &pb.TrafficPattern{
+			Seed:      proto.Int32(42),
+			UnlockAll: proto.Bool(true),
+			TcpFragment: &pb.TCPFragment{
+				Enable:     proto.Bool(true),
+				MaxSleepMs: proto.Int32(10),
+			},
+			Nonce: &pb.NoncePattern{
+				Type:                pb.NonceType_NONCE_TYPE_FIXED.Enum(),
+				ApplyToAllUDPPacket: proto.Bool(true),
+				CustomHexStrings:    []string{"00010203", "04050607"},
+			},
+		},
 	}
 
 	p0 := &pb.ClientProfile{
@@ -131,6 +144,19 @@ func TestClientProfileWithMultiURLs(t *testing.T) {
 			Level: pb.MultiplexingLevel_MULTIPLEXING_MIDDLE.Enum(),
 		},
 		HandshakeMode: pb.HandshakeMode_HANDSHAKE_NO_WAIT.Enum(),
+		TrafficPattern: &pb.TrafficPattern{
+			Seed:      proto.Int32(42),
+			UnlockAll: proto.Bool(true),
+			TcpFragment: &pb.TCPFragment{
+				Enable:     proto.Bool(true),
+				MaxSleepMs: proto.Int32(10),
+			},
+			Nonce: &pb.NoncePattern{
+				Type:                pb.NonceType_NONCE_TYPE_FIXED.Enum(),
+				ApplyToAllUDPPacket: proto.Bool(true),
+				CustomHexStrings:    []string{"00010203", "04050607"},
+			},
+		},
 	}
 
 	p1 := &pb.ClientProfile{
@@ -155,6 +181,19 @@ func TestClientProfileWithMultiURLs(t *testing.T) {
 			Level: pb.MultiplexingLevel_MULTIPLEXING_MIDDLE.Enum(),
 		},
 		HandshakeMode: pb.HandshakeMode_HANDSHAKE_NO_WAIT.Enum(),
+		TrafficPattern: &pb.TrafficPattern{
+			Seed:      proto.Int32(42),
+			UnlockAll: proto.Bool(true),
+			TcpFragment: &pb.TCPFragment{
+				Enable:     proto.Bool(true),
+				MaxSleepMs: proto.Int32(10),
+			},
+			Nonce: &pb.NoncePattern{
+				Type:                pb.NonceType_NONCE_TYPE_FIXED.Enum(),
+				ApplyToAllUDPPacket: proto.Bool(true),
+				CustomHexStrings:    []string{"00010203", "04050607"},
+			},
+		},
 	}
 
 	urls, err := ClientProfileToMultiURLs(p)

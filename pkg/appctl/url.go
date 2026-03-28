@@ -87,6 +87,13 @@ func ClientProfileToMultiURLs(profile *pb.ClientProfile) (urls []string, err err
 		if profile.HandshakeMode != nil {
 			q.Add("handshake-mode", profile.GetHandshakeMode().String())
 		}
+		if tp := profile.GetTrafficPattern(); tp != nil {
+			b, err := proto.Marshal(tp)
+			if err != nil {
+				return nil, fmt.Errorf("proto.Marshal() failed to marshal traffic pattern: %w", err)
+			}
+			q.Add("traffic-pattern", base64.StdEncoding.EncodeToString(b))
+		}
 		for _, binding := range server.GetPortBindings() {
 			if binding.GetPortRange() != "" {
 				q.Add("port", binding.GetPortRange())
@@ -187,6 +194,17 @@ func URLToClientProfile(s string) (*pb.ClientProfile, error) {
 	if q.Get("handshake-mode") != "" {
 		mode := pb.HandshakeMode(pb.HandshakeMode_value[q.Get("handshake-mode")])
 		p.HandshakeMode = &mode
+	}
+	if q.Get("traffic-pattern") != "" {
+		b, err := base64.StdEncoding.DecodeString(q.Get("traffic-pattern"))
+		if err != nil {
+			return nil, fmt.Errorf("base64.StdEncoding.DecodeString() failed to decode traffic pattern: %w", err)
+		}
+		tp := &pb.TrafficPattern{}
+		if err := proto.Unmarshal(b, tp); err != nil {
+			return nil, fmt.Errorf("proto.Unmarshal() failed to unmarshal traffic pattern: %w", err)
+		}
+		p.TrafficPattern = tp
 	}
 
 	portList := q["port"]
