@@ -17,7 +17,6 @@ package protocol
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"io"
 	mrand "math/rand"
@@ -601,37 +600,9 @@ func (m *Mux) acceptTCPUnderlay(rawListener net.Listener, properties UnderlayPro
 }
 
 func (m *Mux) serverWrapTCPConn(rawConn net.Conn, mtu int, users map[string]*appctlpb.User, trafficPattern *appctlpb.TrafficPattern) Underlay {
-	var err error
-	var blocks []cipher.BlockCipher
-	for _, user := range users {
-		var password []byte
-		password, err = hex.DecodeString(user.GetHashedPassword())
-		if err != nil {
-			log.Debugf("Unable to decode hashed password %q from user %q", user.GetHashedPassword(), user.GetName())
-			continue
-		}
-		if len(password) == 0 {
-			password = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
-		}
-		blocksFromUser, err := cipher.BlockCipherListFromPassword(password, false)
-		if err != nil {
-			log.Debugf("Unable to create block cipher of user %q", user.GetName())
-			continue
-		}
-		for _, block := range blocksFromUser {
-			block.SetBlockContext(cipher.BlockContext{
-				UserName: user.GetName(),
-			})
-			if trafficPattern != nil {
-				block.SetNoncePattern(trafficPattern.GetNonce())
-			}
-		}
-		blocks = append(blocks, blocksFromUser...)
-	}
 	return &StreamUnderlay{
 		baseUnderlay:       *newBaseUnderlay(false, mtu, trafficPattern),
 		conn:               rawConn,
-		candidates:         blocks,
 		sessionCleanTicker: time.NewTicker(sessionCleanInterval),
 		users:              users,
 	}

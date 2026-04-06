@@ -17,6 +17,7 @@ package protocol
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"math"
@@ -49,11 +50,10 @@ type StreamUnderlay struct {
 	send cipher.BlockCipher
 	recv cipher.BlockCipher
 
-	// candidates are block ciphers that can be used to encrypt or decrypt data.
-	// When isClient is true, there must be exactly 1 element in the slice.
-	candidates []cipher.BlockCipher
-
 	sessionCleanTicker *time.Ticker
+
+	// ---- client fields ----
+	block cipher.BlockCipher
 
 	// ---- server fields ----
 	users map[string]*appctlpb.User
@@ -101,7 +101,7 @@ func NewStreamUnderlay(
 	t := &StreamUnderlay{
 		baseUnderlay:       *newBaseUnderlay(true, mtu, trafficPattern),
 		conn:               conn,
-		candidates:         []cipher.BlockCipher{block},
+		block:              block,
 		sessionCleanTicker: time.NewTicker(sessionCleanInterval),
 	}
 	return t, nil
@@ -364,11 +364,10 @@ func (t *StreamUnderlay) readOneSegment() (*segment, error) {
 	// Decrypt metadata.
 	var decryptedMeta []byte
 	if t.recv == nil && t.isClient {
-		t.recv = t.candidates[0].Clone()
+		t.recv = t.block.Clone()
 	}
 	if t.recv == nil {
-		var peerBlock cipher.BlockCipher
-		peerBlock, decryptedMeta, err = cipher.SelectDecrypt(encryptedMeta, cipher.CloneBlockCiphers(t.candidates))
+		decryptedMeta, err = t.initRecvBlockCipherAndDecryptMetadata(encryptedMeta)
 		cipher.ServerIterateDecrypt.Add(1)
 		if err != nil {
 			cipher.ServerFailedIterateDecrypt.Add(1)
@@ -376,7 +375,7 @@ func (t *StreamUnderlay) readOneSegment() (*segment, error) {
 				err = fmt.Errorf("found possible replay attack in %v", t)
 				return nil, stderror.WrapErrorWithType(err, stderror.REPLAY_ERROR)
 			} else {
-				err = fmt.Errorf("cipher.SelectDecrypt() failed: %w", err)
+				err = fmt.Errorf("%w", err)
 				return nil, stderror.WrapErrorWithType(err, stderror.CRYPTO_ERROR)
 			}
 		} else if isNewSessionReplay {
@@ -384,7 +383,6 @@ func (t *StreamUnderlay) readOneSegment() (*segment, error) {
 			err = fmt.Errorf("found possible replay attack with payload decrypted in %v", t)
 			return nil, stderror.WrapErrorWithType(err, stderror.REPLAY_ERROR)
 		}
-		t.recv = peerBlock.Clone()
 	} else {
 		decryptedMeta, err = t.recv.Decrypt(encryptedMeta)
 		if t.isClient {
@@ -651,12 +649,56 @@ func (t *StreamUnderlay) writeOneSegment(seg *segment) error {
 	return nil
 }
 
+// initRecvBlockCipherAndDecryptMetadata performs decryption against all
+// registered users and, on success, initialises t.recv with a stateful clone
+// of the single matched cipher. It returns the decrypted metadata.
+func (t *StreamUnderlay) initRecvBlockCipherAndDecryptMetadata(encryptedMeta []byte) ([]byte, error) {
+	if t.recv != nil {
+		return nil, fmt.Errorf("recv cipher is already set")
+	}
+	var matchedBlock cipher.BlockCipher
+	var matchedUserName string
+	for _, user := range t.users {
+		password, err := hex.DecodeString(user.GetHashedPassword())
+		if err != nil {
+			continue
+		}
+		if len(password) == 0 {
+			password = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
+		}
+		matchedBlock, _, err = cipher.TryDecrypt(encryptedMeta, password, true)
+		if err == nil {
+			matchedUserName = user.GetName()
+			break
+		}
+	}
+	if matchedBlock == nil {
+		return nil, fmt.Errorf("cipher.TryDecrypt() failed for all users")
+	}
+
+	// Clone only the matched cipher as stateful, and re-decrypt to capture nonce state.
+	t.recv = matchedBlock.Clone()
+	t.recv.SetBlockContext(cipher.BlockContext{
+		UserName: matchedUserName,
+	})
+	if t.trafficPattern != nil {
+		t.recv.SetNoncePattern(t.trafficPattern.GetNonce())
+	}
+	t.recv.SetImplicitNonceMode(true)
+	decryptedMeta, err := t.recv.Decrypt(encryptedMeta)
+	if err != nil {
+		t.recv = nil
+		return nil, fmt.Errorf("stateful Decrypt() failed: %w", err)
+	}
+	return decryptedMeta, nil
+}
+
 func (t *StreamUnderlay) maybeInitSendBlockCipher() error {
 	if t.send != nil {
 		return nil
 	}
 	if t.isClient {
-		t.send = t.candidates[0].Clone()
+		t.send = t.block.Clone()
 	} else {
 		if t.recv != nil {
 			t.send = t.recv.Clone()
