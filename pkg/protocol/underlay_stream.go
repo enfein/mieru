@@ -650,7 +650,7 @@ func (t *StreamUnderlay) writeOneSegment(seg *segment) error {
 }
 
 // initRecvBlockCipherAndDecryptMetadata performs decryption against all
-// registered users and, on success, initialises t.recv with a stateful clone
+// registered users and, on success, initializes t.recv with a stateful clone
 // of the single matched cipher. It returns the decrypted metadata.
 func (t *StreamUnderlay) initRecvBlockCipherAndDecryptMetadata(encryptedMeta []byte) ([]byte, error) {
 	if t.recv != nil {
