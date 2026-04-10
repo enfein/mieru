@@ -36,6 +36,8 @@ import (
 //   - profile name is not empty
 //   - user name is not empty
 //   - user has either a password or a hashed password
+//   - user name length is not greater than 64 bytes
+//   - user password (if set) length is not greater than 64 bytes
 //   - user has no quota
 //   - it has at least 1 server, and for each server:
 //     1. the server has either IP address or domain name
@@ -54,6 +56,12 @@ func ValidateClientConfigSingleProfile(profile *pb.ClientProfile) error {
 	}
 	if user.GetPassword() == "" && user.GetHashedPassword() == "" {
 		return fmt.Errorf("user password is not set")
+	}
+	if len(user.GetName()) > 64 {
+		return fmt.Errorf("user name exceeds 64 bytes")
+	}
+	if user.GetPassword() != "" && len(user.GetPassword()) > 64 {
+		return fmt.Errorf("user password exceeds 64 bytes")
 	}
 	if len(user.GetQuotas()) != 0 {
 		return fmt.Errorf("user quota is not supported by proxy client")

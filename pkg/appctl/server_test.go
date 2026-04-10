@@ -226,6 +226,24 @@ func TestServerApplyReject(t *testing.T) {
 			}(),
 			wantErrString: "user name is not set",
 		},
+		{
+			name: "user_name_too_long",
+			config: func() *pb.ServerConfig {
+				c := validConfig()
+				c.Users[0].Name = proto.String(strings.Repeat("a", 65))
+				return c
+			}(),
+			wantErrString: "user name exceeds 64 bytes",
+		},
+		{
+			name: "user_password_too_long",
+			config: func() *pb.ServerConfig {
+				c := validConfig()
+				c.Users[0].Password = proto.String(strings.Repeat("a", 65))
+				return c
+			}(),
+			wantErrString: "user password exceeds 64 bytes",
+		},
 	}
 
 	for _, c := range cases {

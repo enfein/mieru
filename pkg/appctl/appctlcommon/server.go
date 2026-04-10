@@ -26,6 +26,8 @@ import (
 // It validates:
 //   - user name is not empty
 //   - user has either a password or a hashed password
+//   - user name length is not greater than 64 bytes
+//   - user password (if set) length is not greater than 64 bytes
 //   - for each quota:
 //     1. number of days is valid
 //     2. traffic volume in megabyte is valid
@@ -35,6 +37,12 @@ func ValidateServerConfigSingleUser(user *pb.User) error {
 	}
 	if user.GetPassword() == "" && user.GetHashedPassword() == "" {
 		return fmt.Errorf("user password is not set")
+	}
+	if len(user.GetName()) > 64 {
+		return fmt.Errorf("user name exceeds 64 bytes")
+	}
+	if user.GetPassword() != "" && len(user.GetPassword()) > 64 {
+		return fmt.Errorf("user password exceeds 64 bytes")
 	}
 	for _, quota := range user.GetQuotas() {
 		if quota.GetDays() <= 0 {

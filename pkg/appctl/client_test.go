@@ -298,6 +298,24 @@ func TestClientApplyReject(t *testing.T) {
 			wantErrString: "socks5 authentication user is not set",
 		},
 		{
+			name: "user_name_too_long",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.Profiles[0].User.Name = proto.String(strings.Repeat("a", 65))
+				return c
+			}(),
+			wantErrString: "user name exceeds 64 bytes",
+		},
+		{
+			name: "user_password_too_long",
+			config: func() *pb.ClientConfig {
+				c := validConfig()
+				c.Profiles[0].User.Password = proto.String(strings.Repeat("a", 65))
+				return c
+			}(),
+			wantErrString: "user password exceeds 64 bytes",
+		},
+		{
 			name: "user_has_quota",
 			config: func() *pb.ClientConfig {
 				c := validConfig()
