@@ -393,69 +393,6 @@ func TestNewNonceApplyOnce(t *testing.T) {
 	}
 }
 
-func BenchmarkAES128GCMStateless(b *testing.B) {
-	key, data := benchmarkGenKeyAndData(b, 16)
-	block, err := newAESGCMBlockCipher(key)
-	if err != nil {
-		b.Fatalf("newAESGCMBlockCipher() failed: %v", err)
-	}
-	block.SetImplicitNonceMode(false)
-	benchmarkEncryptDecryptStateless(b, block, data)
-}
-
-func BenchmarkAES128GCMStateful(b *testing.B) {
-	key, data := benchmarkGenKeyAndData(b, 16)
-	block, err := newAESGCMBlockCipher(key)
-	if err != nil {
-		b.Fatalf("newAESGCMBlockCipher() failed: %v", err)
-	}
-	block.SetImplicitNonceMode(true)
-	block2 := block.Clone().(*AEADBlockCipher)
-	benchmarkEncryptDecryptStateful(b, block, block2, data)
-}
-
-func BenchmarkAES256GCMStateless(b *testing.B) {
-	key, data := benchmarkGenKeyAndData(b, 32)
-	block, err := newAESGCMBlockCipher(key)
-	if err != nil {
-		b.Fatalf("newAESGCMBlockCipher() failed: %v", err)
-	}
-	block.SetImplicitNonceMode(false)
-	benchmarkEncryptDecryptStateless(b, block, data)
-}
-
-func BenchmarkAES256GCMStateful(b *testing.B) {
-	key, data := benchmarkGenKeyAndData(b, 32)
-	block, err := newAESGCMBlockCipher(key)
-	if err != nil {
-		b.Fatalf("newAESGCMBlockCipher() failed: %v", err)
-	}
-	block.SetImplicitNonceMode(true)
-	block2 := block.Clone().(*AEADBlockCipher)
-	benchmarkEncryptDecryptStateful(b, block, block2, data)
-}
-
-func BenchmarkChaCha20Poly1305Stateless(b *testing.B) {
-	key, data := benchmarkGenKeyAndData(b, 32)
-	block, err := newChaCha20Poly1305BlockCipher(key)
-	if err != nil {
-		b.Fatalf("newChaCha20Poly1305BlockCipher() failed: %v", err)
-	}
-	block.SetImplicitNonceMode(false)
-	benchmarkEncryptDecryptStateless(b, block, data)
-}
-
-func BenchmarkChaCha20Poly1305Stateful(b *testing.B) {
-	key, data := benchmarkGenKeyAndData(b, 32)
-	block, err := newChaCha20Poly1305BlockCipher(key)
-	if err != nil {
-		b.Fatalf("newChaCha20Poly1305BlockCipher() failed: %v", err)
-	}
-	block.SetImplicitNonceMode(true)
-	block2 := block.Clone().(*AEADBlockCipher)
-	benchmarkEncryptDecryptStateful(b, block, block2, data)
-}
-
 func BenchmarkXChaCha20Poly1305Stateless(b *testing.B) {
 	key, data := benchmarkGenKeyAndData(b, 32)
 	block, err := newXChaCha20Poly1305BlockCipher(key)

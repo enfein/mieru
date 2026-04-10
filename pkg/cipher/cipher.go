@@ -33,9 +33,13 @@ import (
 type AEADType uint8
 
 const (
+	// Not supported.
 	AES128GCM AEADType = iota + 1
+	// Not supported.
 	AES256GCM
+	// Not supported.
 	ChaCha20Poly1305
+	// Supported.
 	XChaCha20Poly1305
 )
 
@@ -54,60 +58,6 @@ type AEADBlockCipher struct {
 	ctx                 BlockContext
 	noncePattern        *appctlpb.NoncePattern
 	noncePatternApplied bool
-}
-
-// newAESGCMBlockCipher creates a new AES-GCM cipher with the supplied key.
-func newAESGCMBlockCipher(key []byte) (*AEADBlockCipher, error) {
-	keyLen := len(key)
-	if keyLen != 16 && keyLen != 32 {
-		return nil, fmt.Errorf("AES key length is %d bytes, want 16 bytes or 32 bytes", keyLen)
-	}
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, fmt.Errorf("aes.NewCipher() failed: %w", err)
-	}
-
-	aead, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, fmt.Errorf("cipher.NewGCM() failed: %w", err)
-	}
-
-	c := &AEADBlockCipher{
-		aead:                aead,
-		enableImplicitNonce: false,
-		key:                 key,
-		implicitNonce:       nil,
-	}
-	if keyLen == 16 {
-		c.aeadType = AES128GCM
-	} else if keyLen == 32 {
-		c.aeadType = AES256GCM
-	} else {
-		panic(fmt.Sprintf("invalid AES key length: %d bytes", keyLen))
-	}
-	return c, nil
-}
-
-// newChaCha20Poly1305BlockCipher creates a new ChaCha20-Poly1305 cipher with the supplied key.
-func newChaCha20Poly1305BlockCipher(key []byte) (*AEADBlockCipher, error) {
-	keyLen := len(key)
-	if keyLen != 32 {
-		return nil, fmt.Errorf("ChaCha20-Poly1305 key length is %d bytes, want 32 bytes", keyLen)
-	}
-
-	aead, err := chacha20poly1305.New(key)
-	if err != nil {
-		return nil, fmt.Errorf("chacha20poly1305.New() failed: %w", err)
-	}
-
-	return &AEADBlockCipher{
-		aead:                aead,
-		aeadType:            ChaCha20Poly1305,
-		enableImplicitNonce: false,
-		key:                 key,
-		implicitNonce:       nil,
-	}, nil
 }
 
 // newXChaCha20Poly1305BlockCipher creates a new XChaCha20-Poly1305 cipher with the supplied key.
@@ -244,11 +194,7 @@ func (c *AEADBlockCipher) Clone() BlockCipher {
 
 	var newCipher *AEADBlockCipher
 	var err error
-	if c.aeadType == AES128GCM || c.aeadType == AES256GCM {
-		newCipher, err = newAESGCMBlockCipher(c.key)
-	} else if c.aeadType == ChaCha20Poly1305 {
-		newCipher, err = newChaCha20Poly1305BlockCipher(c.key)
-	} else if c.aeadType == XChaCha20Poly1305 {
+	if c.aeadType == XChaCha20Poly1305 {
 		newCipher, err = newXChaCha20Poly1305BlockCipher(c.key)
 	} else {
 		panic("invalid AEAD type")

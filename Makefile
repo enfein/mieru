@@ -74,7 +74,7 @@ lint:
 .PHONY: bench
 bench:
 	go clean -testcache
-	CGO_ENABLED=0 go test -bench=. -benchtime=5s ./pkg/cipher
+	CGO_ENABLED=0 go test -bench=. -benchtime=10s ./pkg/cipher
 
 # Generate vendor directory.
 .PHONY: vendor
