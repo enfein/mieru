@@ -17,6 +17,7 @@ package cipher
 
 import (
 	crand "crypto/rand"
+	"crypto/sha256"
 	"fmt"
 	"testing"
 )
@@ -81,6 +82,32 @@ func Benchmark10KUserStatelessTryDecrypt(b *testing.B) {
 		for j := 0; j < numUsers; j++ {
 			_, _, err := TryDecrypt(ciphertext, passwords[j], true)
 			if err == nil {
+				break
+			}
+		}
+	}
+}
+
+func BenchmarkCheck10KUserFromHint(b *testing.B) {
+	const numUsers = 10000
+	users := make([][]byte, numUsers)
+	for i := 0; i < numUsers; i++ {
+		users[i] = fmt.Appendf(nil, "user-%d", i)
+	}
+
+	// Build a nonce that matches the last user.
+	nonce := make([]byte, DefaultNonceSize)
+	if _, err := crand.Read(nonce); err != nil {
+		b.Fatalf("failed to generate nonce: %v", err)
+	}
+	input := append(users[numUsers-1], nonce[:noncePrefixLenForUserHint]...)
+	output := sha256.Sum256(input)
+	copy(nonce[DefaultNonceSize-nonceSuffixLenForUserHint:], output[:nonceSuffixLenForUserHint])
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for j := 0; j < numUsers; j++ {
+			if CheckUserFromHint(users[j], nonce) {
 				break
 			}
 		}

@@ -16,6 +16,7 @@
 package cipher
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"fmt"
 
@@ -30,6 +31,11 @@ const (
 
 	ClientDecryptionMetricGroupName = "cipher - client"
 	ServerDecryptionMetricGroupName = "cipher - server"
+)
+
+const (
+	noncePrefixLenForUserHint = 16 // 16 bytes user hint input
+	nonceSuffixLenForUserHint = 4  // 4 bytes user hint output
 )
 
 var (
@@ -170,4 +176,17 @@ func CloneBlockCiphers(blocks []BlockCipher) []BlockCipher {
 		clones[i] = b.Clone()
 	}
 	return clones
+}
+
+// CheckUserFromHint checks if the user is the one associated with the nonce.
+func CheckUserFromHint(user, nonce []byte) bool {
+	if len(user) == 0 {
+		panic("user is empty")
+	}
+	if len(nonce) < noncePrefixLenForUserHint+nonceSuffixLenForUserHint {
+		panic(fmt.Sprintf("nonce length %d is too short", len(nonce)))
+	}
+	input := append(user, nonce[:noncePrefixLenForUserHint]...)
+	output := sha256.Sum256(input)
+	return bytes.Equal(output[:nonceSuffixLenForUserHint], nonce[len(nonce)-nonceSuffixLenForUserHint:])
 }
