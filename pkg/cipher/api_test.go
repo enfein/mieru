@@ -17,12 +17,11 @@ package cipher
 
 import (
 	crand "crypto/rand"
-	"crypto/sha256"
 	"fmt"
 	"testing"
 )
 
-func Benchmark10KUserStatefulTryDecrypt(b *testing.B) {
+func Benchmark10KUserTryDecryptStateful(b *testing.B) {
 	const numUsers = 10000
 	passwords := make([][]byte, numUsers)
 	for i := 0; i < numUsers; i++ {
@@ -55,7 +54,7 @@ func Benchmark10KUserStatefulTryDecrypt(b *testing.B) {
 	}
 }
 
-func Benchmark10KUserStatelessTryDecrypt(b *testing.B) {
+func Benchmark10KUserTryDecryptStateless(b *testing.B) {
 	const numUsers = 10000
 	passwords := make([][]byte, numUsers)
 	for i := 0; i < numUsers; i++ {
@@ -95,14 +94,20 @@ func BenchmarkCheck10KUserFromHint(b *testing.B) {
 		users[i] = fmt.Appendf(nil, "user-%d", i)
 	}
 
-	// Build a nonce that matches the last user.
-	nonce := make([]byte, DefaultNonceSize)
-	if _, err := crand.Read(nonce); err != nil {
-		b.Fatalf("failed to generate nonce: %v", err)
+	key := make([]byte, 32)
+	if _, err := crand.Read(key); err != nil {
+		b.Fatalf("fail to generate key: %v", err)
 	}
-	input := append(users[numUsers-1], nonce[:noncePrefixLenForUserHint]...)
-	output := sha256.Sum256(input)
-	copy(nonce[DefaultNonceSize-nonceSuffixLenForUserHint:], output[:nonceSuffixLenForUserHint])
+	c, err := newXChaCha20Poly1305BlockCipher(key)
+	if err != nil {
+		b.Fatalf("newXChaCha20Poly1305BlockCipher() failed: %v", err)
+	}
+	c.SetBlockContext(BlockContext{UserName: string(users[numUsers-1])})
+	nonce, err := c.newNonce()
+	if err != nil {
+		b.Fatalf("newNonce() failed: %v", err)
+	}
+	nonce = c.addUserHintToNonce(nonce)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

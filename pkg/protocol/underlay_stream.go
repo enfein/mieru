@@ -367,7 +367,7 @@ func (t *StreamUnderlay) readOneSegment() (*segment, error) {
 		t.recv = t.block.Clone()
 	}
 	if t.recv == nil {
-		decryptedMeta, err = t.initRecvBlockCipherAndDecryptMetadata(encryptedMeta)
+		decryptedMeta, err = t.serverInitRecvBlockCipherAndDecryptMetadata(encryptedMeta)
 		cipher.ServerIterateDecrypt.Add(1)
 		if err != nil {
 			cipher.ServerFailedIterateDecrypt.Add(1)
@@ -649,27 +649,58 @@ func (t *StreamUnderlay) writeOneSegment(seg *segment) error {
 	return nil
 }
 
-// initRecvBlockCipherAndDecryptMetadata performs decryption against all
+// serverInitRecvBlockCipherAndDecryptMetadata performs decryption against all
 // registered users and, on success, initializes t.recv with a stateful clone
 // of the single matched cipher. It returns the decrypted metadata.
-func (t *StreamUnderlay) initRecvBlockCipherAndDecryptMetadata(encryptedMeta []byte) ([]byte, error) {
+func (t *StreamUnderlay) serverInitRecvBlockCipherAndDecryptMetadata(encryptedMeta []byte) ([]byte, error) {
 	if t.recv != nil {
 		return nil, fmt.Errorf("recv cipher is already set")
 	}
+	nonce := encryptedMeta[:cipher.DefaultNonceSize]
+
 	var matchedBlock cipher.BlockCipher
 	var matchedUserName string
+
+	// First, try to narrow down the user using the nonce hint.
+	var hintUser *appctlpb.User
 	for _, user := range t.users {
-		password, err := hex.DecodeString(user.GetHashedPassword())
-		if err != nil {
-			continue
-		}
-		if len(password) == 0 {
-			password = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
-		}
-		matchedBlock, _, err = cipher.TryDecrypt(encryptedMeta, password, true)
-		if err == nil {
-			matchedUserName = user.GetName()
+		if cipher.CheckUserFromHint([]byte(user.GetName()), nonce) {
+			hintUser = user
 			break
+		}
+	}
+	if hintUser != nil {
+		cipher.ServerHintMatchDecrypt.Add(1)
+		password, err := hex.DecodeString(hintUser.GetHashedPassword())
+		if err == nil {
+			if len(password) == 0 {
+				password = cipher.HashPassword([]byte(hintUser.GetPassword()), []byte(hintUser.GetName()))
+			}
+			matchedBlock, _, err = cipher.TryDecrypt(encryptedMeta, password, true)
+			if err == nil {
+				matchedUserName = hintUser.GetName()
+			} else {
+				cipher.ServerFailedHintMatchDecrypt.Add(1)
+			}
+		}
+	}
+
+	// Fallback: try all registered users.
+	// This handles old clients without hints and hint hash collisions.
+	if matchedBlock == nil {
+		for _, user := range t.users {
+			password, err := hex.DecodeString(user.GetHashedPassword())
+			if err != nil {
+				continue
+			}
+			if len(password) == 0 {
+				password = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
+			}
+			matchedBlock, _, err = cipher.TryDecrypt(encryptedMeta, password, true)
+			if err == nil {
+				matchedUserName = user.GetName()
+				break
+			}
 		}
 	}
 	if matchedBlock == nil {

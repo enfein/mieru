@@ -56,6 +56,12 @@ var (
 
 	// Number of decryption that failed after iterating all possible cipher blocks.
 	ServerFailedIterateDecrypt = metrics.RegisterMetric(ServerDecryptionMetricGroupName, "FailedIterateDecrypt", metrics.COUNTER)
+
+	// Number of decryption where a user hint match was found.
+	ServerHintMatchDecrypt = metrics.RegisterMetric(ServerDecryptionMetricGroupName, "HintMatchDecrypt", metrics.COUNTER)
+
+	// Number of decryption where a user hint match was found but decryption failed.
+	ServerFailedHintMatchDecrypt = metrics.RegisterMetric(ServerDecryptionMetricGroupName, "FailedHintMatchDecrypt", metrics.COUNTER)
 )
 
 // BlockCipher is an interface of block encryption and decryption.

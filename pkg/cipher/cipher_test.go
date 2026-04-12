@@ -65,6 +65,7 @@ func TestAEADBlockCipherEncryptDecrypt(t *testing.T) {
 		if err != nil {
 			t.Fatalf("newXChaCha20Poly1305BlockCipher() failed: %v", err)
 		}
+		cipher.SetBlockContext(BlockContext{UserName: "test-user"})
 		if !cipher.IsStateless() {
 			t.Fatalf("IsStateless() = %v, want %v", cipher.IsStateless(), true)
 		}
@@ -114,6 +115,7 @@ func TestAEADBlockCipherEncryptDecryptImplicitMode(t *testing.T) {
 		t.Fatalf("newXChaCha20Poly1305BlockCipher() failed: %v", err)
 	}
 	sendCipher.SetImplicitNonceMode(true)
+	sendCipher.SetBlockContext(BlockContext{UserName: "test-user"})
 	recvCipher := sendCipher.Clone().(*AEADBlockCipher)
 	if sendCipher.IsStateless() {
 		t.Fatalf("IsStateless() = %v, want %v", sendCipher.IsStateless(), false)

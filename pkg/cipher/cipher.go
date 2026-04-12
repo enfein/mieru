@@ -19,6 +19,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	crand "crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	mrand "math/rand"
@@ -107,6 +108,7 @@ func (c *AEADBlockCipher) Encrypt(plaintext []byte) ([]byte, error) {
 			if err != nil {
 				return nil, fmt.Errorf("newNonce() failed: %w", err)
 			}
+			c.implicitNonce = c.addUserHintToNonce(c.implicitNonce)
 			// Must create a copy because nonce will be extended.
 			nonce = make([]byte, len(c.implicitNonce))
 			copy(nonce, c.implicitNonce)
@@ -120,6 +122,7 @@ func (c *AEADBlockCipher) Encrypt(plaintext []byte) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("newNonce() failed: %w", err)
 		}
+		nonce = c.addUserHintToNonce(nonce)
 	}
 
 	dst := c.aead.Seal(nil, nonce, plaintext, nil)
@@ -328,4 +331,17 @@ func (c *AEADBlockCipher) increaseNonce() {
 			break
 		}
 	}
+}
+
+func (c *AEADBlockCipher) addUserHintToNonce(nonce []byte) []byte {
+	if c.ctx.UserName == "" {
+		return nonce
+	}
+	if len(nonce) < noncePrefixLenForUserHint+nonceSuffixLenForUserHint {
+		panic(fmt.Sprintf("nonce length %d is too short", len(nonce)))
+	}
+	input := append([]byte(c.ctx.UserName), nonce[:noncePrefixLenForUserHint]...)
+	output := sha256.Sum256(input)
+	copy(nonce[len(nonce)-nonceSuffixLenForUserHint:], output[:nonceSuffixLenForUserHint])
+	return nonce
 }

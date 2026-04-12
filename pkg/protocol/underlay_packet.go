@@ -383,7 +383,6 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 			var decrypted bool
 			var err error
 			// Try existing sessions.
-			cipher.ServerIterateDecrypt.Add(1)
 			u.sessionMap.Range(func(k, v any) bool {
 				session := v.(*Session)
 				if session.block.Load() != nil && session.RemoteAddr().String() == addr.String() {
@@ -397,7 +396,45 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 				return true
 			})
 			if !decrypted {
-				// This is a new session. Try all registered users.
+				// This is a new session.
+				cipher.ServerIterateDecrypt.Add(1)
+
+				// First, try to narrow down the user using the nonce hint.
+				var hintUser *appctlpb.User
+				for _, user := range u.users {
+					if cipher.CheckUserFromHint([]byte(user.GetName()), nonce) {
+						hintUser = user
+						break
+					}
+				}
+				if hintUser != nil {
+					cipher.ServerHintMatchDecrypt.Add(1)
+					var password []byte
+					password, err = hex.DecodeString(hintUser.GetHashedPassword())
+					if err != nil {
+						log.Debugf("Unable to decode hashed password %q from user %q", hintUser.GetHashedPassword(), hintUser.GetName())
+					} else {
+						if len(password) == 0 {
+							password = cipher.HashPassword([]byte(hintUser.GetPassword()), []byte(hintUser.GetName()))
+						}
+						blockCipher, decryptedMeta, err = cipher.TryDecrypt(encryptedMeta, password, true)
+						if err == nil {
+							decrypted = true
+							blockCipher.SetBlockContext(cipher.BlockContext{
+								UserName: hintUser.GetName(),
+							})
+							if u.trafficPattern != nil {
+								blockCipher.SetNoncePattern(u.trafficPattern.GetNonce())
+							}
+						} else {
+							cipher.ServerFailedHintMatchDecrypt.Add(1)
+						}
+					}
+				}
+			}
+			if !decrypted {
+				// Fallback: try all registered users.
+				// This handles old clients without hints and hint hash collisions.
 				for _, user := range u.users {
 					var password []byte
 					password, err = hex.DecodeString(user.GetHashedPassword())
