@@ -17,11 +17,15 @@ package cipher
 
 import (
 	"fmt"
+	mrand "math/rand"
 	"sync"
 	"time"
 )
 
-const cacheValidInterval = KeyRefreshInterval / 4
+const (
+	cacheValidInterval    = KeyRefreshInterval / 4
+	cacheValidMaxJitterMs = 5000
+)
 
 type cachedCiphers struct {
 	cipherList []BlockCipher
@@ -39,7 +43,8 @@ func getBlockCipherList(password []byte, stateless bool) ([]BlockCipher, error) 
 	c, ok := blockCipherCache.Load(pw)
 	if ok {
 		// Check if the cached entry is expired.
-		if c.(cachedCiphers).createTime.Add(cacheValidInterval).Before(time.Now()) {
+		jitter := time.Duration(mrand.Intn(cacheValidMaxJitterMs)) * time.Millisecond
+		if c.(cachedCiphers).createTime.Add(cacheValidInterval - jitter).Before(time.Now()) {
 			ok = false
 		}
 	}

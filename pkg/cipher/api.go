@@ -185,6 +185,7 @@ func CloneBlockCiphers(blocks []BlockCipher) []BlockCipher {
 }
 
 // CheckUserFromHint checks if the user is the one associated with the nonce.
+// It panics if the user is empty or the nonce is too short.
 func CheckUserFromHint(user, nonce []byte) bool {
 	if len(user) == 0 {
 		panic("user is empty")
