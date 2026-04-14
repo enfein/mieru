@@ -24,6 +24,9 @@
             "allowLoopbackIP": true
         }
     ],
+    "advancedSettings": {
+        "userHintIsMandatory": true
+    },
     "loggingLevel": "DEBUG",
     "mtu": 1400,
     "trafficPattern": {

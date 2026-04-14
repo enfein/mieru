@@ -123,7 +123,8 @@ func (s *serverManagementService) Start(ctx context.Context, req *emptypb.Empty)
 	}
 	mux := protocol.NewMux(false).
 		SetTrafficPattern(trafficPattern).
-		SetServerUsers(appctlcommon.UserListToMap(config.GetUsers()))
+		SetServerUsers(appctlcommon.UserListToMap(config.GetUsers())).
+		SetServerUserHintIsMandatory(config.GetAdvancedSettings().GetUserHintIsMandatory())
 	mtu := common.DefaultMTU
 	if config.GetMtu() != 0 {
 		mtu = int(config.GetMtu())
@@ -253,6 +254,9 @@ func (s *serverManagementService) Reload(ctx context.Context, req *emptypb.Empty
 
 		// Adjust users.
 		mux.SetServerUsers(appctlcommon.UserListToMap(config.GetUsers()))
+
+		// Adjust advanced settings: user hint is mandatory.
+		mux.SetServerUserHintIsMandatory(config.GetAdvancedSettings().GetUserHintIsMandatory())
 	}
 	log.Infof("completed Reload request from RPC caller")
 	return &emptypb.Empty{}, nil

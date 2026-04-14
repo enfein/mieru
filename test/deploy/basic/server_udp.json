@@ -24,6 +24,9 @@
             "allowLoopbackIP": true
         }
     ],
+    "advancedSettings": {
+        "userHintIsMandatory": true
+    },
     "loggingLevel": "INFO",
     "mtu": 1400
 }

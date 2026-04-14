@@ -491,7 +491,8 @@ var serverRunFunc = func(s []string) error {
 		}
 		mux := protocol.NewMux(false).
 			SetTrafficPattern(trafficPattern).
-			SetServerUsers(appctlcommon.UserListToMap(config.GetUsers()))
+			SetServerUsers(appctlcommon.UserListToMap(config.GetUsers())).
+			SetServerUserHintIsMandatory(config.GetAdvancedSettings().GetUserHintIsMandatory())
 		appctl.SetServerMuxRef(mux)
 		mtu := common.DefaultMTU
 		if config.GetMtu() != 0 {

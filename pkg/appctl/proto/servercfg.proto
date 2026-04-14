@@ -57,6 +57,10 @@ message ServerAdvancedSettings {
     // Examples: 30s, 5m, 2h.
     // If empty, the default interval is used.
     optional string metricsLoggingInterval = 2;
+
+    // If true, proxy clients must provide user hint,
+    // otherwise proxy server will refuse to decrypt the network packets.
+    optional bool userHintIsMandatory = 3;
 }
 
 message Egress {

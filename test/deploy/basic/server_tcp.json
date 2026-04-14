@@ -24,5 +24,8 @@
             "allowLoopbackIP": true
         }
     ],
+    "advancedSettings": {
+        "userHintIsMandatory": true
+    },
     "loggingLevel": "INFO"
 }

@@ -70,7 +70,8 @@ type Mux struct {
 	multiplexFactor int
 
 	// ---- server only fields ----
-	users map[string]*appctlpb.User
+	users               map[string]*appctlpb.User
+	userHintIsMandatory bool
 }
 
 var _ net.Listener = &Mux{}
@@ -260,6 +261,18 @@ func (m *Mux) SetServerUsers(users map[string]*appctlpb.User) *Mux {
 			}
 		}
 	}
+	return m
+}
+
+// SetServerUserHintIsMandatory sets whether the user hint is mandatory.
+func (m *Mux) SetServerUserHintIsMandatory(userHintIsMandatory bool) *Mux {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.isClient {
+		panic("Can't set server user hint is mandatory in client mux")
+	}
+	m.userHintIsMandatory = userHintIsMandatory
+	log.Infof("Mux user hint is mandatory is set to %v", m.userHintIsMandatory)
 	return m
 }
 
@@ -535,10 +548,11 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 			trafficPattern = m.trafficPattern.Effective()
 		}
 		underlay := &PacketUnderlay{
-			baseUnderlay:       *newBaseUnderlay(false, properties.MTU(), trafficPattern),
-			conn:               conn,
-			sessionCleanTicker: time.NewTicker(sessionCleanInterval),
-			users:              m.users,
+			baseUnderlay:        *newBaseUnderlay(false, properties.MTU(), trafficPattern),
+			conn:                conn,
+			sessionCleanTicker:  time.NewTicker(sessionCleanInterval),
+			users:               m.users,
+			userHintIsMandatory: m.userHintIsMandatory,
 		}
 		log.Infof("Created new server underlay %v", underlay)
 		m.mu.Lock()
@@ -601,10 +615,11 @@ func (m *Mux) acceptTCPUnderlay(rawListener net.Listener, properties UnderlayPro
 
 func (m *Mux) serverWrapTCPConn(rawConn net.Conn, mtu int, users map[string]*appctlpb.User, trafficPattern *appctlpb.TrafficPattern) Underlay {
 	return &StreamUnderlay{
-		baseUnderlay:       *newBaseUnderlay(false, mtu, trafficPattern),
-		conn:               rawConn,
-		sessionCleanTicker: time.NewTicker(sessionCleanInterval),
-		users:              users,
+		baseUnderlay:        *newBaseUnderlay(false, mtu, trafficPattern),
+		conn:                rawConn,
+		sessionCleanTicker:  time.NewTicker(sessionCleanInterval),
+		users:               users,
+		userHintIsMandatory: m.userHintIsMandatory,
 	}
 }
 

@@ -250,8 +250,11 @@ type ServerAdvancedSettings struct {
 	// Examples: 30s, 5m, 2h.
 	// If empty, the default interval is used.
 	MetricsLoggingInterval *string `protobuf:"bytes,2,opt,name=metricsLoggingInterval,proto3,oneof" json:"metricsLoggingInterval,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// If true, proxy clients must provide user hint,
+	// otherwise proxy server will refuse to decrypt the network packets.
+	UserHintIsMandatory *bool `protobuf:"varint,3,opt,name=userHintIsMandatory,proto3,oneof" json:"userHintIsMandatory,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *ServerAdvancedSettings) Reset() {
@@ -289,6 +292,13 @@ func (x *ServerAdvancedSettings) GetMetricsLoggingInterval() string {
 		return *x.MetricsLoggingInterval
 	}
 	return ""
+}
+
+func (x *ServerAdvancedSettings) GetUserHintIsMandatory() bool {
+	if x != nil && x.UserHintIsMandatory != nil {
+		return *x.UserHintIsMandatory
+	}
+	return false
 }
 
 type Egress struct {
@@ -567,10 +577,12 @@ const file_appctl_proto_servercfg_proto_rawDesc = "" +
 	"\x04_mtuB\t\n" +
 	"\a_egressB\x06\n" +
 	"\x04_dnsB\x11\n" +
-	"\x0f_trafficPattern\"v\n" +
+	"\x0f_trafficPattern\"\xc5\x01\n" +
 	"\x16ServerAdvancedSettings\x12;\n" +
-	"\x16metricsLoggingInterval\x18\x02 \x01(\tH\x00R\x16metricsLoggingInterval\x88\x01\x01B\x19\n" +
-	"\x17_metricsLoggingIntervalJ\x04\b\x01\x10\x02\"m\n" +
+	"\x16metricsLoggingInterval\x18\x02 \x01(\tH\x00R\x16metricsLoggingInterval\x88\x01\x01\x125\n" +
+	"\x13userHintIsMandatory\x18\x03 \x01(\bH\x01R\x13userHintIsMandatory\x88\x01\x01B\x19\n" +
+	"\x17_metricsLoggingIntervalB\x16\n" +
+	"\x14_userHintIsMandatoryJ\x04\b\x01\x10\x02\"m\n" +
 	"\x06Egress\x123\n" +
 	"\aproxies\x18\x01 \x03(\v2\x19.mieru.appctl.EgressProxyR\aproxies\x12.\n" +
 	"\x05rules\x18\x02 \x03(\v2\x18.mieru.appctl.EgressRuleR\x05rules\"\xa4\x02\n" +

@@ -95,8 +95,9 @@ func (ms *mieruServer) Start() error {
 	if err != nil {
 		return err
 	}
-	ms.mux.SetTrafficPattern(trafficPattern)
-	ms.mux.SetServerUsers(appctlcommon.UserListToMap(ms.config.Config.GetUsers()))
+	ms.mux.SetTrafficPattern(trafficPattern).
+		SetServerUsers(appctlcommon.UserListToMap(ms.config.Config.GetUsers())).
+		SetServerUserHintIsMandatory(ms.config.Config.GetAdvancedSettings().GetUserHintIsMandatory())
 	mtu := common.DefaultMTU
 	if ms.config.Config.GetMtu() != 0 {
 		mtu = int(ms.config.Config.GetMtu())

@@ -54,7 +54,8 @@ type PacketUnderlay struct {
 	block      cipher.BlockCipher
 
 	// ---- server fields ----
-	users map[string]*appctlpb.User
+	users               map[string]*appctlpb.User
+	userHintIsMandatory bool
 }
 
 var _ Underlay = &PacketUnderlay{}
@@ -395,51 +396,51 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 				}
 				return true
 			})
+
 			if !decrypted {
 				// This is a new session.
 				cipher.ServerIterateDecrypt.Add(1)
 
 				// First, try to narrow down the user using the nonce hint.
-				var hintUser *appctlpb.User
+				var hintUsers []*appctlpb.User
 				for _, user := range u.users {
 					if cipher.CheckUserFromHint([]byte(user.GetName()), nonce) {
-						hintUser = user
-						break
+						hintUsers = append(hintUsers, user)
 					}
 				}
-				if hintUser != nil {
+				for _, hintUser := range hintUsers {
 					cipher.ServerHintMatchDecrypt.Add(1)
 					var password []byte
 					password, err = hex.DecodeString(hintUser.GetHashedPassword())
 					if err != nil {
 						log.Debugf("Unable to decode hashed password %q from user %q", hintUser.GetHashedPassword(), hintUser.GetName())
+						continue
+					}
+					if len(password) == 0 {
+						password = cipher.HashPassword([]byte(hintUser.GetPassword()), []byte(hintUser.GetName()))
+					}
+					blockCipher, decryptedMeta, err = cipher.TryDecrypt(encryptedMeta, password, true)
+					if err == nil {
+						decrypted = true
+						blockCipher.SetBlockContext(cipher.BlockContext{
+							UserName: hintUser.GetName(),
+						})
+						if u.trafficPattern != nil {
+							blockCipher.SetNoncePattern(u.trafficPattern.GetNonce())
+						}
+						break
 					} else {
-						if len(password) == 0 {
-							password = cipher.HashPassword([]byte(hintUser.GetPassword()), []byte(hintUser.GetName()))
-						}
-						blockCipher, decryptedMeta, err = cipher.TryDecrypt(encryptedMeta, password, true)
-						if err == nil {
-							decrypted = true
-							blockCipher.SetBlockContext(cipher.BlockContext{
-								UserName: hintUser.GetName(),
-							})
-							if u.trafficPattern != nil {
-								blockCipher.SetNoncePattern(u.trafficPattern.GetNonce())
-							}
-						} else {
-							cipher.ServerFailedHintMatchDecrypt.Add(1)
-						}
+						cipher.ServerFailedHintMatchDecrypt.Add(1)
 					}
 				}
 			}
-			if !decrypted {
+
+			if !decrypted && !u.userHintIsMandatory {
 				// Fallback: try all registered users.
-				// This handles old clients without hints and hint hash collisions.
 				for _, user := range u.users {
 					var password []byte
 					password, err = hex.DecodeString(user.GetHashedPassword())
 					if err != nil {
-						log.Debugf("Unable to decode hashed password %q from user %q", user.GetHashedPassword(), user.GetName())
 						continue
 					}
 					if len(password) == 0 {

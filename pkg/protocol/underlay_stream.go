@@ -56,7 +56,8 @@ type StreamUnderlay struct {
 	block cipher.BlockCipher
 
 	// ---- server fields ----
-	users map[string]*appctlpb.User
+	users               map[string]*appctlpb.User
+	userHintIsMandatory bool
 }
 
 var _ Underlay = &StreamUnderlay{}
@@ -662,32 +663,33 @@ func (t *StreamUnderlay) serverInitRecvBlockCipherAndDecryptMetadata(encryptedMe
 	var matchedUserName string
 
 	// First, try to narrow down the user using the nonce hint.
-	var hintUser *appctlpb.User
+	var hintUsers []*appctlpb.User
 	for _, user := range t.users {
 		if cipher.CheckUserFromHint([]byte(user.GetName()), nonce) {
-			hintUser = user
-			break
+			hintUsers = append(hintUsers, user)
 		}
 	}
-	if hintUser != nil {
+	for _, hintUser := range hintUsers {
 		cipher.ServerHintMatchDecrypt.Add(1)
 		password, err := hex.DecodeString(hintUser.GetHashedPassword())
+		if err != nil {
+			log.Debugf("Unable to decode hashed password %q from user %q", hintUser.GetHashedPassword(), hintUser.GetName())
+			continue
+		}
+		if len(password) == 0 {
+			password = cipher.HashPassword([]byte(hintUser.GetPassword()), []byte(hintUser.GetName()))
+		}
+		matchedBlock, _, err = cipher.TryDecrypt(encryptedMeta, password, true)
 		if err == nil {
-			if len(password) == 0 {
-				password = cipher.HashPassword([]byte(hintUser.GetPassword()), []byte(hintUser.GetName()))
-			}
-			matchedBlock, _, err = cipher.TryDecrypt(encryptedMeta, password, true)
-			if err == nil {
-				matchedUserName = hintUser.GetName()
-			} else {
-				cipher.ServerFailedHintMatchDecrypt.Add(1)
-			}
+			matchedUserName = hintUser.GetName()
+			break
+		} else {
+			cipher.ServerFailedHintMatchDecrypt.Add(1)
 		}
 	}
 
-	// Fallback: try all registered users.
-	// This handles old clients without hints and hint hash collisions.
-	if matchedBlock == nil {
+	if matchedBlock == nil && !t.userHintIsMandatory {
+		// Fallback: try all registered users.
 		for _, user := range t.users {
 			password, err := hex.DecodeString(user.GetHashedPassword())
 			if err != nil {
