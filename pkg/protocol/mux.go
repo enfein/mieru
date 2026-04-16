@@ -72,6 +72,14 @@ type Mux struct {
 	// ---- server only fields ----
 	users               map[string]*appctlpb.User
 	userHintIsMandatory bool
+
+	// ---- encryption scheme selection ----
+	// When encryption is ENCRYPTION_TYPE_UNSPECIFIED or XCHACHA20_POLY1305
+	// the classic password-based scheme is used and noise is ignored.
+	// When encryption is NOISE the handshake described by noise runs on
+	// every underlay before any mieru frame flows.
+	encryption appctlpb.EncryptionType
+	noise      *appctlpb.NoiseConfig
 }
 
 var _ net.Listener = &Mux{}
@@ -275,6 +283,31 @@ func (m *Mux) SetServerUserHintIsMandatory(userHintIsMandatory bool) *Mux {
 	log.Infof("Mux user hint is mandatory is set to %v", m.userHintIsMandatory)
 	return m
 }
+// SetEncryption selects the encryption scheme for this mux. It panics
+// if called after the mux starts. The default (unset) is equivalent to
+// ENCRYPTION_TYPE_UNSPECIFIED and behaves identically to the classic
+// password-based XChaCha20-Poly1305 scheme.
+func (m *Mux) SetEncryption(enc appctlpb.EncryptionType, noiseCfg *appctlpb.NoiseConfig) *Mux {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.used {
+		panic("Can't change encryption scheme after mux is used")
+	}
+	m.encryption = enc
+	m.noise = noiseCfg
+	if enc == appctlpb.EncryptionType_NOISE {
+		log.Infof("Mux encryption set to NOISE")
+	}
+	return m
+}
+
+// usesNoise reports whether the mux is configured to use the Noise
+// Protocol Framework for this session. It holds no locks, so callers
+// must only invoke it while the mux configuration is stable.
+func (m *Mux) usesNoise() bool {
+	return m.encryption == appctlpb.EncryptionType_NOISE
+}
+
 
 func (m *Mux) Accept() (net.Conn, error) {
 	select {
@@ -522,6 +555,13 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 			}(ctx, underlay)
 		}
 	case "udp", "udp4", "udp6":
+		if m.usesNoise() {
+			log.Errorf("Noise encryption is not yet supported over UDP; rejecting %q listener", laddr)
+			if m.acceptHasErr.CompareAndSwap(false, true) {
+				close(m.acceptErr)
+			}
+			return
+		}
 		udpAddr, err := apicommon.ResolveUDPAddr(ctx, m.resolver, "udp", laddr)
 		if err != nil {
 			log.Errorf("ResolveUDPAddr() failed: %v", err)
@@ -610,7 +650,45 @@ func (m *Mux) acceptTCPUnderlay(rawListener net.Listener, properties UnderlayPro
 	if m.trafficPattern != nil {
 		trafficPattern = m.trafficPattern.Effective()
 	}
+	if m.usesNoise() {
+		return m.serverWrapNoiseTCPConn(rawConn, properties.MTU(), m.users, trafficPattern)
+	}
 	return m.serverWrapTCPConn(rawConn, properties.MTU(), m.users, trafficPattern), nil
+}
+
+// serverWrapNoiseTCPConn performs a Noise handshake on the freshly
+// accepted connection and returns a StreamUnderlay pre-populated with
+// the derived send/recv ciphers. The returned underlay bypasses the
+// password-based per-user cipher discovery path.
+func (m *Mux) serverWrapNoiseTCPConn(rawConn net.Conn, mtu int, users map[string]*appctlpb.User, trafficPattern *appctlpb.TrafficPattern) (Underlay, error) {
+	sendCipher, recvCipher, err := noiseHandshakeStream(rawConn, m.noise, noiseResponderRole())
+	if err != nil {
+		_ = rawConn.Close()
+		return nil, fmt.Errorf("serverWrapNoiseTCPConn: handshake: %w", err)
+	}
+	// Bind the ciphers to a user context. With Noise there is no
+	// password-based iteration, so we pick the first registered user
+	// (if any) as the "noise user" and stamp it on the send cipher for
+	// metrics and logging. Per-user authentication with Noise static
+	// keys is a future enhancement.
+	var userName string
+	for name := range users {
+		userName = name
+		break
+	}
+	if userName != "" {
+		sendCipher.SetBlockContext(cipher.BlockContext{UserName: userName})
+		recvCipher.SetBlockContext(cipher.BlockContext{UserName: userName})
+	}
+	return &StreamUnderlay{
+		baseUnderlay:        *newBaseUnderlay(false, mtu, trafficPattern),
+		conn:                rawConn,
+		send:                sendCipher,
+		recv:                recvCipher,
+		sessionCleanTicker:  time.NewTicker(sessionCleanInterval),
+		users:               users,
+		userHintIsMandatory: m.userHintIsMandatory,
+	}, nil
 }
 
 func (m *Mux) serverWrapTCPConn(rawConn net.Conn, mtu int, users map[string]*appctlpb.User, trafficPattern *appctlpb.TrafficPattern) Underlay {
@@ -639,6 +717,19 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 
 	switch p.TransportProtocol() {
 	case common.StreamTransport:
+		if m.usesNoise() {
+			// Noise path: dial a raw TCP connection, perform the
+			// Noise handshake as initiator, then hand the derived
+			// send/recv ciphers to StreamUnderlay. No password-based
+			// cipher material is involved.
+			u, err := NewNoiseStreamUnderlay(ctx, m.dialer, m.resolver, m.clientDNSConfig,
+				p.RemoteAddr().Network(), p.RemoteAddr().String(), p.MTU(), m.noise, trafficPattern, m.username)
+			if err != nil {
+				return nil, fmt.Errorf("NewNoiseStreamUnderlay() failed: %v", err)
+			}
+			underlay = u
+			break
+		}
 		block, err := cipher.BlockCipherFromPassword(m.password, false)
 		if err != nil {
 			return nil, fmt.Errorf("cipher.BlockCipherFromPassword() failed: %v", err)
@@ -654,6 +745,12 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 			return nil, fmt.Errorf("NewTCPUnderlay() failed: %v", err)
 		}
 	case common.PacketTransport:
+		if m.usesNoise() {
+			// Noise over UDP is not yet supported. Fail early with a
+			// clear message so configuration mistakes surface right at
+			// connection time rather than looking like a silent hang.
+			return nil, noiseValidateUDP()
+		}
 		block, err := cipher.BlockCipherFromPassword(m.password, true)
 		if err != nil {
 			return nil, fmt.Errorf("cipher.BlockCipherFromPassword() failed: %v", err)

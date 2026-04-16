@@ -33,6 +33,8 @@ RUN go mod download
 
 # The CMD keeps the test output visible and returns a non-zero exit
 # code on any failure.
-CMD ["go", "test", "-race", "-count=1", "-timeout=120s", \
+CMD ["go", "test", "-race", "-count=1", "-timeout=180s", \
      "./pkg/cipher", \
-     "./pkg/cipher/noise"]
+     "./pkg/cipher/noise", \
+     "./pkg/protocol", \
+     "-run=TestNoise|TestHandshake|TestConfig|TestParse|TestIPv4TCP|TestIPv6TCP"]

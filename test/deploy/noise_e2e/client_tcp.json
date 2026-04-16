@@ -1,0 +1,44 @@
+{
+    "profiles": [
+        {
+            "profileName": "default",
+            "user": {
+                "name": "baozi",
+                "password": "manlianpenfen"
+            },
+            "servers": [
+                {
+                    "domainName": "localhost",
+                    "portBindings": [
+                        {
+                            "port": 8964,
+                            "protocol": "TCP"
+                        }
+                    ]
+                }
+            ],
+            "multiplexing": {
+                "level": "MULTIPLEXING_LOW"
+            },
+            "encryption": "NOISE",
+            "noise": {
+                "pattern":               "NOISE_XX",
+                "dh":                    "NOISE_DH_25519",
+                "cipher":                "NOISE_CIPHER_CHACHA20POLY1305",
+                "hash":                  "NOISE_HASH_SHA256",
+                "localStaticPrivateKey": "e8ec88db0319ce9dec500513a8155ffd170960b0e9492c4b06fff46d88d05cff",
+                "remoteStaticPublicKey": "cc0443ae7105e990d42c981be776003acb4da3a4eac7876264a09c956d13e046"
+            }
+        }
+    ],
+    "activeProfile": "default",
+    "rpcPort": 8989,
+    "socks5Port": 1080,
+    "advancedSettings": {
+        "noCheckUpdate": true
+    },
+    "loggingLevel": "INFO",
+    "socks5ListenLAN": true,
+    "httpProxyPort": 8808,
+    "httpProxyListenLAN": true
+}

@@ -292,6 +292,7 @@ func RegisterClientCommands() {
 		},
 		clientStopCPUProfileFunc,
 	)
+	RegisterKeypairNoiseCommand()
 }
 
 var clientHelpFunc = func(s []string) error {

@@ -227,13 +227,26 @@ round trip through `cipher.NewNoiseBlockCipher`. See
 
 ### Current integration status
 
-- Library: complete (all 17 unit tests pass, all patterns from §7 of
-  the Noise spec are exposed).
+- Library: complete (17 unit tests, all patterns from §7 of the Noise
+  spec are exposed).
 - Configuration: complete (`base.proto`, `clientcfg.proto`,
-  `servercfg.proto`).
-- Wire-up into `pkg/protocol/underlay_stream.go` and
-  `pkg/protocol/underlay_packet.go`: the design is to plumb a new
-  factory on `Session` that returns a pair of `BlockCipher` values
-  depending on `ClientProfile.encryption` / `ServerConfig.encryption`.
-  That work is not yet complete — the current code still uses
-  password-derived ciphers for transport. Tracking issue: TBD.
+  `servercfg.proto`, plus JSON validation + `appctl` wiring).
+- CLI: `mieru keypair noise` / `mita keypair noise` generate a fresh
+  Curve25519 static keypair and print both values as hex on stdout.
+- Protocol wire-up: **complete for TCP**. The mux runs the Noise
+  handshake on every freshly dialed / accepted connection before any
+  mieru frame flows. The derived transport `CipherState` pair is
+  adapted to two `cipher.BlockCipher` values that are installed
+  directly on the stream underlay's send/recv slots, bypassing the
+  password-based key derivation. See
+  [`pkg/protocol/noise_wire.go`](../pkg/protocol/noise_wire.go) and
+  the `usesNoise()` branches in [`pkg/protocol/mux.go`](../pkg/protocol/mux.go).
+- UDP: intentionally rejected at connection time with a clear error
+  (`"noise encryption is not supported over UDP yet; use a TCP port
+  binding or switch encryption to XCHACHA20_POLY1305"`). Adding a
+  datagram-aware handshake with per-source-address state tracking is a
+  future enhancement.
+- End-to-end: [`test/deploy/noise_e2e/`](../test/deploy/noise_e2e)
+  builds the real `mieru` + `mita` binaries into a container,
+  configures them with Noise_XX JSON, and runs SOCKS5 traffic through
+  the Noise tunnel (`make run-container-test-noise-e2e`).

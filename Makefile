@@ -404,7 +404,7 @@ test-container-image-noise:
 
 # Run docker integration tests.
 .PHONY: run-container-test
-run-container-test: run-container-test-basic run-container-test-apiclient run-container-test-apiserver run-container-test-proxychain run-container-test-noise
+run-container-test: run-container-test-basic run-container-test-apiclient run-container-test-apiserver run-container-test-proxychain run-container-test-noise run-container-test-noise-e2e
 
 .PHONY: run-container-test-basic
 run-container-test-basic: test-container-image
@@ -427,6 +427,18 @@ run-container-test-proxychain: test-container-image
 .PHONY: run-container-test-noise
 run-container-test-noise: test-container-image-noise
 	docker run --rm mieru_noise:${SHORT_SHA}
+
+# Build the Noise binary-level end-to-end test image (depends on
+# host-built mieru/mita binaries, like the other e2e scenarios).
+.PHONY: test-container-image-noise-e2e
+test-container-image-noise-e2e: test-binary
+	docker build -t mieru_noise_e2e:${SHORT_SHA} -f test/deploy/noise_e2e/Dockerfile .
+
+# Run the Noise binary-level end-to-end test.
+# See test/deploy/noise_e2e/README.md for what it covers.
+.PHONY: run-container-test-noise-e2e
+run-container-test-noise-e2e: test-container-image-noise-e2e
+	docker run --rm mieru_noise_e2e:${SHORT_SHA}
 
 # Generate source code from protobuf.
 # Call this after proto files are changed.

@@ -1,0 +1,24 @@
+{
+    "portBindings": [
+        {
+            "port": 8964,
+            "protocol": "TCP"
+        }
+    ],
+    "users": [
+        {
+            "name": "baozi",
+            "password": "manlianpenfen",
+            "allowLoopbackIP": true
+        }
+    ],
+    "encryption": "NOISE",
+    "noise": {
+        "pattern":               "NOISE_XX",
+        "dh":                    "NOISE_DH_25519",
+        "cipher":                "NOISE_CIPHER_CHACHA20POLY1305",
+        "hash":                  "NOISE_HASH_SHA256",
+        "localStaticPrivateKey": "83b99f2f35d353ba39eeb1b55287605df91b1e87a7b5df87a4ca3983b0dba99a"
+    },
+    "loggingLevel": "INFO"
+}

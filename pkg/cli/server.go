@@ -241,6 +241,7 @@ func RegisterServerCommands() {
 		},
 		serverStopCPUProfileFunc,
 	)
+	RegisterKeypairNoiseCommand()
 }
 
 var serverHelpFunc = func(s []string) error {
@@ -492,7 +493,8 @@ var serverRunFunc = func(s []string) error {
 		mux := protocol.NewMux(false).
 			SetTrafficPattern(trafficPattern).
 			SetServerUsers(appctlcommon.UserListToMap(config.GetUsers())).
-			SetServerUserHintIsMandatory(config.GetAdvancedSettings().GetUserHintIsMandatory())
+			SetServerUserHintIsMandatory(config.GetAdvancedSettings().GetUserHintIsMandatory()).
+			SetEncryption(config.GetEncryption(), config.GetNoise())
 		appctl.SetServerMuxRef(mux)
 		mtu := common.DefaultMTU
 		if config.GetMtu() != 0 {
