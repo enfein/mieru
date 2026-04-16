@@ -555,13 +555,6 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 			}(ctx, underlay)
 		}
 	case "udp", "udp4", "udp6":
-		if m.usesNoise() {
-			log.Errorf("Noise encryption is not yet supported over UDP; rejecting %q listener", laddr)
-			if m.acceptHasErr.CompareAndSwap(false, true) {
-				close(m.acceptErr)
-			}
-			return
-		}
 		udpAddr, err := apicommon.ResolveUDPAddr(ctx, m.resolver, "udp", laddr)
 		if err != nil {
 			log.Errorf("ResolveUDPAddr() failed: %v", err)
@@ -580,6 +573,27 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 			wg.Done()
 			return
 		}
+
+		// Server-side Noise wrapper: accept handshakes per source
+		// address and present an already-noise-decrypted datagram
+		// stream to PacketUnderlay. Users map is replaced by the
+		// single synthetic noise user for the inner mieru layer.
+		users := m.users
+		if m.usesNoise() {
+			wrapped, werr := newNoiseUDPServerConn(conn, m.noise)
+			if werr != nil {
+				log.Errorf("newNoiseUDPServerConn() failed: %v", werr)
+				_ = conn.Close()
+				if m.acceptHasErr.CompareAndSwap(false, true) {
+					close(m.acceptErr)
+				}
+				wg.Done()
+				return
+			}
+			conn = wrapped
+			users = buildNoiseUDPUser(m.noise)
+		}
+
 		wg.Done()
 		log.Infof("Mux is listening to endpoint %s %s", network, laddr)
 
@@ -591,7 +605,7 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 			baseUnderlay:        *newBaseUnderlay(false, properties.MTU(), trafficPattern),
 			conn:                conn,
 			sessionCleanTicker:  time.NewTicker(sessionCleanInterval),
-			users:               m.users,
+			users:               users,
 			userHintIsMandatory: m.userHintIsMandatory,
 		}
 		log.Infof("Created new server underlay %v", underlay)
@@ -746,10 +760,48 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 		}
 	case common.PacketTransport:
 		if m.usesNoise() {
-			// Noise over UDP is not yet supported. Fail early with a
-			// clear message so configuration mistakes surface right at
-			// connection time rather than looking like a silent hang.
-			return nil, noiseValidateUDP()
+			// Noise+UDP path: open a UDP socket, run a Noise handshake
+			// on top, then hand the wrapped PacketConn to a regular
+			// PacketUnderlay configured with a deterministic inner
+			// password derived from the noise config. The inner layer
+			// is ceremonial (format compliance); real confidentiality
+			// comes from the outer Noise AEAD in noiseUDPClientConn.
+			udpAddr, err := apicommon.ResolveUDPAddr(ctx, m.resolver, p.RemoteAddr().Network(), p.RemoteAddr().String())
+			if err != nil {
+				return nil, fmt.Errorf("ResolveUDPAddr() failed: %v", err)
+			}
+			rawConn, err := m.packetDialer.ListenPacket(ctx, p.RemoteAddr().Network(), "", udpAddr.String())
+			if err != nil {
+				return nil, fmt.Errorf("ListenPacket() failed: %v", err)
+			}
+			nc, err := dialNoiseUDP(rawConn, udpAddr, m.noise)
+			if err != nil {
+				_ = rawConn.Close()
+				return nil, fmt.Errorf("dialNoiseUDP() failed: %v", err)
+			}
+			// Mirror the server's synthetic-user password derivation.
+			// server: user.Password = hex(noiseUDPInnerPassword(cfg));
+			//         HashPassword([]byte(user.Password), []byte(user.Name))
+			// Client must produce the same hashed password so both sides
+			// derive identical XChaCha20-Poly1305 keys via PBKDF2.
+			innerPWHex := fmt.Sprintf("%x", noiseUDPInnerPassword(m.noise))
+			hashedInnerPW := cipher.HashPassword([]byte(innerPWHex), []byte(noiseUDPInnerUserName))
+			block, err := cipher.BlockCipherFromPassword(hashedInnerPW, true)
+			if err != nil {
+				_ = nc.Close()
+				return nil, fmt.Errorf("noise udp inner cipher: %v", err)
+			}
+			block.SetBlockContext(cipher.BlockContext{UserName: noiseUDPInnerUserName})
+			if trafficPattern != nil {
+				block.SetNoncePattern(trafficPattern.GetNonce())
+			}
+			u, err := NewPacketUnderlayWithConn(ctx, nc, udpAddr, p.MTU(), block, trafficPattern)
+			if err != nil {
+				_ = nc.Close()
+				return nil, fmt.Errorf("NewPacketUnderlayWithConn() failed: %v", err)
+			}
+			underlay = u
+			break
 		}
 		block, err := cipher.BlockCipherFromPassword(m.password, true)
 		if err != nil {

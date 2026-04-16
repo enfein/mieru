@@ -80,13 +80,6 @@ func noiseHandshakeStream(conn net.Conn, cfg *appctlpb.NoiseConfig, role noise.R
 		nil
 }
 
-// noiseValidateUDP rejects NOISE encryption on UDP transports until a
-// proper datagram-aware handshake exists. It is called from the mux's
-// newUnderlay() before attempting to dial a UDP peer.
-func noiseValidateUDP() error {
-	return fmt.Errorf("noise encryption is not supported over UDP yet; use a TCP port binding or switch encryption to XCHACHA20_POLY1305")
-}
-
 // noiseInitiatorRole and noiseResponderRole re-export the role
 // constants through the protocol package so callers do not need to
 // import pkg/cipher/noise directly for a trivial enum.

@@ -20,12 +20,16 @@ FROM ubuntu:24.04
 
 WORKDIR /test
 
-# Copy binaries, configs, and test script into the container.
+# Copy binaries, configs, and test scripts into the container.
 COPY bin/mieru bin/mita bin/httpserver bin/sockshttpclient \
     test/deploy/noise_e2e/client_tcp.json \
     test/deploy/noise_e2e/server_tcp.json \
+    test/deploy/noise_e2e/client_udp.json \
+    test/deploy/noise_e2e/server_udp.json \
     test/deploy/noise_e2e/libtest.sh \
     test/deploy/noise_e2e/test_tcp.sh \
+    test/deploy/noise_e2e/test_udp.sh \
+    test/deploy/noise_e2e/test.sh \
     /test/
 
 # Create mita user + server config directories (mirrors basic/).
@@ -40,6 +44,6 @@ RUN /usr/sbin/useradd --no-create-home --user-group mita && \
     chown -R mita:mita /var/run/mita && \
     chmod 775 /var/run/mita
 
-RUN chmod +x /test/test_tcp.sh /test/libtest.sh
+RUN chmod +x /test/test.sh /test/test_tcp.sh /test/test_udp.sh /test/libtest.sh
 
-CMD ["/test/test_tcp.sh"]
+CMD ["/test/test.sh"]

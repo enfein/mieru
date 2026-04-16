@@ -144,44 +144,93 @@ func TestNoiseTCPUnderlay_XX_EndToEnd(t *testing.T) {
 	}
 }
 
-// TestNoiseUDPUnderlay_RejectedCleanly confirms the early-fail guard
-// that refuses Noise + UDP with a user-visible error message rather
-// than hanging or panicking mid-session.
-func TestNoiseUDPUnderlay_RejectedCleanly(t *testing.T) {
+// TestNoiseUDPUnderlay_XX_EndToEnd stands up a server and a client
+// mux, both configured to use Noise_XX over UDP, and runs a small
+// exchange through them. It proves that the datagram handshake flow
+// succeeds, the post-handshake Noise AEAD wrapper encrypts/decrypts
+// each datagram, and the inner mieru PacketUnderlay still performs
+// session multiplexing on top unchanged.
+func TestNoiseUDPUnderlay_XX_EndToEnd(t *testing.T) {
+	log.SetOutputToTest(t)
+	log.SetLevel("DEBUG")
+
 	serverKP := mustNoiseKeypair(t)
+	clientKP := mustNoiseKeypair(t)
 
-	cfg := noiseProtoConfig(&noiseParams{
-		pattern:      appctlpb.NoisePattern_NOISE_XX,
-		localPrivate: serverKP.Private,
-		localPublic:  serverKP.Public,
-	})
-
-	// Client-side: dialing a UDP endpoint with NOISE enabled should
-	// fail at newUnderlay() time with the documented message.
 	port, err := common.UnusedUDPPort()
 	if err != nil {
 		t.Fatalf("UnusedUDPPort: %v", err)
 	}
-	clientProps := NewUnderlayProperties(1400, common.PacketTransport, nil,
+	serverProperties := NewUnderlayProperties(1400, common.PacketTransport,
+		&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port}, nil)
+
+	serverNoise := noiseProtoConfig(&noiseParams{
+		pattern:      appctlpb.NoisePattern_NOISE_XX,
+		localPrivate: serverKP.Private,
+		localPublic:  serverKP.Public,
+	})
+	serverMux := NewMux(false).
+		SetServerUsers(users). // ignored for noise UDP; mux injects a synthetic user
+		SetEncryption(appctlpb.EncryptionType_NOISE, serverNoise).
+		SetEndpoints([]UnderlayProperties{serverProperties})
+	testServer := testtool.NewTestHelperServer()
+	if err := serverMux.Start(); err != nil {
+		t.Fatalf("Start server mux: %v", err)
+	}
+	time.Sleep(150 * time.Millisecond)
+	go func() {
+		if err := testServer.Serve(serverMux); err != nil {
+			t.Errorf("Serve(): %v", err)
+		}
+	}()
+	defer testServer.Close()
+	defer serverMux.Close()
+	time.Sleep(100 * time.Millisecond)
+
+	clientNoise := noiseProtoConfig(&noiseParams{
+		pattern:      appctlpb.NoisePattern_NOISE_XX,
+		localPrivate: clientKP.Private,
+		localPublic:  clientKP.Public,
+		remotePublic: serverKP.Public,
+	})
+	clientProperties := NewUnderlayProperties(1400, common.PacketTransport, nil,
 		&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port})
+	clientMux := NewMux(true).
+		SetClientUserNamePassword("ignored-for-noise", []byte("still-ignored")).
+		SetClientMultiplexFactor(0).
+		SetEncryption(appctlpb.EncryptionType_NOISE, clientNoise).
+		SetEndpoints([]UnderlayProperties{clientProperties})
 
-	m := NewMux(true).
-		SetClientUserNamePassword("x", []byte("y")).
-		SetEncryption(appctlpb.EncryptionType_NOISE, cfg).
-		SetEndpoints([]UnderlayProperties{clientProps})
-
-	dialCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	dialCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	_, err = m.DialContext(dialCtx)
-	if err == nil {
-		t.Fatalf("expected error dialing UDP with noise; got nil")
+	conn, err := clientMux.DialContext(dialCtx)
+	if err != nil {
+		t.Fatalf("DialContext noise+UDP: %v", err)
 	}
-	// Be generous — the error is wrapped; check the sentinel substring.
-	if !bytesContains([]byte(err.Error()), []byte("noise encryption is not supported over UDP")) {
-		t.Fatalf("error does not explain UDP rejection: %v", err)
+	defer conn.Close()
+
+	for j := 0; j < 5; j++ {
+		payload := testtool.TestHelperGenRot13Input(512)
+		if _, err := conn.Write(payload); err != nil {
+			t.Fatalf("Write iter=%d: %v", j, err)
+		}
+		resp := make([]byte, len(payload))
+		if _, err := io.ReadFull(conn, resp); err != nil {
+			t.Fatalf("ReadFull iter=%d: %v", j, err)
+		}
+		rot, err := testtool.TestHelperRot13(resp)
+		if err != nil {
+			t.Fatalf("rot13: %v", err)
+		}
+		if !bytes.Equal(payload, rot) {
+			t.Fatalf("payload mismatch iter=%d", j)
+		}
 	}
-	_ = m.Close()
+
+	if err := clientMux.Close(); err != nil {
+		t.Errorf("client mux close: %v", err)
+	}
 }
 
 // --- helpers --------------------------------------------------------
@@ -228,6 +277,3 @@ func mustNoiseKeypair(t *testing.T) noise.Keypair {
 	return kp
 }
 
-func bytesContains(haystack, needle []byte) bool {
-	return bytes.Contains(haystack, needle)
-}

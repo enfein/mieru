@@ -233,20 +233,22 @@ round trip through `cipher.NewNoiseBlockCipher`. See
   `servercfg.proto`, plus JSON validation + `appctl` wiring).
 - CLI: `mieru keypair noise` / `mita keypair noise` generate a fresh
   Curve25519 static keypair and print both values as hex on stdout.
-- Protocol wire-up: **complete for TCP**. The mux runs the Noise
-  handshake on every freshly dialed / accepted connection before any
-  mieru frame flows. The derived transport `CipherState` pair is
-  adapted to two `cipher.BlockCipher` values that are installed
+- Protocol wire-up: **complete for both TCP and UDP.** For TCP the
+  mux runs the Noise handshake on every freshly dialed / accepted
+  connection, then installs the derived transport `CipherState` pair
   directly on the stream underlay's send/recv slots, bypassing the
-  password-based key derivation. See
-  [`pkg/protocol/noise_wire.go`](../pkg/protocol/noise_wire.go) and
-  the `usesNoise()` branches in [`pkg/protocol/mux.go`](../pkg/protocol/mux.go).
-- UDP: intentionally rejected at connection time with a clear error
-  (`"noise encryption is not supported over UDP yet; use a TCP port
-  binding or switch encryption to XCHACHA20_POLY1305"`). Adding a
-  datagram-aware handshake with per-source-address state tracking is a
-  future enhancement.
+  password-based key derivation. For UDP the mux wraps the raw
+  `net.PacketConn` in a Noise layer (`pkg/protocol/noise_udp.go`) that
+  tracks handshake state per source address and uses
+  `noise.UnsafeNewCipherState(suite, key, counter)` with an explicit
+  per-packet 64-bit counter so datagrams remain stateless on receive
+  — survive reorder, loss, and NAT rebinding. See
+  [`pkg/protocol/noise_wire.go`](../pkg/protocol/noise_wire.go),
+  [`pkg/protocol/noise_udp.go`](../pkg/protocol/noise_udp.go) and the
+  `usesNoise()` branches in
+  [`pkg/protocol/mux.go`](../pkg/protocol/mux.go).
 - End-to-end: [`test/deploy/noise_e2e/`](../test/deploy/noise_e2e)
   builds the real `mieru` + `mita` binaries into a container,
-  configures them with Noise_XX JSON, and runs SOCKS5 traffic through
-  the Noise tunnel (`make run-container-test-noise-e2e`).
+  configures them with Noise_XX JSON over TCP **and** UDP, and runs
+  SOCKS5 traffic through both tunnels (`make
+  run-container-test-noise-e2e`).
