@@ -76,6 +76,17 @@ message ClientProfile {
 
     // Fine tune traffic behaviors.
     optional TrafficPattern trafficPattern = 7;
+
+    // Encryption scheme used for this profile. When unset or set to
+    // ENCRYPTION_TYPE_UNSPECIFIED / XCHACHA20_POLY1305, the default
+    // password-based XChaCha20-Poly1305 is used and the NoiseConfig
+    // below is ignored. When set to NOISE, the NoiseConfig below must
+    // be present and valid; see docs/noise.md.
+    optional EncryptionType encryption = 8;
+
+    // Noise Protocol Framework configuration. Ignored unless
+    // encryption == NOISE.
+    optional NoiseConfig noise = 9;
 }
 
 message ServerEndpoint {

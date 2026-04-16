@@ -198,3 +198,124 @@ enum NonceType {
     // the behavior is the same as NONCE_TYPE_RANDOM.
     NONCE_TYPE_FIXED = 3;
 }
+
+// EncryptionType selects the encryption scheme used on top of the
+// mieru protocol. The default (XCHACHA20_POLY1305) preserves existing
+// behaviour: three rotating 32-byte keys derived from the shared
+// password via PBKDF2 drive an XChaCha20-Poly1305 AEAD. NOISE switches
+// the session to a full Noise Protocol Framework handshake whose
+// parameters are described by NoiseConfig.
+//
+// The two modes are mutually exclusive for a given connection. A server
+// may accept both modes simultaneously by listening on different port
+// bindings or by enabling the client-signalled negotiation bit (see
+// docs/noise.md).
+enum EncryptionType {
+
+    // Default password-based XChaCha20-Poly1305 (see docs/protocol.md).
+    ENCRYPTION_TYPE_UNSPECIFIED = 0;
+
+    // Default password-based XChaCha20-Poly1305 (see docs/protocol.md).
+    XCHACHA20_POLY1305 = 1;
+
+    // Noise Protocol Framework handshake + AEAD transport phase.
+    // Configured via NoiseConfig.
+    NOISE = 2;
+}
+
+// NoisePattern enumerates the Noise handshake patterns supported by
+// mieru. Names follow the Noise specification
+// (https://noiseprotocol.org/noise.html#handshake-patterns). Callers
+// that do not care about the specific pattern should pick NOISE_XX:
+// it provides mutual authentication, forward secrecy and does not
+// require the client to know the server static key in advance.
+enum NoisePattern {
+    NOISE_PATTERN_UNSPECIFIED = 0;
+
+    NOISE_NN = 1;  // Unauthenticated, 1-RTT. Suitable for testing only.
+    NOISE_NK = 2;  // Server authenticated, 0-RTT. Client knows server static key.
+    NOISE_NX = 3;  // Server authenticated, 1-RTT. Server transmits static key.
+    NOISE_XN = 4;  // Client authenticated, 1.5-RTT. Client transmits static key.
+    NOISE_XK = 5;  // Mutual authentication, 1-RTT. Client knows server static key.
+    NOISE_XX = 6;  // Mutual authentication, 1.5-RTT. Recommended default.
+    NOISE_IN = 7;  // Client authenticated immediately, 1-RTT.
+    NOISE_IK = 8;  // Mutual authentication, 1-RTT. Client knows server static key.
+    NOISE_IX = 9;  // Mutual authentication, 1-RTT. Client transmits static key first.
+    NOISE_K  = 10; // One-way, both static keys known in advance.
+    NOISE_N  = 11; // One-way, client only needs server static key.
+    NOISE_X  = 12; // One-way, client transmits static key.
+}
+
+// NoiseDH selects the Diffie-Hellman function used in the handshake.
+enum NoiseDH {
+    NOISE_DH_UNSPECIFIED = 0;
+    NOISE_DH_25519       = 1; // Curve25519 (X25519).
+}
+
+// NoiseCipher selects the AEAD cipher used for the transport phase.
+enum NoiseCipher {
+    NOISE_CIPHER_UNSPECIFIED    = 0;
+    NOISE_CIPHER_CHACHA20POLY1305 = 1; // ChaCha20-Poly1305.
+    NOISE_CIPHER_AES256GCM        = 2; // AES-256-GCM.
+}
+
+// NoiseHash selects the hash function used inside the handshake.
+enum NoiseHash {
+    NOISE_HASH_UNSPECIFIED = 0;
+    NOISE_HASH_SHA256      = 1;
+    NOISE_HASH_SHA512      = 2;
+    NOISE_HASH_BLAKE2S     = 3;
+    NOISE_HASH_BLAKE2B     = 4;
+}
+
+// NoiseConfig fully describes a Noise session.
+//
+// When EncryptionType is NOISE, NoiseConfig must be present and valid.
+// Unset fields fall back to sane defaults documented in docs/noise.md:
+// pattern = NOISE_XX, DH = NOISE_DH_25519, cipher =
+// NOISE_CIPHER_CHACHA20POLY1305, hash = NOISE_HASH_SHA256.
+message NoiseConfig {
+
+    // Handshake pattern. Defaults to NOISE_XX.
+    optional NoisePattern pattern = 1;
+
+    // Diffie-Hellman function. Defaults to NOISE_DH_25519.
+    optional NoiseDH dh = 2;
+
+    // AEAD cipher. Defaults to NOISE_CIPHER_CHACHA20POLY1305.
+    optional NoiseCipher cipher = 3;
+
+    // Hash function. Defaults to NOISE_HASH_SHA256.
+    optional NoiseHash hash = 4;
+
+    // Local static private key, hex-encoded (no 0x prefix).
+    // Required when the selected pattern + role combination contains
+    // a local static token. Must decode to 32 bytes for NOISE_DH_25519.
+    optional string localStaticPrivateKey = 5;
+
+    // Local static public key, hex-encoded.
+    // Must be the DH-derived public of localStaticPrivateKey. If empty
+    // and a private key is present, mieru will derive the public key.
+    optional string localStaticPublicKey = 6;
+
+    // Remote static public key, hex-encoded.
+    // Required for patterns where the initiator must already know the
+    // responder's static key (NK, XK, IK, K, N, X). Unused otherwise.
+    optional string remoteStaticPublicKey = 7;
+
+    // Optional 32-byte pre-shared key, hex-encoded.
+    // When set, the pattern is treated as its "psk"-modified variant
+    // and presharedKeyPlacement selects the token position. Leave empty
+    // to use the plain (non-PSK) pattern.
+    optional string presharedKey = 8;
+
+    // Position of the PSK token in the pattern (0-based).
+    // Ignored when presharedKey is empty. For example, presharedKey
+    // combined with placement = 3 selects XXpsk3 when pattern is NOISE_XX.
+    optional int32 presharedKeyPlacement = 9;
+
+    // Optional prologue bytes, hex-encoded. Both sides must supply the
+    // same prologue. When empty, mieru uses the protocol version string
+    // as an implicit prologue to prevent cross-version confusion.
+    optional string prologue = 10;
+}
