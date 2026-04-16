@@ -306,7 +306,7 @@ func TestHandshake_WrongPSK(t *testing.T) {
 // still complete its local state machine, so we only require that at
 // least one side produces an error — and we back that with a short
 // watchdog that closes the pipe in case flynn/noise ever changes that
-// behaviour and both sides end up "happy".
+// behavior and both sides end up "happy".
 func TestHandshake_PrologueMismatch(t *testing.T) {
 	kpI := mustKeypair(t, noise.DH25519)
 	kpR := mustKeypair(t, noise.DH25519)
@@ -493,7 +493,7 @@ func mustKeypair(t *testing.T, dh noise.DH) noise.Keypair {
 // set keys correctly without reaching into unexported methods.
 //
 // Keeping these in the test file (rather than exporting the helper)
-// lets us catch a divergence between documented behaviour and the
+// lets us catch a divergence between documented behavior and the
 // library's internal helpers.
 func needsLocalStatic(cfg noise.Config) bool {
 	switch cfg.Pattern {
