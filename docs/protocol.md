@@ -20,6 +20,8 @@ Since the key depends on the system time, the time difference between the client
 
 The mieru protocol allows the use of any [AEAD](https://en.wikipedia.org/wiki/Authenticated_encryption) algorithm for encryption. The nonce length of the AEAD algorithm must be 24 bytes. The current version of mieru only implements the XChaCha20-Poly1305 algorithm.
 
+To accelerate user lookup, the last 4 bytes of the nonce is replace by the first 4 bytes of a SHA-256 output. The input of SHA-256 is user name concatenate by the first 16 bytes of the nonce.
+
 ## Segment Format
 
 When mieru receives a network access request from a user, it divides the original data stream into small fragments and sends them to the Internet after encryption and encapsulation. The fields and their lengths in each segment are as shown in the following table:

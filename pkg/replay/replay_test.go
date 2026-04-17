@@ -153,7 +153,7 @@ func TestCapacity(t *testing.T) {
 }
 
 func TestExpireInterval(t *testing.T) {
-	cache := replay.NewCache(10, 50*time.Millisecond)
+	cache := replay.NewCache(10, 100*time.Millisecond)
 	a := make([]byte, 256)
 	if _, err := crand.Read(a); err != nil {
 		t.Fatalf("rand.Read() failed: %v", err)
@@ -170,7 +170,7 @@ func TestExpireInterval(t *testing.T) {
 		t.Errorf("cache sizes are %d %d, want 1 0.", curr, prev)
 	}
 
-	time.Sleep(75 * time.Millisecond)
+	time.Sleep(150 * time.Millisecond)
 
 	if res := cache.IsDuplicate(a, replay.EmptyTag); res == false {
 		t.Errorf("IsDuplicate() = false, want true")
@@ -179,7 +179,7 @@ func TestExpireInterval(t *testing.T) {
 		t.Errorf("cache sizes are %d %d, want 1 1.", curr, prev)
 	}
 
-	time.Sleep(150 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	if res := cache.IsDuplicate(b, replay.EmptyTag); res == true {
 		t.Errorf("IsDuplicate() = true, want false")

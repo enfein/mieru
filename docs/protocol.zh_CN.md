@@ -20,6 +20,8 @@ TCP 和 UDP 协议共用同一套密钥生成方法。
 
 mieru 协议允许使用任何 [AEAD](https://en.wikipedia.org/wiki/Authenticated_encryption) 算法进行加密。算法的 nonce 长度必须为 24 字节。当前 mieru 版本只实现了 XChaCha20-Poly1305 算法。
 
+为了加快用户查找，nonce 的最后 4 个字节被替换为 SHA-256 输出的前 4 个字节，其中 SHA-256 的输入是用户名再接上 nonce 的前 16 个字节。
+
 ## 数据段的格式
 
 mieru 收到用户的网络访问请求后，会将原始数据流量切分成小段（fragment），经过加密封装发送到互联网上。每个数据段（segment）中的数据项（field）及其长度如下表所示。

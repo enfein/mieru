@@ -18,32 +18,32 @@ sudo python3 setup.py --lang=zh
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.30.1/mita_3.30.1_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.31.0/mita_3.31.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.30.1/mita_3.30.1_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.31.0/mita_3.31.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.30.1/mita-3.30.1-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.31.0/mita-3.31.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.30.1/mita-3.30.1-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.31.0/mita-3.31.0-1.aarch64.rpm
 ```
 
 ## 安装 mita 软件包
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_3.30.1_amd64.deb
+sudo dpkg -i mita_3.31.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_3.30.1_arm64.deb
+sudo dpkg -i mita_3.31.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-3.30.1-1.x86_64.rpm
+sudo rpm -Uvh --force mita-3.31.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-3.30.1-1.aarch64.rpm
+sudo rpm -Uvh --force mita-3.31.0-1.aarch64.rpm
 ```
 
 上述指令也可以用来升级 mita 软件包的版本。
@@ -313,6 +313,20 @@ Tor 浏览器 -> mieru 客户端 -> GFW -> mita 服务器 -> Tor 网络 -> 目�
             "password": "caiyouxinzhongguo"
         }
     ]
+}
+```
+
+### 用户提示
+
+从 v3.31.0 版本开始，mieru 客户端会发送用户提示，以加速 mita 服务器对网络数据包的解密。代理用户数量较多时，这尤其有帮助。
+
+由于在没有用户提示的情况下 mita 服务器的 CPU 消耗会更高，你可以应用以下配置来屏蔽旧版本的 mieru 客户端。
+
+```
+{
+    "advancedSettings": {
+        "userHintIsMandatory": true
+    }
 }
 ```
 
