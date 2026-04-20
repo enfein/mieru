@@ -400,63 +400,9 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 			if !decrypted {
 				// This is a new session.
 				cipher.ServerIterateDecrypt.Add(1)
-
-				// First, try to narrow down the user using the nonce hint.
-				var hintUsers []*appctlpb.User
-				for _, user := range u.users {
-					if cipher.CheckUserFromHint([]byte(user.GetName()), nonce) {
-						hintUsers = append(hintUsers, user)
-					}
-				}
-				for _, hintUser := range hintUsers {
-					cipher.ServerHintMatchDecrypt.Add(1)
-					var password []byte
-					password, err = hex.DecodeString(hintUser.GetHashedPassword())
-					if err != nil {
-						log.Debugf("Unable to decode hashed password %q from user %q", hintUser.GetHashedPassword(), hintUser.GetName())
-						continue
-					}
-					if len(password) == 0 {
-						password = cipher.HashPassword([]byte(hintUser.GetPassword()), []byte(hintUser.GetName()))
-					}
-					blockCipher, decryptedMeta, err = cipher.TryDecrypt(encryptedMeta, password, true)
-					if err == nil {
-						decrypted = true
-						blockCipher.SetBlockContext(cipher.BlockContext{
-							UserName: hintUser.GetName(),
-						})
-						if u.trafficPattern != nil {
-							blockCipher.SetNoncePattern(u.trafficPattern.GetNonce())
-						}
-						break
-					} else {
-						cipher.ServerFailedHintMatchDecrypt.Add(1)
-					}
-				}
-			}
-
-			if !decrypted && !u.userHintIsMandatory {
-				// Fallback: try all registered users.
-				for _, user := range u.users {
-					var password []byte
-					password, err = hex.DecodeString(user.GetHashedPassword())
-					if err != nil {
-						continue
-					}
-					if len(password) == 0 {
-						password = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
-					}
-					blockCipher, decryptedMeta, err = cipher.TryDecrypt(encryptedMeta, password, true)
-					if err == nil {
-						decrypted = true
-						blockCipher.SetBlockContext(cipher.BlockContext{
-							UserName: user.GetName(),
-						})
-						if u.trafficPattern != nil {
-							blockCipher.SetNoncePattern(u.trafficPattern.GetNonce())
-						}
-						break
-					}
+				blockCipher, decryptedMeta, err = u.serverTryDecryptMetadataForNewSession(encryptedMeta, nonce)
+				if err == nil {
+					decrypted = true
 				}
 			}
 			if !decrypted {
@@ -762,6 +708,69 @@ func (u *PacketUnderlay) writeOneSegment(seg *segment, addr net.Addr) error {
 		return stderror.ErrInvalidArgument
 	}
 	return nil
+}
+
+// serverTryDecryptMetadataForNewSession attempts to decrypt the metadata of a new
+// session by iterating over registered users.
+func (u *PacketUnderlay) serverTryDecryptMetadataForNewSession(encryptedMeta, nonce []byte) (cipher.BlockCipher, []byte, error) {
+	var matchedBlock cipher.BlockCipher
+	var decryptedMeta []byte
+	var matchedUserName string
+
+	// First, try to narrow down the user using the nonce hint.
+	var hintUsers []*appctlpb.User
+	for _, user := range u.users {
+		if cipher.CheckUserFromHint([]byte(user.GetName()), nonce) {
+			hintUsers = append(hintUsers, user)
+		}
+	}
+	for _, hintUser := range hintUsers {
+		cipher.ServerHintMatchDecrypt.Add(1)
+		password, err := hex.DecodeString(hintUser.GetHashedPassword())
+		if err != nil {
+			log.Debugf("Unable to decode hashed password %q from user %q", hintUser.GetHashedPassword(), hintUser.GetName())
+			continue
+		}
+		if len(password) == 0 {
+			password = cipher.HashPassword([]byte(hintUser.GetPassword()), []byte(hintUser.GetName()))
+		}
+		matchedBlock, decryptedMeta, err = cipher.TryDecrypt(encryptedMeta, password, true)
+		if err == nil {
+			matchedUserName = hintUser.GetName()
+			break
+		} else {
+			cipher.ServerFailedHintMatchDecrypt.Add(1)
+		}
+	}
+
+	if matchedBlock == nil && !u.userHintIsMandatory {
+		// Fallback: try all registered users.
+		for _, user := range u.users {
+			password, err := hex.DecodeString(user.GetHashedPassword())
+			if err != nil {
+				continue
+			}
+			if len(password) == 0 {
+				password = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
+			}
+			matchedBlock, decryptedMeta, err = cipher.TryDecrypt(encryptedMeta, password, true)
+			if err == nil {
+				matchedUserName = user.GetName()
+				break
+			}
+		}
+	}
+	if matchedBlock == nil {
+		return nil, nil, fmt.Errorf("cipher.TryDecrypt() failed for all users")
+	}
+
+	matchedBlock.SetBlockContext(cipher.BlockContext{
+		UserName: matchedUserName,
+	})
+	if u.trafficPattern != nil {
+		matchedBlock.SetNoncePattern(u.trafficPattern.GetNonce())
+	}
+	return matchedBlock, decryptedMeta, nil
 }
 
 func (u *PacketUnderlay) cleanSessions() {
