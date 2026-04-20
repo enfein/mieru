@@ -47,6 +47,18 @@ message ServerConfig {
 
     // Fine tune traffic behaviors.
     optional TrafficPattern trafficPattern = 8;
+
+    // Encryption scheme accepted by this server. When unset or set to
+    // ENCRYPTION_TYPE_UNSPECIFIED / XCHACHA20_POLY1305, the default
+    // password-based XChaCha20-Poly1305 is accepted and the NoiseConfig
+    // below is ignored. When set to NOISE, the server only accepts
+    // Noise handshakes matching the NoiseConfig below; see
+    // docs/noise.md.
+    optional EncryptionType encryption = 9;
+
+    // Noise Protocol Framework configuration. Ignored unless
+    // encryption == NOISE.
+    optional NoiseConfig noise = 10;
 }
 
 message ServerAdvancedSettings {

@@ -318,6 +318,308 @@ func (NonceType) EnumDescriptor() ([]byte, []int) {
 	return file_appctl_proto_base_proto_rawDescGZIP(), []int{4}
 }
 
+// EncryptionType selects the encryption scheme used on top of the
+// mieru protocol. The default (XCHACHA20_POLY1305) preserves existing
+// behaviour: three rotating 32-byte keys derived from the shared
+// password via PBKDF2 drive an XChaCha20-Poly1305 AEAD. NOISE switches
+// the session to a full Noise Protocol Framework handshake whose
+// parameters are described by NoiseConfig.
+//
+// The two modes are mutually exclusive for a given connection. A server
+// may accept both modes simultaneously by listening on different port
+// bindings or by enabling the client-signalled negotiation bit (see
+// docs/noise.md).
+type EncryptionType int32
+
+const (
+	// Default password-based XChaCha20-Poly1305 (see docs/protocol.md).
+	EncryptionType_ENCRYPTION_TYPE_UNSPECIFIED EncryptionType = 0
+	// Default password-based XChaCha20-Poly1305 (see docs/protocol.md).
+	EncryptionType_XCHACHA20_POLY1305 EncryptionType = 1
+	// Noise Protocol Framework handshake + AEAD transport phase.
+	// Configured via NoiseConfig.
+	EncryptionType_NOISE EncryptionType = 2
+)
+
+// Enum value maps for EncryptionType.
+var (
+	EncryptionType_name = map[int32]string{
+		0: "ENCRYPTION_TYPE_UNSPECIFIED",
+		1: "XCHACHA20_POLY1305",
+		2: "NOISE",
+	}
+	EncryptionType_value = map[string]int32{
+		"ENCRYPTION_TYPE_UNSPECIFIED": 0,
+		"XCHACHA20_POLY1305":          1,
+		"NOISE":                       2,
+	}
+)
+
+func (x EncryptionType) Enum() *EncryptionType {
+	p := new(EncryptionType)
+	*p = x
+	return p
+}
+
+func (x EncryptionType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (EncryptionType) Descriptor() protoreflect.EnumDescriptor {
+	return file_appctl_proto_base_proto_enumTypes[5].Descriptor()
+}
+
+func (EncryptionType) Type() protoreflect.EnumType {
+	return &file_appctl_proto_base_proto_enumTypes[5]
+}
+
+func (x EncryptionType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use EncryptionType.Descriptor instead.
+func (EncryptionType) EnumDescriptor() ([]byte, []int) {
+	return file_appctl_proto_base_proto_rawDescGZIP(), []int{5}
+}
+
+// NoisePattern enumerates the Noise handshake patterns supported by
+// mieru. Names follow the Noise specification
+// (https://noiseprotocol.org/noise.html#handshake-patterns). Callers
+// that do not care about the specific pattern should pick NOISE_XX:
+// it provides mutual authentication, forward secrecy and does not
+// require the client to know the server static key in advance.
+type NoisePattern int32
+
+const (
+	NoisePattern_NOISE_PATTERN_UNSPECIFIED NoisePattern = 0
+	NoisePattern_NOISE_NN                  NoisePattern = 1  // Unauthenticated, 1-RTT. Suitable for testing only.
+	NoisePattern_NOISE_NK                  NoisePattern = 2  // Server authenticated, 0-RTT. Client knows server static key.
+	NoisePattern_NOISE_NX                  NoisePattern = 3  // Server authenticated, 1-RTT. Server transmits static key.
+	NoisePattern_NOISE_XN                  NoisePattern = 4  // Client authenticated, 1.5-RTT. Client transmits static key.
+	NoisePattern_NOISE_XK                  NoisePattern = 5  // Mutual authentication, 1-RTT. Client knows server static key.
+	NoisePattern_NOISE_XX                  NoisePattern = 6  // Mutual authentication, 1.5-RTT. Recommended default.
+	NoisePattern_NOISE_IN                  NoisePattern = 7  // Client authenticated immediately, 1-RTT.
+	NoisePattern_NOISE_IK                  NoisePattern = 8  // Mutual authentication, 1-RTT. Client knows server static key.
+	NoisePattern_NOISE_IX                  NoisePattern = 9  // Mutual authentication, 1-RTT. Client transmits static key first.
+	NoisePattern_NOISE_K                   NoisePattern = 10 // One-way, both static keys known in advance.
+	NoisePattern_NOISE_N                   NoisePattern = 11 // One-way, client only needs server static key.
+	NoisePattern_NOISE_X                   NoisePattern = 12 // One-way, client transmits static key.
+)
+
+// Enum value maps for NoisePattern.
+var (
+	NoisePattern_name = map[int32]string{
+		0:  "NOISE_PATTERN_UNSPECIFIED",
+		1:  "NOISE_NN",
+		2:  "NOISE_NK",
+		3:  "NOISE_NX",
+		4:  "NOISE_XN",
+		5:  "NOISE_XK",
+		6:  "NOISE_XX",
+		7:  "NOISE_IN",
+		8:  "NOISE_IK",
+		9:  "NOISE_IX",
+		10: "NOISE_K",
+		11: "NOISE_N",
+		12: "NOISE_X",
+	}
+	NoisePattern_value = map[string]int32{
+		"NOISE_PATTERN_UNSPECIFIED": 0,
+		"NOISE_NN":                  1,
+		"NOISE_NK":                  2,
+		"NOISE_NX":                  3,
+		"NOISE_XN":                  4,
+		"NOISE_XK":                  5,
+		"NOISE_XX":                  6,
+		"NOISE_IN":                  7,
+		"NOISE_IK":                  8,
+		"NOISE_IX":                  9,
+		"NOISE_K":                   10,
+		"NOISE_N":                   11,
+		"NOISE_X":                   12,
+	}
+)
+
+func (x NoisePattern) Enum() *NoisePattern {
+	p := new(NoisePattern)
+	*p = x
+	return p
+}
+
+func (x NoisePattern) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (NoisePattern) Descriptor() protoreflect.EnumDescriptor {
+	return file_appctl_proto_base_proto_enumTypes[6].Descriptor()
+}
+
+func (NoisePattern) Type() protoreflect.EnumType {
+	return &file_appctl_proto_base_proto_enumTypes[6]
+}
+
+func (x NoisePattern) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use NoisePattern.Descriptor instead.
+func (NoisePattern) EnumDescriptor() ([]byte, []int) {
+	return file_appctl_proto_base_proto_rawDescGZIP(), []int{6}
+}
+
+// NoiseDH selects the Diffie-Hellman function used in the handshake.
+type NoiseDH int32
+
+const (
+	NoiseDH_NOISE_DH_UNSPECIFIED NoiseDH = 0
+	NoiseDH_NOISE_DH_25519       NoiseDH = 1 // Curve25519 (X25519).
+)
+
+// Enum value maps for NoiseDH.
+var (
+	NoiseDH_name = map[int32]string{
+		0: "NOISE_DH_UNSPECIFIED",
+		1: "NOISE_DH_25519",
+	}
+	NoiseDH_value = map[string]int32{
+		"NOISE_DH_UNSPECIFIED": 0,
+		"NOISE_DH_25519":       1,
+	}
+)
+
+func (x NoiseDH) Enum() *NoiseDH {
+	p := new(NoiseDH)
+	*p = x
+	return p
+}
+
+func (x NoiseDH) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (NoiseDH) Descriptor() protoreflect.EnumDescriptor {
+	return file_appctl_proto_base_proto_enumTypes[7].Descriptor()
+}
+
+func (NoiseDH) Type() protoreflect.EnumType {
+	return &file_appctl_proto_base_proto_enumTypes[7]
+}
+
+func (x NoiseDH) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use NoiseDH.Descriptor instead.
+func (NoiseDH) EnumDescriptor() ([]byte, []int) {
+	return file_appctl_proto_base_proto_rawDescGZIP(), []int{7}
+}
+
+// NoiseCipher selects the AEAD cipher used for the transport phase.
+type NoiseCipher int32
+
+const (
+	NoiseCipher_NOISE_CIPHER_UNSPECIFIED      NoiseCipher = 0
+	NoiseCipher_NOISE_CIPHER_CHACHA20POLY1305 NoiseCipher = 1 // ChaCha20-Poly1305.
+	NoiseCipher_NOISE_CIPHER_AES256GCM        NoiseCipher = 2 // AES-256-GCM.
+)
+
+// Enum value maps for NoiseCipher.
+var (
+	NoiseCipher_name = map[int32]string{
+		0: "NOISE_CIPHER_UNSPECIFIED",
+		1: "NOISE_CIPHER_CHACHA20POLY1305",
+		2: "NOISE_CIPHER_AES256GCM",
+	}
+	NoiseCipher_value = map[string]int32{
+		"NOISE_CIPHER_UNSPECIFIED":      0,
+		"NOISE_CIPHER_CHACHA20POLY1305": 1,
+		"NOISE_CIPHER_AES256GCM":        2,
+	}
+)
+
+func (x NoiseCipher) Enum() *NoiseCipher {
+	p := new(NoiseCipher)
+	*p = x
+	return p
+}
+
+func (x NoiseCipher) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (NoiseCipher) Descriptor() protoreflect.EnumDescriptor {
+	return file_appctl_proto_base_proto_enumTypes[8].Descriptor()
+}
+
+func (NoiseCipher) Type() protoreflect.EnumType {
+	return &file_appctl_proto_base_proto_enumTypes[8]
+}
+
+func (x NoiseCipher) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use NoiseCipher.Descriptor instead.
+func (NoiseCipher) EnumDescriptor() ([]byte, []int) {
+	return file_appctl_proto_base_proto_rawDescGZIP(), []int{8}
+}
+
+// NoiseHash selects the hash function used inside the handshake.
+type NoiseHash int32
+
+const (
+	NoiseHash_NOISE_HASH_UNSPECIFIED NoiseHash = 0
+	NoiseHash_NOISE_HASH_SHA256      NoiseHash = 1
+	NoiseHash_NOISE_HASH_SHA512      NoiseHash = 2
+	NoiseHash_NOISE_HASH_BLAKE2S     NoiseHash = 3
+	NoiseHash_NOISE_HASH_BLAKE2B     NoiseHash = 4
+)
+
+// Enum value maps for NoiseHash.
+var (
+	NoiseHash_name = map[int32]string{
+		0: "NOISE_HASH_UNSPECIFIED",
+		1: "NOISE_HASH_SHA256",
+		2: "NOISE_HASH_SHA512",
+		3: "NOISE_HASH_BLAKE2S",
+		4: "NOISE_HASH_BLAKE2B",
+	}
+	NoiseHash_value = map[string]int32{
+		"NOISE_HASH_UNSPECIFIED": 0,
+		"NOISE_HASH_SHA256":      1,
+		"NOISE_HASH_SHA512":      2,
+		"NOISE_HASH_BLAKE2S":     3,
+		"NOISE_HASH_BLAKE2B":     4,
+	}
+)
+
+func (x NoiseHash) Enum() *NoiseHash {
+	p := new(NoiseHash)
+	*p = x
+	return p
+}
+
+func (x NoiseHash) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (NoiseHash) Descriptor() protoreflect.EnumDescriptor {
+	return file_appctl_proto_base_proto_enumTypes[9].Descriptor()
+}
+
+func (NoiseHash) Type() protoreflect.EnumType {
+	return &file_appctl_proto_base_proto_enumTypes[9]
+}
+
+func (x NoiseHash) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use NoiseHash.Descriptor instead.
+func (NoiseHash) EnumDescriptor() ([]byte, []int) {
+	return file_appctl_proto_base_proto_rawDescGZIP(), []int{9}
+}
+
 type AppStatusMsg struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Status        *AppStatus             `protobuf:"varint,1,opt,name=status,proto3,enum=mieru.appctl.AppStatus,oneof" json:"status,omitempty"`
@@ -857,6 +1159,151 @@ func (x *NoncePattern) GetCustomHexStrings() []string {
 	return nil
 }
 
+// NoiseConfig fully describes a Noise session.
+//
+// When EncryptionType is NOISE, NoiseConfig must be present and valid.
+// Unset fields fall back to sane defaults documented in docs/noise.md:
+// pattern = NOISE_XX, DH = NOISE_DH_25519, cipher =
+// NOISE_CIPHER_CHACHA20POLY1305, hash = NOISE_HASH_SHA256.
+type NoiseConfig struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Handshake pattern. Defaults to NOISE_XX.
+	Pattern *NoisePattern `protobuf:"varint,1,opt,name=pattern,proto3,enum=mieru.appctl.NoisePattern,oneof" json:"pattern,omitempty"`
+	// Diffie-Hellman function. Defaults to NOISE_DH_25519.
+	Dh *NoiseDH `protobuf:"varint,2,opt,name=dh,proto3,enum=mieru.appctl.NoiseDH,oneof" json:"dh,omitempty"`
+	// AEAD cipher. Defaults to NOISE_CIPHER_CHACHA20POLY1305.
+	Cipher *NoiseCipher `protobuf:"varint,3,opt,name=cipher,proto3,enum=mieru.appctl.NoiseCipher,oneof" json:"cipher,omitempty"`
+	// Hash function. Defaults to NOISE_HASH_SHA256.
+	Hash *NoiseHash `protobuf:"varint,4,opt,name=hash,proto3,enum=mieru.appctl.NoiseHash,oneof" json:"hash,omitempty"`
+	// Local static private key, hex-encoded (no 0x prefix).
+	// Required when the selected pattern + role combination contains
+	// a local static token. Must decode to 32 bytes for NOISE_DH_25519.
+	LocalStaticPrivateKey *string `protobuf:"bytes,5,opt,name=localStaticPrivateKey,proto3,oneof" json:"localStaticPrivateKey,omitempty"`
+	// Local static public key, hex-encoded.
+	// Must be the DH-derived public of localStaticPrivateKey. If empty
+	// and a private key is present, mieru will derive the public key.
+	LocalStaticPublicKey *string `protobuf:"bytes,6,opt,name=localStaticPublicKey,proto3,oneof" json:"localStaticPublicKey,omitempty"`
+	// Remote static public key, hex-encoded.
+	// Required for patterns where the initiator must already know the
+	// responder's static key (NK, XK, IK, K, N, X). Unused otherwise.
+	RemoteStaticPublicKey *string `protobuf:"bytes,7,opt,name=remoteStaticPublicKey,proto3,oneof" json:"remoteStaticPublicKey,omitempty"`
+	// Optional 32-byte pre-shared key, hex-encoded.
+	// When set, the pattern is treated as its "psk"-modified variant
+	// and presharedKeyPlacement selects the token position. Leave empty
+	// to use the plain (non-PSK) pattern.
+	PresharedKey *string `protobuf:"bytes,8,opt,name=presharedKey,proto3,oneof" json:"presharedKey,omitempty"`
+	// Position of the PSK token in the pattern (0-based).
+	// Ignored when presharedKey is empty. For example, presharedKey
+	// combined with placement = 3 selects XXpsk3 when pattern is NOISE_XX.
+	PresharedKeyPlacement *int32 `protobuf:"varint,9,opt,name=presharedKeyPlacement,proto3,oneof" json:"presharedKeyPlacement,omitempty"`
+	// Optional prologue bytes, hex-encoded. Both sides must supply the
+	// same prologue. When empty, mieru uses the protocol version string
+	// as an implicit prologue to prevent cross-version confusion.
+	Prologue      *string `protobuf:"bytes,10,opt,name=prologue,proto3,oneof" json:"prologue,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NoiseConfig) Reset() {
+	*x = NoiseConfig{}
+	mi := &file_appctl_proto_base_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NoiseConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NoiseConfig) ProtoMessage() {}
+
+func (x *NoiseConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_appctl_proto_base_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NoiseConfig.ProtoReflect.Descriptor instead.
+func (*NoiseConfig) Descriptor() ([]byte, []int) {
+	return file_appctl_proto_base_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *NoiseConfig) GetPattern() NoisePattern {
+	if x != nil && x.Pattern != nil {
+		return *x.Pattern
+	}
+	return NoisePattern_NOISE_PATTERN_UNSPECIFIED
+}
+
+func (x *NoiseConfig) GetDh() NoiseDH {
+	if x != nil && x.Dh != nil {
+		return *x.Dh
+	}
+	return NoiseDH_NOISE_DH_UNSPECIFIED
+}
+
+func (x *NoiseConfig) GetCipher() NoiseCipher {
+	if x != nil && x.Cipher != nil {
+		return *x.Cipher
+	}
+	return NoiseCipher_NOISE_CIPHER_UNSPECIFIED
+}
+
+func (x *NoiseConfig) GetHash() NoiseHash {
+	if x != nil && x.Hash != nil {
+		return *x.Hash
+	}
+	return NoiseHash_NOISE_HASH_UNSPECIFIED
+}
+
+func (x *NoiseConfig) GetLocalStaticPrivateKey() string {
+	if x != nil && x.LocalStaticPrivateKey != nil {
+		return *x.LocalStaticPrivateKey
+	}
+	return ""
+}
+
+func (x *NoiseConfig) GetLocalStaticPublicKey() string {
+	if x != nil && x.LocalStaticPublicKey != nil {
+		return *x.LocalStaticPublicKey
+	}
+	return ""
+}
+
+func (x *NoiseConfig) GetRemoteStaticPublicKey() string {
+	if x != nil && x.RemoteStaticPublicKey != nil {
+		return *x.RemoteStaticPublicKey
+	}
+	return ""
+}
+
+func (x *NoiseConfig) GetPresharedKey() string {
+	if x != nil && x.PresharedKey != nil {
+		return *x.PresharedKey
+	}
+	return ""
+}
+
+func (x *NoiseConfig) GetPresharedKeyPlacement() int32 {
+	if x != nil && x.PresharedKeyPlacement != nil {
+		return *x.PresharedKeyPlacement
+	}
+	return 0
+}
+
+func (x *NoiseConfig) GetPrologue() string {
+	if x != nil && x.Prologue != nil {
+		return *x.Prologue
+	}
+	return ""
+}
+
 var File_appctl_proto_base_proto protoreflect.FileDescriptor
 
 const file_appctl_proto_base_proto_rawDesc = "" +
@@ -922,7 +1369,30 @@ const file_appctl_proto_base_proto_rawDesc = "" +
 	"\x05_typeB\x16\n" +
 	"\x14_applyToAllUDPPacketB\t\n" +
 	"\a_minLenB\t\n" +
-	"\a_maxLen*K\n" +
+	"\a_maxLen\"\xbe\x05\n" +
+	"\vNoiseConfig\x129\n" +
+	"\apattern\x18\x01 \x01(\x0e2\x1a.mieru.appctl.NoisePatternH\x00R\apattern\x88\x01\x01\x12*\n" +
+	"\x02dh\x18\x02 \x01(\x0e2\x15.mieru.appctl.NoiseDHH\x01R\x02dh\x88\x01\x01\x126\n" +
+	"\x06cipher\x18\x03 \x01(\x0e2\x19.mieru.appctl.NoiseCipherH\x02R\x06cipher\x88\x01\x01\x120\n" +
+	"\x04hash\x18\x04 \x01(\x0e2\x17.mieru.appctl.NoiseHashH\x03R\x04hash\x88\x01\x01\x129\n" +
+	"\x15localStaticPrivateKey\x18\x05 \x01(\tH\x04R\x15localStaticPrivateKey\x88\x01\x01\x127\n" +
+	"\x14localStaticPublicKey\x18\x06 \x01(\tH\x05R\x14localStaticPublicKey\x88\x01\x01\x129\n" +
+	"\x15remoteStaticPublicKey\x18\a \x01(\tH\x06R\x15remoteStaticPublicKey\x88\x01\x01\x12'\n" +
+	"\fpresharedKey\x18\b \x01(\tH\aR\fpresharedKey\x88\x01\x01\x129\n" +
+	"\x15presharedKeyPlacement\x18\t \x01(\x05H\bR\x15presharedKeyPlacement\x88\x01\x01\x12\x1f\n" +
+	"\bprologue\x18\n" +
+	" \x01(\tH\tR\bprologue\x88\x01\x01B\n" +
+	"\n" +
+	"\b_patternB\x05\n" +
+	"\x03_dhB\t\n" +
+	"\a_cipherB\a\n" +
+	"\x05_hashB\x18\n" +
+	"\x16_localStaticPrivateKeyB\x17\n" +
+	"\x15_localStaticPublicKeyB\x18\n" +
+	"\x16_remoteStaticPublicKeyB\x0f\n" +
+	"\r_presharedKeyB\x18\n" +
+	"\x16_presharedKeyPlacementB\v\n" +
+	"\t_prologue*K\n" +
 	"\tAppStatus\x12\v\n" +
 	"\aUNKNOWN\x10\x00\x12\b\n" +
 	"\x04IDLE\x10\x01\x12\f\n" +
@@ -951,7 +1421,39 @@ const file_appctl_proto_base_proto_rawDesc = "" +
 	"\x11NONCE_TYPE_RANDOM\x10\x00\x12\x18\n" +
 	"\x14NONCE_TYPE_PRINTABLE\x10\x01\x12\x1f\n" +
 	"\x1bNONCE_TYPE_PRINTABLE_SUBSET\x10\x02\x12\x14\n" +
-	"\x10NONCE_TYPE_FIXED\x10\x03B0Z.github.com/enfein/mieru/v3/pkg/appctl/appctlpbb\x06proto3"
+	"\x10NONCE_TYPE_FIXED\x10\x03*T\n" +
+	"\x0eEncryptionType\x12\x1f\n" +
+	"\x1bENCRYPTION_TYPE_UNSPECIFIED\x10\x00\x12\x16\n" +
+	"\x12XCHACHA20_POLY1305\x10\x01\x12\t\n" +
+	"\x05NOISE\x10\x02*\xd2\x01\n" +
+	"\fNoisePattern\x12\x1d\n" +
+	"\x19NOISE_PATTERN_UNSPECIFIED\x10\x00\x12\f\n" +
+	"\bNOISE_NN\x10\x01\x12\f\n" +
+	"\bNOISE_NK\x10\x02\x12\f\n" +
+	"\bNOISE_NX\x10\x03\x12\f\n" +
+	"\bNOISE_XN\x10\x04\x12\f\n" +
+	"\bNOISE_XK\x10\x05\x12\f\n" +
+	"\bNOISE_XX\x10\x06\x12\f\n" +
+	"\bNOISE_IN\x10\a\x12\f\n" +
+	"\bNOISE_IK\x10\b\x12\f\n" +
+	"\bNOISE_IX\x10\t\x12\v\n" +
+	"\aNOISE_K\x10\n" +
+	"\x12\v\n" +
+	"\aNOISE_N\x10\v\x12\v\n" +
+	"\aNOISE_X\x10\f*7\n" +
+	"\aNoiseDH\x12\x18\n" +
+	"\x14NOISE_DH_UNSPECIFIED\x10\x00\x12\x12\n" +
+	"\x0eNOISE_DH_25519\x10\x01*j\n" +
+	"\vNoiseCipher\x12\x1c\n" +
+	"\x18NOISE_CIPHER_UNSPECIFIED\x10\x00\x12!\n" +
+	"\x1dNOISE_CIPHER_CHACHA20POLY1305\x10\x01\x12\x1a\n" +
+	"\x16NOISE_CIPHER_AES256GCM\x10\x02*\x85\x01\n" +
+	"\tNoiseHash\x12\x1a\n" +
+	"\x16NOISE_HASH_UNSPECIFIED\x10\x00\x12\x15\n" +
+	"\x11NOISE_HASH_SHA256\x10\x01\x12\x15\n" +
+	"\x11NOISE_HASH_SHA512\x10\x02\x12\x16\n" +
+	"\x12NOISE_HASH_BLAKE2S\x10\x03\x12\x16\n" +
+	"\x12NOISE_HASH_BLAKE2B\x10\x04B0Z.github.com/enfein/mieru/v3/pkg/appctl/appctlpbb\x06proto3"
 
 var (
 	file_appctl_proto_base_proto_rawDescOnce sync.Once
@@ -965,35 +1467,45 @@ func file_appctl_proto_base_proto_rawDescGZIP() []byte {
 	return file_appctl_proto_base_proto_rawDescData
 }
 
-var file_appctl_proto_base_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_appctl_proto_base_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_appctl_proto_base_proto_enumTypes = make([]protoimpl.EnumInfo, 10)
+var file_appctl_proto_base_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_appctl_proto_base_proto_goTypes = []any{
 	(AppStatus)(0),         // 0: mieru.appctl.AppStatus
 	(LoggingLevel)(0),      // 1: mieru.appctl.LoggingLevel
 	(DualStack)(0),         // 2: mieru.appctl.DualStack
 	(TransportProtocol)(0), // 3: mieru.appctl.TransportProtocol
 	(NonceType)(0),         // 4: mieru.appctl.NonceType
-	(*AppStatusMsg)(nil),   // 5: mieru.appctl.AppStatusMsg
-	(*PortBinding)(nil),    // 6: mieru.appctl.PortBinding
-	(*User)(nil),           // 7: mieru.appctl.User
-	(*Quota)(nil),          // 8: mieru.appctl.Quota
-	(*Auth)(nil),           // 9: mieru.appctl.Auth
-	(*TrafficPattern)(nil), // 10: mieru.appctl.TrafficPattern
-	(*TCPFragment)(nil),    // 11: mieru.appctl.TCPFragment
-	(*NoncePattern)(nil),   // 12: mieru.appctl.NoncePattern
+	(EncryptionType)(0),    // 5: mieru.appctl.EncryptionType
+	(NoisePattern)(0),      // 6: mieru.appctl.NoisePattern
+	(NoiseDH)(0),           // 7: mieru.appctl.NoiseDH
+	(NoiseCipher)(0),       // 8: mieru.appctl.NoiseCipher
+	(NoiseHash)(0),         // 9: mieru.appctl.NoiseHash
+	(*AppStatusMsg)(nil),   // 10: mieru.appctl.AppStatusMsg
+	(*PortBinding)(nil),    // 11: mieru.appctl.PortBinding
+	(*User)(nil),           // 12: mieru.appctl.User
+	(*Quota)(nil),          // 13: mieru.appctl.Quota
+	(*Auth)(nil),           // 14: mieru.appctl.Auth
+	(*TrafficPattern)(nil), // 15: mieru.appctl.TrafficPattern
+	(*TCPFragment)(nil),    // 16: mieru.appctl.TCPFragment
+	(*NoncePattern)(nil),   // 17: mieru.appctl.NoncePattern
+	(*NoiseConfig)(nil),    // 18: mieru.appctl.NoiseConfig
 }
 var file_appctl_proto_base_proto_depIdxs = []int32{
 	0,  // 0: mieru.appctl.AppStatusMsg.status:type_name -> mieru.appctl.AppStatus
 	3,  // 1: mieru.appctl.PortBinding.protocol:type_name -> mieru.appctl.TransportProtocol
-	8,  // 2: mieru.appctl.User.quotas:type_name -> mieru.appctl.Quota
-	11, // 3: mieru.appctl.TrafficPattern.tcpFragment:type_name -> mieru.appctl.TCPFragment
-	12, // 4: mieru.appctl.TrafficPattern.nonce:type_name -> mieru.appctl.NoncePattern
+	13, // 2: mieru.appctl.User.quotas:type_name -> mieru.appctl.Quota
+	16, // 3: mieru.appctl.TrafficPattern.tcpFragment:type_name -> mieru.appctl.TCPFragment
+	17, // 4: mieru.appctl.TrafficPattern.nonce:type_name -> mieru.appctl.NoncePattern
 	4,  // 5: mieru.appctl.NoncePattern.type:type_name -> mieru.appctl.NonceType
-	6,  // [6:6] is the sub-list for method output_type
-	6,  // [6:6] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	6,  // 6: mieru.appctl.NoiseConfig.pattern:type_name -> mieru.appctl.NoisePattern
+	7,  // 7: mieru.appctl.NoiseConfig.dh:type_name -> mieru.appctl.NoiseDH
+	8,  // 8: mieru.appctl.NoiseConfig.cipher:type_name -> mieru.appctl.NoiseCipher
+	9,  // 9: mieru.appctl.NoiseConfig.hash:type_name -> mieru.appctl.NoiseHash
+	10, // [10:10] is the sub-list for method output_type
+	10, // [10:10] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_appctl_proto_base_proto_init() }
@@ -1009,13 +1521,14 @@ func file_appctl_proto_base_proto_init() {
 	file_appctl_proto_base_proto_msgTypes[5].OneofWrappers = []any{}
 	file_appctl_proto_base_proto_msgTypes[6].OneofWrappers = []any{}
 	file_appctl_proto_base_proto_msgTypes[7].OneofWrappers = []any{}
+	file_appctl_proto_base_proto_msgTypes[8].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_appctl_proto_base_proto_rawDesc), len(file_appctl_proto_base_proto_rawDesc)),
-			NumEnums:      5,
-			NumMessages:   8,
+			NumEnums:      10,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

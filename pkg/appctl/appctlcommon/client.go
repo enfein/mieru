@@ -138,6 +138,11 @@ func NewClientMuxFromProfile(activeProfile *pb.ClientProfile, dialer apicommon.D
 	}
 	mux = mux.SetClientUserNamePassword(user.GetName(), hashedPassword)
 
+	// Encryption scheme. When NOISE is selected, NoiseConfig must be
+	// present; the Mux performs the handshake on every underlay before
+	// any mieru frame flows.
+	mux = mux.SetEncryption(activeProfile.GetEncryption(), activeProfile.GetNoise())
+
 	// Set multiplex factor.
 	multiplexFactor := 1
 	switch activeProfile.GetMultiplexing().GetLevel() {

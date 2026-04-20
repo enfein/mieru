@@ -154,8 +154,18 @@ type ServerConfig struct {
 	Dns *DNS `protobuf:"bytes,7,opt,name=dns,proto3,oneof" json:"dns,omitempty"`
 	// Fine tune traffic behaviors.
 	TrafficPattern *TrafficPattern `protobuf:"bytes,8,opt,name=trafficPattern,proto3,oneof" json:"trafficPattern,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Encryption scheme accepted by this server. When unset or set to
+	// ENCRYPTION_TYPE_UNSPECIFIED / XCHACHA20_POLY1305, the default
+	// password-based XChaCha20-Poly1305 is accepted and the NoiseConfig
+	// below is ignored. When set to NOISE, the server only accepts
+	// Noise handshakes matching the NoiseConfig below; see
+	// docs/noise.md.
+	Encryption *EncryptionType `protobuf:"varint,9,opt,name=encryption,proto3,enum=mieru.appctl.EncryptionType,oneof" json:"encryption,omitempty"`
+	// Noise Protocol Framework configuration. Ignored unless
+	// encryption == NOISE.
+	Noise         *NoiseConfig `protobuf:"bytes,10,opt,name=noise,proto3,oneof" json:"noise,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ServerConfig) Reset() {
@@ -240,6 +250,20 @@ func (x *ServerConfig) GetDns() *DNS {
 func (x *ServerConfig) GetTrafficPattern() *TrafficPattern {
 	if x != nil {
 		return x.TrafficPattern
+	}
+	return nil
+}
+
+func (x *ServerConfig) GetEncryption() EncryptionType {
+	if x != nil && x.Encryption != nil {
+		return *x.Encryption
+	}
+	return EncryptionType_ENCRYPTION_TYPE_UNSPECIFIED
+}
+
+func (x *ServerConfig) GetNoise() *NoiseConfig {
+	if x != nil {
+		return x.Noise
 	}
 	return nil
 }
@@ -562,7 +586,7 @@ var File_appctl_proto_servercfg_proto protoreflect.FileDescriptor
 
 const file_appctl_proto_servercfg_proto_rawDesc = "" +
 	"\n" +
-	"\x1cappctl/proto/servercfg.proto\x12\fmieru.appctl\x1a\x17appctl/proto/base.proto\"\xa6\x04\n" +
+	"\x1cappctl/proto/servercfg.proto\x12\fmieru.appctl\x1a\x17appctl/proto/base.proto\"\xb8\x05\n" +
 	"\fServerConfig\x12=\n" +
 	"\fportBindings\x18\x01 \x03(\v2\x19.mieru.appctl.PortBindingR\fportBindings\x12(\n" +
 	"\x05users\x18\x02 \x03(\v2\x12.mieru.appctl.UserR\x05users\x12U\n" +
@@ -571,13 +595,20 @@ const file_appctl_proto_servercfg_proto_rawDesc = "" +
 	"\x03mtu\x18\x05 \x01(\x05H\x02R\x03mtu\x88\x01\x01\x121\n" +
 	"\x06egress\x18\x06 \x01(\v2\x14.mieru.appctl.EgressH\x03R\x06egress\x88\x01\x01\x12(\n" +
 	"\x03dns\x18\a \x01(\v2\x11.mieru.appctl.DNSH\x04R\x03dns\x88\x01\x01\x12I\n" +
-	"\x0etrafficPattern\x18\b \x01(\v2\x1c.mieru.appctl.TrafficPatternH\x05R\x0etrafficPattern\x88\x01\x01B\x13\n" +
+	"\x0etrafficPattern\x18\b \x01(\v2\x1c.mieru.appctl.TrafficPatternH\x05R\x0etrafficPattern\x88\x01\x01\x12A\n" +
+	"\n" +
+	"encryption\x18\t \x01(\x0e2\x1c.mieru.appctl.EncryptionTypeH\x06R\n" +
+	"encryption\x88\x01\x01\x124\n" +
+	"\x05noise\x18\n" +
+	" \x01(\v2\x19.mieru.appctl.NoiseConfigH\aR\x05noise\x88\x01\x01B\x13\n" +
 	"\x11_advancedSettingsB\x0f\n" +
 	"\r_loggingLevelB\x06\n" +
 	"\x04_mtuB\t\n" +
 	"\a_egressB\x06\n" +
 	"\x04_dnsB\x11\n" +
-	"\x0f_trafficPattern\"\xc5\x01\n" +
+	"\x0f_trafficPatternB\r\n" +
+	"\v_encryptionB\b\n" +
+	"\x06_noise\"\xc5\x01\n" +
 	"\x16ServerAdvancedSettings\x12;\n" +
 	"\x16metricsLoggingInterval\x18\x02 \x01(\tH\x00R\x16metricsLoggingInterval\x88\x01\x01\x125\n" +
 	"\x13userHintIsMandatory\x18\x03 \x01(\bH\x01R\x13userHintIsMandatory\x88\x01\x01B\x19\n" +
@@ -647,8 +678,10 @@ var file_appctl_proto_servercfg_proto_goTypes = []any{
 	(*User)(nil),                   // 9: mieru.appctl.User
 	(LoggingLevel)(0),              // 10: mieru.appctl.LoggingLevel
 	(*TrafficPattern)(nil),         // 11: mieru.appctl.TrafficPattern
-	(*Auth)(nil),                   // 12: mieru.appctl.Auth
-	(DualStack)(0),                 // 13: mieru.appctl.DualStack
+	(EncryptionType)(0),            // 12: mieru.appctl.EncryptionType
+	(*NoiseConfig)(nil),            // 13: mieru.appctl.NoiseConfig
+	(*Auth)(nil),                   // 14: mieru.appctl.Auth
+	(DualStack)(0),                 // 15: mieru.appctl.DualStack
 }
 var file_appctl_proto_servercfg_proto_depIdxs = []int32{
 	8,  // 0: mieru.appctl.ServerConfig.portBindings:type_name -> mieru.appctl.PortBinding
@@ -658,17 +691,19 @@ var file_appctl_proto_servercfg_proto_depIdxs = []int32{
 	4,  // 4: mieru.appctl.ServerConfig.egress:type_name -> mieru.appctl.Egress
 	7,  // 5: mieru.appctl.ServerConfig.dns:type_name -> mieru.appctl.DNS
 	11, // 6: mieru.appctl.ServerConfig.trafficPattern:type_name -> mieru.appctl.TrafficPattern
-	5,  // 7: mieru.appctl.Egress.proxies:type_name -> mieru.appctl.EgressProxy
-	6,  // 8: mieru.appctl.Egress.rules:type_name -> mieru.appctl.EgressRule
-	0,  // 9: mieru.appctl.EgressProxy.protocol:type_name -> mieru.appctl.ProxyProtocol
-	12, // 10: mieru.appctl.EgressProxy.socks5Authentication:type_name -> mieru.appctl.Auth
-	1,  // 11: mieru.appctl.EgressRule.action:type_name -> mieru.appctl.EgressAction
-	13, // 12: mieru.appctl.DNS.dualStack:type_name -> mieru.appctl.DualStack
-	13, // [13:13] is the sub-list for method output_type
-	13, // [13:13] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	12, // 7: mieru.appctl.ServerConfig.encryption:type_name -> mieru.appctl.EncryptionType
+	13, // 8: mieru.appctl.ServerConfig.noise:type_name -> mieru.appctl.NoiseConfig
+	5,  // 9: mieru.appctl.Egress.proxies:type_name -> mieru.appctl.EgressProxy
+	6,  // 10: mieru.appctl.Egress.rules:type_name -> mieru.appctl.EgressRule
+	0,  // 11: mieru.appctl.EgressProxy.protocol:type_name -> mieru.appctl.ProxyProtocol
+	14, // 12: mieru.appctl.EgressProxy.socks5Authentication:type_name -> mieru.appctl.Auth
+	1,  // 13: mieru.appctl.EgressRule.action:type_name -> mieru.appctl.EgressAction
+	15, // 14: mieru.appctl.DNS.dualStack:type_name -> mieru.appctl.DualStack
+	15, // [15:15] is the sub-list for method output_type
+	15, // [15:15] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_appctl_proto_servercfg_proto_init() }

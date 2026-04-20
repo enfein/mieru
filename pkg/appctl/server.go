@@ -124,7 +124,8 @@ func (s *serverManagementService) Start(ctx context.Context, req *emptypb.Empty)
 	mux := protocol.NewMux(false).
 		SetTrafficPattern(trafficPattern).
 		SetServerUsers(appctlcommon.UserListToMap(config.GetUsers())).
-		SetServerUserHintIsMandatory(config.GetAdvancedSettings().GetUserHintIsMandatory())
+		SetServerUserHintIsMandatory(config.GetAdvancedSettings().GetUserHintIsMandatory()).
+		SetEncryption(config.GetEncryption(), config.GetNoise())
 	mtu := common.DefaultMTU
 	if config.GetMtu() != 0 {
 		mtu = int(config.GetMtu())

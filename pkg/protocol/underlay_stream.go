@@ -108,6 +108,69 @@ func NewStreamUnderlay(
 	return t, nil
 }
 
+// NewNoiseStreamUnderlay is the client-side constructor that performs
+// a Noise handshake on a freshly dialed TCP connection and returns a
+// StreamUnderlay wired with the derived transport ciphers.
+//
+// Unlike NewStreamUnderlay, no BlockCipher is generated from a
+// password; the returned underlay's send and recv ciphers come
+// directly from the Noise transport phase, so the caller must not
+// pass a password-derived block cipher here.
+//
+// This is a client-only constructor. The server-side equivalent is
+// Mux.serverWrapNoiseTCPConn (see mux.go), which performs the
+// handshake as responder right after accepting the connection.
+func NewNoiseStreamUnderlay(
+	ctx context.Context,
+	dialer apicommon.Dialer,
+	resolver apicommon.DNSResolver,
+	dnsConfig *apicommon.ClientDNSConfig,
+	network string,
+	addr string,
+	mtu int,
+	noiseCfg *appctlpb.NoiseConfig,
+	trafficPattern *appctlpb.TrafficPattern,
+	userName string,
+) (*StreamUnderlay, error) {
+	switch network {
+	case "tcp", "tcp4", "tcp6":
+	default:
+		return nil, fmt.Errorf("network %s is not supported by stream underlay", network)
+	}
+	remote := addr
+	if dnsConfig == nil || (!dnsConfig.BypassDialerDNS) {
+		remoteTCPAddr, err := apicommon.ResolveTCPAddr(ctx, resolver, network, addr)
+		if err != nil {
+			return nil, fmt.Errorf("ResolveTCPAddr() failed: %w", err)
+		}
+		remote = remoteTCPAddr.String()
+	}
+
+	conn, err := dialer.DialContext(ctx, network, remote)
+	if err != nil {
+		return nil, fmt.Errorf("DialContext() failed: %w", err)
+	}
+
+	sendCipher, recvCipher, err := noiseHandshakeStream(conn, noiseCfg, noiseInitiatorRole())
+	if err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("noise handshake failed: %w", err)
+	}
+	if userName != "" {
+		sendCipher.SetBlockContext(cipher.BlockContext{UserName: userName})
+		recvCipher.SetBlockContext(cipher.BlockContext{UserName: userName})
+	}
+
+	t := &StreamUnderlay{
+		baseUnderlay:       *newBaseUnderlay(true, mtu, trafficPattern),
+		conn:               conn,
+		send:               sendCipher,
+		recv:               recvCipher,
+		sessionCleanTicker: time.NewTicker(sessionCleanInterval),
+	}
+	return t, nil
+}
+
 func (t *StreamUnderlay) String() string {
 	if t.conn == nil {
 		return "StreamUnderlay{}"
@@ -365,6 +428,9 @@ func (t *StreamUnderlay) readOneSegment() (*segment, error) {
 	// Decrypt metadata.
 	var decryptedMeta []byte
 	if t.recv == nil && t.isClient {
+		if t.block == nil {
+			return nil, fmt.Errorf("client recv cipher is nil and no block cipher available to clone from")
+		}
 		t.recv = t.block.Clone()
 	}
 	if t.recv == nil {

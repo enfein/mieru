@@ -289,8 +289,17 @@ type ClientProfile struct {
 	HandshakeMode *HandshakeMode `protobuf:"varint,6,opt,name=handshakeMode,proto3,enum=mieru.appctl.HandshakeMode,oneof" json:"handshakeMode,omitempty"`
 	// Fine tune traffic behaviors.
 	TrafficPattern *TrafficPattern `protobuf:"bytes,7,opt,name=trafficPattern,proto3,oneof" json:"trafficPattern,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Encryption scheme used for this profile. When unset or set to
+	// ENCRYPTION_TYPE_UNSPECIFIED / XCHACHA20_POLY1305, the default
+	// password-based XChaCha20-Poly1305 is used and the NoiseConfig
+	// below is ignored. When set to NOISE, the NoiseConfig below must
+	// be present and valid; see docs/noise.md.
+	Encryption *EncryptionType `protobuf:"varint,8,opt,name=encryption,proto3,enum=mieru.appctl.EncryptionType,oneof" json:"encryption,omitempty"`
+	// Noise Protocol Framework configuration. Ignored unless
+	// encryption == NOISE.
+	Noise         *NoiseConfig `protobuf:"bytes,9,opt,name=noise,proto3,oneof" json:"noise,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ClientProfile) Reset() {
@@ -368,6 +377,20 @@ func (x *ClientProfile) GetHandshakeMode() HandshakeMode {
 func (x *ClientProfile) GetTrafficPattern() *TrafficPattern {
 	if x != nil {
 		return x.TrafficPattern
+	}
+	return nil
+}
+
+func (x *ClientProfile) GetEncryption() EncryptionType {
+	if x != nil && x.Encryption != nil {
+		return *x.Encryption
+	}
+	return EncryptionType_ENCRYPTION_TYPE_UNSPECIFIED
+}
+
+func (x *ClientProfile) GetNoise() *NoiseConfig {
+	if x != nil {
+		return x.Noise
 	}
 	return nil
 }
@@ -565,7 +588,7 @@ const file_appctl_proto_clientcfg_proto_rawDesc = "" +
 	"\r_loggingLevelB\x12\n" +
 	"\x10_socks5ListenLANB\x10\n" +
 	"\x0e_httpProxyPortB\x15\n" +
-	"\x13_httpProxyListenLAN\"\xe7\x03\n" +
+	"\x13_httpProxyListenLAN\"\xf9\x04\n" +
 	"\rClientProfile\x12%\n" +
 	"\vprofileName\x18\x01 \x01(\tH\x00R\vprofileName\x88\x01\x01\x12+\n" +
 	"\x04user\x18\x02 \x01(\v2\x12.mieru.appctl.UserH\x01R\x04user\x88\x01\x01\x126\n" +
@@ -573,13 +596,19 @@ const file_appctl_proto_clientcfg_proto_rawDesc = "" +
 	"\x03mtu\x18\x04 \x01(\x05H\x02R\x03mtu\x88\x01\x01\x12I\n" +
 	"\fmultiplexing\x18\x05 \x01(\v2 .mieru.appctl.MultiplexingConfigH\x03R\fmultiplexing\x88\x01\x01\x12F\n" +
 	"\rhandshakeMode\x18\x06 \x01(\x0e2\x1b.mieru.appctl.HandshakeModeH\x04R\rhandshakeMode\x88\x01\x01\x12I\n" +
-	"\x0etrafficPattern\x18\a \x01(\v2\x1c.mieru.appctl.TrafficPatternH\x05R\x0etrafficPattern\x88\x01\x01B\x0e\n" +
+	"\x0etrafficPattern\x18\a \x01(\v2\x1c.mieru.appctl.TrafficPatternH\x05R\x0etrafficPattern\x88\x01\x01\x12A\n" +
+	"\n" +
+	"encryption\x18\b \x01(\x0e2\x1c.mieru.appctl.EncryptionTypeH\x06R\n" +
+	"encryption\x88\x01\x01\x124\n" +
+	"\x05noise\x18\t \x01(\v2\x19.mieru.appctl.NoiseConfigH\aR\x05noise\x88\x01\x01B\x0e\n" +
 	"\f_profileNameB\a\n" +
 	"\x05_userB\x06\n" +
 	"\x04_mtuB\x0f\n" +
 	"\r_multiplexingB\x10\n" +
 	"\x0e_handshakeModeB\x11\n" +
-	"\x0f_trafficPattern\"\xb4\x01\n" +
+	"\x0f_trafficPatternB\r\n" +
+	"\v_encryptionB\b\n" +
+	"\x06_noise\"\xb4\x01\n" +
 	"\x0eServerEndpoint\x12!\n" +
 	"\tipAddress\x18\x01 \x01(\tH\x00R\tipAddress\x88\x01\x01\x12#\n" +
 	"\n" +
@@ -634,7 +663,9 @@ var file_appctl_proto_clientcfg_proto_goTypes = []any{
 	(*Auth)(nil),                   // 8: mieru.appctl.Auth
 	(*User)(nil),                   // 9: mieru.appctl.User
 	(*TrafficPattern)(nil),         // 10: mieru.appctl.TrafficPattern
-	(*PortBinding)(nil),            // 11: mieru.appctl.PortBinding
+	(EncryptionType)(0),            // 11: mieru.appctl.EncryptionType
+	(*NoiseConfig)(nil),            // 12: mieru.appctl.NoiseConfig
+	(*PortBinding)(nil),            // 13: mieru.appctl.PortBinding
 }
 var file_appctl_proto_clientcfg_proto_depIdxs = []int32{
 	3,  // 0: mieru.appctl.ClientConfig.profiles:type_name -> mieru.appctl.ClientProfile
@@ -646,13 +677,15 @@ var file_appctl_proto_clientcfg_proto_depIdxs = []int32{
 	5,  // 6: mieru.appctl.ClientProfile.multiplexing:type_name -> mieru.appctl.MultiplexingConfig
 	1,  // 7: mieru.appctl.ClientProfile.handshakeMode:type_name -> mieru.appctl.HandshakeMode
 	10, // 8: mieru.appctl.ClientProfile.trafficPattern:type_name -> mieru.appctl.TrafficPattern
-	11, // 9: mieru.appctl.ServerEndpoint.portBindings:type_name -> mieru.appctl.PortBinding
-	0,  // 10: mieru.appctl.MultiplexingConfig.level:type_name -> mieru.appctl.MultiplexingLevel
-	11, // [11:11] is the sub-list for method output_type
-	11, // [11:11] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	11, // 9: mieru.appctl.ClientProfile.encryption:type_name -> mieru.appctl.EncryptionType
+	12, // 10: mieru.appctl.ClientProfile.noise:type_name -> mieru.appctl.NoiseConfig
+	13, // 11: mieru.appctl.ServerEndpoint.portBindings:type_name -> mieru.appctl.PortBinding
+	0,  // 12: mieru.appctl.MultiplexingConfig.level:type_name -> mieru.appctl.MultiplexingLevel
+	13, // [13:13] is the sub-list for method output_type
+	13, // [13:13] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_appctl_proto_clientcfg_proto_init() }

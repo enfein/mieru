@@ -105,6 +105,38 @@ func NewPacketUnderlay(
 	return u, nil
 }
 
+// NewPacketUnderlayWithConn constructs a client-side PacketUnderlay
+// around an already-opened net.PacketConn. Unlike NewPacketUnderlay,
+// it does not dial the remote itself; the caller is responsible for
+// producing a PacketConn whose WriteTo/ReadFrom already target the
+// desired peer (typically a noise-wrapped UDP connection produced by
+// dialNoiseUDP).
+//
+// Used by the Noise+UDP path on the client side: the raw UDP socket
+// is wrapped by noiseUDPClientConn, which performs the handshake and
+// then behaves as a plain PacketConn speaking to one peer.
+func NewPacketUnderlayWithConn(
+	ctx context.Context,
+	conn net.PacketConn,
+	remoteAddr net.Addr,
+	mtu int,
+	block cipher.BlockCipher,
+	trafficPattern *appctlpb.TrafficPattern,
+) (*PacketUnderlay, error) {
+	if !block.IsStateless() {
+		return nil, fmt.Errorf("packet underlay block cipher must be stateless")
+	}
+	u := &PacketUnderlay{
+		baseUnderlay:       *newBaseUnderlay(true, mtu, trafficPattern),
+		conn:               conn,
+		sessionCleanTicker: time.NewTicker(sessionCleanInterval),
+		serverAddr:         remoteAddr,
+		block:              block,
+	}
+	u.scheduler.SetRemainingTime(cipher.KeyRefreshInterval / 2)
+	return u, nil
+}
+
 func (u *PacketUnderlay) String() string {
 	if u.conn == nil {
 		return "PacketUnderlay{}"
@@ -420,6 +452,8 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 						password = cipher.HashPassword([]byte(hintUser.GetPassword()), []byte(hintUser.GetName()))
 					}
 					blockCipher, decryptedMeta, err = cipher.TryDecrypt(encryptedMeta, password, true)
+					if err != nil {
+					}
 					if err == nil {
 						decrypted = true
 						blockCipher.SetBlockContext(cipher.BlockContext{
