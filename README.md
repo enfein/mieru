@@ -32,13 +32,13 @@ The mieru proxy software suite consists of two parts, a client software called m
   - [Mihomo Party](https://mihomo.party/)
   - [NyameBox](https://qr243vbi.github.io/nekobox/#/) - a fork of NekoBox
 - Android
+  - [ClashFest](https://github.com/Nemu-x/ClashFest)
   - [ClashMetaForAndroid](https://github.com/MetaCubeX/ClashMetaForAndroid)
   - [ClashMi](https://clashmi.app/)
   - [Exclave](https://github.com/dyhkwong/Exclave)
   - [husi](https://github.com/xchacha20-poly1305/husi) + [mieru plugin](https://github.com/xchacha20-poly1305/husi/releases?q=plugin-mieru)
   - [Karing](https://karing.app/)
   - [NekoBoxForAndroid](https://github.com/MatsuriDayo/NekoBoxForAndroid) + [mieru plugin](https://github.com/enfein/NekoBoxPlugins)
-  - [ClashFest](https://github.com/Nemu-x/ClashFest)
 - iOS
   - [ClashMi](https://clashmi.app/)
   - [Karing](https://karing.app/)
