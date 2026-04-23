@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"net"
 	"testing"
@@ -16,6 +17,12 @@ import (
 	"github.com/enfein/mieru/v3/pkg/stderror"
 	"github.com/enfein/mieru/v3/pkg/testtool"
 )
+
+type failResolver struct{}
+
+func (r failResolver) LookupIP(_ context.Context, _ string, host string) ([]net.IP, error) {
+	return nil, fmt.Errorf("unexpected DNS lookup for %s", host)
+}
 
 func TestHandleConnect(t *testing.T) {
 	// Create a local listener as the destination target.
@@ -58,6 +65,93 @@ func TestHandleConnect(t *testing.T) {
 	defer clientConn.Close()
 
 	clientConn.Write([]byte{constant.Socks5Version, constant.Socks5ConnectCmd, 0, constant.Socks5IPv4Address, 127, 0, 0, 1})
+	port := []byte{0, 0}
+	binary.BigEndian.PutUint16(port, uint16(dstAddr.Port))
+	clientConn.Write(port)
+	clientConn.Write([]byte("ping"))
+
+	// Socks server handles the request.
+	go func() {
+		req, err := s.readRequest(serverConn)
+		if err != nil {
+			t.Errorf("NewRequest() failed: %v", err)
+		}
+		if err := s.handleRequest(context.Background(), req, serverConn); err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
+			t.Errorf("handleRequest() failed: %v", err)
+		}
+	}()
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify response from socks server.
+	out := make([]byte, 14)
+	if _, err := io.ReadFull(clientConn, out); err != nil {
+		t.Fatalf("io.ReadFull() failed: %v", err)
+	}
+	want := []byte{
+		constant.Socks5Version, constant.Socks5ReplySuccess, 0, constant.Socks5IPv4Address,
+		127, 0, 0, 1,
+		0, 0,
+		'p', 'o', 'n', 'g',
+	}
+
+	// Ignore the port number before comparing the result.
+	out[8] = 0
+	out[9] = 0
+
+	if !bytes.Equal(out, want) {
+		t.Fatalf("got %v, want %v", out, want)
+	}
+}
+
+func TestHandleConnectWithDNSHostMapping(t *testing.T) {
+	// Create a local listener as the destination target.
+	dst, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("net.Listen() failed: %v", err)
+	}
+	defer dst.Close()
+	go func() {
+		conn, err := dst.Accept()
+		if err != nil {
+			t.Errorf("Accept() failed: %v", err)
+			return
+		}
+		defer conn.Close()
+
+		buf := make([]byte, 4)
+		if _, err := io.ReadFull(conn, buf); err != nil {
+			t.Errorf("io.ReadFull() failed: %v", err)
+			return
+		}
+		if !bytes.Equal(buf, []byte("ping")) {
+			t.Errorf("got %v, want %v", buf, []byte("ping"))
+			return
+		}
+		conn.Write([]byte("pong"))
+	}()
+	dstAddr := dst.Addr().(*net.TCPAddr)
+
+	// Create a socks server with DNS host mapping.
+	s := &Server{
+		config: &Config{
+			AllowLoopbackDestination: true,
+			Resolver: apicommon.HostMapResolver{
+				Resolver: failResolver{},
+				Hosts: map[string]net.IP{
+					apicommon.NormalizeDomainName("Study.OK.Com"): net.IPv4(127, 0, 0, 1),
+				},
+			},
+		},
+	}
+
+	// Create the connect request.
+	clientConn, serverConn := testtool.BufPipe()
+	defer serverConn.Close()
+	defer clientConn.Close()
+
+	hostName := "study.ok.com"
+	clientConn.Write([]byte{constant.Socks5Version, constant.Socks5ConnectCmd, 0, constant.Socks5FQDNAddress, byte(len(hostName))})
+	clientConn.Write([]byte(hostName))
 	port := []byte{0, 0}
 	binary.BigEndian.PutUint16(port, uint16(dstAddr.Port))
 	clientConn.Write(port)

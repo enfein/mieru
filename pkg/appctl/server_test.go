@@ -227,6 +227,19 @@ func TestServerApplyReject(t *testing.T) {
 			wantErrString: "user name is not set",
 		},
 		{
+			name: "invalid_dns_host_ip",
+			config: func() *pb.ServerConfig {
+				c := validConfig()
+				c.Dns = &pb.DNS{
+					Hosts: map[string]string{
+						"study.ok.com": "bad-ip",
+					},
+				}
+				return c
+			}(),
+			wantErrString: `domain name "study.ok.com" has invalid IP address "bad-ip"`,
+		},
+		{
 			name: "user_name_too_long",
 			config: func() *pb.ServerConfig {
 				c := validConfig()

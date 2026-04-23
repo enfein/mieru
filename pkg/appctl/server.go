@@ -27,6 +27,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/trafficpattern"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlcommon"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlgrpc"
@@ -135,6 +136,11 @@ func (s *serverManagementService) Start(ctx context.Context, req *emptypb.Empty)
 	}
 	mux.SetEndpoints(endpoints)
 
+	dnsHosts, err := appctlcommon.TransformDNSHosts(config.GetDns())
+	if err != nil {
+		return &emptypb.Empty{}, err
+	}
+
 	// Create the egress socks5 server.
 	socks5Config := &socks5.Config{
 		AuthOpts: socks5.Auth{
@@ -143,6 +149,7 @@ func (s *serverManagementService) Start(ctx context.Context, req *emptypb.Empty)
 		DualStackPreference: common.DualStackPreference(config.GetDns().GetDualStack()),
 		Egress:              config.GetEgress(),
 		HandshakeTimeout:    10 * time.Second,
+		Resolver:            apicommon.HostMapResolver{Resolver: &net.Resolver{}, Hosts: dnsHosts},
 		Users:               appctlcommon.UserListToMap(config.GetUsers()),
 	}
 	socks5Server, err := socks5.New(socks5Config)
@@ -582,8 +589,9 @@ func DeleteServerUsers(names []string) error {
 // 5.1. each IP range is either "*" or a valid IP CIDR
 // 5.2. each domain name is not empty, and does not begin or end with a dot
 // 5.3. if the action is "PROXY", the proxy is defined
-// 6. if set, metrics logging interval is valid, and it is not less than 1 second
-// 7. if set, traffic pattern is valid
+// 6. DNS host mapping is valid
+// 7. if set, metrics logging interval is valid, and it is not less than 1 second
+// 8. if set, traffic pattern is valid
 func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 	if _, err := appctlcommon.FlatPortBindings(patch.GetPortBindings()); err != nil {
 		return err
@@ -656,6 +664,9 @@ func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 				return fmt.Errorf("egress rule: proxy name list is not empty for non-PROXY action")
 			}
 		}
+	}
+	if _, err := appctlcommon.TransformDNSHosts(patch.GetDns()); err != nil {
+		return fmt.Errorf("invalid DNS configuration: %w", err)
 	}
 	if patch.GetAdvancedSettings().GetMetricsLoggingInterval() != "" {
 		d, err := time.ParseDuration(patch.GetAdvancedSettings().GetMetricsLoggingInterval())

@@ -17,9 +17,161 @@ package common
 
 import (
 	"context"
+	"errors"
 	"net"
 	"testing"
 )
+
+type testDNSResolver struct {
+	lookupIP func(ctx context.Context, network, host string) ([]net.IP, error)
+}
+
+func (r testDNSResolver) LookupIP(ctx context.Context, network, host string) ([]net.IP, error) {
+	if r.lookupIP == nil {
+		return nil, nil
+	}
+	return r.lookupIP(ctx, network, host)
+}
+
+func TestHostMapResolverLookupIP(t *testing.T) {
+	ipv4 := net.ParseIP("192.0.2.10")
+	ipv6 := net.ParseIP("2001:db8::10")
+
+	testcases := []struct {
+		name     string
+		resolver HostMapResolver
+		network  string
+		host     string
+		expected []net.IP
+		wantErr  error
+	}{
+		{
+			name: "mapped_ipv4_with_normalized_host",
+			resolver: HostMapResolver{
+				Hosts: map[string]net.IP{
+					"example.com": ipv4,
+				},
+			},
+			network:  "",
+			host:     "Example.COM.",
+			expected: []net.IP{net.ParseIP("192.0.2.10")},
+		},
+		{
+			name: "mapped_ipv4_filtered_by_ip4",
+			resolver: HostMapResolver{
+				Hosts: map[string]net.IP{
+					"example.com": ipv4,
+				},
+			},
+			network:  "ip4",
+			host:     "example.com",
+			expected: []net.IP{net.ParseIP("192.0.2.10")},
+		},
+		{
+			name: "mapped_ipv4_filtered_out_by_ip6",
+			resolver: HostMapResolver{
+				Hosts: map[string]net.IP{
+					"example.com": ipv4,
+				},
+			},
+			network:  "ip6",
+			host:     "example.com",
+			expected: nil,
+		},
+		{
+			name: "mapped_ipv6_filtered_by_ip6",
+			resolver: HostMapResolver{
+				Hosts: map[string]net.IP{
+					"example.com": ipv6,
+				},
+			},
+			network:  "ip6",
+			host:     "example.com",
+			expected: []net.IP{net.ParseIP("2001:db8::10")},
+		},
+		{
+			name: "mapped_ipv6_filtered_out_by_ip4",
+			resolver: HostMapResolver{
+				Hosts: map[string]net.IP{
+					"example.com": ipv6,
+				},
+			},
+			network:  "ip4",
+			host:     "example.com",
+			expected: nil,
+		},
+		{
+			name: "unknown_network_on_mapped_host",
+			resolver: HostMapResolver{
+				Hosts: map[string]net.IP{
+					"example.com": ipv4,
+				},
+			},
+			network: "tcp",
+			host:    "example.com",
+			wantErr: net.UnknownNetworkError("tcp"),
+		},
+		{
+			name: "fallback_to_delegate_resolver_on_miss",
+			resolver: HostMapResolver{
+				Hosts: map[string]net.IP{
+					"mapped.example": ipv4,
+				},
+				Resolver: testDNSResolver{
+					lookupIP: func(ctx context.Context, network, host string) ([]net.IP, error) {
+						if network != "ip" {
+							t.Fatalf("LookupIP() network = %q, want %q", network, "ip")
+						}
+						if host != "unmapped.example." {
+							t.Fatalf("LookupIP() host = %q, want %q", host, "unmapped.example.")
+						}
+						return []net.IP{net.ParseIP("198.51.100.20")}, nil
+					},
+				},
+			},
+			network:  "ip",
+			host:     "unmapped.example.",
+			expected: []net.IP{net.ParseIP("198.51.100.20")},
+		},
+		{
+			name: "missing_delegate_returns_error",
+			resolver: HostMapResolver{
+				Hosts: map[string]net.IP{
+					"example.com": ipv4,
+				},
+			},
+			network: "ip",
+			host:    "missing.example",
+			wantErr: errors.New("look up IP address of missing.example is not supported"),
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := tc.resolver.LookupIP(context.Background(), tc.network, tc.host)
+			if tc.wantErr != nil {
+				if err == nil {
+					t.Fatalf("LookupIP() error = nil, want %v", tc.wantErr)
+				}
+				if err.Error() != tc.wantErr.Error() {
+					t.Fatalf("LookupIP() error = %v, want %v", err, tc.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("LookupIP() error = %v", err)
+			}
+			if len(got) != len(tc.expected) {
+				t.Fatalf("LookupIP() len = %d, want %d", len(got), len(tc.expected))
+			}
+			for i := range tc.expected {
+				if !got[i].Equal(tc.expected[i]) {
+					t.Fatalf("LookupIP()[%d] = %v, want %v", i, got[i], tc.expected[i])
+				}
+			}
+		})
+	}
+}
 
 func TestResolveTCPAddr(t *testing.T) {
 	resolver := &net.Resolver{PreferGo: true}

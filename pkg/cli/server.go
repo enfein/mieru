@@ -28,6 +28,7 @@ import (
 	"syscall"
 	"time"
 
+	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/trafficpattern"
 	"github.com/enfein/mieru/v3/pkg/appctl"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlcommon"
@@ -504,6 +505,11 @@ var serverRunFunc = func(s []string) error {
 		}
 		mux.SetEndpoints(endpoints)
 
+		dnsHosts, err := appctlcommon.TransformDNSHosts(config.GetDns())
+		if err != nil {
+			return err
+		}
+
 		// Create the egress socks5 server.
 		socks5Config := &socks5.Config{
 			AuthOpts: socks5.Auth{
@@ -512,6 +518,7 @@ var serverRunFunc = func(s []string) error {
 			DualStackPreference: common.DualStackPreference(config.GetDns().GetDualStack()),
 			Egress:              config.GetEgress(),
 			HandshakeTimeout:    10 * time.Second,
+			Resolver:            apicommon.HostMapResolver{Resolver: &net.Resolver{}, Hosts: dnsHosts},
 			Users:               appctlcommon.UserListToMap(config.GetUsers()),
 		}
 		socks5Server, err := socks5.New(socks5Config)

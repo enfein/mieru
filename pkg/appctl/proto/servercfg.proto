@@ -126,4 +126,7 @@ enum EgressAction {
 message DNS {
     // Pick up IP address from IP version preference.
     optional DualStack dualStack = 1;
+
+    // Static domain to IP mappings, similar to /etc/hosts.
+    map<string, string> hosts = 2;
 }

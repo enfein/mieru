@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 )
 
 // DNSResolver provides a way to look up IP addresses from host name.
@@ -39,6 +40,46 @@ func (r NilDNSResolver) LookupIP(ctx context.Context, network, host string) ([]n
 }
 
 var _ DNSResolver = NilDNSResolver{}
+
+// NormalizeDomainName canonicalizes a domain name for resolver lookups.
+func NormalizeDomainName(host string) string {
+	return strings.TrimSuffix(strings.ToLower(host), ".")
+}
+
+// HostMapResolver consults static host mappings before delegating to Resolver.
+type HostMapResolver struct {
+	Resolver DNSResolver
+	Hosts    map[string]net.IP
+}
+
+var _ DNSResolver = HostMapResolver{}
+
+func (r HostMapResolver) LookupIP(ctx context.Context, network, host string) ([]net.IP, error) {
+	ip, found := r.Hosts[NormalizeDomainName(host)]
+	if found {
+		switch network {
+		case "", "ip":
+			// Return a copy of net.IP object. Same below.
+			return []net.IP{append(net.IP(nil), ip...)}, nil
+		case "ip4":
+			if ipv4 := ip.To4(); ipv4 != nil {
+				return []net.IP{append(net.IP(nil), ipv4...)}, nil
+			}
+			return nil, nil
+		case "ip6":
+			if ipv4 := ip.To4(); ipv4 == nil {
+				return []net.IP{append(net.IP(nil), ip.To16()...)}, nil
+			}
+			return nil, nil
+		default:
+			return nil, net.UnknownNetworkError(network)
+		}
+	}
+	if r.Resolver == nil {
+		return nil, fmt.Errorf("look up IP address of %s is not supported", host)
+	}
+	return r.Resolver.LookupIP(ctx, network, host)
+}
 
 // ClientDNSConfig provides DNS configurations used by proxy client.
 type ClientDNSConfig struct {
