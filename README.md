@@ -31,6 +31,7 @@ The mieru proxy software suite consists of two parts, a client software called m
   - [Clash Verge Rev](https://www.clashverge.dev/)
   - [Mihomo Party](https://mihomo.party/)
   - [NyameBox](https://qr243vbi.github.io/nekobox/#/) - a fork of NekoBox
+  - [SlothClash](https://github.com/Nemu-x/SlothClash)
 - Android
   - [ClashFest](https://github.com/Nemu-x/ClashFest)
   - [ClashMetaForAndroid](https://github.com/MetaCubeX/ClashMetaForAndroid)
