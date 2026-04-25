@@ -33,8 +33,11 @@ __pycache__/
 !/tools/build/README.md
 
 # code editors
-.vscode/
+/.vscode/
 
 # code coverage
 /coverage.out
 /coverage.html
+
+# AI tools
+/.codex
