@@ -47,6 +47,7 @@ func NormalizeDomainName(host string) string {
 }
 
 // HostMapResolver consults static host mappings before delegating to Resolver.
+// It is not safe to modify this object after its first use.
 type HostMapResolver struct {
 	Resolver DNSResolver
 	Hosts    map[string]net.IP

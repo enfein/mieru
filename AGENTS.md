@@ -55,3 +55,5 @@ Use concise Conventional Commit-style prefixes.
 Do not run destructive cleanup such as `make clean` unless explicitly requested.
 
 Avoid editing generated protobuf files by hand; update the source `.proto` and run `make protobuf` instead.
+
+When modifying documentation, also provide a precise Chinese translation of the modified content in related `zh_CN.md` file.

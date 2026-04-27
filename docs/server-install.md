@@ -18,32 +18,32 @@ Or you can manually install and configure proxy server using the steps below.
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.31.0/mita_3.31.0_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.32.0/mita_3.32.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.31.0/mita_3.31.0_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.32.0/mita_3.32.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.31.0/mita-3.31.0-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.32.0/mita-3.32.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.31.0/mita-3.31.0-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.32.0/mita-3.32.0-1.aarch64.rpm
 ```
 
 ## Install mita package
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_3.31.0_amd64.deb
+sudo dpkg -i mita_3.32.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_3.31.0_arm64.deb
+sudo dpkg -i mita_3.32.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-3.31.0-1.x86_64.rpm
+sudo rpm -Uvh --force mita-3.32.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-3.31.0-1.aarch64.rpm
+sudo rpm -Uvh --force mita-3.32.0-1.aarch64.rpm
 ```
 
 Those instructions can also be used to upgrade the version of mita software package.
@@ -242,14 +242,18 @@ Tor browser -> mieru client -> GFW -> mita server -> Tor network -> target websi
 
 For information on how to configure nested proxy on a Tor browser, please refer to the [Security Guide](./security.md).
 
-### DNS Policy in IPv4 / IPv6 Dual-Stack Network
+### DNS Policy
 
-When a proxy client requests a target website using a domain name instead of an IP address, the proxy server needs to initiate a DNS request. If the proxy server is in an IPv4 / IPv6 dual-stack network, you can adjust the DNS policy using the following configuration:
+When a proxy client requests a target website using a domain name instead of an IP address, the proxy server needs to resolve the domain name before connecting to the target website. You can adjust the proxy server DNS policy using the following configuration:
 
 ```js
 {
     "dns": {
-        "dualStack": "USE_FIRST_IP"
+        "dualStack": "USE_FIRST_IP",
+        "hosts": {
+            "example.com": "93.184.216.34",
+            "ipv6.example.com": "2606:2800:220:1:248:1893:25c8:1946"
+        }
     }
 }
 ```
@@ -261,6 +265,10 @@ The `dns` -> `dualStack` attribute supports the following values:
 3. `PREFER_IPv6`: Prefer to use the first IPv6 address returned by the DNS server. If there is no IPv6 address, use the first IPv4 address.
 4. `ONLY_IPv4`: Force to use the first IPv4 address returned by the DNS server. If there is no IPv4 address, the connection fails.
 5. `ONLY_IPv6`: Force to use the first IPv6 address returned by the DNS server. If there is no IPv6 address, the connection fails.
+
+The `dns` -> `hosts` attribute defines static domain name to IP address mappings, similar to `/etc/hosts`. When the proxy server receives a request for a domain name listed in `hosts`, it uses the configured IP address directly instead of querying DNS resolver.
+
+Each key in `hosts` must be a domain name, and each value must be a valid IPv4 or IPv6 address. Domain name matching is exact and case-insensitive. Wildcards and DNS suffix matching are not supported. Domain names must not begin or end with a dot.
 
 ### Allow Users to Access Internal Network
 
