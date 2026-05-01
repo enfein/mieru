@@ -16,8 +16,10 @@
 package socks5
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
+	"fmt"
 	"net"
 	"strconv"
 	"sync"
@@ -25,6 +27,8 @@ import (
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/constant"
+	"github.com/enfein/mieru/v3/apis/model"
+	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
@@ -260,6 +264,131 @@ func RunUDPForwardingLoop(udpConn *net.UDPConn, conn *apicommon.PacketOverStream
 		return err.(error)
 	}
 	return nil
+}
+
+// runUDPAssociateDatagramLoop exchanges RFC 1928 SOCKS5 UDP datagrams between
+// a SOCKS5 proxy client and UDP destinations until the TCP control connection
+// is closed.
+func runUDPAssociateDatagramLoop(udpConn *net.UDPConn, ctrlConn net.Conn, resolver apicommon.DNSResolver) error {
+	if resolver == nil {
+		resolver = &net.Resolver{}
+	}
+
+	var monitorWG sync.WaitGroup
+	monitorWG.Add(1)
+	go func() {
+		defer monitorWG.Done()
+		common.ReadAllAndDiscard(ctrlConn)
+		udpConn.Close()
+	}()
+	defer func() {
+		ctrlConn.Close()
+		udpConn.Close()
+		monitorWG.Wait()
+	}()
+
+	var clientAddr *net.UDPAddr
+	targetAddrs := make(map[string]struct{})
+	buf := make([]byte, 1<<16)
+	for {
+		n, addr, err := udpConn.ReadFromUDP(buf)
+		if err != nil {
+			if !stderror.IsEOF(err) && !stderror.IsClosed(err) {
+				return fmt.Errorf("UDP datagram relay %v ReadFromUDP() failed: %w", udpConn.LocalAddr(), err)
+			}
+			return nil
+		}
+
+		if clientAddr == nil || sameUDPAddr(addr, clientAddr) {
+			dstAddr, payload, err := parseUDPAssociateDatagram(buf[:n], resolver)
+			if err != nil {
+				log.Debugf("UDP datagram relay %v dropped invalid packet from %v: %v", udpConn.LocalAddr(), addr, err)
+				UDPAssociateErrors.Add(1)
+				continue
+			}
+			if clientAddr == nil {
+				clientAddr = cloneUDPAddr(addr)
+			}
+
+			ws, err := udpConn.WriteToUDP(payload, dstAddr)
+			if err != nil {
+				log.Debugf("UDP datagram relay [%v - %v] WriteToUDP() failed: %v", udpConn.LocalAddr(), dstAddr, err)
+				UDPAssociateErrors.Add(1)
+				continue
+			}
+			targetAddrs[dstAddr.String()] = struct{}{}
+			UDPAssociateUploadPackets.Add(1)
+			UDPAssociateUploadBytes.Add(int64(ws))
+			continue
+		}
+
+		if _, ok := targetAddrs[addr.String()]; !ok {
+			log.Debugf("UDP datagram relay %v dropped packet from unexpected endpoint %v", udpConn.LocalAddr(), addr)
+			continue
+		}
+
+		header := udpAddrToHeader(addr)
+		ws, err := udpConn.WriteToUDP(append(header, buf[:n]...), clientAddr)
+		if err != nil {
+			log.Debugf("UDP datagram relay [%v - %v] WriteToUDP() to client failed: %v", udpConn.LocalAddr(), clientAddr, err)
+			UDPAssociateErrors.Add(1)
+			continue
+		}
+		UDPAssociateDownloadPackets.Add(1)
+		UDPAssociateDownloadBytes.Add(int64(ws - len(header)))
+	}
+}
+
+func parseUDPAssociateDatagram(pkt []byte, resolver apicommon.DNSResolver) (*net.UDPAddr, []byte, error) {
+	if len(pkt) <= 6 {
+		return nil, nil, stderror.ErrNoEnoughData
+	}
+	if pkt[0] != 0x00 || pkt[1] != 0x00 {
+		return nil, nil, stderror.ErrInvalidArgument
+	}
+	if pkt[2] != 0x00 {
+		return nil, nil, stderror.ErrUnsupported
+	}
+
+	r := bytes.NewReader(pkt[3:])
+	dst := &model.AddrSpec{}
+	if err := dst.ReadFromSocks5(r); err != nil {
+		return nil, nil, err
+	}
+	headerLen := len(pkt) - r.Len()
+	dstAddr, err := resolveUDPAssociateDatagramAddr(context.Background(), resolver, dst)
+	if err != nil {
+		return nil, nil, err
+	}
+	return dstAddr, pkt[headerLen:], nil
+}
+
+func resolveUDPAssociateDatagramAddr(ctx context.Context, resolver apicommon.DNSResolver, addr *model.AddrSpec) (*net.UDPAddr, error) {
+	if addr.IP.To4() != nil || addr.IP.To16() != nil {
+		return &net.UDPAddr{IP: addr.IP, Port: addr.Port}, nil
+	}
+	if addr.FQDN != "" {
+		return apicommon.ResolveUDPAddr(ctx, resolver, "udp", addr.String())
+	}
+	return nil, model.ErrUnrecognizedAddrType
+}
+
+func cloneUDPAddr(addr *net.UDPAddr) *net.UDPAddr {
+	if addr == nil {
+		return nil
+	}
+	return &net.UDPAddr{
+		IP:   append(net.IP(nil), addr.IP...),
+		Port: addr.Port,
+		Zone: addr.Zone,
+	}
+}
+
+func sameUDPAddr(a, b *net.UDPAddr) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.Port == b.Port && a.Zone == b.Zone && a.IP.Equal(b.IP)
 }
 
 // udpAddrToHeader returns a UDP associate header with the given

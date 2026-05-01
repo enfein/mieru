@@ -607,7 +607,7 @@ var clientRunFunc = func(s []string) error {
 			ClientSideAuthentication: true,
 			IngressCredentials:       socks5IngressCredentials,
 		},
-		ProxyMux:         mux,
+		ProxyDialer:      mux,
 		Resolver:         resolver,
 		HandshakeTimeout: 10 * time.Second,
 	}

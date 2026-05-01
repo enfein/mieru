@@ -383,6 +383,7 @@ test-binary:
 	CGO_ENABLED=0 go build -o bin/exampleapiclient test/cmd/exampleapiclient/exampleapiclient.go
 	CGO_ENABLED=0 go build -o bin/exampleapiserver test/cmd/exampleapiserver/exampleapiserver.go
 	CGO_ENABLED=0 go build -o bin/httpserver test/cmd/httpserver/httpserver.go
+	CGO_ENABLED=0 go build -o bin/socks5server test/cmd/socks5server/socks5server.go
 	CGO_ENABLED=0 go build -o bin/sockshttpclient test/cmd/sockshttpclient/sockshttpclient.go
 	CGO_ENABLED=0 go build -o bin/socksudpclient test/cmd/socksudpclient/socksudpclient.go
 	CGO_ENABLED=0 go build -o bin/udpserver test/cmd/udpserver/udpserver.go

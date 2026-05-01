@@ -133,8 +133,15 @@ func (s *Server) handleBind(_ context.Context, _ *model.Request, conn net.Conn) 
 	return nil
 }
 
-// handleAssociate is used to handle a associate command.
-func (s *Server) handleAssociate(ctx context.Context, _ *model.Request, conn net.Conn) error {
+// handleAssociate is used to handle an associate command.
+func (s *Server) handleAssociate(ctx context.Context, req *model.Request, conn net.Conn) error {
+	if s.config.UDPAssociateMode == UDPAssociateModeDatagram {
+		return s.handleAssociateDatagram(ctx, req, conn)
+	}
+	return s.handleAssociatePacketOverStream(ctx, req, conn)
+}
+
+func (s *Server) handleAssociatePacketOverStream(ctx context.Context, _ *model.Request, conn net.Conn) error {
 	// Create a UDP listener on a random port.
 	// All the requests associated to this connection will go through this port.
 	udpListenerAddr, err := apicommon.ResolveUDPAddr(ctx, s.config.Resolver, "udp", common.MaybeDecorateIPv6(common.AllIPAddr())+":0")
@@ -173,6 +180,50 @@ func (s *Server) handleAssociate(ctx context.Context, _ *model.Request, conn net
 	}
 
 	return RunUDPAssociateLoop(udpConn, apicommon.NewPacketOverStreamTunnel(conn), s.config.Resolver)
+}
+
+func (s *Server) handleAssociateDatagram(ctx context.Context, _ *model.Request, conn net.Conn) error {
+	// Create a UDP listener on a random port.
+	// All the requests associated to this connection will go through this port.
+	udpListenerAddr, err := apicommon.ResolveUDPAddr(ctx, s.config.Resolver, "udp", common.MaybeDecorateIPv6(common.AllIPAddr())+":0")
+	if err != nil {
+		UDPAssociateErrors.Add(1)
+		return fmt.Errorf("failed to resolve UDP address: %w", err)
+	}
+	udpConn, err := net.ListenUDP("udp", udpListenerAddr)
+	if err != nil {
+		UDPAssociateErrors.Add(1)
+		return fmt.Errorf("failed to listen UDP: %w", err)
+	}
+
+	local, ok := udpConn.LocalAddr().(*net.UDPAddr)
+	if !ok {
+		udpConn.Close()
+		UDPAssociateErrors.Add(1)
+		return fmt.Errorf("UDP listener local address has unexpected type %T", udpConn.LocalAddr())
+	}
+	bind := model.AddrSpec{IP: socks5UDPAssociateBindIP(conn, local), Port: local.Port}
+	resp := &model.Response{
+		Reply:    constant.Socks5ReplySuccess,
+		BindAddr: bind,
+	}
+	if err := resp.WriteToSocks5(conn); err != nil {
+		udpConn.Close()
+		HandshakeErrors.Add(1)
+		return fmt.Errorf("failed to send reply: %w", err)
+	}
+
+	return runUDPAssociateDatagramLoop(udpConn, conn, s.config.Resolver)
+}
+
+func socks5UDPAssociateBindIP(conn net.Conn, udpLocal *net.UDPAddr) net.IP {
+	if tcpAddr, ok := conn.LocalAddr().(*net.TCPAddr); ok && tcpAddr.IP != nil && !tcpAddr.IP.IsUnspecified() {
+		return tcpAddr.IP
+	}
+	if udpLocal != nil && udpLocal.IP != nil && !udpLocal.IP.IsUnspecified() {
+		return udpLocal.IP
+	}
+	return net.IPv4(0, 0, 0, 0)
 }
 
 func (s *Server) handleForwarding(req *model.Request, conn net.Conn, proxy *appctlpb.EgressProxy) error {

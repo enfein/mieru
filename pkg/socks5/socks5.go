@@ -17,7 +17,6 @@ import (
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/mathext"
 	"github.com/enfein/mieru/v3/pkg/metrics"
-	"github.com/enfein/mieru/v3/pkg/protocol"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
 
@@ -37,10 +36,28 @@ var (
 	UDPAssociateDownloadPackets = metrics.RegisterMetric("socks5 UDP associate", "DownloadPackets", metrics.COUNTER)
 )
 
+// ProxyDialer creates proxy connections for client-side socks5 forwarding.
+type ProxyDialer interface {
+	DialContext(ctx context.Context) (net.Conn, error)
+}
+
+// UDPAssociateMode controls how a SOCKS5 UDP associate request is relayed.
+type UDPAssociateMode int
+
+const (
+	// UDPAssociateModePacketOverStream relays UDP packets through the TCP
+	// control connection using PacketOverStreamTunnel. This is the default
+	// mode used by mieru client and server.
+	UDPAssociateModePacketOverStream UDPAssociateMode = iota
+
+	// UDPAssociateModeDatagram relays UDP packets with a RFC 1928 UDP socket.
+	UDPAssociateModeDatagram
+)
+
 // Config is used to setup and configure a socks5 server.
 type Config struct {
-	// Mieru proxy multiplexer.
-	ProxyMux *protocol.Mux
+	// Proxy dialer used to carry socks5 traffic.
+	ProxyDialer ProxyDialer
 
 	// Authentication options.
 	AuthOpts Auth
@@ -54,6 +71,10 @@ type Config struct {
 
 	// Resolver can be provided to do custom name resolution.
 	Resolver apicommon.DNSResolver
+
+	// UDPAssociateMode controls how SOCKS5 UDP associate requests are relayed.
+	// Zero value defaults to UDPAssociateModePacketOverStream.
+	UDPAssociateMode UDPAssociateMode
 
 	// ---- server only fields ----
 
@@ -89,8 +110,13 @@ type Server struct {
 
 // New creates a new Server and potentially returns an error.
 func New(conf *Config) (*Server, error) {
-	if conf.UseProxy && conf.ProxyMux == nil {
-		return nil, fmt.Errorf("ProxyMux must be set when proxy is enabled")
+	if conf.UseProxy && conf.ProxyDialer == nil {
+		return nil, fmt.Errorf("ProxyDialer must be set when proxy is enabled")
+	}
+	switch conf.UDPAssociateMode {
+	case UDPAssociateModePacketOverStream, UDPAssociateModeDatagram:
+	default:
+		return nil, fmt.Errorf("unsupported UDP associate mode: %d", conf.UDPAssociateMode)
 	}
 
 	// Ensure HandshakeTimeout is not negative.
@@ -111,12 +137,13 @@ func New(conf *Config) (*Server, error) {
 		conf.Egress = &appctlpb.Egress{}
 	}
 
-	return &Server{
+	s := &Server{
 		config:      conf,
 		chAccept:    make(chan net.Conn, 256),
 		chAcceptErr: make(chan error, 1), // non-blocking
 		die:         make(chan struct{}),
-	}, nil
+	}
+	return s, nil
 }
 
 // ListenAndServe is used to create a listener and serve on it.
@@ -202,9 +229,9 @@ func (s *Server) clientServeConn(conn net.Conn) error {
 	ctx := context.Background()
 	var proxyConn net.Conn
 	var err error
-	proxyConn, err = s.config.ProxyMux.DialContext(ctx)
+	proxyConn, err = s.config.ProxyDialer.DialContext(ctx)
 	if err != nil {
-		return fmt.Errorf("mux DialContext() failed: %w", err)
+		return fmt.Errorf("proxy dialer DialContext() failed: %w", err)
 	}
 
 	if !s.config.AuthOpts.ClientSideAuthentication {

@@ -14,6 +14,13 @@ import (
 	"github.com/enfein/mieru/v3/pkg/common"
 )
 
+func TestNewRejectsUnsupportedUDPAssociateMode(t *testing.T) {
+	_, err := New(&Config{UDPAssociateMode: UDPAssociateMode(99)})
+	if err == nil {
+		t.Fatal("New() error = nil, want error")
+	}
+}
+
 func TestSocks5Connect(t *testing.T) {
 	// Create a local listener as the destination target.
 	l, err := net.Listen("tcp", "127.0.0.1:0")
