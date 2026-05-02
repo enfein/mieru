@@ -1,0 +1,70 @@
+name: 'compatibility test'
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Published mieru version to test'
+        required: true
+        default: '3.31.0'
+        type: string
+permissions:
+  contents: read
+jobs:
+  published-client:
+    name: 'published client'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      COMPAT_VERSION: ${{ inputs.version }}
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v6
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Build test binaries
+        run: make test-binary
+      - name: Download published mieru
+        run: |
+          set -euo pipefail
+          if [[ ! "${COMPAT_VERSION}" =~ ^[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+            echo "Invalid version: ${COMPAT_VERSION}" >&2
+            exit 1
+          fi
+          archive="mieru_${COMPAT_VERSION}_linux_amd64.tar.gz"
+          curl --fail --location --show-error --output "/tmp/${archive}" \
+            "https://github.com/enfein/mieru/releases/download/v${COMPAT_VERSION}/${archive}"
+          tar -xzf "/tmp/${archive}" -C bin mieru
+          chmod 755 bin/mieru
+      - name: Run compatibility integration test
+        run: make run-container-test-prebuilt
+  published-server:
+    name: 'published server'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      COMPAT_VERSION: ${{ inputs.version }}
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v6
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Build test binaries
+        run: make test-binary
+      - name: Download published mita
+        run: |
+          set -euo pipefail
+          if [[ ! "${COMPAT_VERSION}" =~ ^[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+            echo "Invalid version: ${COMPAT_VERSION}" >&2
+            exit 1
+          fi
+          archive="mita_${COMPAT_VERSION}_linux_amd64.tar.gz"
+          curl --fail --location --show-error --output "/tmp/${archive}" \
+            "https://github.com/enfein/mieru/releases/download/v${COMPAT_VERSION}/${archive}"
+          tar -xzf "/tmp/${archive}" -C bin mita
+          chmod 755 bin/mita
+      - name: Run compatibility integration test
+        run: make run-container-test-prebuilt

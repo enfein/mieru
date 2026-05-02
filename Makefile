@@ -16,6 +16,7 @@
 ROOT=$(shell git rev-parse --show-toplevel)
 SHORT_SHA=$(shell git rev-parse --short HEAD)
 PROJECT_NAME=$(shell basename "${ROOT}")
+TEST_BINARY_PREREQ = test-binary
 
 # If this version is changed, also change the version in
 #
@@ -390,7 +391,7 @@ test-binary:
 
 # Build docker images to run integration tests.
 .PHONY: test-container-image
-test-container-image: test-binary
+test-container-image: $(TEST_BINARY_PREREQ)
 	docker build -t mieru_basic:${SHORT_SHA} -f test/deploy/basic/Dockerfile .
 	docker build -t mieru_apiclient:${SHORT_SHA} -f test/deploy/apiclient/Dockerfile .
 	docker build -t mieru_apiserver:${SHORT_SHA} -f test/deploy/apiserver/Dockerfile .
@@ -399,6 +400,10 @@ test-container-image: test-binary
 # Run docker integration tests.
 .PHONY: run-container-test
 run-container-test: run-container-test-basic run-container-test-apiclient run-container-test-apiserver run-container-test-proxychain
+
+.PHONY: run-container-test-prebuilt
+run-container-test-prebuilt:
+	$(MAKE) TEST_BINARY_PREREQ= run-container-test
 
 .PHONY: run-container-test-basic
 run-container-test-basic: test-container-image
