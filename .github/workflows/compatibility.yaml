@@ -39,8 +39,8 @@ jobs:
           chmod 755 bin/mieru
       - name: Show build info
         run: |
-          bin/mieru describe build
-          bin/mita describe build
+          bin/mieru version
+          bin/mita version
       - name: Run compatibility integration test
         run: make run-container-test-prebuilt
   published-server:
@@ -72,7 +72,7 @@ jobs:
           chmod 755 bin/mita
       - name: Show build info
         run: |
-          bin/mieru describe build
-          bin/mita describe build
+          bin/mieru version
+          bin/mita version
       - name: Run compatibility integration test
         run: make run-container-test-prebuilt
