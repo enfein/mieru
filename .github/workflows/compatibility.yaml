@@ -37,6 +37,10 @@ jobs:
             "https://github.com/enfein/mieru/releases/download/v${COMPAT_VERSION}/${archive}"
           tar -xzf "/tmp/${archive}" -C bin mieru
           chmod 755 bin/mieru
+      - name: Show build info
+        run: |
+          bin/mieru describe build
+          bin/mita describe build
       - name: Run compatibility integration test
         run: make run-container-test-prebuilt
   published-server:
@@ -66,5 +70,9 @@ jobs:
             "https://github.com/enfein/mieru/releases/download/v${COMPAT_VERSION}/${archive}"
           tar -xzf "/tmp/${archive}" -C bin mita
           chmod 755 bin/mita
+      - name: Show build info
+        run: |
+          bin/mieru describe build
+          bin/mita describe build
       - name: Run compatibility integration test
         run: make run-container-test-prebuilt
