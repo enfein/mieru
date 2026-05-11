@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	mrand "math/rand"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -135,6 +136,7 @@ type Session struct {
 	lastSend               atomic.Uint32 // last segment sequence number sent
 	lastRXTime             atomic.Int64  // last timestamp when a segment is received, in microseconds since Unix epoch
 	lastTXTime             atomic.Int64  // last timestamp when a segment is sent, in microseconds since Unix epoch
+	heartbeatJitter        time.Duration // random jitter added to heartbeat interval to break periodic pattern
 	nextRetransmissionTime atomic.Int64  // time that need to retransmit a segment in sendBuf, in microseconds since Unix epoch
 	ackOnDataRecv          atomic.Bool   // whether ack should be sent due to receive of new data
 	unreadBuf              []byte        // payload removed from the recvQueue that haven't been read by application
@@ -189,6 +191,9 @@ func NewSession(id uint32, isClient bool, mtu int, users map[string]*appctlpb.Us
 	now := time.Now().UnixMicro()
 	s.lastRXTime.Store(now)
 	s.lastTXTime.Store(now)
+	// Add random jitter of [-2s, +2s] to heartbeat interval to prevent
+	// pattern detection based on the fixed 5-second cycle.
+	s.heartbeatJitter = time.Duration(mrand.Intn(5)-2) * time.Second
 	s.remoteWindowSize.Store(minWindowSize)
 	return s
 }
@@ -829,7 +834,8 @@ func (s *Session) runOutputOncePacket() {
 
 	// Send ACK or heartbeat if needed.
 	// ACK is not limited by window.
-	exceedHeartbeatInterval := time.Now().UnixMicro()-s.lastTXTime.Load() > sessionHeartbeatInterval.Microseconds()
+	jitteredInterval := sessionHeartbeatInterval + s.heartbeatJitter
+	exceedHeartbeatInterval := time.Now().UnixMicro()-s.lastTXTime.Load() > jitteredInterval.Microseconds()
 	if s.ackOnDataRecv.Load() || exceedHeartbeatInterval {
 		baseStruct := baseStruct{}
 		if s.isClient {
@@ -858,6 +864,8 @@ func (s *Session) runOutputOncePacket() {
 			s.closeWithError(err)
 		}
 		s.ackOnDataRecv.Store(false)
+		// Re-randomize jitter after each heartbeat to further break periodicity.
+		s.heartbeatJitter = time.Duration(mrand.Intn(5)-2) * time.Second
 	}
 }
 
