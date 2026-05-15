@@ -1,20 +1,59 @@
 # 运营维护与故障排查
 
-## 查看当前客户端与服务器之间的连接
+本指南涵盖 **mita** 服务器和 **mieru** 客户端的监控、诊断和常见问题处理。
 
-可以在客户端运行 `mieru get connections` 指令查看当前客户端与服务器之间的连接。该指令输出的一个示例如下。
+- [查看活跃连接](#查看活跃连接)
+- [检查连通性](#检查连通性)
+- [查看日志](#查看日志)
+- [打开和关闭调试日志](#打开和关闭调试日志)
+- [常见问题速查](#常见问题速查)
+  - [完全无法连接](#症状完全无法连接)
+  - [连接一段时间后断开](#症状连接一段时间后断开)
+  - [速度非常慢](#症状速度非常慢)
+  - [客户端无法启动](#症状客户端无法启动)
+- [配置文件存放位置](#配置文件存放位置)
+- [环境变量](#环境变量)
+- [用户流量与配额](#用户流量与配额)
+- [重置服务器指标](#重置服务器指标)
+- [其他设置](#其他设置)
+
+---
+
+## 查看活跃连接
+
+### 客户端
+
+```sh
+mieru get connections
+```
+
+示例输出：
 
 ```
-SessionID   Protocol  Local       Remote             State        RecvQ+Buf  SendQ+Buf  LastRecv  LastSend
-3078661580  UDP       [::]:34453  12.34.123.45:5852  ESTABLISHED  0+0        0+0        0s (31)   0s (28)
-3408448183  UDP       [::]:34453  12.34.123.45:5852  ESTABLISHED  0+0        0+0        3s (22)   3s (21)
+SessionID    Protocol  Local        Remote              State        RecvQ+Buf  SendQ+Buf  LastRecv  LastSend
+3078661580   UDP       [::]:34453   12.34.123.45:5852   ESTABLISHED  0+0        0+0        0s (31)   0s (28)
+3408448183   UDP       [::]:34453   12.34.123.45:5852   ESTABLISHED  0+0        0+0        3s (22)   3s (21)
 ```
 
-类似的，可以在服务器运行 `mita get connections` 指令查看当前服务器与所有客户端之间的连接。
+### 服务器
 
-## 判断客户端与服务器之间的连接是否正常
+```sh
+mita get connections
+```
 
-要确定连接是否正常，可以查看客户端指标。要获取指标，请运行命令 `mieru get metrics`。在下面的例子中，
+显示所有客户端的当前连接。
+
+---
+
+## 检查连通性
+
+最可靠的端到端验证方式是查看客户端指标。
+
+```sh
+mieru get metrics
+```
+
+示例（节选）：
 
 ```json
 {
@@ -27,130 +66,214 @@ SessionID   Protocol  Local       Remote             State        RecvQ+Buf  Sen
         "CurrEstablished": 2,
         "MaxConn": 35,
         "PassiveOpens": 0
-    },
-    "HTTP proxy": {
-        "ConnErrors": 2,
-        "Requests": 130,
-        "SchemeErrors": 0
-    },
-    "replay": {
-        "KnownSession": 0,
-        "NewSession": 0,
-        "NewSessionDecrypted": 0
-    },
-    "socks5": {
-        "ConnectionRefusedErrors": 0,
-        "DNSResolveErrors": 0,
-        "HandshakeErrors": 1,
-        "HostUnreachableErrors": 0,
-        "NetworkUnreachableErrors": 0,
-        "UDPAssociateErrors": 0,
-        "UnsupportedCommandErrors": 0
-    },
-    "socks5 UDP associate": {
-        "DownloadBytes": 0,
-        "DownloadPackets": 0,
-        "UploadBytes": 0,
-        "UploadPackets": 0
-    },
-    "traffic": {
-        "DownloadBytes": 257341785,
-        "OutputPaddingBytes": 511223,
-        "UploadBytes": 1254325
-    },
-    "underlay": {
-        "ActiveOpens": 16,
-        "CurrEstablished": 7,
-        "MaxConn": 11,
-        "PassiveOpens": 0,
-        "UnderlayMalformedUDP": 0,
-        "UnsolicitedUDP": 0
     }
 }
 ```
 
-如果 `connections` -> `CurrEstablished` 的值不为 0，说明此刻客户端与服务器之间有活跃的连接。如果 `cipher - client` -> `DirectDecrypt` 的值不为 0，说明客户端曾经成功解密了服务器返回的数据包。
+**关键指标：**
 
-## 故障诊断与排查
+| 字段 | 健康值 | 含义 |
+|------|--------|------|
+| `connections` → `CurrEstablished` | > 0 | 当前客户端与服务器之间至少有一条活跃连接。 |
+| `cipher - client` → `DirectDecrypt` | > 0 | 客户端已成功解密服务器返回的数据包。 |
+| `cipher - client` → `FailedDirectDecrypt` | 0 | 无解密失败（时间同步正常，密码匹配）。 |
+| `underlay` → `UnsolicitedUDP` | 0 | 无异常 UDP 包（无重放/探测攻击）。 |
 
-mieru 为了防止 GFW 主动探测，增强了服务器端的隐蔽性，但是也增加了调试的难度。如果你的客户端和服务器之间无法建立连接，从以下几个排查方向入手可能会有所帮助。
+如果 `CurrEstablished` 为 0 但 `DirectDecrypt` > 0，说明连接曾建立但当前处于空闲状态。
 
-1. 服务器是否在正常工作？用 `ping` 指令确认客户端是否可以到达服务器。
-2. mita 代理服务是否已经启动？用 `mita status` 指令查看。
-3. mieru 客户端是否已经启动？用 `mieru status` 指令查看。
-4. 客户端和服务器的设置中，端口号是否相同？用户名是否相同？密码是否相同？用 `mieru describe config` 和 `mita describe config` 查看。
-5. 打开客户端和服务器的调试日志，查看具体的网络连接情况。
+如果 `FailedDirectDecrypt` > 0，最可能的原因：
 
-如果未能解决问题，可以提交 GitHub Issue 联系开发者。
+1. **时钟偏差** — 客户端与服务器系统时间相差超过几分钟。请在两端均启用 NTP。
+2. **凭据错误** — 用户名或密码在客户端与服务器之间不匹配。
+3. **端口/协议错误** — 客户端连接的端口或协议并非服务器正在监听的。
 
-## 配置文件存放地址
+---
 
-代理服务器软件 mita 的配置存放在 `/etc/mita/server.conf.pb`。这是一个以 protocol buffer 格式存储的二进制文件。为保护用户信息，mita 不会存储用户密码的明文，只会存储其校验码。
+## 查看日志
 
-客户端软件 mieru 的配置文件同样是一个二进制文件。它在不同操作系统中存储的位置如下表所示
-
-| 操作系统 | 配置文件位置 | 示例 |
-| :----: | :----: | :----: |
-| Linux | $HOME/.config/mieru/client.conf.pb | /home/enfein/.config/mieru/client.conf.pb |
-| Mac OS | $HOME/Library/Application Support/mieru/client.conf.pb | /Users/enfein/Library/Application Support/mieru/client.conf.pb |
-| Windows | %USERPROFILE%\AppData\Roaming\mieru\client.conf.pb | C:\Users\enfein\AppData\Roaming\mieru\client.conf.pb |
-
-## 查看代理服务器 mita 的日志
-
-用户可以使用下面的指令打印 mita 的近期日志
+### 服务器 (mita)
 
 ```sh
 sudo journalctl -u mita -xe --no-pager
 ```
 
-## 查看客户端 mieru 的日志
+### 客户端 (mieru)
 
-客户端 mieru 的日志存放位置如下表所示
+| 操作系统 | 日志目录 | 示例 |
+|----------|----------|------|
+| Linux | `$HOME/.cache/mieru/` 或 `$XDG_CACHE_HOME/mieru/` | `/home/enfein/.cache/mieru/` |
+| macOS | `$HOME/Library/Caches/mieru/` | `/Users/enfein/Library/Caches/mieru/` |
+| Windows | `%USERPROFILE%\AppData\Local\mieru\` | `C:\Users\enfein\AppData\Local\mieru\` |
 
-| 操作系统 | 日志文件位置 | 示例 |
-| :----: | :----: | :----: |
-| Linux | $HOME/.cache/mieru/ or $XDG_CACHE_HOME/mieru/ | /home/enfein/.cache/mieru/ |
-| Mac OS | $HOME/Library/Caches/mieru/ | /Users/enfein/Library/Caches/mieru/ |
-| Windows | %USERPROFILE%\AppData\Local\mieru\ | C:\Users\enfein\AppData\Local\mieru\ |
+日志文件命名格式：`yyyyMMdd_HHmm_PID.log`。每次重启 mieru 会生成新文件。日志数量过多时，旧文件会被自动清理。
 
-每个日志文件的格式为 `yyyyMMdd_HHmm_PID.log`，其中 `yyyyMMdd_HHmm` 是 mieru 进程启动的时间，`PID` 是进程号码。每次重启 mieru 会生成一个新的日志文件。当日志文件的数量太多时，旧的文件会被自动删除。
+---
 
 ## 打开和关闭调试日志
 
-mieru / mita 在默认的日志等级下，打印的信息非常少，不包含 IP 地址、端口号等敏感信息。如果需要诊断单个网络连接，则需要打开调试日志（debug log）。
+默认情况下，mieru / mita 打印的日志非常少，且不包含 IP 地址、端口号等敏感信息。如需诊断单个网络连接，请打开调试日志。
 
-本项目在 `configs/templates` 目录下提供了快速打开和关闭调试日志的配置文件。请将它们下载到服务器或本地计算机上，并输入以下指令。注意，改变 mieru 的设置后，需要重新启动服务才能生效。
+仓库在 `configs/templates/` 目录下提供了模板文件。
+
+**服务器：**
 
 ```sh
-# enable debug logging
+# 启用
 mita apply config server_enable_debug_logging.json
+mita reload   # 不会中断流量
 
-# OR disable debug logging
+# 关闭
 mita apply config server_disable_debug_logging.json
-
-# This will not interrupt traffic
 mita reload
 ```
 
+**客户端：**
+
 ```sh
-# enable debug logging
+# 启用
 mieru apply config client_enable_debug_logging.json
-
-# OR disable debug logging
-mieru apply config client_disable_debug_logging.json
-
 mieru stop
+mieru start
 
+# 关闭
+mieru apply config client_disable_debug_logging.json
+mieru stop
 mieru start
 ```
 
-所有支持的日志等级包括 `FATAL`, `ERROR`, `WARN`, `INFO`, `DEBUG` 和 `TRACE`。
+所有支持的日志级别：`FATAL`、`ERROR`、`WARN`、`INFO`、`DEBUG`、`TRACE`。
 
-## 修改指标日志输出间隔
+---
 
-mieru / mita 每隔 10 分钟通过日志打印指标信息。如果想要调整这个输出的间隔，请使用下面的设置：
+## 常见问题速查
 
-```js
+### 症状：完全无法连接
+
+| 步骤 | 命令/操作 | 检查内容 |
+|------|-----------|----------|
+| 1 | `ping <server_ip>` | 确认基础网络可达性。 |
+| 2 | `mita status`（服务器端） | 确认代理服务处于 `RUNNING` 状态。 |
+| 3 | `mieru status`（客户端） | 确认客户端已启动。 |
+| 4 | `mieru describe config` 与 `mita describe config` | 对比**端口**、**协议**、**用户名**和**密码**，必须完全一致。 |
+| 5 | `date`（两端均执行） | 确认系统时间偏差在几分钟以内。 |
+| 6 | `mieru get metrics` | 检查 `FailedDirectDecrypt`。若 > 0，请参阅[检查连通性](#检查连通性)。 |
+| 7 | 在两端启用调试日志 | 查找 `handshake`、`cipher` 或 `underlay` 相关错误。 |
+
+### 症状：连接一段时间后断开
+
+| 可能原因 | 如何检查 | 解决方法 |
+|----------|----------|----------|
+| 服务器防火墙关闭了空闲端口 | `mita get connections` → 连接数降为 0 | 使用更大的端口范围，或在应用层启用 keepalive。 |
+| 客户端或服务器重启 | 检查日志时间戳 | 服务器端确保执行 `systemctl enable mita`；客户端配置[开机自启](./client-install.zh_CN.md#开机自启)。 |
+| GFW 限速/QoS | 仅在高峰时段降速 | 改用 UDP 协议或启用流量混淆。 |
+
+### 症状：速度非常慢
+
+| 可能原因 | 如何检查 | 解决方法 |
+|----------|----------|----------|
+| TCP 拥塞控制未使用 BBR | `sysctl net.ipv4.tcp_congestion_control` | 运行 [BBR 脚本](./server-install.zh_CN.md#bbr-拥塞控制算法)。 |
+| MTU 不匹配导致分片 | `ping -M do -s 1372 <server>`（Linux） | 在两端将 `mtu` 设为 1280 后再次测试。 |
+| 多路复用过于激进 | `mieru get metrics` → `MaxConn` 非常高 | 将 multiplexing 降为 `MULTIPLEXING_LOW` 或 `MULTIPLEXING_MIDDLE`。 |
+| 服务器过载（用户过多） | `mita get users` | 增加服务器数量，或为单个用户设置流量配额。 |
+
+### 症状：客户端无法启动
+
+| 可能原因 | 如何检查 | 解决方法 |
+|----------|----------|----------|
+| 端口已被占用 | `lsof -i :1080`（macOS/Linux）或 `netstat -ano | findstr 1080`（Windows） | 更换 `socks5Port` 或 `rpcPort` 为未占用的端口。 |
+| 配置文件 JSON 语法错误 | `mieru apply config` 打印错误 | 修正 JSON 语法后重新应用。 |
+| 权限不足（Linux） | 客户端二进制文件无执行权限 | `chmod +x mieru` 或通过软件包安装。 |
+
+---
+
+## 配置文件存放位置
+
+### 服务器
+
+| 文件 | 路径 | 格式 |
+|------|------|------|
+| 配置 | `/etc/mita/server.conf.pb` | Protocol buffer（二进制） |
+
+服务器**不**存储密码明文，仅保存校验码。
+
+### 客户端
+
+| 操作系统 | 配置路径 | 示例 |
+|----------|----------|------|
+| Linux | `$HOME/.config/mieru/client.conf.pb` | `/home/enfein/.config/mieru/client.conf.pb` |
+| macOS | `$HOME/Library/Application Support/mieru/client.conf.pb` | `/Users/enfein/Library/Application Support/mieru/client.conf.pb` |
+| Windows | `%USERPROFILE%\AppData\Roaming\mieru\client.conf.pb` | `C:\Users\enfein\AppData\Roaming\mieru\client.conf.pb` |
+
+---
+
+## 环境变量
+
+| 变量 | 用途 |
+|------|------|
+| `MITA_CONFIG_JSON_FILE` | 从该路径加载 JSON 格式服务器配置文件。 |
+| `MITA_CONFIG_FILE` | 从该路径加载 protobuf 格式服务器配置文件。 |
+| `MIERU_CONFIG_JSON_FILE` | 从该路径加载 JSON 格式客户端配置文件。 |
+| `MIERU_CONFIG_FILE` | 从该路径加载 protobuf 格式客户端配置文件。 |
+| `MITA_LOG_NO_TIMESTAMP` | 非空时，服务器日志不打印时间戳（配合 journald 使用）。 |
+| `MITA_UDS_PATH` | UNIX domain socket 路径。默认值：`/var/run/mita/mita.sock`。 |
+| `MITA_INSECURE_UDS` | 非空时，跳过 UDS 文件权限强制检查。适用于受限系统。 |
+
+**示例：使用自定义配置文件在前台运行客户端**
+
+```sh
+MIERU_CONFIG_JSON_FILE=/etc/mieru_client_config.json mieru run
+```
+
+日志直接输出到终端。按 `Ctrl+C` 退出。
+
+---
+
+## 用户流量与配额
+
+### 查看各用户使用情况
+
+```sh
+mita get users
+```
+
+```
+User  LastActive            1DayDownload  1DayUpload  30DaysDownload  30DaysUpload
+abcd  2025-04-23T01:02:03Z  938.1MiB      12.9MiB     4.0GiB          31.8MiB
+```
+
+### 查看配额状态
+
+```sh
+mita get quotas
+```
+
+```
+User  Days  Limit    Usage
+abcd  1     10.0GiB  951.1MiB
+abcd  7     40.0GiB  4.0GiB
+```
+
+---
+
+## 重置服务器指标
+
+服务器指标存储在 `/var/lib/mita/metrics.pb` 中，重启后依然保留。如需清零：
+
+```sh
+sudo systemctl stop mita
+sudo rm -f /var/lib/mita/metrics.pb
+sudo systemctl start mita
+```
+
+---
+
+## 其他设置
+
+### 修改指标日志输出间隔
+
+默认每隔 10 分钟在日志中打印一次指标。如需调整间隔：
+
+```json
 {
     "advancedSettings": {
         "metricsLoggingInterval": "1h30m"
@@ -158,60 +281,9 @@ mieru / mita 每隔 10 分钟通过日志打印指标信息。如果想要调整
 }
 ```
 
-其中可以使用单位
+有效单位：`s`（秒）、`m`（分钟）、`h`（小时），以及它们的组合。
 
-- 秒 `s`
-- 分钟 `m`
-- 小时 `h`
-
-以及他们的组合。
-
-## 查看用户网络流量
-
-可以在服务器运行 `mita get users` 和 `mita get quotas` 指令，查看每个用户最近的活跃时间和消耗的网络流量。
-
-```
-$ mita get users
-User  LastActive            1DayDownload  1DayUpload  30DaysDownload  30DaysUpload
-abcd  2025-04-23T01:02:03Z  938.1MiB      12.9MiB     4.0GiB          31.8MiB
-
-$ mita get quotas
-User  Days  Limit    Usage
-abcd  1     10.0GiB  951.1MiB
-abcd  7     40.0GiB  4.0GiB
-```
-
-## 环境变量
-
-如有必要，用户可以使用环境变量控制服务器和客户端的行为。
-
-- `MITA_CONFIG_JSON_FILE` 从这个路径加载 JSON 格式的服务器配置文件。
-- `MITA_CONFIG_FILE` 从这个路径加载 protocol buffer 格式的服务器配置文件。
-- `MIERU_CONFIG_JSON_FILE` 从这个路径加载 JSON 格式的客户端配置文件。
-- `MIERU_CONFIG_FILE` 从这个路径加载 protocol buffer 格式的客户端配置文件。
-- `MITA_LOG_NO_TIMESTAMP` 这个值非空时，服务器日志不打印时间戳。因为 journald 已经提供了时间戳，我们默认开启这项设置，以避免打印重复的时间戳。
-- `MITA_UDS_PATH` 使用这个路径创建服务器 UNIX domain socket 文件。默认的路径是 `/var/run/mita/mita.sock`。
-- `MITA_INSECURE_UDS` 这个值非空时，不强制修改服务器 UNIX domain socket 文件 `/var/run/mita/mita.sock` 的用户和访问权限。这个设置可以用于某些非常受限（例如不能创建新用户）的系统中。
-
-## 在前台运行客户端
-
-在下面几种情况下，用户可能希望在前台运行 mieru 客户端：
-
-- 同时运行多个 mieru 客户端进程。
-- 让 mieru 客户端随系统一同启动。
-- 快速调试 mieru 客户端配置。
-
-在 Linux 系统下，假设 mieru 客户端配置文件的路径是 `/etc/mieru_client_config.json`，用户可以使用下面的指令在前台运行客户端：
-
-```sh
-MIERU_CONFIG_JSON_FILE=/etc/mieru_client_config.json mieru run
-```
-
-此时，mieru 客户端的日志会直接打印至终端。按下 Ctrl+C 退出。
-
-## 关闭客户端自动检查更新
-
-启动 mieru 客户端时，每隔几天，会自动检查更新。如果想关闭自动检查更新，请添加如下的客户端配置：
+### 关闭客户端自动检查更新
 
 ```json
 {
@@ -219,12 +291,4 @@ MIERU_CONFIG_JSON_FILE=/etc/mieru_client_config.json mieru run
         "noCheckUpdate": true
     }
 }
-```
-
-## 重置服务器指标
-
-服务器指标存储在文件 `/var/lib/mita/metrics.pb` 中。即便服务器重启，也可以通过 `mita get metrics`，`mita get users` 和 `mita get quotas` 指令读取累积的指标。如果想重置指标，可以运行下面的命令：
-
-```sh
-sudo systemctl stop mita && sudo rm -f /var/lib/mita/metrics.pb && sudo systemctl start mita
 ```
