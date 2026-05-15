@@ -1,93 +1,262 @@
 # Server Installation & Configuration
 
-The proxy server software mita needs to run on Linux. We provide both debian and RPM installers for installing mita on Debian / Ubuntu and Fedora / CentOS / Red Hat Enterprise Linux series distributions.
+This guide covers the installation, configuration, and operation of **mita**, the proxy server component of the mieru proxy suite.
 
-## Use installation script
+**mita** must run on Linux. This document provides three deployment paths:
 
-Follow the installation script and complete the server installation and configuration.
+1. **Docker** (recommended for most users) — fastest to deploy and easiest to manage.
+2. **Package installation** — native Debian/RPM packages with systemd integration.
+3. **Installation script** — automated setup for common distributions.
+
+- [Prerequisites](#prerequisites)
+- [One-Click Installation](#one-click-installation-recommended-for-systemd-systems)
+- [Docker Deployment](#docker-deployment)
+  - [Quick Start with Docker](#quick-start-with-docker)
+  - [Docker Compose](#docker-compose)
+  - [Managing the Container](#managing-the-container)
+- [Package Installation](#package-installation)
+  - [Download](#download)
+  - [Install](#install)
+  - [Permissions & Daemon Status](#permissions--daemon-status)
+- [Configure the Proxy Server](#configure-the-proxy-server)
+- [Start, Stop, and Reload](#start-stop-and-reload)
+- [Advanced Settings](#advanced-settings)
+  - [BBR Congestion Control](#bbr-congestion-control-algorithm)
+  - [Outbound Proxy (Proxy Chain)](#configuring-outbound-proxy)
+  - [DNS Policy](#dns-policy)
+  - [Allow Private / Loopback Access](#allow-users-to-access-internal-network)
+  - [Traffic Quotas](#limiting-user-traffic)
+  - [Mandatory User Hint](#user-hint)
+- [Time Synchronization](#optional-install-ntp-network-time-synchronization-service)
+
+---
+
+## Prerequisites
+
+- A Linux server with a public IPv4 or IPv6 address.
+- Root or `sudo` access.
+- Firewall rules that allow inbound TCP and/or UDP traffic on the port(s) you intend to use (default range: 1025–65535).
+- Accurate system time (see [NTP section](#optional-install-ntp-network-time-synchronization-service)).
+
+> **Note on time synchronization**
+> The client and server derive encryption keys from the username, password, and current system time. If the clocks drift apart, the server will be unable to decrypt client traffic. Enabling NTP on both sides is strongly recommended.
+
+---
+
+## One-Click Installation (Recommended for Systemd Systems)
+
+For Debian / Ubuntu and RHEL / CentOS / Rocky Linux systems, the easiest way to install mita is the official one-click script. It automatically detects your architecture and OS, downloads the latest release from GitHub, installs the package, runs an interactive configuration wizard, configures the firewall, enables auto-start, and prints connection info.
 
 ```sh
-curl -fSsLO https://raw.githubusercontent.com/enfein/mieru/refs/heads/main/tools/setup.py
-chmod +x setup.py
-sudo python3 setup.py
+curl -fsSL https://raw.githubusercontent.com/enfein/mieru/main/tools/install.sh | sudo bash -s -- install
 ```
 
-Or you can manually install and configure proxy server using the steps below.
-
-## Download mita installation package
+Or download the script first and run interactively:
 
 ```sh
-# Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.32.0/mita_3.32.0_amd64.deb
+curl -fsSL -o install-mita.sh https://raw.githubusercontent.com/enfein/mieru/main/tools/install.sh
+chmod +x install-mita.sh
+sudo ./install-mita.sh
+```
+
+### Script commands
+
+| Command | Description |
+|---------|-------------|
+| `install` | Install latest mita and run interactive configuration |
+| `update` | Update to the latest release, preserving existing config |
+| `uninstall` | Remove mita and optionally delete configuration |
+| `reconfigure` | Rewrite `server_config.json` interactively and restart |
+| `start` / `stop` / `restart` | Control the proxy service |
+| `enable` / `disable` | Toggle systemd auto-start |
+| `status` | Show daemon and proxy status |
+| `info` | Display server IP, ports, users, and `mierus://` sharing links |
+| `bbr` | Enable BBR congestion control (idempotent) |
+
+---
+
+## Docker Deployment
+
+The official Docker image is published to the GitHub Container Registry and is the quickest way to get mita running.
+
+**Registry:** `ghcr.io/enfein/mita:latest`  
+**Source:** [deployments/docker/mita/Dockerfile](../deployments/docker/mita/Dockerfile)
+
+### Quick Start with Docker
+
+```sh
+# 1. Create a local directory for the server config
+mkdir -p ~/mita-config
+
+# 2. Create server_config.json (see Configuration section below)
+#    Example: nano ~/mita-config/server_config.json
+
+# 3. Pull and run
+sudo docker run -d \
+  --name mita \
+  --restart unless-stopped \
+  -p 2012-2022:2012-2022/tcp \
+  -p 2027:2027/tcp \
+  -v ~/mita-config:/etc/mita:Z \
+  ghcr.io/enfein/mita:latest \
+  mita run
+```
+
+Then apply your configuration inside the running container:
+
+```sh
+sudo docker exec -it mita mita apply config /etc/mita/server_config.json
+sudo docker exec -it mita mita start
+sudo docker exec -it mita mita status
+```
+
+### Docker Compose
+
+For production or long-term deployments, use Docker Compose.
+
+Create `docker-compose.yml`:
+
+```yaml
+services:
+  mita:
+    image: ghcr.io/enfein/mita:latest
+    container_name: mita
+    restart: unless-stopped
+    ports:
+      - "2012-2022:2012-2022/tcp"
+      - "2027:2027/tcp"
+      # Add UDP if needed, e.g.:
+      # - "3000-3010:3000-3010/udp"
+    volumes:
+      - ./mita-config:/etc/mita:Z
+    command: mita run
+```
+
+Create `mita-config/server_config.json` (see [Configure the Proxy Server](#configure-the-proxy-server) for the full schema).
+
+Start the stack:
+
+```sh
+docker compose up -d
+```
+
+Apply configuration and start the proxy service:
+
+```sh
+docker compose exec mita mita apply config /etc/mita/server_config.json
+docker compose exec mita mita start
+docker compose exec mita mita status
+```
+
+### Managing the Container
+
+| Task | Command |
+|------|---------|
+| View logs | `docker logs --tail 100 -f mita` |
+| Restart service | `docker restart mita` |
+| Stop service | `docker exec mita mita stop` |
+| Shell inside container | `docker exec -it mita sh` |
+| Upgrade image | `docker pull ghcr.io/enfein/mita:latest && docker compose up -d` |
+
+> **Tip:** Because the container runs `mita run` (foreground mode) rather than a systemd unit, `docker restart` is sufficient to restart the daemon. Configuration changes that require a restart can be applied with `docker compose exec mita mita stop` followed by the container restart.
+
+---
+
+## Package Installation
+
+For users who prefer native packages with systemd integration.
+
+### Download
+
+The commands below automatically fetch the latest release tag from GitHub and download the corresponding package. Run the `TAG=...` line once, then copy the block for your platform.
+
+```sh
+# Fetch the latest release tag, e.g. v3.32.0
+TAG=$(curl -s https://api.github.com/repos/enfein/mieru/releases/latest | grep '"tag_name":' | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+VER="${TAG#v}"
+
+# Debian / Ubuntu - x86_64
+curl -LSO "https://github.com/enfein/mieru/releases/download/${TAG}/mita_${VER}_amd64.deb"
+sudo dpkg -i "mita_${VER}_amd64.deb"
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.32.0/mita_3.32.0_arm64.deb
+curl -LSO "https://github.com/enfein/mieru/releases/download/${TAG}/mita_${VER}_arm64.deb"
+sudo dpkg -i "mita_${VER}_arm64.deb"
 
-# RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.32.0/mita-3.32.0-1.x86_64.rpm
+# Red Hat / CentOS / Rocky Linux - x86_64
+curl -LSO "https://github.com/enfein/mieru/releases/download/${TAG}/mita-${VER}-1.x86_64.rpm"
+sudo rpm -Uvh --force "mita-${VER}-1.x86_64.rpm"
 
-# RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.32.0/mita-3.32.0-1.aarch64.rpm
+# Red Hat / CentOS / Rocky Linux - ARM 64
+curl -LSO "https://github.com/enfein/mieru/releases/download/${TAG}/mita-${VER}-1.aarch64.rpm"
+sudo rpm -Uvh --force "mita-${VER}-1.aarch64.rpm"
 ```
 
-## Install mita package
+> **Tip:** If `curl` is unavailable, run `TAG=$(wget -qO- https://api.github.com/repos/enfein/mieru/releases/latest | grep '"tag_name":' | head -1 | sed -E 's/.*"([^"]+)".*/\1/')` instead.
+
+The same commands are used to upgrade an existing installation.
+
+### Permissions & Daemon Status
 
 ```sh
-# Debian / Ubuntu - X86_64
-sudo dpkg -i mita_3.32.0_amd64.deb
+# Debian / Ubuntu - x86_64
+sudo dpkg -i mita_X.Y.Z_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_3.32.0_arm64.deb
+sudo dpkg -i mita_X.Y.Z_arm64.deb
 
-# RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-3.32.0-1.x86_64.rpm
+# Red Hat / CentOS / Rocky Linux - x86_64
+sudo rpm -Uvh --force mita-X.Y.Z-1.x86_64.rpm
 
-# RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-3.32.0-1.aarch64.rpm
+# Red Hat / CentOS / Rocky Linux - ARM 64
+sudo rpm -Uvh --force mita-X.Y.Z-1.aarch64.rpm
 ```
 
-Those instructions can also be used to upgrade the version of mita software package.
+The same commands are used to upgrade an existing installation.
 
-## Grant permissions, logout and login again to make the change effective
+### Permissions & Daemon Status
+
+Add your user to the `mita` group so you can run `mita` commands without `sudo`:
 
 ```sh
 sudo usermod -a -G mita $USER
-
-# logout
+# Log out and back in for the group change to take effect
 exit
 ```
 
-## Reconnect the server via SSH, check mita daemon status
+After reconnecting via SSH, verify the daemon:
 
 ```sh
 systemctl status mita
 ```
 
-If the output contains `active (running)`, it means that the mita daemon is already running. Normally, mita will start automatically after the server is booted.
+If the output contains `active (running)`, the mita systemd service is operational and will start automatically on boot.
 
-## Check mita working status
+Check the mita application status:
 
 ```sh
 mita status
 ```
 
-If the installation is just completed, the output will be `mita server status is "IDLE"`, indicating that mita has not yet listening to requests from the mieru client.
+A fresh installation will report `mita server status is "IDLE"`, indicating the server is not yet listening for client connections.
 
-## Modify proxy server settings
+---
 
-The mieru proxy supports two different transport protocols, TCP and UDP. To understand the differences between the protocols, please read [mieru proxy protocols](./protocol.md).
+## Configure the Proxy Server
 
-Users should call
+mieru supports two transport protocols: **TCP** and **UDP**. See [mieru Proxy Protocol](./protocol.md) for a comparison.
+
+Configuration is applied via:
 
 ```sh
 mita apply config <FILE>
 ```
 
-to modify the proxy server settings. `<FILE>` is a JSON formatted configuration file. This configuration file does not need to specify the full proxy server settings. When you run command `mita apply config <FILE>`, the contents of the file will be merged into any existing proxy server settings.
+`<FILE>` is a JSON file. Its contents are merged into the existing server configuration; you do not need to provide a full configuration on every update.
 
-Below is an example of the server configuration file.
+### Minimal Example
 
-```js
+```json
 {
     "portBindings": [
         {
@@ -114,65 +283,77 @@ Below is an example of the server configuration file.
 }
 ```
 
-1. The `portBindings` -> `port` property is the TCP or UDP port number that mita listens on, specify a value from 1025 to 65535. If you want to listen to a range of consecutive port numbers, you can also use the `portRange` property instead. **Please make sure that the firewall allows communication using these ports.**
-2. The `portBindings` -> `protocol` property can be set to `TCP` or `UDP`.
-3. Fill in the `users` -> `name` property with the user name.
-4. Fill in the `users` -> `password` property with the user's password.
-5. [Optional] The `mtu` property is the maximum transport layer payload size when using the UDP proxy protocol. The default value is 1400. The minimum value is 1280.
+**Field reference:**
 
-In addition to this, mita can listen to several different ports. We recommend using multiple ports in both server and client configurations.
+| Field | Description |
+|-------|-------------|
+| `portBindings` | List of ports or port ranges to listen on. Each entry needs a `protocol` (`TCP` or `UDP`). Use `port` (integer, 1025–65535) or `portRange` (string, e.g. `"2012-2022"`). |
+| `users` | List of credential objects. `name` and `password` are required for each user. |
+| `loggingLevel` | Log verbosity: `DEBUG`, `INFO`, `WARN`, or `ERROR`. Default: `INFO`. |
+| `mtu` | *(Optional)* Maximum transport-unit payload when using UDP. Default: `1400`. Minimum: `1280`. |
 
-You can also create multiple users if you want to share the proxy for others to use.
+> **Security note:** Ensure your host firewall (e.g., `iptables`, `nftables`, `ufw`, or cloud-provider security groups) allows inbound traffic on the configured ports.
 
-Assuming that on the server, the configuration file name is `server_config.json`, call the command `mita apply config server_config.json` to write the configuration after the file is modified.
+After editing the file, apply it:
 
-If there is an error in the configuration, mita will print the problem that occurred. Follow the prompts to modify the configuration file and re-run the `mita apply config <FILE>` command to write the configuration.
+```sh
+mita apply config server_config.json
+```
 
-After that, invoke command
+If validation fails, mita prints the specific error. Fix the file and re-run the command.
+
+Review the current effective configuration with:
 
 ```sh
 mita describe config
 ```
 
-to check the current proxy settings.
+---
 
-## Start proxy service
+## Start, Stop, and Reload
 
-Use command
+### Start the proxy service
 
 ```sh
 mita start
 ```
 
-to start proxy service. At this point, mita will start listening to the port number specified in the settings.
-
-Then, use command
+mita will begin listening on the configured ports. Verify with:
 
 ```sh
 mita status
 ```
 
-to check working status. If `mita server status is "RUNNING"` is returned here, it means that the proxy service is running and can process client requests.
+If the output is `mita server status is "RUNNING"`, the server is ready to accept client connections.
 
-If you want to stop the proxy service, use command
+### Stop the proxy service
 
 ```sh
 mita stop
 ```
 
-Note that each time you change the settings with `mita apply config <FILE>`, you need to restart the service with `mita stop` and `mita start` for the new settings to take effect. An exception is, if you only change `users` or `loggingLevel` settings, you may run `mita reload` to load the new settings, which will not disturb active connections between server and client.
+### Reload settings without dropping connections
 
-After starting the proxy service, proceed to [Client Installation & Configuration](./client-install.md).
+```sh
+mita reload
+```
+
+`reload` is supported **only** for changes to the `users` or `loggingLevel` fields. For any other configuration change, stop and start the service:
+
+```sh
+mita stop
+mita start
+```
+
+After the server is running, proceed to [Client Installation & Configuration](./client-install.md).
+
+---
 
 ## Advanced Settings
 
 ### BBR Congestion Control Algorithm
 
-[BBR](https://en.wikipedia.org/wiki/TCP_congestion_control#TCP_BBR) is a congestion control algorithm that does not rely on packet loss. Under poor network conditions, network transmission using BBR is faster than traditional algorithms.
-
-mieru's UDP transmission protocol already uses the BBR algorithm.
-
-Run the following script to use BBR algorithm on TCP transmission protocol on Linux.
+[BBR](https://en.wikipedia.org/wiki/TCP_congestion_control#TCP_BBR) is a congestion-control algorithm that improves throughput on lossy networks. mieru’s UDP protocol already uses BBR; the script below enables it for TCP as well.
 
 ```sh
 curl -fSsLO https://raw.githubusercontent.com/enfein/mieru/refs/heads/main/tools/enable_tcp_bbr.py
@@ -180,21 +361,23 @@ chmod +x enable_tcp_bbr.py
 sudo python3 enable_tcp_bbr.py
 ```
 
-That script can be used on both server side and client side.
+This can be run on both the server and the client.
 
 ### Configuring Outbound Proxy
 
-The outbound proxy feature allows mieru to work with other proxy tools to form a proxy chain. An example of the network topology of a proxy chain is shown in the diagram below:
+Outbound proxy (proxy chain) lets mita forward traffic through an upstream SOCKS5 proxy.
+
+Example topology:
 
 ```
 mieru client -> GFW -> mita server -> cloudflare proxy client -> cloudflare CDN -> target website
 ```
 
-Through proxy chain, the target website sees the IP address of the cloudflare CDN, not the address of the mita server.
+With this setup, the target website sees the Cloudflare CDN IP, not the mita server IP.
 
-Below is an example to configure a proxy chain.
+Example configuration:
 
-```js
+```json
 {
     "egress": {
         "proxies": [
@@ -229,24 +412,22 @@ Below is an example to configure a proxy chain.
 }
 ```
 
-1. In the `egress` -> `proxies` property, list the information of outbound proxy servers. The current version only supports socks5 outbound, so the value of `protocol` must be set to `SOCKS5_PROXY_PROTOCOL`. If the outbound proxy server requires socks5 username and password authentication, please fill in the `socks5Authentication` property. Otherwise, please remove the `socks5Authentication` property.
-2. In the `egress` -> `rules` property, list outbound rules. From begin to end, the first rule that matches IP address range or DNS suffix is executed. Use wildcard `"*"` to match all IP addresses or domain names. Outbound actions include `DIRECT`, `PROXY` and `REJECT`. `proxyNames` must be set if `PROXY` action is used. `proxyNames` needs to point to proxies that exist in `egress` -> `proxies` property. The default outbound action is `DIRECT`.
+**Field reference:**
 
-If you want to turn off the outbound proxy feature, simply set the `egress` property to an empty value `{}`.
+| Field | Description |
+|-------|-------------|
+| `egress.proxies` | Upstream SOCKS5 proxies. `protocol` must be `SOCKS5_PROXY_PROTOCOL`. Omit `socks5Authentication` if the proxy does not require credentials. |
+| `egress.rules` | Ordered list of rules. The **first** matching rule is executed. Wildcard `"*"` matches all IPs or domains. Actions: `DIRECT`, `PROXY`, `REJECT`. `PROXY` requires `proxyNames` referencing a defined proxy. Default action: `DIRECT`. |
 
-Note that proxy chain is different from nested proxy. An example of the network topology of a nested proxy is shown in the diagram below:
+To disable outbound proxy, set `egress` to `{}`.
 
-```
-Tor browser -> mieru client -> GFW -> mita server -> Tor network -> target website
-```
-
-For information on how to configure nested proxy on a Tor browser, please refer to the [Security Guide](./security.md).
+> **Proxy chain vs. nested proxy:** Proxy chain routes traffic through an intermediate proxy *after* mita. A nested proxy routes traffic through another proxy *before* mieru (e.g., Tor Browser -> mieru client -> GFW -> mita server -> Tor network). For nested proxy setup, see the [Security Guide](./security.md).
 
 ### DNS Policy
 
-When a proxy client requests a target website using a domain name instead of an IP address, the proxy server needs to resolve the domain name before connecting to the target website. You can adjust the proxy server DNS policy using the following configuration:
+When the client requests a destination by domain name, mita resolves it before connecting. You can customize resolution behavior:
 
-```js
+```json
 {
     "dns": {
         "dualStack": "USE_FIRST_IP",
@@ -258,27 +439,26 @@ When a proxy client requests a target website using a domain name instead of an 
 }
 ```
 
-The `dns` -> `dualStack` attribute supports the following values:
+`dualStack` options:
 
-1. `USE_FIRST_IP`: Always use the first IP address returned by the DNS server. This is the default policy.
-2. `PREFER_IPv4`: Prefer to use the first IPv4 address returned by the DNS server. If there is no IPv4 address, use the first IPv6 address.
-3. `PREFER_IPv6`: Prefer to use the first IPv6 address returned by the DNS server. If there is no IPv6 address, use the first IPv4 address.
-4. `ONLY_IPv4`: Force to use the first IPv4 address returned by the DNS server. If there is no IPv4 address, the connection fails.
-5. `ONLY_IPv6`: Force to use the first IPv6 address returned by the DNS server. If there is no IPv6 address, the connection fails.
+| Value | Behavior |
+|-------|----------|
+| `USE_FIRST_IP` | Use the first IP returned by the DNS resolver. (Default) |
+| `PREFER_IPv4` | Prefer the first IPv4 address; fall back to IPv6 if absent. |
+| `PREFER_IPv6` | Prefer the first IPv6 address; fall back to IPv4 if absent. |
+| `ONLY_IPv4` | Force IPv4; fail if none is returned. |
+| `ONLY_IPv6` | Force IPv6; fail if none is returned. |
 
-The `dns` -> `hosts` attribute defines static domain name to IP address mappings, similar to `/etc/hosts`. When the proxy server receives a request for a domain name listed in `hosts`, it uses the configured IP address directly instead of querying DNS resolver.
-
-Each key in `hosts` must be a domain name, and each value must be a valid IPv4 or IPv6 address. Domain name matching is exact and case-insensitive. Wildcards and DNS suffix matching are not supported. Domain names must not begin or end with a dot.
+`hosts` defines static name-to-IP mappings, similar to `/etc/hosts`. Matching is exact and case-insensitive; wildcards and suffix matching are not supported. Keys must not begin or end with a dot.
 
 ### Allow Users to Access Internal Network
 
-By default, proxy server only allows users to send proxy requests to the Internet.
+By default, mita rejects requests to private and loopback addresses.
 
-If you want to allow users to access private IP addresses (e.g., `192.168.1.100`) through the proxy server, set the `users` -> `allowPrivateIP` attribute.
+To allow a specific user to reach private IPs (e.g., `192.168.1.100`), set `allowPrivateIP: true`.  
+To allow a specific user to reach the server itself (e.g., `127.0.0.1`), set `allowLoopbackIP: true`.
 
-If you want to allow users to access the server's local machine (e.g., `127.0.0.1`) through the proxy server, add the `users` -> `allowLoopbackIP` attribute.
-
-```js
+```json
 {
     "users": [
         {
@@ -297,23 +477,19 @@ If you want to allow users to access the server's local machine (e.g., `127.0.0.
 
 ### Limiting User Traffic
 
-We can use the `users` -> `quotas` property to limit the amount of traffic a user is allowed to use. For example, if you want user "ducaiguozei" to use no more than 1 GB of traffic within 1 day, and no more than 10 GB within 30 days, you can apply the following settings.
+Use `quotas` to enforce traffic limits per user.
 
-```js
+Example: user `ducaiguozei` may consume at most 1 GB per day and 10 GB per 30 days.
+
+```json
 {
     "users": [
         {
             "name": "ducaiguozei",
             "password": "xijinping",
             "quotas": [
-                {
-                    "days": 1,
-                    "megabytes": 1024
-                },
-                {
-                    "days": 30,
-                    "megabytes": 10240
-                }
+                { "days": 1,  "megabytes": 1024 },
+                { "days": 30, "megabytes": 10240 }
             ]
         },
         {
@@ -326,11 +502,11 @@ We can use the `users` -> `quotas` property to limit the amount of traffic a use
 
 ### User Hint
 
-Starting from v3.31.0 release, mieru client send user hint to accelerate the decryption of network packets in mita server. This is especially helpful when the number of proxy users is large.
+Since v3.31.0, the mieru client sends a *user hint* that accelerates packet decryption on the server. This is especially beneficial when serving many users.
 
-Because mita server will have higher CPU consumption when the user hint is not available, you can apply the following configuration to block old mieru clients.
+If you want to block older clients that do not send the hint (to reduce server CPU load), apply:
 
-```
+```json
 {
     "advancedSettings": {
         "userHintIsMandatory": true
@@ -338,25 +514,31 @@ Because mita server will have higher CPU consumption when the user hint is not a
 }
 ```
 
-## [Optional] Install NTP network time synchronization service
+---
 
-The client and proxy server software calculate the key based on the user name, password and system time. The server can decrypt and respond to the client's request only if the client and server have the same key. This requires that the system time of the client and the server must be in sync.
+## [Optional] Install NTP Network Time Synchronization Service
 
-To ensure that the server system time is accurate, we recommend that users enable or install the NTP network time service.
+The client and server derive encryption keys from the username, password, and system time. If their clocks diverge significantly, the server cannot decrypt traffic. We strongly recommend enabling NTP on both sides.
 
-In Linux, if system time synchronization is controlled by `systemd-timesyncd` service, you can modify configuration file `/etc/systemd/timesyncd.conf` to the following.
+If your system uses `systemd-timesyncd`, edit `/etc/systemd/timesyncd.conf`:
 
-```
+```ini
 [Time]
 NTP=time.google.com
 ```
 
-Otherwise, install NTP with the following command.
+Then restart the service:
+
+```sh
+sudo systemctl restart systemd-timesyncd
+```
+
+Otherwise, install a standalone NTP package:
 
 ```sh
 # Debian / Ubuntu
 sudo apt-get install ntp
 
-# RedHat / CentOS / Rocky Linux
+# Red Hat / CentOS / Rocky Linux
 sudo dnf install ntp
 ```
