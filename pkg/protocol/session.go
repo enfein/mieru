@@ -55,6 +55,7 @@ const (
 
 	serverRespTimeout        = 10 * time.Second
 	sessionHeartbeatInterval = 5 * time.Second
+	sessionHeartbeatJitterMs = 1000
 
 	// periodicOutputInterval triggers periodic output of packet transport,
 	// even if there is no new data to send.
@@ -191,9 +192,7 @@ func NewSession(id uint32, isClient bool, mtu int, users map[string]*appctlpb.Us
 	now := time.Now().UnixMicro()
 	s.lastRXTime.Store(now)
 	s.lastTXTime.Store(now)
-	// Add random jitter of [-2s, +2s] to heartbeat interval to prevent
-	// pattern detection based on the fixed 5-second cycle.
-	s.heartbeatJitter = time.Duration(mrand.Intn(5)-2) * time.Second
+	s.heartbeatJitter = randomHeartbeatJitter()
 	s.remoteWindowSize.Store(minWindowSize)
 	return s
 }
@@ -864,8 +863,7 @@ func (s *Session) runOutputOncePacket() {
 			s.closeWithError(err)
 		}
 		s.ackOnDataRecv.Store(false)
-		// Re-randomize jitter after each heartbeat to further break periodicity.
-		s.heartbeatJitter = time.Duration(mrand.Intn(5)-2) * time.Second
+		s.heartbeatJitter = randomHeartbeatJitter()
 	}
 }
 
@@ -1273,4 +1271,10 @@ func (s *Session) checkQuota(userName string) (ok bool, err error) {
 		}
 	}
 	return true, nil
+}
+
+// randomHeartbeatJitter returns a duration in [-1s, +1s] at millisecond granularity.
+func randomHeartbeatJitter() time.Duration {
+	jitterMs := mrand.Intn(2*sessionHeartbeatJitterMs+1) - sessionHeartbeatJitterMs
+	return time.Duration(jitterMs) * time.Millisecond
 }

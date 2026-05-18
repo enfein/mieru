@@ -41,6 +41,7 @@ mieru 代理软件由称为 mieru【見える】的客户端软件和称为 mita
 - iOS
   - [ClashMi](https://clashmi.app/)
   - [Karing](https://karing.app/)
+  - [Shadowrocket](https://apps.apple.com/app/id932747118)
 
 ## 使用教程
 
