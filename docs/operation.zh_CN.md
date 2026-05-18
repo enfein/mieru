@@ -164,7 +164,7 @@ mieru start
 | 可能原因 | 如何检查 | 解决方法 |
 |----------|----------|----------|
 | 服务器防火墙关闭了空闲端口 | `mita get connections` → 连接数降为 0 | 使用更大的端口范围，或在应用层启用 keepalive。 |
-| 客户端或服务器重启 | 检查日志时间戳 | 服务器端确保执行 `systemctl enable mita`；客户端配置[开机自启](./client-install.zh_CN.md#开机自启)。 |
+| 客户端或服务器重启 | 检查日志时间戳 | 服务器端确保执行 `systemctl enable mita`。 |
 | GFW 限速/QoS | 仅在高峰时段降速 | 改用 UDP 协议或启用流量混淆。 |
 
 ### 症状：速度非常慢
@@ -180,7 +180,7 @@ mieru start
 
 | 可能原因 | 如何检查 | 解决方法 |
 |----------|----------|----------|
-| 端口已被占用 | `lsof -i :1080`（macOS/Linux）或 `netstat -ano | findstr 1080`（Windows） | 更换 `socks5Port` 或 `rpcPort` 为未占用的端口。 |
+| 端口已被占用 | `lsof -i :1080`（macOS/Linux）或 `netstat -ano \| findstr 1080`（Windows） | 更换 `socks5Port` 或 `rpcPort` 为未占用的端口。 |
 | 配置文件 JSON 语法错误 | `mieru apply config` 打印错误 | 修正 JSON 语法后重新应用。 |
 | 权限不足（Linux） | 客户端二进制文件无执行权限 | `chmod +x mieru` 或通过软件包安装。 |
 

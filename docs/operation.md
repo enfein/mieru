@@ -164,7 +164,7 @@ All supported levels: `FATAL`, `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`.
 | Possible cause | How to check | Fix |
 |----------------|--------------|-----|
 | Server firewall closed the idle port | `mita get connections` → count drops to 0 | Use a larger port range or enable keepalive at the application level. |
-| Client or server restarted | Check log timestamps | Ensure `systemctl enable mita` on the server; configure [client auto-start](./client-install.md#auto-start-on-boot). |
+| Client or server restarted | Check log timestamps | Ensure `systemctl enable mita` on the server. |
 | GFW throttling / QoS | Speed drops during peak hours only | Switch to UDP protocol or enable traffic pattern. |
 
 ### Symptom: Very slow speed
