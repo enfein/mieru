@@ -2,8 +2,23 @@ name: 'integration test'
 on: [push, pull_request, workflow_dispatch]
 jobs:
   run-test:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: socks5
+            target: run-container-test-socks5
+          - name: basic
+            target: run-container-test-basic
+          - name: apiclient
+            target: run-container-test-apiclient
+          - name: apiserver
+            target: run-container-test-apiserver
+          - name: proxychain
+            target: run-container-test-proxychain
     steps:
       - name: Check out repository code
         uses: actions/checkout@v6
@@ -12,4 +27,4 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Run integration test
-        run: make run-container-test
+        run: make ${{ matrix.target }}

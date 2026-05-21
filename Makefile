@@ -391,11 +391,26 @@ test-binary:
 
 # Build docker images to run integration tests.
 .PHONY: test-container-image
-test-container-image: $(TEST_BINARY_PREREQ)
+test-container-image: test-container-image-socks5 test-container-image-basic test-container-image-apiclient test-container-image-apiserver test-container-image-proxychain
+
+.PHONY: test-container-image-socks5
+test-container-image-socks5: $(TEST_BINARY_PREREQ)
 	docker build -t mieru_socks5:${SHORT_SHA} -f test/deploy/socks5/Dockerfile .
+
+.PHONY: test-container-image-basic
+test-container-image-basic: $(TEST_BINARY_PREREQ)
 	docker build -t mieru_basic:${SHORT_SHA} -f test/deploy/basic/Dockerfile .
+
+.PHONY: test-container-image-apiclient
+test-container-image-apiclient: $(TEST_BINARY_PREREQ)
 	docker build -t mieru_apiclient:${SHORT_SHA} -f test/deploy/apiclient/Dockerfile .
+
+.PHONY: test-container-image-apiserver
+test-container-image-apiserver: $(TEST_BINARY_PREREQ)
 	docker build -t mieru_apiserver:${SHORT_SHA} -f test/deploy/apiserver/Dockerfile .
+
+.PHONY: test-container-image-proxychain
+test-container-image-proxychain: $(TEST_BINARY_PREREQ)
 	docker build -t mieru_proxychain:${SHORT_SHA} -f test/deploy/proxychain/Dockerfile .
 
 # Run docker integration tests.
@@ -407,23 +422,23 @@ run-container-test-prebuilt:
 	$(MAKE) TEST_BINARY_PREREQ= run-container-test
 
 .PHONY: run-container-test-socks5
-run-container-test-socks5: test-container-image
+run-container-test-socks5: test-container-image-socks5
 	docker run mieru_socks5:${SHORT_SHA}
 
 .PHONY: run-container-test-basic
-run-container-test-basic: test-container-image
+run-container-test-basic: test-container-image-basic
 	docker run mieru_basic:${SHORT_SHA}
 
 .PHONY: run-container-test-apiclient
-run-container-test-apiclient: test-container-image
+run-container-test-apiclient: test-container-image-apiclient
 	docker run mieru_apiclient:${SHORT_SHA}
 
 .PHONY: run-container-test-apiserver
-run-container-test-apiserver: test-container-image
+run-container-test-apiserver: test-container-image-apiserver
 	docker run mieru_apiserver:${SHORT_SHA}
 
 .PHONY: run-container-test-proxychain
-run-container-test-proxychain: test-container-image
+run-container-test-proxychain: test-container-image-proxychain
 	docker run mieru_proxychain:${SHORT_SHA}
 
 # Generate source code from protobuf.
