@@ -76,6 +76,9 @@ func (mc *mieruClient) Store(config *ClientConfig) error {
 	if mc.running.Load() {
 		return ErrStoreClientConfigAfterStart
 	}
+	if config.Profile.GetDialer() != nil {
+		return fmt.Errorf("%w: client profile dialer is not supported by client API", ErrInvalidClientConfig)
+	}
 	if err := appctlcommon.ValidateClientConfigSingleProfile(config.Profile); err != nil {
 		return fmt.Errorf("%w: %s", ErrInvalidClientConfig, err.Error())
 	}

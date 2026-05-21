@@ -159,6 +159,42 @@ proxies:
 
 ## 高级设置
 
+### 通过 socks5 代理连接 mita 服务器
+
+> 这项功能尚未发布。
+
+如果 mieru 客户端必须通过已有的 socks5 代理连接 mita 服务器，可以在客户端 profile 中添加 `dialer` 对象。没有 `dialer` 的已有 profile 会继续直接连接 mita。
+
+```js
+{
+    "profiles": [
+        {
+            "profileName": "default",
+            "user": {
+                ...
+            },
+            "servers": [
+                ...
+            ],
+            "dialer": {
+                "protocol": "SOCKS5_PROXY_PROTOCOL",
+                "host": "127.0.0.1",
+                "port": 1081,
+                "socks5UDPAssociate": true,
+                "socks5Authentication": {
+                    "user": "proxy-user",
+                    "password": "proxy-password"
+                }
+            }
+        }
+    ]
+}
+```
+
+当前只支持 `SOCKS5_PROXY_PROTOCOL`。`host` 和 `port` 必须填写。`socks5Authentication` 是可选的；如果填写，则 `user` 和 `password` 都必须设置。
+
+将 `socks5UDPAssociate` 设置为 `true`，可以通过 socks5 UDP ASSOCIATE 连接 mita 代理服务器。如果它为 `false` 或未填写，UDP 流量不会通过 socks5 代理。
+
 ### socks5 用户名和密码验证
 
 如果你想要让应用程序必须通过用户名和密码验证才能访问 socks5 代理，可以在客户端设置中添加 `socks5Authentication` 属性。一个示例如下：

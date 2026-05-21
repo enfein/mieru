@@ -159,6 +159,42 @@ Use `udp: true` to allow socks5 UDP associate requests. You can't have both `por
 
 ## Advanced Settings
 
+### Connecting to mita Server Through a socks5 Proxy
+
+> This feature is to be released.
+
+If the mieru client must reach mita server through an existing socks5 proxy, add a `dialer` object to the client profile. Existing profiles without `dialer` continue to connect to mita directly.
+
+```js
+{
+    "profiles": [
+        {
+            "profileName": "default",
+            "user": {
+                ...
+            },
+            "servers": [
+                ...
+            ],
+            "dialer": {
+                "protocol": "SOCKS5_PROXY_PROTOCOL",
+                "host": "127.0.0.1",
+                "port": 1081,
+                "socks5UDPAssociate": true,
+                "socks5Authentication": {
+                    "user": "proxy-user",
+                    "password": "proxy-password"
+                }
+            }
+        }
+    ]
+}
+```
+
+Only `SOCKS5_PROXY_PROTOCOL` is supported. `host` and `port` are required. `socks5Authentication` is optional; when it is set, both `user` and `password` are required.
+
+Set `socks5UDPAssociate` to `true` to connect to mita proxy server through socks5 UDP ASSOCIATE. If it is `false` or omitted, UDP traffic doesn't go through the socks5 proxy.
+
 ### socks5 Username and Password Authentication
 
 If you want to require applications to authenticate the socks5 proxy using a username and password, you can add the `socks5Authentication` property to the client configuration. An example is as follows:

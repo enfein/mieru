@@ -36,52 +36,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type ProxyProtocol int32
-
-const (
-	ProxyProtocol_UNKNOWN_PROXY_PROTOCOL ProxyProtocol = 0
-	ProxyProtocol_SOCKS5_PROXY_PROTOCOL  ProxyProtocol = 1
-)
-
-// Enum value maps for ProxyProtocol.
-var (
-	ProxyProtocol_name = map[int32]string{
-		0: "UNKNOWN_PROXY_PROTOCOL",
-		1: "SOCKS5_PROXY_PROTOCOL",
-	}
-	ProxyProtocol_value = map[string]int32{
-		"UNKNOWN_PROXY_PROTOCOL": 0,
-		"SOCKS5_PROXY_PROTOCOL":  1,
-	}
-)
-
-func (x ProxyProtocol) Enum() *ProxyProtocol {
-	p := new(ProxyProtocol)
-	*p = x
-	return p
-}
-
-func (x ProxyProtocol) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (ProxyProtocol) Descriptor() protoreflect.EnumDescriptor {
-	return file_appctl_proto_servercfg_proto_enumTypes[0].Descriptor()
-}
-
-func (ProxyProtocol) Type() protoreflect.EnumType {
-	return &file_appctl_proto_servercfg_proto_enumTypes[0]
-}
-
-func (x ProxyProtocol) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use ProxyProtocol.Descriptor instead.
-func (ProxyProtocol) EnumDescriptor() ([]byte, []int) {
-	return file_appctl_proto_servercfg_proto_rawDescGZIP(), []int{0}
-}
-
 type EgressAction int32
 
 const (
@@ -118,11 +72,11 @@ func (x EgressAction) String() string {
 }
 
 func (EgressAction) Descriptor() protoreflect.EnumDescriptor {
-	return file_appctl_proto_servercfg_proto_enumTypes[1].Descriptor()
+	return file_appctl_proto_servercfg_proto_enumTypes[0].Descriptor()
 }
 
 func (EgressAction) Type() protoreflect.EnumType {
-	return &file_appctl_proto_servercfg_proto_enumTypes[1]
+	return &file_appctl_proto_servercfg_proto_enumTypes[0]
 }
 
 func (x EgressAction) Number() protoreflect.EnumNumber {
@@ -131,7 +85,7 @@ func (x EgressAction) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use EgressAction.Descriptor instead.
 func (EgressAction) EnumDescriptor() ([]byte, []int) {
-	return file_appctl_proto_servercfg_proto_rawDescGZIP(), []int{1}
+	return file_appctl_proto_servercfg_proto_rawDescGZIP(), []int{0}
 }
 
 type ServerConfig struct {
@@ -623,10 +577,7 @@ const file_appctl_proto_servercfg_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\f\n" +
 	"\n" +
-	"_dualStack*F\n" +
-	"\rProxyProtocol\x12\x1a\n" +
-	"\x16UNKNOWN_PROXY_PROTOCOL\x10\x00\x12\x19\n" +
-	"\x15SOCKS5_PROXY_PROTOCOL\x10\x01*1\n" +
+	"_dualStack*1\n" +
 	"\fEgressAction\x12\t\n" +
 	"\x05PROXY\x10\x00\x12\n" +
 	"\n" +
@@ -646,40 +597,40 @@ func file_appctl_proto_servercfg_proto_rawDescGZIP() []byte {
 	return file_appctl_proto_servercfg_proto_rawDescData
 }
 
-var file_appctl_proto_servercfg_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_appctl_proto_servercfg_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_appctl_proto_servercfg_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_appctl_proto_servercfg_proto_goTypes = []any{
-	(ProxyProtocol)(0),             // 0: mieru.appctl.ProxyProtocol
-	(EgressAction)(0),              // 1: mieru.appctl.EgressAction
-	(*ServerConfig)(nil),           // 2: mieru.appctl.ServerConfig
-	(*ServerAdvancedSettings)(nil), // 3: mieru.appctl.ServerAdvancedSettings
-	(*Egress)(nil),                 // 4: mieru.appctl.Egress
-	(*EgressProxy)(nil),            // 5: mieru.appctl.EgressProxy
-	(*EgressRule)(nil),             // 6: mieru.appctl.EgressRule
-	(*DNS)(nil),                    // 7: mieru.appctl.DNS
-	nil,                            // 8: mieru.appctl.DNS.HostsEntry
-	(*PortBinding)(nil),            // 9: mieru.appctl.PortBinding
-	(*User)(nil),                   // 10: mieru.appctl.User
-	(LoggingLevel)(0),              // 11: mieru.appctl.LoggingLevel
-	(*TrafficPattern)(nil),         // 12: mieru.appctl.TrafficPattern
+	(EgressAction)(0),              // 0: mieru.appctl.EgressAction
+	(*ServerConfig)(nil),           // 1: mieru.appctl.ServerConfig
+	(*ServerAdvancedSettings)(nil), // 2: mieru.appctl.ServerAdvancedSettings
+	(*Egress)(nil),                 // 3: mieru.appctl.Egress
+	(*EgressProxy)(nil),            // 4: mieru.appctl.EgressProxy
+	(*EgressRule)(nil),             // 5: mieru.appctl.EgressRule
+	(*DNS)(nil),                    // 6: mieru.appctl.DNS
+	nil,                            // 7: mieru.appctl.DNS.HostsEntry
+	(*PortBinding)(nil),            // 8: mieru.appctl.PortBinding
+	(*User)(nil),                   // 9: mieru.appctl.User
+	(LoggingLevel)(0),              // 10: mieru.appctl.LoggingLevel
+	(*TrafficPattern)(nil),         // 11: mieru.appctl.TrafficPattern
+	(ProxyProtocol)(0),             // 12: mieru.appctl.ProxyProtocol
 	(*Auth)(nil),                   // 13: mieru.appctl.Auth
 	(DualStack)(0),                 // 14: mieru.appctl.DualStack
 }
 var file_appctl_proto_servercfg_proto_depIdxs = []int32{
-	9,  // 0: mieru.appctl.ServerConfig.portBindings:type_name -> mieru.appctl.PortBinding
-	10, // 1: mieru.appctl.ServerConfig.users:type_name -> mieru.appctl.User
-	3,  // 2: mieru.appctl.ServerConfig.advancedSettings:type_name -> mieru.appctl.ServerAdvancedSettings
-	11, // 3: mieru.appctl.ServerConfig.loggingLevel:type_name -> mieru.appctl.LoggingLevel
-	4,  // 4: mieru.appctl.ServerConfig.egress:type_name -> mieru.appctl.Egress
-	7,  // 5: mieru.appctl.ServerConfig.dns:type_name -> mieru.appctl.DNS
-	12, // 6: mieru.appctl.ServerConfig.trafficPattern:type_name -> mieru.appctl.TrafficPattern
-	5,  // 7: mieru.appctl.Egress.proxies:type_name -> mieru.appctl.EgressProxy
-	6,  // 8: mieru.appctl.Egress.rules:type_name -> mieru.appctl.EgressRule
-	0,  // 9: mieru.appctl.EgressProxy.protocol:type_name -> mieru.appctl.ProxyProtocol
+	8,  // 0: mieru.appctl.ServerConfig.portBindings:type_name -> mieru.appctl.PortBinding
+	9,  // 1: mieru.appctl.ServerConfig.users:type_name -> mieru.appctl.User
+	2,  // 2: mieru.appctl.ServerConfig.advancedSettings:type_name -> mieru.appctl.ServerAdvancedSettings
+	10, // 3: mieru.appctl.ServerConfig.loggingLevel:type_name -> mieru.appctl.LoggingLevel
+	3,  // 4: mieru.appctl.ServerConfig.egress:type_name -> mieru.appctl.Egress
+	6,  // 5: mieru.appctl.ServerConfig.dns:type_name -> mieru.appctl.DNS
+	11, // 6: mieru.appctl.ServerConfig.trafficPattern:type_name -> mieru.appctl.TrafficPattern
+	4,  // 7: mieru.appctl.Egress.proxies:type_name -> mieru.appctl.EgressProxy
+	5,  // 8: mieru.appctl.Egress.rules:type_name -> mieru.appctl.EgressRule
+	12, // 9: mieru.appctl.EgressProxy.protocol:type_name -> mieru.appctl.ProxyProtocol
 	13, // 10: mieru.appctl.EgressProxy.socks5Authentication:type_name -> mieru.appctl.Auth
-	1,  // 11: mieru.appctl.EgressRule.action:type_name -> mieru.appctl.EgressAction
+	0,  // 11: mieru.appctl.EgressRule.action:type_name -> mieru.appctl.EgressAction
 	14, // 12: mieru.appctl.DNS.dualStack:type_name -> mieru.appctl.DualStack
-	8,  // 13: mieru.appctl.DNS.hosts:type_name -> mieru.appctl.DNS.HostsEntry
+	7,  // 13: mieru.appctl.DNS.hosts:type_name -> mieru.appctl.DNS.HostsEntry
 	14, // [14:14] is the sub-list for method output_type
 	14, // [14:14] is the sub-list for method input_type
 	14, // [14:14] is the sub-list for extension type_name
@@ -703,7 +654,7 @@ func file_appctl_proto_servercfg_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_appctl_proto_servercfg_proto_rawDesc), len(file_appctl_proto_servercfg_proto_rawDesc)),
-			NumEnums:      2,
+			NumEnums:      1,
 			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,

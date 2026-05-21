@@ -76,6 +76,11 @@ enum TransportProtocol {
     TCP = 2;
 }
 
+enum ProxyProtocol {
+    UNKNOWN_PROXY_PROTOCOL = 0;
+    SOCKS5_PROXY_PROTOCOL = 1;
+}
+
 message User {
 
     // User name is also the ID of user.

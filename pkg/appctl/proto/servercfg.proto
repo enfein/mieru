@@ -88,11 +88,6 @@ message EgressProxy {
     optional Auth socks5Authentication = 5;
 }
 
-enum ProxyProtocol {
-    UNKNOWN_PROXY_PROTOCOL = 0;
-    SOCKS5_PROXY_PROTOCOL = 1;
-}
-
 message EgressRule {
     // A list of CIDR to match the rule.
     // Use "*" to match all IP addresses.

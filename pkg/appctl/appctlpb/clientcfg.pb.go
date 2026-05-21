@@ -289,8 +289,10 @@ type ClientProfile struct {
 	HandshakeMode *HandshakeMode `protobuf:"varint,6,opt,name=handshakeMode,proto3,enum=mieru.appctl.HandshakeMode,oneof" json:"handshakeMode,omitempty"`
 	// Fine tune traffic behaviors.
 	TrafficPattern *TrafficPattern `protobuf:"bytes,7,opt,name=trafficPattern,proto3,oneof" json:"trafficPattern,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Optional proxy dialer used by the client to connect to mita.
+	Dialer        *ClientDialer `protobuf:"bytes,8,opt,name=dialer,proto3,oneof" json:"dialer,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ClientProfile) Reset() {
@@ -372,6 +374,94 @@ func (x *ClientProfile) GetTrafficPattern() *TrafficPattern {
 	return nil
 }
 
+func (x *ClientProfile) GetDialer() *ClientDialer {
+	if x != nil {
+		return x.Dialer
+	}
+	return nil
+}
+
+type ClientDialer struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Dialer proxy protocol.
+	Protocol *ProxyProtocol `protobuf:"varint,1,opt,name=protocol,proto3,enum=mieru.appctl.ProxyProtocol,oneof" json:"protocol,omitempty"`
+	// Dialer proxy IP address or domain name.
+	Host *string `protobuf:"bytes,2,opt,name=host,proto3,oneof" json:"host,omitempty"`
+	// Dialer proxy port number.
+	Port *int32 `protobuf:"varint,3,opt,name=port,proto3,oneof" json:"port,omitempty"`
+	// Use socks5 UDP ASSOCIATE for UDP underlays.
+	Socks5UDPAssociate *bool `protobuf:"varint,4,opt,name=socks5UDPAssociate,proto3,oneof" json:"socks5UDPAssociate,omitempty"`
+	// Credential to authenticate socks5 proxy.
+	Socks5Authentication *Auth `protobuf:"bytes,5,opt,name=socks5Authentication,proto3,oneof" json:"socks5Authentication,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *ClientDialer) Reset() {
+	*x = ClientDialer{}
+	mi := &file_appctl_proto_clientcfg_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClientDialer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClientDialer) ProtoMessage() {}
+
+func (x *ClientDialer) ProtoReflect() protoreflect.Message {
+	mi := &file_appctl_proto_clientcfg_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClientDialer.ProtoReflect.Descriptor instead.
+func (*ClientDialer) Descriptor() ([]byte, []int) {
+	return file_appctl_proto_clientcfg_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ClientDialer) GetProtocol() ProxyProtocol {
+	if x != nil && x.Protocol != nil {
+		return *x.Protocol
+	}
+	return ProxyProtocol_UNKNOWN_PROXY_PROTOCOL
+}
+
+func (x *ClientDialer) GetHost() string {
+	if x != nil && x.Host != nil {
+		return *x.Host
+	}
+	return ""
+}
+
+func (x *ClientDialer) GetPort() int32 {
+	if x != nil && x.Port != nil {
+		return *x.Port
+	}
+	return 0
+}
+
+func (x *ClientDialer) GetSocks5UDPAssociate() bool {
+	if x != nil && x.Socks5UDPAssociate != nil {
+		return *x.Socks5UDPAssociate
+	}
+	return false
+}
+
+func (x *ClientDialer) GetSocks5Authentication() *Auth {
+	if x != nil {
+		return x.Socks5Authentication
+	}
+	return nil
+}
+
 type ServerEndpoint struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// String representation of IP address.
@@ -388,7 +478,7 @@ type ServerEndpoint struct {
 
 func (x *ServerEndpoint) Reset() {
 	*x = ServerEndpoint{}
-	mi := &file_appctl_proto_clientcfg_proto_msgTypes[2]
+	mi := &file_appctl_proto_clientcfg_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -400,7 +490,7 @@ func (x *ServerEndpoint) String() string {
 func (*ServerEndpoint) ProtoMessage() {}
 
 func (x *ServerEndpoint) ProtoReflect() protoreflect.Message {
-	mi := &file_appctl_proto_clientcfg_proto_msgTypes[2]
+	mi := &file_appctl_proto_clientcfg_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -413,7 +503,7 @@ func (x *ServerEndpoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServerEndpoint.ProtoReflect.Descriptor instead.
 func (*ServerEndpoint) Descriptor() ([]byte, []int) {
-	return file_appctl_proto_clientcfg_proto_rawDescGZIP(), []int{2}
+	return file_appctl_proto_clientcfg_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ServerEndpoint) GetIpAddress() string {
@@ -447,7 +537,7 @@ type MultiplexingConfig struct {
 
 func (x *MultiplexingConfig) Reset() {
 	*x = MultiplexingConfig{}
-	mi := &file_appctl_proto_clientcfg_proto_msgTypes[3]
+	mi := &file_appctl_proto_clientcfg_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -459,7 +549,7 @@ func (x *MultiplexingConfig) String() string {
 func (*MultiplexingConfig) ProtoMessage() {}
 
 func (x *MultiplexingConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_appctl_proto_clientcfg_proto_msgTypes[3]
+	mi := &file_appctl_proto_clientcfg_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -472,7 +562,7 @@ func (x *MultiplexingConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MultiplexingConfig.ProtoReflect.Descriptor instead.
 func (*MultiplexingConfig) Descriptor() ([]byte, []int) {
-	return file_appctl_proto_clientcfg_proto_rawDescGZIP(), []int{3}
+	return file_appctl_proto_clientcfg_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *MultiplexingConfig) GetLevel() MultiplexingLevel {
@@ -496,7 +586,7 @@ type ClientAdvancedSettings struct {
 
 func (x *ClientAdvancedSettings) Reset() {
 	*x = ClientAdvancedSettings{}
-	mi := &file_appctl_proto_clientcfg_proto_msgTypes[4]
+	mi := &file_appctl_proto_clientcfg_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -508,7 +598,7 @@ func (x *ClientAdvancedSettings) String() string {
 func (*ClientAdvancedSettings) ProtoMessage() {}
 
 func (x *ClientAdvancedSettings) ProtoReflect() protoreflect.Message {
-	mi := &file_appctl_proto_clientcfg_proto_msgTypes[4]
+	mi := &file_appctl_proto_clientcfg_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -521,7 +611,7 @@ func (x *ClientAdvancedSettings) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClientAdvancedSettings.ProtoReflect.Descriptor instead.
 func (*ClientAdvancedSettings) Descriptor() ([]byte, []int) {
-	return file_appctl_proto_clientcfg_proto_rawDescGZIP(), []int{4}
+	return file_appctl_proto_clientcfg_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ClientAdvancedSettings) GetNoCheckUpdate() bool {
@@ -565,7 +655,7 @@ const file_appctl_proto_clientcfg_proto_rawDesc = "" +
 	"\r_loggingLevelB\x12\n" +
 	"\x10_socks5ListenLANB\x10\n" +
 	"\x0e_httpProxyPortB\x15\n" +
-	"\x13_httpProxyListenLAN\"\xe7\x03\n" +
+	"\x13_httpProxyListenLAN\"\xab\x04\n" +
 	"\rClientProfile\x12%\n" +
 	"\vprofileName\x18\x01 \x01(\tH\x00R\vprofileName\x88\x01\x01\x12+\n" +
 	"\x04user\x18\x02 \x01(\v2\x12.mieru.appctl.UserH\x01R\x04user\x88\x01\x01\x126\n" +
@@ -573,13 +663,26 @@ const file_appctl_proto_clientcfg_proto_rawDesc = "" +
 	"\x03mtu\x18\x04 \x01(\x05H\x02R\x03mtu\x88\x01\x01\x12I\n" +
 	"\fmultiplexing\x18\x05 \x01(\v2 .mieru.appctl.MultiplexingConfigH\x03R\fmultiplexing\x88\x01\x01\x12F\n" +
 	"\rhandshakeMode\x18\x06 \x01(\x0e2\x1b.mieru.appctl.HandshakeModeH\x04R\rhandshakeMode\x88\x01\x01\x12I\n" +
-	"\x0etrafficPattern\x18\a \x01(\v2\x1c.mieru.appctl.TrafficPatternH\x05R\x0etrafficPattern\x88\x01\x01B\x0e\n" +
+	"\x0etrafficPattern\x18\a \x01(\v2\x1c.mieru.appctl.TrafficPatternH\x05R\x0etrafficPattern\x88\x01\x01\x127\n" +
+	"\x06dialer\x18\b \x01(\v2\x1a.mieru.appctl.ClientDialerH\x06R\x06dialer\x88\x01\x01B\x0e\n" +
 	"\f_profileNameB\a\n" +
 	"\x05_userB\x06\n" +
 	"\x04_mtuB\x0f\n" +
 	"\r_multiplexingB\x10\n" +
 	"\x0e_handshakeModeB\x11\n" +
-	"\x0f_trafficPattern\"\xb4\x01\n" +
+	"\x0f_trafficPatternB\t\n" +
+	"\a_dialer\"\xcf\x02\n" +
+	"\fClientDialer\x12<\n" +
+	"\bprotocol\x18\x01 \x01(\x0e2\x1b.mieru.appctl.ProxyProtocolH\x00R\bprotocol\x88\x01\x01\x12\x17\n" +
+	"\x04host\x18\x02 \x01(\tH\x01R\x04host\x88\x01\x01\x12\x17\n" +
+	"\x04port\x18\x03 \x01(\x05H\x02R\x04port\x88\x01\x01\x123\n" +
+	"\x12socks5UDPAssociate\x18\x04 \x01(\bH\x03R\x12socks5UDPAssociate\x88\x01\x01\x12K\n" +
+	"\x14socks5Authentication\x18\x05 \x01(\v2\x12.mieru.appctl.AuthH\x04R\x14socks5Authentication\x88\x01\x01B\v\n" +
+	"\t_protocolB\a\n" +
+	"\x05_hostB\a\n" +
+	"\x05_portB\x15\n" +
+	"\x13_socks5UDPAssociateB\x17\n" +
+	"\x15_socks5Authentication\"\xb4\x01\n" +
 	"\x0eServerEndpoint\x12!\n" +
 	"\tipAddress\x18\x01 \x01(\tH\x00R\tipAddress\x88\x01\x01\x12#\n" +
 	"\n" +
@@ -621,38 +724,43 @@ func file_appctl_proto_clientcfg_proto_rawDescGZIP() []byte {
 }
 
 var file_appctl_proto_clientcfg_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_appctl_proto_clientcfg_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_appctl_proto_clientcfg_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_appctl_proto_clientcfg_proto_goTypes = []any{
 	(MultiplexingLevel)(0),         // 0: mieru.appctl.MultiplexingLevel
 	(HandshakeMode)(0),             // 1: mieru.appctl.HandshakeMode
 	(*ClientConfig)(nil),           // 2: mieru.appctl.ClientConfig
 	(*ClientProfile)(nil),          // 3: mieru.appctl.ClientProfile
-	(*ServerEndpoint)(nil),         // 4: mieru.appctl.ServerEndpoint
-	(*MultiplexingConfig)(nil),     // 5: mieru.appctl.MultiplexingConfig
-	(*ClientAdvancedSettings)(nil), // 6: mieru.appctl.ClientAdvancedSettings
-	(LoggingLevel)(0),              // 7: mieru.appctl.LoggingLevel
-	(*Auth)(nil),                   // 8: mieru.appctl.Auth
-	(*User)(nil),                   // 9: mieru.appctl.User
-	(*TrafficPattern)(nil),         // 10: mieru.appctl.TrafficPattern
-	(*PortBinding)(nil),            // 11: mieru.appctl.PortBinding
+	(*ClientDialer)(nil),           // 4: mieru.appctl.ClientDialer
+	(*ServerEndpoint)(nil),         // 5: mieru.appctl.ServerEndpoint
+	(*MultiplexingConfig)(nil),     // 6: mieru.appctl.MultiplexingConfig
+	(*ClientAdvancedSettings)(nil), // 7: mieru.appctl.ClientAdvancedSettings
+	(LoggingLevel)(0),              // 8: mieru.appctl.LoggingLevel
+	(*Auth)(nil),                   // 9: mieru.appctl.Auth
+	(*User)(nil),                   // 10: mieru.appctl.User
+	(*TrafficPattern)(nil),         // 11: mieru.appctl.TrafficPattern
+	(ProxyProtocol)(0),             // 12: mieru.appctl.ProxyProtocol
+	(*PortBinding)(nil),            // 13: mieru.appctl.PortBinding
 }
 var file_appctl_proto_clientcfg_proto_depIdxs = []int32{
 	3,  // 0: mieru.appctl.ClientConfig.profiles:type_name -> mieru.appctl.ClientProfile
-	6,  // 1: mieru.appctl.ClientConfig.advancedSettings:type_name -> mieru.appctl.ClientAdvancedSettings
-	7,  // 2: mieru.appctl.ClientConfig.loggingLevel:type_name -> mieru.appctl.LoggingLevel
-	8,  // 3: mieru.appctl.ClientConfig.socks5Authentication:type_name -> mieru.appctl.Auth
-	9,  // 4: mieru.appctl.ClientProfile.user:type_name -> mieru.appctl.User
-	4,  // 5: mieru.appctl.ClientProfile.servers:type_name -> mieru.appctl.ServerEndpoint
-	5,  // 6: mieru.appctl.ClientProfile.multiplexing:type_name -> mieru.appctl.MultiplexingConfig
+	7,  // 1: mieru.appctl.ClientConfig.advancedSettings:type_name -> mieru.appctl.ClientAdvancedSettings
+	8,  // 2: mieru.appctl.ClientConfig.loggingLevel:type_name -> mieru.appctl.LoggingLevel
+	9,  // 3: mieru.appctl.ClientConfig.socks5Authentication:type_name -> mieru.appctl.Auth
+	10, // 4: mieru.appctl.ClientProfile.user:type_name -> mieru.appctl.User
+	5,  // 5: mieru.appctl.ClientProfile.servers:type_name -> mieru.appctl.ServerEndpoint
+	6,  // 6: mieru.appctl.ClientProfile.multiplexing:type_name -> mieru.appctl.MultiplexingConfig
 	1,  // 7: mieru.appctl.ClientProfile.handshakeMode:type_name -> mieru.appctl.HandshakeMode
-	10, // 8: mieru.appctl.ClientProfile.trafficPattern:type_name -> mieru.appctl.TrafficPattern
-	11, // 9: mieru.appctl.ServerEndpoint.portBindings:type_name -> mieru.appctl.PortBinding
-	0,  // 10: mieru.appctl.MultiplexingConfig.level:type_name -> mieru.appctl.MultiplexingLevel
-	11, // [11:11] is the sub-list for method output_type
-	11, // [11:11] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	11, // 8: mieru.appctl.ClientProfile.trafficPattern:type_name -> mieru.appctl.TrafficPattern
+	4,  // 9: mieru.appctl.ClientProfile.dialer:type_name -> mieru.appctl.ClientDialer
+	12, // 10: mieru.appctl.ClientDialer.protocol:type_name -> mieru.appctl.ProxyProtocol
+	9,  // 11: mieru.appctl.ClientDialer.socks5Authentication:type_name -> mieru.appctl.Auth
+	13, // 12: mieru.appctl.ServerEndpoint.portBindings:type_name -> mieru.appctl.PortBinding
+	0,  // 13: mieru.appctl.MultiplexingConfig.level:type_name -> mieru.appctl.MultiplexingLevel
+	14, // [14:14] is the sub-list for method output_type
+	14, // [14:14] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_appctl_proto_clientcfg_proto_init() }
@@ -666,13 +774,14 @@ func file_appctl_proto_clientcfg_proto_init() {
 	file_appctl_proto_clientcfg_proto_msgTypes[2].OneofWrappers = []any{}
 	file_appctl_proto_clientcfg_proto_msgTypes[3].OneofWrappers = []any{}
 	file_appctl_proto_clientcfg_proto_msgTypes[4].OneofWrappers = []any{}
+	file_appctl_proto_clientcfg_proto_msgTypes[5].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_appctl_proto_clientcfg_proto_rawDesc), len(file_appctl_proto_clientcfg_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   5,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
