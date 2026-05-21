@@ -122,9 +122,7 @@ func (d *ClientDialer) dial(ctx context.Context, cmd byte, network, targetAddr, 
 			}
 		}
 	}()
-	stopCancelWatcher := context.AfterFunc(ctx, func() {
-		conn.SetDeadline(time.Now())
-	})
+	stopCancelWatcher := setConnDeadlineOnContextDone(ctx, conn)
 	defer stopCancelWatcher()
 
 	if err = d.negotiateAuthentication(conn); err != nil {
@@ -161,6 +159,25 @@ func (d *ClientDialer) dial(ctx context.Context, cmd byte, network, targetAddr, 
 		}
 	}
 	return conn, udpConn, proxyUDPAddr, nil
+}
+
+func setConnDeadlineOnContextDone(ctx context.Context, conn net.Conn) func() {
+	done := ctx.Done()
+	if done == nil {
+		return func() {}
+	}
+
+	stop := make(chan struct{})
+	go func() {
+		select {
+		case <-done:
+			conn.SetDeadline(time.Now())
+		case <-stop:
+		}
+	}()
+	return func() {
+		close(stop)
+	}
 }
 
 func (d *ClientDialer) negotiateAuthentication(conn net.Conn) error {
