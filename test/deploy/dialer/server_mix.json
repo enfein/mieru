@@ -1,0 +1,24 @@
+{
+    "portBindings": [
+        {
+            "port": 8964,
+            "protocol": "TCP"
+        },
+        {
+            "port": 6489,
+            "protocol": "UDP"
+        }
+    ],
+    "users": [
+        {
+            "name": "baozi",
+            "password": "manlianpenfen",
+            "allowLoopbackIP": true
+        }
+    ],
+    "advancedSettings": {
+        "userHintIsMandatory": true
+    },
+    "loggingLevel": "INFO",
+    "mtu": 1400
+}

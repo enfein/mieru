@@ -391,7 +391,7 @@ test-binary:
 
 # Build docker images to run integration tests.
 .PHONY: test-container-image
-test-container-image: test-container-image-socks5 test-container-image-basic test-container-image-apiclient test-container-image-apiserver test-container-image-proxychain
+test-container-image: test-container-image-socks5 test-container-image-basic test-container-image-apiclient test-container-image-apiserver test-container-image-dialer test-container-image-egress
 
 .PHONY: test-container-image-socks5
 test-container-image-socks5: $(TEST_BINARY_PREREQ)
@@ -409,13 +409,17 @@ test-container-image-apiclient: $(TEST_BINARY_PREREQ)
 test-container-image-apiserver: $(TEST_BINARY_PREREQ)
 	docker build -t mieru_apiserver:${SHORT_SHA} -f test/deploy/apiserver/Dockerfile .
 
-.PHONY: test-container-image-proxychain
-test-container-image-proxychain: $(TEST_BINARY_PREREQ)
-	docker build -t mieru_proxychain:${SHORT_SHA} -f test/deploy/proxychain/Dockerfile .
+.PHONY: test-container-image-dialer
+test-container-image-dialer: $(TEST_BINARY_PREREQ)
+	docker build -t mieru_dialer:${SHORT_SHA} -f test/deploy/dialer/Dockerfile .
+
+.PHONY: test-container-image-egress
+test-container-image-egress: $(TEST_BINARY_PREREQ)
+	docker build -t mieru_egress:${SHORT_SHA} -f test/deploy/egress/Dockerfile .
 
 # Run docker integration tests.
 .PHONY: run-container-test
-run-container-test: run-container-test-socks5 run-container-test-basic run-container-test-apiclient run-container-test-apiserver run-container-test-proxychain
+run-container-test: run-container-test-socks5 run-container-test-basic run-container-test-apiclient run-container-test-apiserver run-container-test-dialer run-container-test-egress
 
 .PHONY: run-container-test-prebuilt
 run-container-test-prebuilt:
@@ -437,9 +441,13 @@ run-container-test-apiclient: test-container-image-apiclient
 run-container-test-apiserver: test-container-image-apiserver
 	docker run mieru_apiserver:${SHORT_SHA}
 
-.PHONY: run-container-test-proxychain
-run-container-test-proxychain: test-container-image-proxychain
-	docker run mieru_proxychain:${SHORT_SHA}
+.PHONY: run-container-test-dialer
+run-container-test-dialer: test-container-image-dialer
+	docker run mieru_dialer:${SHORT_SHA}
+
+.PHONY: run-container-test-egress
+run-container-test-egress: test-container-image-egress
+	docker run mieru_egress:${SHORT_SHA}
 
 # Generate source code from protobuf.
 # Call this after proto files are changed.

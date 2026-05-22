@@ -17,8 +17,10 @@ jobs:
             target: run-container-test-apiclient
           - name: apiserver
             target: run-container-test-apiserver
-          - name: proxychain
-            target: run-container-test-proxychain
+          - name: dialer
+            target: run-container-test-dialer
+          - name: egress
+            target: run-container-test-egress
     steps:
       - name: Check out repository code
         uses: actions/checkout@v6

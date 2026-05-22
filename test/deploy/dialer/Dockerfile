@@ -1,4 +1,4 @@
-# Copyright (C) 2021  mieru authors
+# Copyright (C) 2026  mieru authors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,10 +20,11 @@ FROM ubuntu:24.04
 WORKDIR /test
 
 # Copy binaries, data and test script into the container.
-COPY bin/mieru bin/mieru2 bin/mita bin/mita2 bin/httpserver bin/sockshttpclient bin/socksudpclient bin/udpserver \
-    test/deploy/proxychain/client1.json test/deploy/proxychain/client2.json \
-    test/deploy/proxychain/server1.json test/deploy/proxychain/server2.json \
-    test/deploy/proxychain/test.sh /test/
+COPY bin/mieru bin/mita bin/httpserver bin/udpserver bin/socks5server bin/sockshttpclient bin/socksudpclient \
+    test/deploy/dialer/server_mix.json \
+    test/deploy/dialer/client_tcp.json test/deploy/dialer/client_udp.json \
+    test/deploy/dialer/client_tcp_no_wait.json test/deploy/dialer/client_udp_no_wait.json \
+    test/deploy/dialer/test.sh /test/
 
 # Create mita user and server config directory.
 RUN /usr/sbin/useradd --no-create-home --user-group mita && \

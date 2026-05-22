@@ -1,0 +1,39 @@
+{
+    "profiles": [
+        {
+            "profileName": "default",
+            "user": {
+                "name": "baozi",
+                "password": "manlianpenfen"
+            },
+            "servers": [
+                {
+                    "ipAddress": "127.0.0.1",
+                    "portBindings": [
+                        {
+                            "port": 8964,
+                            "protocol": "TCP"
+                        }
+                    ]
+                }
+            ],
+            "dialer": {
+                "protocol": "SOCKS5_PROXY_PROTOCOL",
+                "host": "127.0.0.1",
+                "port": 2083
+            },
+            "multiplexing": {
+                "level": "MULTIPLEXING_LOW"
+            },
+            "handshakeMode": "HANDSHAKE_NO_WAIT"
+        }
+    ],
+    "activeProfile": "default",
+    "rpcPort": 8989,
+    "socks5Port": 1080,
+    "advancedSettings": {
+        "noCheckUpdate": true
+    },
+    "loggingLevel": "INFO",
+    "socks5ListenLAN": true
+}
