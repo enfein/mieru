@@ -16,18 +16,13 @@
 package socks5
 
 import (
-	"bytes"
 	"context"
-	"encoding/binary"
 	"fmt"
 	"net"
-	"strconv"
 	"sync"
 	"sync/atomic"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
-	"github.com/enfein/mieru/v3/apis/constant"
-	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/stderror"
@@ -58,83 +53,26 @@ func RunUDPAssociateLoop(udpConn *net.UDPConn, conn *apicommon.PacketOverStreamT
 				return
 			}
 
-			// Validate received UDP request.
-			if n <= 6 {
-				udpErr.Store(stderror.ErrNoEnoughData)
+			datagram, err := parseSocks5UDPDatagram(buf[:n])
+			if err != nil {
+				udpErr.Store(err)
 				UDPAssociateErrors.Add(1)
 				return
 			}
-			if buf[0] != 0x00 || buf[1] != 0x00 {
-				udpErr.Store(stderror.ErrInvalidArgument)
+			dstAddr, err := resolveSocks5UDPAddr(context.Background(), resolver, datagram.Addr)
+			if err != nil {
+				log.Debugf("UDP associate %v ResolveUDPAddr() failed: %v", udpConn.LocalAddr(), err)
 				UDPAssociateErrors.Add(1)
-				return
+				continue
 			}
-			if buf[2] != 0x00 {
-				// UDP fragment is not supported.
-				udpErr.Store(stderror.ErrUnsupported)
+			addrMap.Store(dstAddr.String(), datagram.Header)
+			ws, err := udpConn.WriteToUDP(datagram.Payload, dstAddr)
+			if err != nil {
+				log.Debugf("UDP associate [%v - %v] WriteToUDP() failed: %v", udpConn.LocalAddr(), dstAddr, err)
 				UDPAssociateErrors.Add(1)
-				return
-			}
-			addrType := buf[3]
-			if addrType != constant.Socks5IPv4Address && addrType != constant.Socks5FQDNAddress && addrType != constant.Socks5IPv6Address {
-				udpErr.Store(stderror.ErrInvalidArgument)
-				UDPAssociateErrors.Add(1)
-				return
-			}
-			if (addrType == constant.Socks5IPv4Address && n <= 10) || (addrType == constant.Socks5FQDNAddress && n <= int(buf[4])+6) || (addrType == constant.Socks5IPv6Address && n <= 22) {
-				udpErr.Store(stderror.ErrNoEnoughData)
-				UDPAssociateErrors.Add(1)
-				return
-			}
-
-			// Get target address and send data.
-			switch addrType {
-			case constant.Socks5IPv4Address:
-				dstAddr := &net.UDPAddr{
-					IP:   net.IP(buf[4:8]),
-					Port: int(buf[8])<<8 + int(buf[9]),
-				}
-				addrMap.Store(dstAddr.String(), buf[:10])
-				ws, err := udpConn.WriteToUDP(buf[10:n], dstAddr)
-				if err != nil {
-					log.Debugf("UDP associate [%v - %v] WriteToUDP() failed: %v", udpConn.LocalAddr(), dstAddr, err)
-					UDPAssociateErrors.Add(1)
-				} else {
-					UDPAssociateUploadPackets.Add(1)
-					UDPAssociateUploadBytes.Add(int64(ws))
-				}
-			case constant.Socks5FQDNAddress:
-				fqdnLen := buf[4]
-				fqdn := string(buf[5 : 5+fqdnLen])
-				dstAddr, err := apicommon.ResolveUDPAddr(context.Background(), resolver, "udp", fqdn+":"+strconv.Itoa(int(buf[5+fqdnLen])<<8+int(buf[6+fqdnLen])))
-				if err != nil {
-					log.Debugf("UDP associate %v ResolveUDPAddr() failed: %v", udpConn.LocalAddr(), err)
-					UDPAssociateErrors.Add(1)
-					break
-				}
-				addrMap.Store(dstAddr.String(), buf[:7+fqdnLen])
-				ws, err := udpConn.WriteToUDP(buf[7+fqdnLen:n], dstAddr)
-				if err != nil {
-					log.Debugf("UDP associate [%v - %v] WriteToUDP() failed: %v", udpConn.LocalAddr(), dstAddr, err)
-					UDPAssociateErrors.Add(1)
-				} else {
-					UDPAssociateUploadPackets.Add(1)
-					UDPAssociateUploadBytes.Add(int64(ws))
-				}
-			case constant.Socks5IPv6Address:
-				dstAddr := &net.UDPAddr{
-					IP:   net.IP(buf[4:20]),
-					Port: int(buf[20])<<8 + int(buf[21]),
-				}
-				addrMap.Store(dstAddr.String(), buf[:22])
-				ws, err := udpConn.WriteToUDP(buf[22:n], dstAddr)
-				if err != nil {
-					log.Debugf("UDP associate [%v - %v] WriteToUDP() failed: %v", udpConn.LocalAddr(), dstAddr, err)
-					UDPAssociateErrors.Add(1)
-				} else {
-					UDPAssociateUploadPackets.Add(1)
-					UDPAssociateUploadBytes.Add(int64(ws))
-				}
+			} else {
+				UDPAssociateUploadPackets.Add(1)
+				UDPAssociateUploadBytes.Add(int64(ws))
 			}
 		}
 	}()
@@ -167,7 +105,7 @@ func RunUDPAssociateLoop(udpConn *net.UDPConn, conn *apicommon.PacketOverStreamT
 				header = udpAddrToHeader(addr)
 				addrMap.Store(addr.String(), header)
 			}
-			_, err = conn.Write(append(header, buf[:n]...))
+			_, err = conn.Write(append(append([]byte(nil), header...), buf[:n]...))
 			if err != nil {
 				log.Debugf("UDP associate %v Write() to proxy client failed: %v", udpConn.LocalAddr(), err)
 				if udpErr.Load() == nil {
@@ -339,40 +277,6 @@ func runUDPAssociateDatagramLoop(udpConn *net.UDPConn, ctrlConn net.Conn, resolv
 	}
 }
 
-func parseUDPAssociateDatagram(pkt []byte, resolver apicommon.DNSResolver) (*net.UDPAddr, []byte, error) {
-	if len(pkt) <= 6 {
-		return nil, nil, stderror.ErrNoEnoughData
-	}
-	if pkt[0] != 0x00 || pkt[1] != 0x00 {
-		return nil, nil, stderror.ErrInvalidArgument
-	}
-	if pkt[2] != 0x00 {
-		return nil, nil, stderror.ErrUnsupported
-	}
-
-	r := bytes.NewReader(pkt[3:])
-	dst := &model.AddrSpec{}
-	if err := dst.ReadFromSocks5(r); err != nil {
-		return nil, nil, err
-	}
-	headerLen := len(pkt) - r.Len()
-	dstAddr, err := resolveUDPAssociateDatagramAddr(context.Background(), resolver, dst)
-	if err != nil {
-		return nil, nil, err
-	}
-	return dstAddr, pkt[headerLen:], nil
-}
-
-func resolveUDPAssociateDatagramAddr(ctx context.Context, resolver apicommon.DNSResolver, addr *model.AddrSpec) (*net.UDPAddr, error) {
-	if addr.IP.To4() != nil || addr.IP.To16() != nil {
-		return &net.UDPAddr{IP: addr.IP, Port: addr.Port}, nil
-	}
-	if addr.FQDN != "" {
-		return apicommon.ResolveUDPAddr(ctx, resolver, "udp", addr.String())
-	}
-	return nil, model.ErrUnrecognizedAddrType
-}
-
 func cloneUDPAddr(addr *net.UDPAddr) *net.UDPAddr {
 	if addr == nil {
 		return nil
@@ -389,22 +293,4 @@ func sameUDPAddr(a, b *net.UDPAddr) bool {
 		return a == b
 	}
 	return a.Port == b.Port && a.Zone == b.Zone && a.IP.Equal(b.IP)
-}
-
-// udpAddrToHeader returns a UDP associate header with the given
-// destination address.
-func udpAddrToHeader(addr *net.UDPAddr) []byte {
-	if addr == nil {
-		panic("When translating UDP address to UDP associate header, the UDP address is nil")
-	}
-	res := []byte{0, 0, 0}
-	ip := addr.IP
-	if ip.To4() != nil {
-		res = append(res, 1)
-		res = append(res, ip.To4()...)
-	} else {
-		res = append(res, 4)
-		res = append(res, ip.To16()...)
-	}
-	return binary.BigEndian.AppendUint16(res, uint16(addr.Port))
 }

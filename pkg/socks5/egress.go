@@ -16,12 +16,14 @@
 package socks5
 
 import (
+	"bytes"
 	"context"
 	mrand "math/rand"
 	"net"
 	"strings"
 
 	"github.com/enfein/mieru/v3/apis/constant"
+	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/egress"
 	"github.com/enfein/mieru/v3/pkg/log"
@@ -66,32 +68,43 @@ func (s *Server) FindAction(ctx context.Context, in egress.Input) egress.Action 
 		return egress.Action{
 			Action: appctlpb.EgressAction_DIRECT,
 		}
-	} else if in.Data[1] == constant.Socks5ConnectCmd || in.Data[1] == constant.Socks5UDPAssociateCmd {
+	}
+	req, err := parseEgressSocks5Request(in.Data)
+	if err != nil {
+		log.Debugf("socks5 egress controller: failed to parse input %v: %v", in.Data, err)
+		return egress.Action{
+			Action: appctlpb.EgressAction_DIRECT,
+		}
+	}
+	if req.Command == constant.Socks5ConnectCmd || req.Command == constant.Socks5UDPAssociateCmd {
 		// 1. Check if the request should be rejected because the destination is
 		// private or loopback IP.
-		action := s.rejectPrivateAndLoopbackIPAction(ctx, in)
+		action := s.rejectPrivateAndLoopbackIPAction(ctx, in, req)
 		if action.Action == appctlpb.EgressAction_REJECT {
 			return action
 		}
 		// 2. Check if the request should be forwarded to another proxy.
-		return s.forwardToProxyAction(ctx, in)
+		return s.forwardToProxyAction(ctx, req)
 	}
 	return egress.Action{
 		Action: appctlpb.EgressAction_DIRECT,
 	}
 }
 
-func (s *Server) rejectPrivateAndLoopbackIPAction(_ context.Context, in egress.Input) egress.Action {
-	var ip net.IP
-	if in.Data[3] == constant.Socks5IPv4Address {
-		ip = net.IP(in.Data[4:8])
-	} else if in.Data[3] == constant.Socks5IPv6Address {
-		ip = net.IP(in.Data[4:20])
-	} else if in.Data[3] == constant.Socks5FQDNAddress {
-		domainNameLength := int(in.Data[4])
-		domainName := string(in.Data[5 : 5+domainNameLength])
+func parseEgressSocks5Request(data []byte) (*model.Request, error) {
+	req := &model.Request{}
+	if err := req.ReadFromSocks5(bytes.NewReader(data)); err != nil {
+		return nil, err
+	}
+	return req, nil
+}
+
+func (s *Server) rejectPrivateAndLoopbackIPAction(_ context.Context, in egress.Input, req *model.Request) egress.Action {
+	ip := req.DstAddr.IP
+	if len(ip) == 0 && req.DstAddr.FQDN != "" {
 		// If we do a DNS lookup, we leak the destination domain name to the DNS server.
 		// For user privacy, we only check some well-known local domain names.
+		domainName := req.DstAddr.FQDN
 		isWellKnownIPv4LocalDomainName := false
 		isWellKnownIPv6LocalDomainName := false
 		for _, d := range wellKnownIPv4LocalDomainNames {
@@ -114,6 +127,10 @@ func (s *Server) rejectPrivateAndLoopbackIPAction(_ context.Context, in egress.I
 			return egress.Action{
 				Action: appctlpb.EgressAction_DIRECT,
 			}
+		}
+	} else if len(ip) == 0 {
+		return egress.Action{
+			Action: appctlpb.EgressAction_DIRECT,
 		}
 	}
 
@@ -161,20 +178,10 @@ func (s *Server) rejectPrivateAndLoopbackIPAction(_ context.Context, in egress.I
 	}
 }
 
-func (s *Server) forwardToProxyAction(_ context.Context, in egress.Input) egress.Action {
-	addrType := in.Data[3]
-	var addr net.IP
-	var domain string
-
-	switch addrType {
-	case constant.Socks5IPv4Address:
-		addr = net.IP(in.Data[4:8])
-	case constant.Socks5IPv6Address:
-		addr = net.IP(in.Data[4:20])
-	case constant.Socks5FQDNAddress:
-		domainLen := int(in.Data[4])
-		domain = string(in.Data[5 : 5+domainLen])
-	default:
+func (s *Server) forwardToProxyAction(_ context.Context, req *model.Request) egress.Action {
+	addr := req.DstAddr.IP
+	domain := req.DstAddr.FQDN
+	if len(addr) == 0 && domain == "" {
 		return egress.Action{Action: appctlpb.EgressAction_DIRECT}
 	}
 

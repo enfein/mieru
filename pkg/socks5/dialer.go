@@ -16,7 +16,6 @@
 package socks5
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -181,43 +180,7 @@ func setConnDeadlineOnContextDone(ctx context.Context, conn net.Conn) func() {
 }
 
 func (d *ClientDialer) negotiateAuthentication(conn net.Conn) error {
-	method := constant.Socks5NoAuth
-	if d.Credential != nil {
-		method = constant.Socks5UserPassAuth
-	}
-	if _, err := conn.Write([]byte{constant.Socks5Version, 1, method}); err != nil {
-		return fmt.Errorf("write socks5 authentication methods failed: %w", err)
-	}
-	resp := make([]byte, 2)
-	if _, err := io.ReadFull(conn, resp); err != nil {
-		return fmt.Errorf("read socks5 authentication method failed: %w", err)
-	}
-	if resp[0] != constant.Socks5Version || resp[1] != method {
-		return fmt.Errorf("socks5 authentication method negotiation failed: %v", resp)
-	}
-	if d.Credential == nil {
-		return nil
-	}
-
-	if len(d.Credential.User) > 255 || len(d.Credential.Password) > 255 {
-		return fmt.Errorf("socks5 username and password must not exceed 255 bytes")
-	}
-	var req bytes.Buffer
-	req.WriteByte(constant.Socks5UserPassAuthVersion)
-	req.WriteByte(byte(len(d.Credential.User)))
-	req.WriteString(d.Credential.User)
-	req.WriteByte(byte(len(d.Credential.Password)))
-	req.WriteString(d.Credential.Password)
-	if _, err := conn.Write(req.Bytes()); err != nil {
-		return fmt.Errorf("write socks5 username password authentication failed: %w", err)
-	}
-	if _, err := io.ReadFull(conn, resp); err != nil {
-		return fmt.Errorf("read socks5 username password authentication failed: %w", err)
-	}
-	if resp[0] != constant.Socks5UserPassAuthVersion || resp[1] != constant.Socks5AuthSuccess {
-		return fmt.Errorf("socks5 username password authentication failed: %v", resp)
-	}
-	return nil
+	return negotiateSocks5ClientAuthentication(conn, d.Credential)
 }
 
 type clientPacketConn struct {
@@ -341,25 +304,6 @@ func parseAddrSpec(address string) (model.AddrSpec, error) {
 	return model.AddrSpec{FQDN: host, Port: port}, nil
 }
 
-func socks5UDPAddrFromResponse(conn net.Conn, resp *model.Response) (*net.UDPAddr, error) {
-	tcpRemote, ok := conn.RemoteAddr().(*net.TCPAddr)
-	if !ok {
-		return nil, fmt.Errorf("socks5 proxy remote address has unexpected type %T", conn.RemoteAddr())
-	}
-	port := resp.BindAddr.Port
-	if port < 1 || port > 65535 {
-		return nil, fmt.Errorf("socks5 UDP bind port %d is invalid", port)
-	}
-	ip := resp.BindAddr.IP
-	if ip == nil || ip.IsUnspecified() {
-		ip = tcpRemote.IP
-	}
-	if ip == nil || ip.IsUnspecified() {
-		return nil, fmt.Errorf("socks5 UDP bind address is unspecified")
-	}
-	return &net.UDPAddr{IP: ip, Port: port}, nil
-}
-
 func listenUDPForSocks5(network, laddr string, proxyUDPAddr *net.UDPAddr) (*net.UDPConn, error) {
 	listenNetwork := network
 	if listenNetwork == "udp" {
@@ -382,41 +326,6 @@ func listenUDPForSocks5(network, laddr string, proxyUDPAddr *net.UDPAddr) (*net.
 		return nil, fmt.Errorf("net.ListenUDP() failed: %w", err)
 	}
 	return conn, nil
-}
-
-func wrapSocks5UDPPacket(addr net.Addr, payload []byte) ([]byte, error) {
-	var netAddr model.NetAddrSpec
-	if err := netAddr.From(addr); err != nil {
-		return nil, err
-	}
-	if len(netAddr.FQDN) > 255 {
-		return nil, fmt.Errorf("FQDN %q exceeds 255 bytes", netAddr.FQDN)
-	}
-	var buf bytes.Buffer
-	buf.Write([]byte{0, 0, 0})
-	if err := netAddr.AddrSpec.WriteToSocks5(&buf); err != nil {
-		return nil, err
-	}
-	buf.Write(payload)
-	return buf.Bytes(), nil
-}
-
-func unwrapSocks5UDPPacket(pkt []byte) ([]byte, error) {
-	if len(pkt) <= 6 {
-		return nil, fmt.Errorf("socks5 UDP packet is too short")
-	}
-	if pkt[0] != 0 || pkt[1] != 0 {
-		return nil, fmt.Errorf("socks5 UDP reserved bytes are invalid")
-	}
-	if pkt[2] != 0 {
-		return nil, fmt.Errorf("socks5 UDP fragmentation is not supported")
-	}
-	r := bytes.NewReader(pkt[3:])
-	var addr model.AddrSpec
-	if err := addr.ReadFromSocks5(r); err != nil {
-		return nil, err
-	}
-	return pkt[len(pkt)-r.Len():], nil
 }
 
 func sameUDPAddrPort(a, b *net.UDPAddr) bool {

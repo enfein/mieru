@@ -16,6 +16,7 @@
 package socks5
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net"
@@ -168,78 +169,66 @@ func (s *Server) handleAuthentication(conn net.Conn) error {
 	return nil
 }
 
+func negotiateSocks5ClientAuthentication(conn io.ReadWriter, credential *Credential) error {
+	method := constant.Socks5NoAuth
+	if credential != nil {
+		method = constant.Socks5UserPassAuth
+	}
+	if _, err := conn.Write([]byte{constant.Socks5Version, 1, method}); err != nil {
+		return fmt.Errorf("write socks5 authentication methods failed: %w", err)
+	}
+
+	resp := make([]byte, 2)
+	if _, err := io.ReadFull(conn, resp); err != nil {
+		return fmt.Errorf("read socks5 authentication method failed: %w", err)
+	}
+	if resp[0] != constant.Socks5Version || resp[1] != method {
+		return fmt.Errorf("socks5 authentication method negotiation failed: %v", resp)
+	}
+	if credential == nil {
+		return nil
+	}
+
+	if len(credential.User) > 255 || len(credential.Password) > 255 {
+		return fmt.Errorf("socks5 username and password must not exceed 255 bytes")
+	}
+	var req bytes.Buffer
+	req.WriteByte(constant.Socks5UserPassAuthVersion)
+	req.WriteByte(byte(len(credential.User)))
+	req.WriteString(credential.User)
+	req.WriteByte(byte(len(credential.Password)))
+	req.WriteString(credential.Password)
+	if _, err := conn.Write(req.Bytes()); err != nil {
+		return fmt.Errorf("write socks5 username password authentication failed: %w", err)
+	}
+	if _, err := io.ReadFull(conn, resp); err != nil {
+		return fmt.Errorf("read socks5 username password authentication failed: %w", err)
+	}
+	if resp[0] != constant.Socks5UserPassAuthVersion || resp[1] != constant.Socks5AuthSuccess {
+		return fmt.Errorf("socks5 username password authentication failed: %v", resp)
+	}
+	return nil
+}
+
 // dialWithAuthentication dials to another socks5 server with given credential.
 // The proxy connection is closed if there is any error.
 func (s *Server) dialWithAuthentication(proxyConn net.Conn, auth *appctlpb.Auth) error {
 	common.SetReadTimeout(proxyConn, s.config.HandshakeTimeout)
 	defer common.SetReadTimeout(proxyConn, 0)
 
+	var credential *Credential
 	if auth == nil || auth.GetUser() == "" || auth.GetPassword() == "" {
-		// No authentication required.
-		if _, err := proxyConn.Write([]byte{constant.Socks5Version, 1, constant.Socks5NoAuth}); err != nil {
-			HandshakeErrors.Add(1)
-			proxyConn.Close()
-			return fmt.Errorf("failed to write socks5 authentication header to egress proxy: %w", err)
-		}
-
-		resp := []byte{0, 0}
-		if _, err := io.ReadFull(proxyConn, resp); err != nil {
-			HandshakeErrors.Add(1)
-			proxyConn.Close()
-			return fmt.Errorf("failed to read socks5 authentication response from egress proxy: %w", err)
-		}
-		if resp[0] != constant.Socks5Version || resp[1] != constant.Socks5NoAuth {
-			HandshakeErrors.Add(1)
-			proxyConn.Close()
-			return fmt.Errorf("got unexpected socks5 authentication response from egress proxy: %v", resp)
-		}
+		credential = nil
 	} else {
-		// User password authentication.
-		if _, err := proxyConn.Write([]byte{constant.Socks5Version, 1, constant.Socks5UserPassAuth}); err != nil {
-			HandshakeErrors.Add(1)
-			proxyConn.Close()
-			return fmt.Errorf("failed to write socks5 authentication header to egress proxy: %w", err)
+		credential = &Credential{
+			User:     auth.GetUser(),
+			Password: auth.GetPassword(),
 		}
-
-		resp := []byte{0, 0}
-		if _, err := io.ReadFull(proxyConn, resp); err != nil {
-			HandshakeErrors.Add(1)
-			proxyConn.Close()
-			return fmt.Errorf("failed to read socks5 authentication response from egress proxy: %w", err)
-		}
-		if resp[0] != constant.Socks5Version || resp[1] != constant.Socks5UserPassAuth {
-			HandshakeErrors.Add(1)
-			proxyConn.Close()
-			return fmt.Errorf("got unexpected socks5 authentication response from egress proxy: %v", resp)
-		}
-
-		// Send socks5 credential.
-		credential := []byte{constant.Socks5UserPassAuthVersion}
-		credential = append(credential, byte(len(auth.GetUser())))
-		credential = append(credential, []byte(auth.GetUser())...)
-		credential = append(credential, byte(len(auth.GetPassword())))
-		credential = append(credential, []byte(auth.GetPassword())...)
-		if _, err := proxyConn.Write(credential); err != nil {
-			HandshakeErrors.Add(1)
-			proxyConn.Close()
-			return fmt.Errorf("failed to write socks5 authentication credential to egress proxy: %w", err)
-		}
-
-		if _, err := io.ReadFull(proxyConn, resp); err != nil {
-			HandshakeErrors.Add(1)
-			proxyConn.Close()
-			return fmt.Errorf("failed to read socks5 authentication response from egress proxy: %w", err)
-		}
-		if resp[0] != constant.Socks5UserPassAuthVersion {
-			HandshakeErrors.Add(1)
-			proxyConn.Close()
-			return fmt.Errorf("got unexpected socks5 user password authentication version from egress proxy: %v", resp[0])
-		}
-		if resp[1] != constant.Socks5AuthSuccess {
-			HandshakeErrors.Add(1)
-			proxyConn.Close()
-			return fmt.Errorf("socks5 authentication with user password failed from egress proxy")
-		}
+	}
+	if err := negotiateSocks5ClientAuthentication(proxyConn, credential); err != nil {
+		HandshakeErrors.Add(1)
+		proxyConn.Close()
+		return fmt.Errorf("socks5 authentication with egress proxy failed: %w", err)
 	}
 	return nil
 }

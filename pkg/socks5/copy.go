@@ -22,7 +22,6 @@ import (
 	"sync/atomic"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
-	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
@@ -135,44 +134,14 @@ func BidiCopySocks5(conn, proxyConn io.ReadWriteCloser, pendingReq []byte) error
 
 	go func() {
 		// proxyConn -> conn
-		connResp := make([]byte, 4)
-		if _, err := io.ReadFull(proxyConn, connResp); err != nil {
+		connResp, err := readSocks5Response(proxyConn)
+		if err != nil {
 			conn.Close()
 			errCh <- fmt.Errorf("failed to read connection response from the server: %w", err)
 			return
 		}
-		respAddrType := connResp[3]
-		var respFQDNLen []byte
-		var bindAddr []byte
-		switch respAddrType {
-		case constant.Socks5IPv4Address:
-			bindAddr = make([]byte, 6)
-		case constant.Socks5FQDNAddress:
-			respFQDNLen = []byte{0}
-			if _, err := io.ReadFull(proxyConn, respFQDNLen); err != nil {
-				conn.Close()
-				errCh <- fmt.Errorf("failed to get FQDN length: %w", err)
-				return
-			}
-			bindAddr = make([]byte, respFQDNLen[0]+2)
-		case constant.Socks5IPv6Address:
-			bindAddr = make([]byte, 18)
-		default:
-			conn.Close()
-			errCh <- fmt.Errorf("unsupported address type: %d", respAddrType)
-			return
-		}
-		if _, err := io.ReadFull(proxyConn, bindAddr); err != nil {
-			conn.Close()
-			errCh <- fmt.Errorf("failed to get bind address: %w", err)
-			return
-		}
-		if len(respFQDNLen) != 0 {
-			connResp = append(connResp, respFQDNLen...)
-		}
-		connResp = append(connResp, bindAddr...)
-		log.Debugf("HANDSHAKE_NO_WAIT mode socks5 server reply: %v", connResp)
-		_, err := io.Copy(conn, proxyConn)
+		log.Debugf("HANDSHAKE_NO_WAIT mode socks5 server reply: %v", connResp.Raw)
+		_, err = io.Copy(conn, proxyConn)
 		conn.Close()
 		errCh <- err
 	}()
