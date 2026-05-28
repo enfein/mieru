@@ -17,15 +17,15 @@
                     ]
                 }
             ],
+            "multiplexing": {
+                "level": "MULTIPLEXING_LOW"
+            },
+            "handshakeMode": "HANDSHAKE_NO_WAIT",
             "dialer": {
                 "protocol": "SOCKS5_PROXY_PROTOCOL",
                 "host": "127.0.0.1",
                 "port": 2083
-            },
-            "multiplexing": {
-                "level": "MULTIPLEXING_LOW"
-            },
-            "handshakeMode": "HANDSHAKE_NO_WAIT"
+            }
         }
     ],
     "activeProfile": "default",

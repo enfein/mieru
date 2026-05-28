@@ -161,8 +161,6 @@ proxies:
 
 ### 通过 socks5 代理连接 mita 服务器
 
-> 这项功能尚未发布。
-
 如果 mieru 客户端必须通过已有的 socks5 代理连接 mita 服务器，可以在客户端 profile 中添加 `dialer` 对象。没有 `dialer` 的已有 profile 会继续直接连接 mita。
 
 ```js

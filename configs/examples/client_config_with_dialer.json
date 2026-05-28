@@ -3,39 +3,43 @@
         {
             "profileName": "default",
             "user": {
-                "name": "baozi",
-                "password": "manlianpenfen"
+                "name": "ducaiguozei",
+                "password": "xijinping"
             },
             "servers": [
                 {
-                    "ipAddress": "127.0.0.1",
+                    "ipAddress": "12.34.56.78",
+                    "domainName": "",
                     "portBindings": [
                         {
-                            "port": 6489,
-                            "protocol": "UDP"
+                            "portRange": "2012-2022",
+                            "protocol": "TCP"
+                        },
+                        {
+                            "port": 2027,
+                            "protocol": "TCP"
                         }
                     ]
                 }
             ],
             "mtu": 1400,
             "multiplexing": {
-                "level": "MULTIPLEXING_LOW"
+                "level": "MULTIPLEXING_HIGH"
             },
             "handshakeMode": "HANDSHAKE_NO_WAIT",
             "dialer": {
                 "protocol": "SOCKS5_PROXY_PROTOCOL",
                 "host": "127.0.0.1",
-                "port": 2084,
+                "port": 2080,
                 "socks5UDPAssociate": true
             }
         }
     ],
     "activeProfile": "default",
-    "rpcPort": 8989,
+    "rpcPort": 8964,
     "socks5Port": 1080,
-    "advancedSettings": {
-        "noCheckUpdate": true
-    },
     "loggingLevel": "INFO",
-    "socks5ListenLAN": true
+    "socks5ListenLAN": false,
+    "httpProxyPort": 8080,
+    "httpProxyListenLAN": false
 }

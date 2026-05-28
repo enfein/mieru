@@ -161,8 +161,6 @@ Use `udp: true` to allow socks5 UDP associate requests. You can't have both `por
 
 ### Connecting to mita Server Through a socks5 Proxy
 
-> This feature is to be released.
-
 If the mieru client must reach mita server through an existing socks5 proxy, add a `dialer` object to the client profile. Existing profiles without `dialer` continue to connect to mita directly.
 
 ```js

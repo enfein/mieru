@@ -17,17 +17,17 @@
                     ]
                 }
             ],
+            "mtu": 1400,
+            "multiplexing": {
+                "level": "MULTIPLEXING_LOW"
+            },
+            "handshakeMode": "HANDSHAKE_STANDARD",
             "dialer": {
                 "protocol": "SOCKS5_PROXY_PROTOCOL",
                 "host": "127.0.0.1",
                 "port": 2082,
                 "socks5UDPAssociate": true
-            },
-            "mtu": 1400,
-            "multiplexing": {
-                "level": "MULTIPLEXING_LOW"
-            },
-            "handshakeMode": "HANDSHAKE_STANDARD"
+            }
         }
     ],
     "activeProfile": "default",
