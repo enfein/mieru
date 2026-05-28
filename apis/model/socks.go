@@ -36,6 +36,23 @@ func (r Request) String() string {
 	return fmt.Sprintf("Request{command=%d, destination=%v}", r.Command, r.DstAddr)
 }
 
+// ReadSocks5Request reads a socks5 request.
+func ReadSocks5Request(reader io.Reader) (*Request, error) {
+	header := make([]byte, 4)
+	if _, err := io.ReadFull(reader, header); err != nil {
+		return nil, err
+	}
+	dstAddr, addrRaw, err := readSocks5AddrAfterType(reader, header[3])
+	if err != nil {
+		return nil, err
+	}
+	return &Request{
+		Command: header[1],
+		DstAddr: dstAddr,
+		Raw:     append(header, addrRaw...),
+	}, nil
+}
+
 // ReadFromSocks5 reads a socks5 request.
 func (r *Request) ReadFromSocks5(reader io.Reader) error {
 	var buf bytes.Buffer
@@ -57,6 +74,15 @@ func (r *Request) ReadFromSocks5(reader io.Reader) error {
 
 	r.Raw = buf.Bytes()
 	return nil
+}
+
+// WriteSocks5Request writes a socks5 request.
+func WriteSocks5Request(writer io.Writer, command byte, dst AddrSpec) error {
+	req := &Request{
+		Command: command,
+		DstAddr: dst,
+	}
+	return req.WriteToSocks5(writer)
 }
 
 // WriteToSocks5 writes a socks5 request.
@@ -104,6 +130,23 @@ func (r Response) String() string {
 	return fmt.Sprintf("Response{reply=%d, bind=%v}", r.Reply, r.BindAddr)
 }
 
+// ReadSocks5Response reads a socks5 response.
+func ReadSocks5Response(reader io.Reader) (*Response, error) {
+	header := make([]byte, 4)
+	if _, err := io.ReadFull(reader, header); err != nil {
+		return nil, err
+	}
+	bindAddr, addrRaw, err := readSocks5AddrAfterType(reader, header[3])
+	if err != nil {
+		return nil, err
+	}
+	return &Response{
+		Reply:    header[1],
+		BindAddr: bindAddr,
+		Raw:      append(header, addrRaw...),
+	}, nil
+}
+
 // ReadFromSocks5 reads a socks5 response.
 func (r *Response) ReadFromSocks5(reader io.Reader) error {
 	var buf bytes.Buffer
@@ -127,6 +170,15 @@ func (r *Response) ReadFromSocks5(reader io.Reader) error {
 	return nil
 }
 
+// WriteSocks5Response writes a socks5 response.
+func WriteSocks5Response(writer io.Writer, reply byte, bind AddrSpec) error {
+	resp := &Response{
+		Reply:    reply,
+		BindAddr: bind,
+	}
+	return resp.WriteToSocks5(writer)
+}
+
 // WriteToSocks5 writes a socks5 response.
 func (r *Response) WriteToSocks5(writer io.Writer) error {
 	var buf bytes.Buffer
@@ -139,4 +191,14 @@ func (r *Response) WriteToSocks5(writer io.Writer) error {
 	r.Raw = buf.Bytes()
 	_, err := writer.Write(r.Raw)
 	return err
+}
+
+func readSocks5AddrAfterType(reader io.Reader, addrType byte) (AddrSpec, []byte, error) {
+	var addr AddrSpec
+	var raw bytes.Buffer
+	tee := io.TeeReader(reader, &raw)
+	if err := addr.ReadFromSocks5(io.MultiReader(bytes.NewReader([]byte{addrType}), tee)); err != nil {
+		return AddrSpec{}, nil, err
+	}
+	return addr, raw.Bytes(), nil
 }

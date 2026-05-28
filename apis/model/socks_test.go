@@ -24,6 +24,32 @@ import (
 	"github.com/enfein/mieru/v3/apis/constant"
 )
 
+func TestSocks5RequestHelpers(t *testing.T) {
+	input := []byte{constant.Socks5Version, constant.Socks5UDPAssociateCmd, 0, constant.Socks5FQDNAddress, 11, 'e', 'x', 'a', 'm', 'p', 'l', 'e', '.', 'c', 'o', 'm', 0x1f, 0x90}
+
+	req, err := ReadSocks5Request(bytes.NewBuffer(input))
+	if err != nil {
+		t.Fatalf("ReadSocks5Request() failed: %v", err)
+	}
+	if req.Command != constant.Socks5UDPAssociateCmd {
+		t.Errorf("got command %v, want %v", req.Command, constant.Socks5UDPAssociateCmd)
+	}
+	if req.DstAddr.FQDN != "example.com" || req.DstAddr.Port != 8080 {
+		t.Errorf("got DstAddr %+v, want example.com:8080", req.DstAddr)
+	}
+	if !bytes.Equal(req.Raw, input) {
+		t.Errorf("got raw %v, want %v", req.Raw, input)
+	}
+
+	var output bytes.Buffer
+	if err := WriteSocks5Request(&output, req.Command, req.DstAddr); err != nil {
+		t.Fatalf("WriteSocks5Request() failed: %v", err)
+	}
+	if !bytes.Equal(output.Bytes(), input) {
+		t.Errorf("got output %v, want %v", output.Bytes(), input)
+	}
+}
+
 func TestRequestReadWrite(t *testing.T) {
 	testCases := []struct {
 		input   []byte
@@ -143,6 +169,32 @@ func TestRequestToNetAddrSpec(t *testing.T) {
 				t.Errorf("ToNetAddrSpec() = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestSocks5ResponseHelpers(t *testing.T) {
+	input := []byte{constant.Socks5Version, constant.Socks5ReplySuccess, 0, constant.Socks5IPv4Address, 127, 0, 0, 1, 0x23, 0x29}
+
+	resp, err := ReadSocks5Response(bytes.NewBuffer(input))
+	if err != nil {
+		t.Fatalf("ReadSocks5Response() failed: %v", err)
+	}
+	if resp.Reply != constant.Socks5ReplySuccess {
+		t.Errorf("got reply %v, want %v", resp.Reply, constant.Socks5ReplySuccess)
+	}
+	if !reflect.DeepEqual(resp.BindAddr, AddrSpec{IP: net.IP{127, 0, 0, 1}, Port: 9001}) {
+		t.Errorf("got BindAddr %+v, want 127.0.0.1:9001", resp.BindAddr)
+	}
+	if !bytes.Equal(resp.Raw, input) {
+		t.Errorf("got raw %v, want %v", resp.Raw, input)
+	}
+
+	var output bytes.Buffer
+	if err := WriteSocks5Response(&output, resp.Reply, resp.BindAddr); err != nil {
+		t.Fatalf("WriteSocks5Response() failed: %v", err)
+	}
+	if !bytes.Equal(output.Bytes(), input) {
+		t.Errorf("got output %v, want %v", output.Bytes(), input)
 	}
 }
 

@@ -274,7 +274,7 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 	if err != nil {
 		HandshakeErrors.Add(1)
 		if errors.Is(err, model.ErrUnrecognizedAddrType) {
-			if err := writeSocks5Response(conn, constant.Socks5ReplyAddrTypeNotSupported, zeroBindAddr()); err != nil {
+			if err := model.WriteSocks5Response(conn, constant.Socks5ReplyAddrTypeNotSupported, zeroBindAddr()); err != nil {
 				return fmt.Errorf("failed to send reply for addrTypeNotSupported error: %w", err)
 			}
 		}
@@ -318,7 +318,7 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 		return s.handleForwarding(request, conn, action.Proxy)
 	case appctlpb.EgressAction_REJECT:
 		RejectByRules.Add(1)
-		if err := writeSocks5Response(conn, constant.Socks5ReplyNotAllowedByRuleSet, zeroBindAddr()); err != nil {
+		if err := model.WriteSocks5Response(conn, constant.Socks5ReplyNotAllowedByRuleSet, zeroBindAddr()); err != nil {
 			return fmt.Errorf("failed to send reply for notAllowedByRuleSet error: %w", err)
 		}
 		return fmt.Errorf("connection is rejected by egress rules")

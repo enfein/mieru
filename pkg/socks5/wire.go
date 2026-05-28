@@ -24,89 +24,12 @@ import (
 	"net"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
-	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
 
 func zeroBindAddr() model.AddrSpec {
 	return model.AddrSpec{IP: net.IPv4(0, 0, 0, 0)}
-}
-
-func writeSocks5Response(w io.Writer, reply byte, bind model.AddrSpec) error {
-	resp := &model.Response{
-		Reply:    reply,
-		BindAddr: bind,
-	}
-	return resp.WriteToSocks5(w)
-}
-
-func readSocks5Response(r io.Reader) (*model.Response, error) {
-	header := make([]byte, 4)
-	if _, err := io.ReadFull(r, header); err != nil {
-		return nil, err
-	}
-	bindAddr, addrRaw, err := readSocks5AddrAfterType(r, header[3])
-	if err != nil {
-		return nil, err
-	}
-	return &model.Response{
-		Reply:    header[1],
-		BindAddr: bindAddr,
-		Raw:      append(header, addrRaw...),
-	}, nil
-}
-
-func readSocks5Request(r io.Reader) (*model.Request, error) {
-	header := make([]byte, 4)
-	if _, err := io.ReadFull(r, header); err != nil {
-		return nil, err
-	}
-	dstAddr, addrRaw, err := readSocks5AddrAfterType(r, header[3])
-	if err != nil {
-		return nil, err
-	}
-	return &model.Request{
-		Command: header[1],
-		DstAddr: dstAddr,
-		Raw:     append(header, addrRaw...),
-	}, nil
-}
-
-func readSocks5AddrAfterType(r io.Reader, addrType byte) (model.AddrSpec, []byte, error) {
-	var addr model.AddrSpec
-	var raw []byte
-	switch addrType {
-	case constant.Socks5IPv4Address:
-		raw = make([]byte, 6)
-		if _, err := io.ReadFull(r, raw); err != nil {
-			return model.AddrSpec{}, nil, err
-		}
-		addr.IP = net.IP(raw[:4])
-		addr.Port = int(raw[4])<<8 | int(raw[5])
-	case constant.Socks5FQDNAddress:
-		fqdnLen := []byte{0}
-		if _, err := io.ReadFull(r, fqdnLen); err != nil {
-			return model.AddrSpec{}, nil, err
-		}
-		raw = make([]byte, int(fqdnLen[0])+2)
-		if _, err := io.ReadFull(r, raw); err != nil {
-			return model.AddrSpec{}, nil, err
-		}
-		addr.FQDN = string(raw[:fqdnLen[0]])
-		addr.Port = int(raw[fqdnLen[0]])<<8 | int(raw[fqdnLen[0]+1])
-		raw = append(fqdnLen, raw...)
-	case constant.Socks5IPv6Address:
-		raw = make([]byte, 18)
-		if _, err := io.ReadFull(r, raw); err != nil {
-			return model.AddrSpec{}, nil, err
-		}
-		addr.IP = net.IP(raw[:16])
-		addr.Port = int(raw[16])<<8 | int(raw[17])
-	default:
-		return model.AddrSpec{}, nil, model.ErrUnrecognizedAddrType
-	}
-	return addr, raw, nil
 }
 
 func localUDPPort(conn *net.UDPConn) (int, error) {

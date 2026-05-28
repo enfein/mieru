@@ -26,7 +26,7 @@ func (s *Server) handleRequest(ctx context.Context, req *model.Request, conn net
 		ips, err := s.config.Resolver.LookupIP(ctx, "ip", dst.FQDN)
 		if err != nil || len(ips) == 0 {
 			DNSResolveErrors.Add(1)
-			if err := writeSocks5Response(conn, constant.Socks5ReplyHostUnreachable, zeroBindAddr()); err != nil {
+			if err := model.WriteSocks5Response(conn, constant.Socks5ReplyHostUnreachable, zeroBindAddr()); err != nil {
 				return fmt.Errorf("failed to send reply: %w", err)
 			}
 			if err != nil {
@@ -38,7 +38,7 @@ func (s *Server) handleRequest(ctx context.Context, req *model.Request, conn net
 			dst.IP = common.SelectIPFromList(ips, s.config.DualStackPreference)
 			if dst.IP == nil {
 				DNSResolveErrors.Add(1)
-				if err := writeSocks5Response(conn, constant.Socks5ReplyNetworkUnreachable, zeroBindAddr()); err != nil {
+				if err := model.WriteSocks5Response(conn, constant.Socks5ReplyNetworkUnreachable, zeroBindAddr()); err != nil {
 					return fmt.Errorf("failed to send reply: %w", err)
 				}
 				return fmt.Errorf("resolved domain name %s to IP addresses %v, but no IP address satisfy DNS dual stack preference", dst.FQDN, ips)
@@ -57,7 +57,7 @@ func (s *Server) handleRequest(ctx context.Context, req *model.Request, conn net
 		return s.handleAssociate(ctx, req, conn)
 	default:
 		UnsupportedCommandErrors.Add(1)
-		if err := writeSocks5Response(conn, constant.Socks5ReplyCommandNotSupported, zeroBindAddr()); err != nil {
+		if err := model.WriteSocks5Response(conn, constant.Socks5ReplyCommandNotSupported, zeroBindAddr()); err != nil {
 			return fmt.Errorf("failed to send reply: %w", err)
 		}
 		return fmt.Errorf("unsupported command: %v", req.Command)
@@ -81,7 +81,7 @@ func (s *Server) handleConnect(ctx context.Context, req *model.Request, conn net
 			replyCode = constant.Socks5ReplyHostUnreachable
 			HostUnreachableErrors.Add(1)
 		}
-		if err := writeSocks5Response(conn, replyCode, zeroBindAddr()); err != nil {
+		if err := model.WriteSocks5Response(conn, replyCode, zeroBindAddr()); err != nil {
 			return fmt.Errorf("failed to send reply: %w", err)
 		}
 		return fmt.Errorf("connect to %v failed: %w", req.DstAddr, err)
@@ -91,7 +91,7 @@ func (s *Server) handleConnect(ctx context.Context, req *model.Request, conn net
 	// Send success.
 	local := target.LocalAddr().(*net.TCPAddr)
 	bind := model.AddrSpec{IP: local.IP, Port: local.Port}
-	if err := writeSocks5Response(conn, constant.Socks5ReplySuccess, bind); err != nil {
+	if err := model.WriteSocks5Response(conn, constant.Socks5ReplySuccess, bind); err != nil {
 		HandshakeErrors.Add(1)
 		return fmt.Errorf("failed to send reply: %w", err)
 	}
@@ -102,7 +102,7 @@ func (s *Server) handleConnect(ctx context.Context, req *model.Request, conn net
 // handleBind is used to handle a bind command.
 func (s *Server) handleBind(_ context.Context, _ *model.Request, conn net.Conn) error {
 	UnsupportedCommandErrors.Add(1)
-	if err := writeSocks5Response(conn, constant.Socks5ReplyCommandNotSupported, zeroBindAddr()); err != nil {
+	if err := model.WriteSocks5Response(conn, constant.Socks5ReplyCommandNotSupported, zeroBindAddr()); err != nil {
 		HandshakeErrors.Add(1)
 		return fmt.Errorf("failed to send reply: %w", err)
 	}
@@ -141,7 +141,7 @@ func (s *Server) handleAssociatePacketOverStream(ctx context.Context, _ *model.R
 		return err
 	}
 	bind := model.AddrSpec{IP: net.IP{0, 0, 0, 0}, Port: udpPort}
-	if err := writeSocks5Response(conn, constant.Socks5ReplySuccess, bind); err != nil {
+	if err := model.WriteSocks5Response(conn, constant.Socks5ReplySuccess, bind); err != nil {
 		HandshakeErrors.Add(1)
 		return fmt.Errorf("failed to send reply: %w", err)
 	}
@@ -170,7 +170,7 @@ func (s *Server) handleAssociateDatagram(ctx context.Context, _ *model.Request, 
 		return fmt.Errorf("UDP listener local address has unexpected type %T", udpConn.LocalAddr())
 	}
 	bind := model.AddrSpec{IP: socks5UDPAssociateBindIP(conn, local), Port: local.Port}
-	if err := writeSocks5Response(conn, constant.Socks5ReplySuccess, bind); err != nil {
+	if err := model.WriteSocks5Response(conn, constant.Socks5ReplySuccess, bind); err != nil {
 		udpConn.Close()
 		HandshakeErrors.Add(1)
 		return fmt.Errorf("failed to send reply: %w", err)
@@ -226,7 +226,7 @@ func (s *Server) handleForwardingUDP(req *model.Request, conn net.Conn, proxyCon
 		return fmt.Errorf("failed to write socks5 request to egress proxy: %w", err)
 	}
 
-	resp, err := readSocks5Response(proxyConn)
+	resp, err := model.ReadSocks5Response(proxyConn)
 	if err != nil {
 		HandshakeErrors.Add(1)
 		proxyConn.Close()
@@ -337,7 +337,7 @@ func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, []b
 	defer common.SetReadTimeout(proxyConn, 0)
 	common.SetReadTimeout(conn, s.config.HandshakeTimeout)
 
-	req, err := readSocks5Request(conn)
+	req, err := model.ReadSocks5Request(conn)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get socks5 connection request: %w", err)
 	}
@@ -371,7 +371,7 @@ func (s *Server) proxySocks5ConnReq(conn, proxyConn net.Conn) (*net.UDPConn, []b
 
 	// Get server connection response.
 	common.SetReadTimeout(proxyConn, s.config.HandshakeTimeout)
-	connResp, err := readSocks5Response(proxyConn)
+	connResp, err := model.ReadSocks5Response(proxyConn)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read connection response from the server: %w", err)
 	}

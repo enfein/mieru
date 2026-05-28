@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
+	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
@@ -134,7 +135,7 @@ func BidiCopySocks5(conn, proxyConn io.ReadWriteCloser, pendingReq []byte) error
 
 	go func() {
 		// proxyConn -> conn
-		connResp, err := readSocks5Response(proxyConn)
+		connResp, err := model.ReadSocks5Response(proxyConn)
 		if err != nil {
 			conn.Close()
 			errCh <- fmt.Errorf("failed to read connection response from the server: %w", err)
