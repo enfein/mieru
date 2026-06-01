@@ -57,6 +57,8 @@ Run `make bench` when changing `pkg/cipher`.
 
 Use Docker integration tests when changes affect runtime networking, client/server behavior, API clients, or deployment configs. It can take a few minutes to run the Docker integration tests.
 
+Run tests outside sandbox because most tests require network setup.
+
 ## Commit & Pull Request Guidelines
 
 Use concise Conventional Commit-style prefixes.
@@ -64,6 +66,8 @@ Use concise Conventional Commit-style prefixes.
 ## Agent-Specific Instructions
 
 Do not run destructive cleanup such as `make clean` unless explicitly requested.
+
+Before writing go code, check go.mod file to confirm the compatibility of libraries.
 
 Avoid editing generated protobuf files by hand; update the source `.proto` and run `make protobuf` instead.
 
