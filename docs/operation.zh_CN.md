@@ -7,6 +7,7 @@
 - [查看日志](#查看日志)
 - [打开和关闭调试日志](#打开和关闭调试日志)
 - [常见问题速查](#常见问题速查)
+  - [应用配置时提示 unknown field](#症状应用配置时提示-unknown-field)
   - [完全无法连接](#症状完全无法连接)
   - [连接一段时间后断开](#症状连接一段时间后断开)
   - [速度非常慢](#症状速度非常慢)
@@ -146,6 +147,27 @@ mieru start
 ---
 
 ## 常见问题速查
+
+### 症状：应用配置时提示 unknown field
+
+错误示例：
+
+```text
+common.UnmarshalJSON() failed: proto: (line 2:2): unknown field "profiles"
+```
+
+```text
+common.UnmarshalJSON() failed: proto: (line 2:2): unknown field "portBindings"
+```
+
+这通常表示配置文件被应用到了错误的程序。如果 `mita` 报告 `profiles` 等未知字段，很可能是它正在读取客户端配置。如果 `mieru` 报告 `portBindings` 或 `users` 等未知字段，很可能是它正在读取服务器配置。
+
+请使用匹配的命令：
+
+```sh
+mita apply config <server_config.json>
+mieru apply config <client_config.json>
+```
 
 ### 症状：完全无法连接
 

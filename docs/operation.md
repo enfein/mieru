@@ -7,6 +7,7 @@ This guide covers monitoring, diagnostics, and common issues for both the **mita
 - [View Logs](#view-logs)
 - [Enable / Disable Debug Logging](#enable--disable-debug-logging)
 - [Common Issues — Quick Reference](#common-issues--quick-reference)
+  - [Configuration apply fails with unknown field](#symptom-configuration-apply-fails-with-unknown-field)
   - [Cannot connect at all](#symptom-cannot-connect-at-all)
   - [Connection drops after a while](#symptom-connection-drops-after-a-while)
   - [Very slow speed](#symptom-very-slow-speed)
@@ -146,6 +147,27 @@ All supported levels: `FATAL`, `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`.
 ---
 
 ## Common Issues — Quick Reference
+
+### Symptom: Configuration apply fails with unknown field
+
+Example error:
+
+```text
+common.UnmarshalJSON() failed: proto: (line 2:2): unknown field "profiles"
+```
+
+```text
+common.UnmarshalJSON() failed: proto: (line 2:2): unknown field "portBindings"
+```
+
+This usually means a configuration file is being applied to the wrong program. If `mita` reports an unknown field such as `profiles`, it is likely reading a client configuration. If `mieru` reports an unknown field such as `portBindings` or `users`, it is likely reading a server configuration.
+
+Use the matching command:
+
+```sh
+mita apply config <server_config.json>
+mieru apply config <client_config.json>
+```
 
 ### Symptom: Cannot connect at all
 
