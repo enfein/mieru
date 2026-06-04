@@ -27,19 +27,10 @@ import (
 	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
-	"github.com/enfein/mieru/v3/pkg/metrics"
 )
 
 const (
 	clientTimeout time.Duration = 10 * time.Second
-)
-
-var (
-	HTTPMetricGroupName = "HTTP proxy"
-
-	HTTPRequests     = metrics.RegisterMetric(HTTPMetricGroupName, "Requests", metrics.COUNTER)
-	HTTPConnErrors   = metrics.RegisterMetric(HTTPMetricGroupName, "ConnErrors", metrics.COUNTER)
-	HTTPSchemeErrors = metrics.RegisterMetric(HTTPMetricGroupName, "SchemeErrors", metrics.COUNTER)
 )
 
 // hopByHopHeaders are HTTP headers that need to be removed by intermediaries.

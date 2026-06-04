@@ -177,7 +177,7 @@ func TestNetAddrSpecFrom(t *testing.T) {
 		{
 			netAddrSpec: NetAddrSpec{},
 			addr: &net.TCPAddr{
-				Port: 8080,
+				Port: 80800,
 			},
 			wantErr: true,
 		},

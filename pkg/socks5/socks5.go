@@ -16,27 +16,10 @@ import (
 	"github.com/enfein/mieru/v3/pkg/egress"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/mathext"
-	"github.com/enfein/mieru/v3/pkg/metrics"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
 
-var (
-	HandshakeErrors          = metrics.RegisterMetric("socks5", "HandshakeErrors", metrics.COUNTER)
-	DNSResolveErrors         = metrics.RegisterMetric("socks5", "DNSResolveErrors", metrics.COUNTER)
-	UnsupportedCommandErrors = metrics.RegisterMetric("socks5", "UnsupportedCommandErrors", metrics.COUNTER)
-	NetworkUnreachableErrors = metrics.RegisterMetric("socks5", "NetworkUnreachableErrors", metrics.COUNTER)
-	HostUnreachableErrors    = metrics.RegisterMetric("socks5", "HostUnreachableErrors", metrics.COUNTER)
-	ConnectionRefusedErrors  = metrics.RegisterMetric("socks5", "ConnectionRefusedErrors", metrics.COUNTER)
-	UDPAssociateErrors       = metrics.RegisterMetric("socks5", "UDPAssociateErrors", metrics.COUNTER)
-	RejectByRules            = metrics.RegisterMetric("socks5", "RejectByRules", metrics.COUNTER)
-
-	UDPAssociateUploadBytes     = metrics.RegisterMetric("socks5 UDP associate", "UploadBytes", metrics.COUNTER)
-	UDPAssociateDownloadBytes   = metrics.RegisterMetric("socks5 UDP associate", "DownloadBytes", metrics.COUNTER)
-	UDPAssociateUploadPackets   = metrics.RegisterMetric("socks5 UDP associate", "UploadPackets", metrics.COUNTER)
-	UDPAssociateDownloadPackets = metrics.RegisterMetric("socks5 UDP associate", "DownloadPackets", metrics.COUNTER)
-)
-
-// ProxyDialer creates proxy connections for client-side socks5 forwarding.
+// ProxyDialer creates a new connection to proxy server.
 type ProxyDialer interface {
 	DialContext(ctx context.Context) (net.Conn, error)
 }
@@ -45,12 +28,12 @@ type ProxyDialer interface {
 type UDPAssociateMode int
 
 const (
-	// UDPAssociateModePacketOverStream relays UDP packets through the TCP
-	// control connection using PacketOverStreamTunnel. This is the default
+	// UDPAssociateModePacketOverStream relays UDP packets through a streaming
+	// connection using PacketOverStreamTunnel. This is the default
 	// mode used by mieru client and server.
 	UDPAssociateModePacketOverStream UDPAssociateMode = iota
 
-	// UDPAssociateModeDatagram relays UDP packets with a RFC 1928 UDP socket.
+	// UDPAssociateModeDatagram relays UDP packets with packeting connection.
 	UDPAssociateModeDatagram
 )
 
@@ -193,9 +176,8 @@ func (s *Server) ServeConn(conn net.Conn) error {
 
 	if s.config.UseProxy {
 		return s.clientServeConn(conn)
-	} else {
-		return s.serverServeConn(conn)
 	}
+	return s.serverServeConn(conn)
 }
 
 // Close closes the network listener used by the server.
@@ -218,63 +200,21 @@ func (s *Server) acceptLoop() {
 	}
 }
 
-func (s *Server) clientServeConn(conn net.Conn) error {
-	if s.config.AuthOpts.ClientSideAuthentication {
-		if err := s.handleAuthentication(conn); err != nil {
-			return err
-		}
-	}
-
-	// Establish connection to proxy server.
-	ctx := context.Background()
-	var proxyConn net.Conn
-	var err error
-	proxyConn, err = s.config.ProxyDialer.DialContext(ctx)
-	if err != nil {
-		return fmt.Errorf("proxy dialer DialContext() failed: %w", err)
-	}
-
+// serverServeConn serves the incoming socks5 connection in proxy server.
+// The connection is initiated by proxy client.
+func (s *Server) serverServeConn(proxyConn net.Conn) error {
 	if !s.config.AuthOpts.ClientSideAuthentication {
-		if err := s.proxySocks5AuthReq(conn, proxyConn); err != nil {
-			HandshakeErrors.Add(1)
-			proxyConn.Close()
-			return err
-		}
-	}
-	udpAssociateConn, pendingConnReq, err := s.proxySocks5ConnReq(conn, proxyConn)
-	if err != nil {
-		HandshakeErrors.Add(1)
-		proxyConn.Close()
-		return err
-	}
-	if udpAssociateConn == nil {
-		if s.config.HandshakeNoWait {
-			return BidiCopySocks5(conn, proxyConn, pendingConnReq)
-		}
-		return common.BidiCopy(conn, proxyConn)
-	}
-	log.Debugf("UDP association is listening on %v", udpAssociateConn.LocalAddr())
-	conn.(apicommon.HierarchyConn).Add(udpAssociateConn)
-	go func() {
-		common.ReadAllAndDiscard(conn)
-		conn.Close()
-	}()
-	return BidiCopyUDP(udpAssociateConn, apicommon.NewPacketOverStreamTunnel(proxyConn))
-}
-
-func (s *Server) serverServeConn(conn net.Conn) error {
-	if !s.config.AuthOpts.ClientSideAuthentication {
-		if err := s.handleAuthentication(conn); err != nil {
+		if err := s.handleAuthentication(proxyConn); err != nil {
 			return err
 		}
 	}
 
 	ctx := context.Background()
-	request, err := s.readRequest(conn)
+	request, err := s.readRequest(proxyConn)
 	if err != nil {
 		HandshakeErrors.Add(1)
 		if errors.Is(err, model.ErrUnrecognizedAddrType) {
-			if err := model.WriteSocks5Response(conn, constant.Socks5ReplyAddrTypeNotSupported, zeroBindAddr()); err != nil {
+			if err := model.WriteSocks5Response(proxyConn, constant.Socks5ReplyAddrTypeNotSupported, zeroBindAddr()); err != nil {
 				return fmt.Errorf("failed to send reply for addrTypeNotSupported error: %w", err)
 			}
 		}
@@ -285,7 +225,7 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 		Protocol: appctlpb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL,
 		Data:     request.Raw,
 	}
-	userCtx := conn.(apicommon.UserContext)
+	userCtx := proxyConn.(apicommon.UserContext)
 	userName := userCtx.UserName()
 	if userName == "" {
 		log.Debugf("Failed to determine user name from the connection")
@@ -308,20 +248,62 @@ func (s *Server) serverServeConn(conn net.Conn) error {
 	}
 	switch action.Action {
 	case appctlpb.EgressAction_DIRECT:
-		if err := s.handleRequest(ctx, request, conn); err != nil {
+		if err := s.handleRequest(ctx, request, proxyConn); err != nil {
 			return fmt.Errorf("handleRequest() failed: %w", err)
 		}
 	case appctlpb.EgressAction_PROXY:
 		if action.Proxy == nil {
 			return fmt.Errorf("egress action is PROXY but proxy info is unavailable")
 		}
-		return s.handleForwarding(request, conn, action.Proxy)
+		return s.handleForwarding(request, proxyConn, action.Proxy)
 	case appctlpb.EgressAction_REJECT:
 		RejectByRules.Add(1)
-		if err := model.WriteSocks5Response(conn, constant.Socks5ReplyNotAllowedByRuleSet, zeroBindAddr()); err != nil {
+		if err := model.WriteSocks5Response(proxyConn, constant.Socks5ReplyNotAllowedByRuleSet, zeroBindAddr()); err != nil {
 			return fmt.Errorf("failed to send reply for notAllowedByRuleSet error: %w", err)
 		}
 		return fmt.Errorf("connection is rejected by egress rules")
 	}
 	return nil
+}
+
+// clientServeConn serves the incoming socks5 connection in proxy client.
+// The connection is initiated by the user.
+func (s *Server) clientServeConn(userConn net.Conn) error {
+	if s.config.AuthOpts.ClientSideAuthentication {
+		if err := s.handleAuthentication(userConn); err != nil {
+			return err
+		}
+	}
+
+	proxyConn, err := s.config.ProxyDialer.DialContext(context.Background())
+	if err != nil {
+		return fmt.Errorf("proxy dialer DialContext() failed: %w", err)
+	}
+
+	if !s.config.AuthOpts.ClientSideAuthentication {
+		if err := s.proxySocks5AuthReq(userConn, proxyConn); err != nil {
+			HandshakeErrors.Add(1)
+			proxyConn.Close()
+			return err
+		}
+	}
+	udpAssociateConn, pendingConnReq, err := s.proxySocks5ConnReq(userConn, proxyConn)
+	if err != nil {
+		HandshakeErrors.Add(1)
+		proxyConn.Close()
+		return err
+	}
+	if udpAssociateConn == nil {
+		if s.config.HandshakeNoWait {
+			return BidiCopySocks5(userConn, proxyConn, pendingConnReq)
+		}
+		return common.BidiCopy(userConn, proxyConn)
+	}
+	log.Debugf("UDP association is listening on %v", udpAssociateConn.LocalAddr())
+	userConn.(apicommon.HierarchyConn).Add(udpAssociateConn)
+	go func() {
+		common.ReadAllAndDiscard(userConn)
+		userConn.Close()
+	}()
+	return BidiCopyUDP(udpAssociateConn, apicommon.NewPacketOverStreamTunnel(proxyConn))
 }

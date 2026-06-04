@@ -61,6 +61,38 @@ func (a AddrSpec) AddrType() uint8 {
 	return 0 // invalid address
 }
 
+// From sets the AddrSpec object with the given address.
+// It doesn't modify the object if error is not nil.
+func (a *AddrSpec) From(addr string) error {
+	host, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		return err
+	}
+
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return err
+	}
+	if port < 0 || port > 65535 {
+		return fmt.Errorf("port %d is out of range", port)
+	}
+
+	if ip := net.ParseIP(host); ip != nil {
+		a.FQDN = ""
+		a.IP = ip
+		a.Port = port
+		return nil
+	}
+
+	if len(host) > 255 {
+		return fmt.Errorf("FQDN %q exceeds 255 bytes", host)
+	}
+	a.FQDN = host
+	a.IP = nil
+	a.Port = port
+	return nil
+}
+
 // ReadFromSocks5 reads the AddrSpec from a socks5 request.
 func (a *AddrSpec) ReadFromSocks5(r io.Reader) error {
 	// Get the address type.
@@ -150,6 +182,7 @@ func (n NetAddrSpec) Network() string {
 }
 
 // From sets the NetAddrSpec object with the given network address.
+// It doesn't modify the object if error is not nil.
 func (n *NetAddrSpec) From(addr net.Addr) error {
 	if nas, ok := addr.(NetAddrSpec); ok {
 		n.AddrSpec = nas.AddrSpec
@@ -162,29 +195,11 @@ func (n *NetAddrSpec) From(addr net.Addr) error {
 		return nil
 	}
 
+	addrSpec := AddrSpec{}
+	if err := addrSpec.From(addr.String()); err != nil {
+		return err
+	}
+	n.AddrSpec = addrSpec
 	n.Net = addr.Network()
-
-	host, portStr, err := net.SplitHostPort(addr.String())
-	if err != nil {
-		return fmt.Errorf("split host port failed: %w", err)
-	}
-	if host == "" {
-		return fmt.Errorf("host is empty")
-	}
-
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return fmt.Errorf("parse port failed: %w", err)
-	}
-	n.Port = port
-
-	if ip := net.ParseIP(host); ip != nil {
-		n.IP = ip
-		n.FQDN = ""
-		return nil
-	}
-
-	n.IP = nil
-	n.FQDN = host
 	return nil
 }

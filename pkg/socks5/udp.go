@@ -16,13 +16,17 @@
 package socks5
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"sync"
 	"sync/atomic"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
+	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/stderror"
@@ -245,7 +249,11 @@ func runUDPAssociateDatagramLoop(udpConn *net.UDPConn, ctrlConn net.Conn, resolv
 				continue
 			}
 			if clientAddr == nil {
-				clientAddr = cloneUDPAddr(addr)
+				clientAddr = &net.UDPAddr{
+					IP:   append(net.IP(nil), addr.IP...),
+					Port: addr.Port,
+					Zone: addr.Zone,
+				}
 			}
 
 			ws, err := udpConn.WriteToUDP(payload, dstAddr)
@@ -277,20 +285,163 @@ func runUDPAssociateDatagramLoop(udpConn *net.UDPConn, ctrlConn net.Conn, resolv
 	}
 }
 
-func cloneUDPAddr(addr *net.UDPAddr) *net.UDPAddr {
-	if addr == nil {
+func rewriteSocks5ResponseBindPort(resp *model.Response, port int) error {
+	if resp == nil {
+		return fmt.Errorf("socks5 response is nil")
+	}
+	if port < 0 || port > 65535 {
+		return fmt.Errorf("port %d is out of range", port)
+	}
+	resp.BindAddr.Port = port
+	if len(resp.Raw) >= 2 {
+		resp.Raw[len(resp.Raw)-2] = byte(port >> 8)
+		resp.Raw[len(resp.Raw)-1] = byte(port)
 		return nil
 	}
-	return &net.UDPAddr{
-		IP:   append(net.IP(nil), addr.IP...),
-		Port: addr.Port,
-		Zone: addr.Zone,
+
+	var buf bytes.Buffer
+	if err := resp.WriteToSocks5(&buf); err != nil {
+		return err
 	}
+	resp.Raw = buf.Bytes()
+	return nil
+}
+
+func socks5UDPAddrFromResponse(conn net.Conn, resp *model.Response) (*net.UDPAddr, error) {
+	tcpRemote, ok := conn.RemoteAddr().(*net.TCPAddr)
+	if !ok {
+		return nil, fmt.Errorf("socks5 proxy remote address has unexpected type %T", conn.RemoteAddr())
+	}
+	port := resp.BindAddr.Port
+	if port < 1 || port > 65535 {
+		return nil, fmt.Errorf("socks5 UDP bind port %d is invalid", port)
+	}
+	ip := resp.BindAddr.IP
+	if ip == nil || ip.IsUnspecified() {
+		ip = tcpRemote.IP
+	}
+	if ip == nil || ip.IsUnspecified() {
+		return nil, fmt.Errorf("socks5 UDP bind address is unspecified")
+	}
+	return &net.UDPAddr{IP: ip, Port: port}, nil
+}
+
+type socks5UDPDatagram struct {
+	Addr    model.AddrSpec
+	Header  []byte
+	Payload []byte
+}
+
+func parseSocks5UDPDatagram(pkt []byte) (*socks5UDPDatagram, error) {
+	if len(pkt) <= 6 {
+		return nil, stderror.ErrNoEnoughData
+	}
+	if pkt[0] != 0x00 || pkt[1] != 0x00 {
+		return nil, stderror.ErrInvalidArgument
+	}
+	if pkt[2] != 0x00 {
+		return nil, stderror.ErrUnsupported
+	}
+
+	r := bytes.NewReader(pkt[3:])
+	dst := model.AddrSpec{}
+	if err := dst.ReadFromSocks5(r); err != nil {
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			return nil, stderror.ErrNoEnoughData
+		}
+		return nil, err
+	}
+	headerLen := len(pkt) - r.Len()
+	if len(pkt) < headerLen {
+		return nil, stderror.ErrNoEnoughData
+	}
+
+	return &socks5UDPDatagram{
+		Addr:    dst,
+		Header:  append([]byte(nil), pkt[:headerLen]...),
+		Payload: pkt[headerLen:],
+	}, nil
+}
+
+func newSocks5UDPDatagram(addr model.AddrSpec, payload []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	buf.Write([]byte{0, 0, 0})
+	if err := addr.WriteToSocks5(&buf); err != nil {
+		return nil, err
+	}
+	buf.Write(payload)
+	return buf.Bytes(), nil
+}
+
+func resolveSocks5UDPAddr(ctx context.Context, resolver apicommon.DNSResolver, addr model.AddrSpec) (*net.UDPAddr, error) {
+	if addr.IP.To4() != nil || addr.IP.To16() != nil {
+		return &net.UDPAddr{IP: addr.IP, Port: addr.Port}, nil
+	}
+	if addr.FQDN != "" {
+		return apicommon.ResolveUDPAddr(ctx, resolver, "udp", addr.String())
+	}
+	return nil, model.ErrUnrecognizedAddrType
+}
+
+func parseUDPAssociateDatagram(pkt []byte, resolver apicommon.DNSResolver) (*net.UDPAddr, []byte, error) {
+	datagram, err := parseSocks5UDPDatagram(pkt)
+	if err != nil {
+		return nil, nil, err
+	}
+	dstAddr, err := resolveSocks5UDPAddr(context.Background(), resolver, datagram.Addr)
+	if err != nil {
+		return nil, nil, err
+	}
+	return dstAddr, datagram.Payload, nil
+}
+
+func udpAddrSpec(addr *net.UDPAddr) model.AddrSpec {
+	return model.AddrSpec{
+		IP:   addr.IP,
+		Port: addr.Port,
+	}
+}
+
+// udpAddrToHeader returns a UDP associate header with the given
+// destination address.
+func udpAddrToHeader(addr *net.UDPAddr) []byte {
+	if addr == nil {
+		panic("When translating UDP address to UDP associate header, the UDP address is nil")
+	}
+	header, err := newSocks5UDPDatagram(udpAddrSpec(addr), nil)
+	if err != nil {
+		panic(err)
+	}
+	return header
+}
+
+func wrapSocks5UDPPacket(addr net.Addr, payload []byte) ([]byte, error) {
+	var netAddr model.NetAddrSpec
+	if err := netAddr.From(addr); err != nil {
+		return nil, err
+	}
+	return newSocks5UDPDatagram(netAddr.AddrSpec, payload)
+}
+
+func unwrapSocks5UDPPacket(pkt []byte) ([]byte, error) {
+	datagram, err := parseSocks5UDPDatagram(pkt)
+	if err != nil {
+		return nil, err
+	}
+	return datagram.Payload, nil
+}
+
+func localUDPPort(conn *net.UDPConn) (int, error) {
+	local, ok := conn.LocalAddr().(*net.UDPAddr)
+	if !ok {
+		return 0, fmt.Errorf("UDP listener local address has unexpected type %T", conn.LocalAddr())
+	}
+	return local.Port, nil
 }
 
 func sameUDPAddr(a, b *net.UDPAddr) bool {
 	if a == nil || b == nil {
 		return a == b
 	}
-	return a.Port == b.Port && a.Zone == b.Zone && a.IP.Equal(b.IP)
+	return a.Port == b.Port && a.IP.Equal(b.IP)
 }

@@ -20,15 +20,12 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"strconv"
 	"time"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/apis/model"
 )
-
-const socks5UDPAssociateRequestAddr = "0.0.0.0:0"
 
 // ClientDialer connects to upstream endpoints through a socks5 proxy.
 type ClientDialer struct {
@@ -58,7 +55,7 @@ func (d *ClientDialer) DialContext(ctx context.Context, network, address string)
 		return nil, net.UnknownNetworkError(network)
 	}
 
-	conn, _, _, err := d.dial(ctx, constant.Socks5ConnectCmd, network, address, "")
+	conn, _, _, err := d.dial(ctx, constant.Socks5ConnectCmd, network, "", address)
 	if err != nil {
 		return nil, err
 	}
@@ -75,24 +72,28 @@ func (d *ClientDialer) ListenPacket(ctx context.Context, network, laddr, raddr s
 	if !d.Socks5UDPAssociate {
 		return nil, fmt.Errorf("socks5 UDP ASSOCIATE is disabled")
 	}
-
-	remoteAddr, err := parseNetAddr(network, raddr)
-	if err != nil {
+	var remoteAddrSpec model.AddrSpec
+	if err := remoteAddrSpec.From(raddr); err != nil {
 		return nil, fmt.Errorf("parse remote address failed: %w", err)
 	}
-	ctrlConn, udpConn, proxyUDPAddr, err := d.dial(ctx, constant.Socks5UDPAssociateCmd, network, socks5UDPAssociateRequestAddr, laddr)
+	remoteAddr := model.NetAddrSpec{
+		AddrSpec: remoteAddrSpec,
+		Net:      network,
+	}
+
+	ctrlConn, udpConn, serverListenAddr, err := d.dial(ctx, constant.Socks5UDPAssociateCmd, network, laddr, raddr)
 	if err != nil {
 		return nil, err
 	}
 	return &clientPacketConn{
-		ctrlConn:     ctrlConn,
-		udpConn:      udpConn,
-		proxyUDPAddr: proxyUDPAddr,
-		remoteAddr:   remoteAddr,
+		ctrlConn:         ctrlConn,
+		udpConn:          udpConn,
+		serverListenAddr: serverListenAddr,
+		remoteAddr:       remoteAddr,
 	}, nil
 }
 
-func (d *ClientDialer) dial(ctx context.Context, cmd byte, network, targetAddr, laddr string) (conn net.Conn, udpConn *net.UDPConn, proxyUDPAddr *net.UDPAddr, err error) {
+func (d *ClientDialer) dial(ctx context.Context, cmd byte, network, laddr, raddr string) (conn net.Conn, udpConn *net.UDPConn, serverListenAddr *net.UDPAddr, err error) {
 	if d == nil {
 		return nil, nil, nil, fmt.Errorf("socks5 client dialer is nil")
 	}
@@ -115,7 +116,9 @@ func (d *ClientDialer) dial(ctx context.Context, cmd byte, network, targetAddr, 
 	}
 	defer func() {
 		if err != nil {
-			conn.Close()
+			if conn != nil {
+				conn.Close()
+			}
 			if udpConn != nil {
 				udpConn.Close()
 			}
@@ -124,12 +127,12 @@ func (d *ClientDialer) dial(ctx context.Context, cmd byte, network, targetAddr, 
 	stopCancelWatcher := setConnDeadlineOnContextDone(ctx, conn)
 	defer stopCancelWatcher()
 
-	if err = d.negotiateAuthentication(conn); err != nil {
+	if err = clientNegotiateAuthentication(conn, d.Credential); err != nil {
 		return nil, nil, nil, err
 	}
 
-	dstAddr, err := parseAddrSpec(targetAddr)
-	if err != nil {
+	var dstAddr model.AddrSpec
+	if err = dstAddr.From(raddr); err != nil {
 		return nil, nil, nil, fmt.Errorf("parse target address failed: %w", err)
 	}
 	req := &model.Request{
@@ -147,47 +150,28 @@ func (d *ClientDialer) dial(ctx context.Context, cmd byte, network, targetAddr, 
 	if resp.Reply != constant.Socks5ReplySuccess {
 		return nil, nil, nil, fmt.Errorf("socks5 request failed with reply code %d", resp.Reply)
 	}
+
 	if cmd == constant.Socks5UDPAssociateCmd {
-		proxyUDPAddr, err = socks5UDPAddrFromResponse(conn, resp)
+		// Parse socks5 proxy server's bind address from response.
+		serverListenAddr, err = socks5UDPAddrFromResponse(conn, resp)
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		udpConn, err = listenUDPForSocks5(network, laddr, proxyUDPAddr)
+
+		// Create local UDP listener for communicating with the socks5 proxy server.
+		udpConn, err = net.ListenUDP("udp4", nil)
 		if err != nil {
 			return nil, nil, nil, err
 		}
 	}
-	return conn, udpConn, proxyUDPAddr, nil
-}
-
-func setConnDeadlineOnContextDone(ctx context.Context, conn net.Conn) func() {
-	done := ctx.Done()
-	if done == nil {
-		return func() {}
-	}
-
-	stop := make(chan struct{})
-	go func() {
-		select {
-		case <-done:
-			conn.SetDeadline(time.Now())
-		case <-stop:
-		}
-	}()
-	return func() {
-		close(stop)
-	}
-}
-
-func (d *ClientDialer) negotiateAuthentication(conn net.Conn) error {
-	return negotiateSocks5ClientAuthentication(conn, d.Credential)
+	return conn, udpConn, serverListenAddr, nil
 }
 
 type clientPacketConn struct {
-	ctrlConn     net.Conn
-	udpConn      *net.UDPConn
-	proxyUDPAddr *net.UDPAddr
-	remoteAddr   net.Addr
+	ctrlConn         net.Conn
+	udpConn          *net.UDPConn
+	serverListenAddr *net.UDPAddr
+	remoteAddr       net.Addr // destination address, not proxy server address
 }
 
 var _ net.PacketConn = (*clientPacketConn)(nil)
@@ -199,7 +183,7 @@ func (c *clientPacketConn) ReadFrom(p []byte) (int, net.Addr, error) {
 		if err != nil {
 			return 0, nil, err
 		}
-		if !sameUDPAddrPort(addr, c.proxyUDPAddr) {
+		if c.serverListenAddr == nil || !sameUDPAddr(addr, c.serverListenAddr) {
 			continue
 		}
 		payload, err := unwrapSocks5UDPPacket(buf[:n])
@@ -222,7 +206,7 @@ func (c *clientPacketConn) WriteTo(p []byte, addr net.Addr) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	if _, err := c.udpConn.WriteToUDP(pkt, c.proxyUDPAddr); err != nil {
+	if _, err := c.udpConn.WriteToUDP(pkt, c.serverListenAddr); err != nil {
 		return 0, err
 	}
 	return len(p), nil
@@ -253,84 +237,21 @@ func (c *clientPacketConn) SetWriteDeadline(t time.Time) error {
 	return c.udpConn.SetWriteDeadline(t)
 }
 
-func parseNetAddr(network, address string) (net.Addr, error) {
-	host, portStr, err := net.SplitHostPort(address)
-	if err != nil {
-		return nil, err
+func setConnDeadlineOnContextDone(ctx context.Context, conn net.Conn) func() {
+	done := ctx.Done()
+	if done == nil {
+		return func() {}
 	}
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return nil, err
-	}
-	if port < 1 || port > 65535 {
-		return nil, fmt.Errorf("port %d is out of range", port)
-	}
-	if ip := net.ParseIP(host); ip != nil {
-		if network == "tcp" || network == "tcp4" || network == "tcp6" {
-			return &net.TCPAddr{IP: ip, Port: port}, nil
-		}
-		return &net.UDPAddr{IP: ip, Port: port}, nil
-	}
-	if len(host) > 255 {
-		return nil, fmt.Errorf("FQDN %q exceeds 255 bytes", host)
-	}
-	return &model.NetAddrSpec{
-		Net: network,
-		AddrSpec: model.AddrSpec{
-			FQDN: host,
-			Port: port,
-		},
-	}, nil
-}
 
-func parseAddrSpec(address string) (model.AddrSpec, error) {
-	host, portStr, err := net.SplitHostPort(address)
-	if err != nil {
-		return model.AddrSpec{}, err
-	}
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return model.AddrSpec{}, err
-	}
-	if port < 0 || port > 65535 {
-		return model.AddrSpec{}, fmt.Errorf("port %d is out of range", port)
-	}
-	if ip := net.ParseIP(host); ip != nil {
-		return model.AddrSpec{IP: ip, Port: port}, nil
-	}
-	if len(host) > 255 {
-		return model.AddrSpec{}, fmt.Errorf("FQDN %q exceeds 255 bytes", host)
-	}
-	return model.AddrSpec{FQDN: host, Port: port}, nil
-}
-
-func listenUDPForSocks5(network, laddr string, proxyUDPAddr *net.UDPAddr) (*net.UDPConn, error) {
-	listenNetwork := network
-	if listenNetwork == "udp" {
-		if proxyUDPAddr.IP.To4() != nil {
-			listenNetwork = "udp4"
-		} else {
-			listenNetwork = "udp6"
+	stop := make(chan struct{})
+	go func() {
+		select {
+		case <-done:
+			conn.SetDeadline(time.Now())
+		case <-stop:
 		}
+	}()
+	return func() {
+		close(stop)
 	}
-	var localUDPAddr *net.UDPAddr
-	if laddr != "" {
-		var err error
-		localUDPAddr, err = net.ResolveUDPAddr(listenNetwork, laddr)
-		if err != nil {
-			return nil, fmt.Errorf("net.ResolveUDPAddr() failed: %w", err)
-		}
-	}
-	conn, err := net.ListenUDP(listenNetwork, localUDPAddr)
-	if err != nil {
-		return nil, fmt.Errorf("net.ListenUDP() failed: %w", err)
-	}
-	return conn, nil
-}
-
-func sameUDPAddrPort(a, b *net.UDPAddr) bool {
-	if a == nil || b == nil {
-		return a == b
-	}
-	return a.Port == b.Port
 }

@@ -22,7 +22,6 @@ import (
 	"net"
 
 	"github.com/enfein/mieru/v3/apis/constant"
-	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/common"
 )
 
@@ -49,6 +48,8 @@ type Credential struct {
 	Password string
 }
 
+// handleAuthentication reads socks5 authentication request from the
+// connection and write response back.
 func (s *Server) handleAuthentication(conn net.Conn) error {
 	// Read the version byte and ensure we are compatible.
 	common.SetReadTimeout(conn, s.config.HandshakeTimeout)
@@ -169,7 +170,7 @@ func (s *Server) handleAuthentication(conn net.Conn) error {
 	return nil
 }
 
-func negotiateSocks5ClientAuthentication(conn io.ReadWriter, credential *Credential) error {
+func clientNegotiateAuthentication(conn io.ReadWriter, credential *Credential) error {
 	method := constant.Socks5NoAuth
 	if credential != nil {
 		method = constant.Socks5UserPassAuth
@@ -206,29 +207,6 @@ func negotiateSocks5ClientAuthentication(conn io.ReadWriter, credential *Credent
 	}
 	if resp[0] != constant.Socks5UserPassAuthVersion || resp[1] != constant.Socks5AuthSuccess {
 		return fmt.Errorf("socks5 username password authentication failed: %v", resp)
-	}
-	return nil
-}
-
-// dialWithAuthentication dials to another socks5 server with given credential.
-// The proxy connection is closed if there is any error.
-func (s *Server) dialWithAuthentication(proxyConn net.Conn, auth *appctlpb.Auth) error {
-	common.SetReadTimeout(proxyConn, s.config.HandshakeTimeout)
-	defer common.SetReadTimeout(proxyConn, 0)
-
-	var credential *Credential
-	if auth == nil || auth.GetUser() == "" || auth.GetPassword() == "" {
-		credential = nil
-	} else {
-		credential = &Credential{
-			User:     auth.GetUser(),
-			Password: auth.GetPassword(),
-		}
-	}
-	if err := negotiateSocks5ClientAuthentication(proxyConn, credential); err != nil {
-		HandshakeErrors.Add(1)
-		proxyConn.Close()
-		return fmt.Errorf("socks5 authentication with egress proxy failed: %w", err)
 	}
 	return nil
 }

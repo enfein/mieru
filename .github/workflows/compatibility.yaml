@@ -5,7 +5,7 @@ on:
       version:
         description: 'Published mieru version to test'
         required: true
-        default: '3.31.0'
+        default: '3.33.0'
         type: string
 permissions:
   contents: read
