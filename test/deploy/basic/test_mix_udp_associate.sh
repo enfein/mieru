@@ -91,6 +91,12 @@ if [[ "$?" -ne 0 ]]; then
     exit 1
 fi
 
+# Print metrics before test.
+print_mieru_client_metrics
+sleep 1
+print_mieru_server_metrics
+sleep 1
+
 # Start testing.
 sleep 1
 echo ">>> socks5 UDP associate - TCP and UDP <<<"
@@ -109,7 +115,7 @@ fi
 ./mieru get heap-profile /test/mieru.associate.heap.gz
 ./mita get heap-profile /test/mita.associate.heap.gz
 
-# Print metrics and memory statistics.
+# Print metrics after test.
 print_mieru_client_metrics
 sleep 1
 print_mieru_server_metrics

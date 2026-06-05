@@ -39,6 +39,7 @@ function print_mieru_server_thread_dump() {
 
 function print_mieru_client_metrics() {
     echo "========== BEGIN OF MIERU CLIENT METRICS =========="
+    ./mieru get connections
     ./mieru get metrics
     ./mieru get memory-statistics
     echo "==========  END OF MIERU CLIENT METRICS  =========="
@@ -46,6 +47,8 @@ function print_mieru_client_metrics() {
 
 function print_mieru_server_metrics() {
     echo "========== BEGIN OF MIERU SERVER METRICS =========="
+    ./mita get users
+    ./mita get connections
     ./mita get metrics
     ./mita get memory-statistics
     echo "==========  END OF MIERU SERVER METRICS  =========="

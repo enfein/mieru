@@ -55,6 +55,12 @@ if [[ "$?" -ne 0 ]]; then
 fi
 ./mieru profile cpu start /test/mieru.tcp.cpu.gz
 
+# Print metrics before test.
+print_mieru_client_metrics
+sleep 1
+print_mieru_server_metrics
+sleep 1
+
 # Start testing.
 sleep 2
 echo ">>> socks5 - new connections - TCP <<<"
@@ -101,9 +107,7 @@ fi
 ./mieru get heap-profile /test/mieru.tcp.heap.gz
 ./mita get heap-profile /test/mita.tcp.heap.gz
 
-# Print metrics and memory statistics.
-./mita get users
-sleep 1
+# Print metrics after test.
 print_mieru_client_metrics
 sleep 1
 print_mieru_server_metrics

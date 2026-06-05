@@ -162,13 +162,14 @@ func (s *serverManagementService) Start(ctx context.Context, req *emptypb.Empty)
 	var initProxyTasks sync.WaitGroup
 	initProxyTasks.Add(1)
 	go func() {
-		if err = mux.Start(); err != nil {
+		if err := mux.Start(); err != nil {
 			log.Fatalf("socks5 server listening failed: %v", err)
 		}
+		SetServerMuxRef(mux)
 		initProxyTasks.Done()
 
 		log.Infof("mita server daemon socks5 server is running")
-		if err = socks5Server.Serve(mux); err != nil {
+		if err := socks5Server.Serve(mux); err != nil {
 			log.Fatalf("run socks5 server failed: %v", err)
 		}
 		log.Infof("mita server daemon socks5 server is stopped")
@@ -205,6 +206,7 @@ func (s *serverManagementService) Stop(ctx context.Context, req *emptypb.Empty) 
 	} else {
 		log.Infof("active socks5 servers not found")
 	}
+	SetServerMuxRef(nil)
 	SetAppStatus(pb.AppStatus_IDLE)
 	log.Infof("completed Stop request from RPC caller")
 	return &emptypb.Empty{}, nil
@@ -281,6 +283,7 @@ func (s *serverManagementService) Exit(ctx context.Context, req *emptypb.Empty) 
 	} else {
 		log.Infof("active socks5 servers not found")
 	}
+	SetServerMuxRef(nil)
 	SetAppStatus(pb.AppStatus_IDLE)
 
 	grpcServer := serverRPCServerRef.Load()

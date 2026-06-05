@@ -49,6 +49,7 @@ function delete_mieru_client_log() {
 
 function print_mieru_client_metrics() {
     echo "========== BEGIN OF MIERU CLIENT METRICS =========="
+    ./bin/mieru get connections
     ./bin/mieru get metrics
     ./bin/mieru get memory-statistics
     echo "==========  END OF MIERU CLIENT METRICS  =========="
@@ -56,6 +57,8 @@ function print_mieru_client_metrics() {
 
 function print_mieru_server_metrics() {
     echo "========== BEGIN OF MIERU SERVER METRICS =========="
+    ./bin/mita get users
+    ./bin/mita get connections
     ./bin/mita get metrics
     ./bin/mita get memory-statistics
     echo "==========  END OF MIERU SERVER METRICS  =========="

@@ -23,6 +23,7 @@ import (
 
 	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/common"
+	"github.com/enfein/mieru/v3/pkg/protocol"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -327,6 +328,56 @@ func TestServerHashUserPassword(t *testing.T) {
 	}
 
 	afterServerTest(t)
+}
+
+func TestServerStopClearsMuxRef(t *testing.T) {
+	rpcServer := NewServerManagementService()
+	mux := protocol.NewMux(false)
+	t.Cleanup(func() {
+		SetServerMuxRef(nil)
+		if err := mux.Close(); err != nil {
+			t.Errorf("mux.Close() failed: %v", err)
+		}
+	})
+	SetServerMuxRef(mux)
+	SetSocks5Server(nil)
+
+	if _, err := rpcServer.Stop(context.Background(), &emptypb.Empty{}); err != nil {
+		t.Fatalf("Stop() failed: %v", err)
+	}
+	if serverMuxRef.Load() != nil {
+		t.Fatal("server mux ref is not cleared after Stop()")
+	}
+}
+
+func TestServerGetSessionInfoListRequiresMux(t *testing.T) {
+	rpcServer := NewServerManagementService()
+	SetServerMuxRef(nil)
+	t.Cleanup(func() {
+		SetServerMuxRef(nil)
+	})
+
+	if _, err := rpcServer.GetSessionInfoList(context.Background(), &emptypb.Empty{}); err == nil {
+		t.Fatal("GetSessionInfoList() succeeded without server mux")
+	} else if !strings.Contains(err.Error(), "server multiplexier is unavailable") {
+		t.Fatalf("GetSessionInfoList() error = %q, want server mux unavailable", err.Error())
+	}
+
+	mux := protocol.NewMux(false)
+	t.Cleanup(func() {
+		if err := mux.Close(); err != nil {
+			t.Errorf("mux.Close() failed: %v", err)
+		}
+	})
+	SetServerMuxRef(mux)
+
+	info, err := rpcServer.GetSessionInfoList(context.Background(), &emptypb.Empty{})
+	if err != nil {
+		t.Fatalf("GetSessionInfoList() failed: %v", err)
+	}
+	if len(info.GetItems()) != 0 {
+		t.Fatalf("GetSessionInfoList() returned %d items, want 0", len(info.GetItems()))
+	}
 }
 
 func TestServerGetVersion(t *testing.T) {

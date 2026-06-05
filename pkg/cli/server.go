@@ -874,8 +874,8 @@ var serverGetConnectionsFunc = func(s []string) error {
 		}
 		return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
 	}
-	if err := appctl.IsServerDaemonRunning(appStatus); err != nil {
-		return fmt.Errorf(stderror.ServerNotRunningErr, err)
+	if err := appctl.IsServerProxyRunning(appStatus); err != nil {
+		return fmt.Errorf(stderror.ServerProxyNotRunningErr, err)
 	}
 
 	client, err := appctl.NewServerManagementRPCClient()
