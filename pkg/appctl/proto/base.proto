@@ -144,6 +144,9 @@ message TrafficPattern {
 
     // Manipulate nonce prefix.
     optional NoncePattern nonce = 4;
+
+    // Define padding behavior.
+    optional PaddingPattern padding = 5;
 }
 
 message TCPFragment {
@@ -202,4 +205,19 @@ enum NonceType {
     // If field customHexStrings is not set in NoncePattern,
     // the behavior is the same as NONCE_TYPE_RANDOM.
     NONCE_TYPE_FIXED = 3;
+}
+
+message PaddingPattern {
+
+    // Maximum number of padding bytes in the middle of a network segment.
+    // The valid range is [0, 255].
+    // Set it to 0 to disable middle padding.
+    // It not set, an internal value is used.
+    optional int32 maxMiddlePaddingLen = 1;
+
+    // Maximum number of padding bytes at the end of a network segment.
+    // The valid range is [0, 255].
+    // Set it to 0 to disable end padding.
+    // It not set, an internal value is used.
+    optional int32 maxEndPaddingLen = 2;
 }

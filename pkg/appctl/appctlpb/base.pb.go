@@ -691,7 +691,9 @@ type TrafficPattern struct {
 	// Split TCP packets by fragmentation.
 	TcpFragment *TCPFragment `protobuf:"bytes,3,opt,name=tcpFragment,proto3,oneof" json:"tcpFragment,omitempty"`
 	// Manipulate nonce prefix.
-	Nonce         *NoncePattern `protobuf:"bytes,4,opt,name=nonce,proto3,oneof" json:"nonce,omitempty"`
+	Nonce *NoncePattern `protobuf:"bytes,4,opt,name=nonce,proto3,oneof" json:"nonce,omitempty"`
+	// Define padding behavior.
+	Padding       *PaddingPattern `protobuf:"bytes,5,opt,name=padding,proto3,oneof" json:"padding,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -750,6 +752,13 @@ func (x *TrafficPattern) GetTcpFragment() *TCPFragment {
 func (x *TrafficPattern) GetNonce() *NoncePattern {
 	if x != nil {
 		return x.Nonce
+	}
+	return nil
+}
+
+func (x *TrafficPattern) GetPadding() *PaddingPattern {
+	if x != nil {
+		return x.Padding
 	}
 	return nil
 }
@@ -903,6 +912,66 @@ func (x *NoncePattern) GetCustomHexStrings() []string {
 	return nil
 }
 
+type PaddingPattern struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Maximum number of padding bytes in the middle of a network segment.
+	// The valid range is [0, 255].
+	// Set it to 0 to disable middle padding.
+	// It not set, an internal value is used.
+	MaxMiddlePaddingLen *int32 `protobuf:"varint,1,opt,name=maxMiddlePaddingLen,proto3,oneof" json:"maxMiddlePaddingLen,omitempty"`
+	// Maximum number of padding bytes at the end of a network segment.
+	// The valid range is [0, 255].
+	// Set it to 0 to disable end padding.
+	// It not set, an internal value is used.
+	MaxEndPaddingLen *int32 `protobuf:"varint,2,opt,name=maxEndPaddingLen,proto3,oneof" json:"maxEndPaddingLen,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *PaddingPattern) Reset() {
+	*x = PaddingPattern{}
+	mi := &file_appctl_proto_base_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PaddingPattern) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PaddingPattern) ProtoMessage() {}
+
+func (x *PaddingPattern) ProtoReflect() protoreflect.Message {
+	mi := &file_appctl_proto_base_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PaddingPattern.ProtoReflect.Descriptor instead.
+func (*PaddingPattern) Descriptor() ([]byte, []int) {
+	return file_appctl_proto_base_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *PaddingPattern) GetMaxMiddlePaddingLen() int32 {
+	if x != nil && x.MaxMiddlePaddingLen != nil {
+		return *x.MaxMiddlePaddingLen
+	}
+	return 0
+}
+
+func (x *PaddingPattern) GetMaxEndPaddingLen() int32 {
+	if x != nil && x.MaxEndPaddingLen != nil {
+		return *x.MaxEndPaddingLen
+	}
+	return 0
+}
+
 var File_appctl_proto_base_proto protoreflect.FileDescriptor
 
 const file_appctl_proto_base_proto_rawDesc = "" +
@@ -941,17 +1010,20 @@ const file_appctl_proto_base_proto_rawDesc = "" +
 	"\x04user\x18\x01 \x01(\tH\x00R\x04user\x88\x01\x01\x12\x1f\n" +
 	"\bpassword\x18\x02 \x01(\tH\x01R\bpassword\x88\x01\x01B\a\n" +
 	"\x05_userB\v\n" +
-	"\t_password\"\xf6\x01\n" +
+	"\t_password\"\xbf\x02\n" +
 	"\x0eTrafficPattern\x12\x17\n" +
 	"\x04seed\x18\x01 \x01(\x05H\x00R\x04seed\x88\x01\x01\x12!\n" +
 	"\tunlockAll\x18\x02 \x01(\bH\x01R\tunlockAll\x88\x01\x01\x12@\n" +
 	"\vtcpFragment\x18\x03 \x01(\v2\x19.mieru.appctl.TCPFragmentH\x02R\vtcpFragment\x88\x01\x01\x125\n" +
-	"\x05nonce\x18\x04 \x01(\v2\x1a.mieru.appctl.NoncePatternH\x03R\x05nonce\x88\x01\x01B\a\n" +
+	"\x05nonce\x18\x04 \x01(\v2\x1a.mieru.appctl.NoncePatternH\x03R\x05nonce\x88\x01\x01\x12;\n" +
+	"\apadding\x18\x05 \x01(\v2\x1c.mieru.appctl.PaddingPatternH\x04R\apadding\x88\x01\x01B\a\n" +
 	"\x05_seedB\f\n" +
 	"\n" +
 	"_unlockAllB\x0e\n" +
 	"\f_tcpFragmentB\b\n" +
-	"\x06_nonce\"i\n" +
+	"\x06_nonceB\n" +
+	"\n" +
+	"\b_padding\"i\n" +
 	"\vTCPFragment\x12\x1b\n" +
 	"\x06enable\x18\x01 \x01(\bH\x00R\x06enable\x88\x01\x01\x12#\n" +
 	"\n" +
@@ -968,7 +1040,12 @@ const file_appctl_proto_base_proto_rawDesc = "" +
 	"\x05_typeB\x16\n" +
 	"\x14_applyToAllUDPPacketB\t\n" +
 	"\a_minLenB\t\n" +
-	"\a_maxLen*K\n" +
+	"\a_maxLen\"\xa5\x01\n" +
+	"\x0ePaddingPattern\x125\n" +
+	"\x13maxMiddlePaddingLen\x18\x01 \x01(\x05H\x00R\x13maxMiddlePaddingLen\x88\x01\x01\x12/\n" +
+	"\x10maxEndPaddingLen\x18\x02 \x01(\x05H\x01R\x10maxEndPaddingLen\x88\x01\x01B\x16\n" +
+	"\x14_maxMiddlePaddingLenB\x13\n" +
+	"\x11_maxEndPaddingLen*K\n" +
 	"\tAppStatus\x12\v\n" +
 	"\aUNKNOWN\x10\x00\x12\b\n" +
 	"\x04IDLE\x10\x01\x12\f\n" +
@@ -1015,7 +1092,7 @@ func file_appctl_proto_base_proto_rawDescGZIP() []byte {
 }
 
 var file_appctl_proto_base_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_appctl_proto_base_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_appctl_proto_base_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_appctl_proto_base_proto_goTypes = []any{
 	(AppStatus)(0),         // 0: mieru.appctl.AppStatus
 	(LoggingLevel)(0),      // 1: mieru.appctl.LoggingLevel
@@ -1031,6 +1108,7 @@ var file_appctl_proto_base_proto_goTypes = []any{
 	(*TrafficPattern)(nil), // 11: mieru.appctl.TrafficPattern
 	(*TCPFragment)(nil),    // 12: mieru.appctl.TCPFragment
 	(*NoncePattern)(nil),   // 13: mieru.appctl.NoncePattern
+	(*PaddingPattern)(nil), // 14: mieru.appctl.PaddingPattern
 }
 var file_appctl_proto_base_proto_depIdxs = []int32{
 	0,  // 0: mieru.appctl.AppStatusMsg.status:type_name -> mieru.appctl.AppStatus
@@ -1038,12 +1116,13 @@ var file_appctl_proto_base_proto_depIdxs = []int32{
 	9,  // 2: mieru.appctl.User.quotas:type_name -> mieru.appctl.Quota
 	12, // 3: mieru.appctl.TrafficPattern.tcpFragment:type_name -> mieru.appctl.TCPFragment
 	13, // 4: mieru.appctl.TrafficPattern.nonce:type_name -> mieru.appctl.NoncePattern
-	5,  // 5: mieru.appctl.NoncePattern.type:type_name -> mieru.appctl.NonceType
-	6,  // [6:6] is the sub-list for method output_type
-	6,  // [6:6] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	14, // 5: mieru.appctl.TrafficPattern.padding:type_name -> mieru.appctl.PaddingPattern
+	5,  // 6: mieru.appctl.NoncePattern.type:type_name -> mieru.appctl.NonceType
+	7,  // [7:7] is the sub-list for method output_type
+	7,  // [7:7] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_appctl_proto_base_proto_init() }
@@ -1059,13 +1138,14 @@ func file_appctl_proto_base_proto_init() {
 	file_appctl_proto_base_proto_msgTypes[5].OneofWrappers = []any{}
 	file_appctl_proto_base_proto_msgTypes[6].OneofWrappers = []any{}
 	file_appctl_proto_base_proto_msgTypes[7].OneofWrappers = []any{}
+	file_appctl_proto_base_proto_msgTypes[8].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_appctl_proto_base_proto_rawDesc), len(file_appctl_proto_base_proto_rawDesc)),
 			NumEnums:      6,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

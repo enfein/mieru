@@ -26,6 +26,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const (
+	maxPaddingLen = 255
+)
+
 // Config stores the traffic pattern configuration.
 type Config struct {
 	original  *appctlpb.TrafficPattern
@@ -95,6 +99,9 @@ func Validate(pattern *appctlpb.TrafficPattern) error {
 	if err := validateNoncePattern(pattern.GetNonce()); err != nil {
 		return err
 	}
+	if err := validatePaddingPattern(pattern.GetPadding()); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -106,6 +113,7 @@ func (c *Config) generateImplicitTrafficPattern() {
 	unlockAll := c.original.GetUnlockAll()
 	c.generateTCPFragment(seed, unlockAll)
 	c.generateNoncePattern(seed, unlockAll)
+	c.generatePaddingPattern(seed, unlockAll)
 }
 
 func (c *Config) generateTCPFragment(seed int, unlockAll bool) {
@@ -174,6 +182,29 @@ func (c *Config) generateNoncePattern(seed int, unlockAll bool) {
 	}
 }
 
+func (c *Config) generatePaddingPattern(seed int, unlockAll bool) {
+	if c.effective.Padding == nil {
+		c.effective.Padding = &appctlpb.PaddingPattern{}
+	}
+	p := c.effective.Padding
+
+	if c.original.Padding == nil || c.original.Padding.MaxMiddlePaddingLen == nil {
+		maxMiddlePaddingLen := rng.FixedInt(maxPaddingLen+1, fmt.Sprintf("%d:padding.maxMiddlePaddingLen", seed)) - 128
+		if maxMiddlePaddingLen <= 0 {
+			maxMiddlePaddingLen = 0
+		}
+		p.MaxMiddlePaddingLen = proto.Int32(int32(maxMiddlePaddingLen))
+	}
+
+	if c.original.Padding == nil || c.original.Padding.MaxEndPaddingLen == nil {
+		if unlockAll {
+			p.MaxEndPaddingLen = proto.Int32(int32(rng.FixedInt(maxPaddingLen+1, fmt.Sprintf("%d:padding.maxEndPaddingLen", seed))))
+		} else {
+			p.MaxEndPaddingLen = proto.Int32(maxPaddingLen)
+		}
+	}
+}
+
 func validateTCPFragment(fragment *appctlpb.TCPFragment) error {
 	if fragment == nil {
 		return nil
@@ -221,6 +252,29 @@ func validateNoncePattern(nonce *appctlpb.NoncePattern) error {
 		}
 		if len(decoded) > 12 {
 			return fmt.Errorf("NoncePattern customHexStrings[%d] decoded length %d exceeds maximum 12 bytes", i, len(decoded))
+		}
+	}
+	return nil
+}
+
+func validatePaddingPattern(padding *appctlpb.PaddingPattern) error {
+	if padding == nil {
+		return nil
+	}
+	if padding.MaxMiddlePaddingLen != nil {
+		if padding.GetMaxMiddlePaddingLen() < 0 {
+			return fmt.Errorf("PaddingPattern maxMiddlePaddingLen %d is negative", padding.GetMaxMiddlePaddingLen())
+		}
+		if padding.GetMaxMiddlePaddingLen() > maxPaddingLen {
+			return fmt.Errorf("PaddingPattern maxMiddlePaddingLen %d exceeds maximum value %d", padding.GetMaxMiddlePaddingLen(), maxPaddingLen)
+		}
+	}
+	if padding.MaxEndPaddingLen != nil {
+		if padding.GetMaxEndPaddingLen() < 0 {
+			return fmt.Errorf("PaddingPattern maxEndPaddingLen %d is negative", padding.GetMaxEndPaddingLen())
+		}
+		if padding.GetMaxEndPaddingLen() > maxPaddingLen {
+			return fmt.Errorf("PaddingPattern maxEndPaddingLen %d exceeds maximum value %d", padding.GetMaxEndPaddingLen(), maxPaddingLen)
 		}
 	}
 	return nil

@@ -38,6 +38,10 @@ func TestExplicitValuesPreserved(t *testing.T) {
 			MinLen:              proto.Int32(5),
 			MaxLen:              proto.Int32(10),
 		},
+		Padding: &appctlpb.PaddingPattern{
+			MaxMiddlePaddingLen: proto.Int32(64),
+			MaxEndPaddingLen:    proto.Int32(128),
+		},
 	}
 
 	cfg, _ := NewConfig(origin)
@@ -65,6 +69,12 @@ func TestExplicitValuesPreserved(t *testing.T) {
 	}
 	if cfg.effective.Nonce.GetMaxLen() != 10 {
 		t.Errorf("expected nonce.maxLen 10, got %d", cfg.effective.Nonce.GetMaxLen())
+	}
+	if cfg.effective.Padding.GetMaxMiddlePaddingLen() != 64 {
+		t.Errorf("expected padding.maxMiddlePaddingLen 64, got %d", cfg.effective.Padding.GetMaxMiddlePaddingLen())
+	}
+	if cfg.effective.Padding.GetMaxEndPaddingLen() != 128 {
+		t.Errorf("expected padding.maxEndPaddingLen 128, got %d", cfg.effective.Padding.GetMaxEndPaddingLen())
 	}
 }
 
@@ -99,6 +109,17 @@ func TestImplicitValuesGenerated(t *testing.T) {
 	}
 	if cfg.effective.Nonce.MaxLen == nil {
 		t.Error("expected nonce.maxLen to be generated")
+	}
+
+	// PaddingPattern should be initialized
+	if cfg.effective.Padding == nil {
+		t.Fatal("expected padding to be initialized")
+	}
+	if cfg.effective.Padding.MaxMiddlePaddingLen == nil {
+		t.Error("expected padding.maxMiddlePaddingLen to be generated")
+	}
+	if cfg.effective.Padding.MaxEndPaddingLen == nil {
+		t.Error("expected padding.maxEndPaddingLen to be generated")
 	}
 }
 
@@ -154,6 +175,25 @@ func TestPartialNoncePatternPreserved(t *testing.T) {
 	}
 }
 
+func TestPartialPaddingPatternPreserved(t *testing.T) {
+	origin := &appctlpb.TrafficPattern{
+		Seed: proto.Int32(42),
+		Padding: &appctlpb.PaddingPattern{
+			MaxMiddlePaddingLen: proto.Int32(99),
+			// MaxEndPaddingLen not set
+		},
+	}
+
+	cfg, _ := NewConfig(origin)
+
+	if cfg.effective.Padding.GetMaxMiddlePaddingLen() != 99 {
+		t.Errorf("expected padding.maxMiddlePaddingLen to be preserved as 99, got %d", cfg.effective.Padding.GetMaxMiddlePaddingLen())
+	}
+	if cfg.effective.Padding.MaxEndPaddingLen == nil {
+		t.Error("expected padding.maxEndPaddingLen to be generated")
+	}
+}
+
 func TestDeterministicGeneration(t *testing.T) {
 	origin := &appctlpb.TrafficPattern{}
 
@@ -177,6 +217,12 @@ func TestDeterministicGeneration(t *testing.T) {
 	}
 	if cfg1.effective.Nonce.GetMaxLen() != cfg2.effective.Nonce.GetMaxLen() {
 		t.Error("nonce.maxLen should be deterministic")
+	}
+	if cfg1.effective.Padding.GetMaxMiddlePaddingLen() != cfg2.effective.Padding.GetMaxMiddlePaddingLen() {
+		t.Error("padding.maxMiddlePaddingLen should be deterministic")
+	}
+	if cfg1.effective.Padding.GetMaxEndPaddingLen() != cfg2.effective.Padding.GetMaxEndPaddingLen() {
+		t.Error("padding.maxEndPaddingLen should be deterministic")
 	}
 }
 
@@ -224,6 +270,10 @@ func TestEncodeDecode(t *testing.T) {
 			MinLen:              proto.Int32(6),
 			MaxLen:              proto.Int32(8),
 		},
+		Padding: &appctlpb.PaddingPattern{
+			MaxMiddlePaddingLen: proto.Int32(64),
+			MaxEndPaddingLen:    proto.Int32(128),
+		},
 	}
 
 	encoded := Encode(origin)
@@ -262,6 +312,12 @@ func TestEncodeDecode(t *testing.T) {
 	}
 	if restored.Nonce.GetMaxLen() != origin.Nonce.GetMaxLen() {
 		t.Errorf("nonce.maxLen mismatch: expected %d, got %d", origin.Nonce.GetMaxLen(), restored.Nonce.GetMaxLen())
+	}
+	if restored.Padding.GetMaxMiddlePaddingLen() != origin.Padding.GetMaxMiddlePaddingLen() {
+		t.Errorf("padding.maxMiddlePaddingLen mismatch: expected %d, got %d", origin.Padding.GetMaxMiddlePaddingLen(), restored.Padding.GetMaxMiddlePaddingLen())
+	}
+	if restored.Padding.GetMaxEndPaddingLen() != origin.Padding.GetMaxEndPaddingLen() {
+		t.Errorf("padding.maxEndPaddingLen mismatch: expected %d, got %d", origin.Padding.GetMaxEndPaddingLen(), restored.Padding.GetMaxEndPaddingLen())
 	}
 }
 
@@ -427,6 +483,52 @@ func TestValidate(t *testing.T) {
 			wantErrString: "is not a valid hex string",
 		},
 		{
+			name: "valid_padding_pattern",
+			pattern: &appctlpb.TrafficPattern{
+				Padding: &appctlpb.PaddingPattern{
+					MaxMiddlePaddingLen: proto.Int32(0),
+					MaxEndPaddingLen:    proto.Int32(255),
+				},
+			},
+			wantErrString: "",
+		},
+		{
+			name: "padding_max_middle_padding_len_exceeds_255",
+			pattern: &appctlpb.TrafficPattern{
+				Padding: &appctlpb.PaddingPattern{
+					MaxMiddlePaddingLen: proto.Int32(256),
+				},
+			},
+			wantErrString: "maxMiddlePaddingLen 256 exceeds maximum value 255",
+		},
+		{
+			name: "padding_max_middle_padding_len_negative",
+			pattern: &appctlpb.TrafficPattern{
+				Padding: &appctlpb.PaddingPattern{
+					MaxMiddlePaddingLen: proto.Int32(-1),
+				},
+			},
+			wantErrString: "maxMiddlePaddingLen -1 is negative",
+		},
+		{
+			name: "padding_max_end_padding_len_exceeds_255",
+			pattern: &appctlpb.TrafficPattern{
+				Padding: &appctlpb.PaddingPattern{
+					MaxEndPaddingLen: proto.Int32(256),
+				},
+			},
+			wantErrString: "maxEndPaddingLen 256 exceeds maximum value 255",
+		},
+		{
+			name: "padding_max_end_padding_len_negative",
+			pattern: &appctlpb.TrafficPattern{
+				Padding: &appctlpb.PaddingPattern{
+					MaxEndPaddingLen: proto.Int32(-1),
+				},
+			},
+			wantErrString: "maxEndPaddingLen -1 is negative",
+		},
+		{
 			name: "valid_full_pattern",
 			pattern: &appctlpb.TrafficPattern{
 				Seed: proto.Int32(12345),
@@ -440,6 +542,10 @@ func TestValidate(t *testing.T) {
 					MinLen:              proto.Int32(4),
 					MaxLen:              proto.Int32(8),
 					CustomHexStrings:    []string{"00010203"},
+				},
+				Padding: &appctlpb.PaddingPattern{
+					MaxMiddlePaddingLen: proto.Int32(127),
+					MaxEndPaddingLen:    proto.Int32(255),
 				},
 			},
 			wantErrString: "",
