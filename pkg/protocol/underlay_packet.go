@@ -629,7 +629,7 @@ func (u *PacketUnderlay) writeOneSegment(seg *segment, addr net.Addr) error {
 	}
 
 	if ss, ok := toSessionStruct(seg.metadata); ok {
-		maxPaddingSize := MaxPaddingSize(u.mtu, u.TransportProtocol(), int(ss.payloadLen), 0)
+		maxPaddingSize := maxPaddingSizeWithTrafficPattern(u.mtu, u.TransportProtocol(), int(ss.payloadLen), 0, u.trafficPattern, endPadding)
 		padding := newPadding(
 			buildRecommendedPaddingOpts(maxPaddingSize, packetOverhead+int(ss.payloadLen), blockCipher.BlockContext().UserName),
 		)
@@ -665,11 +665,11 @@ func (u *PacketUnderlay) writeOneSegment(seg *segment, addr net.Addr) error {
 		metrics.OutputPaddingBytes.Add(int64(len(padding)))
 	} else if das, ok := toDataAckStruct(seg.metadata); ok {
 		padding1 := newPadding(paddingOpts{
-			maxLen: MaxPaddingSize(u.mtu, u.TransportProtocol(), int(das.payloadLen), 0),
+			maxLen: maxPaddingSizeWithTrafficPattern(u.mtu, u.TransportProtocol(), int(das.payloadLen), 0, u.trafficPattern, middlePadding),
 			ascii:  &asciiPaddingOpts{},
 		})
 		padding2 := newPadding(paddingOpts{
-			maxLen: MaxPaddingSize(u.mtu, u.TransportProtocol(), int(das.payloadLen), len(padding1)),
+			maxLen: maxPaddingSizeWithTrafficPattern(u.mtu, u.TransportProtocol(), int(das.payloadLen), len(padding1), u.trafficPattern, endPadding),
 			ascii:  &asciiPaddingOpts{},
 		})
 		das.prefixLen = uint8(len(padding1))

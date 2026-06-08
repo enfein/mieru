@@ -568,7 +568,7 @@ func (t *StreamUnderlay) writeOneSegment(seg *segment) error {
 	}
 
 	if ss, ok := toSessionStruct(seg.metadata); ok {
-		maxPaddingSize := MaxPaddingSize(t.mtu, t.TransportProtocol(), int(ss.payloadLen), 0)
+		maxPaddingSize := maxPaddingSizeWithTrafficPattern(t.mtu, t.TransportProtocol(), int(ss.payloadLen), 0, t.trafficPattern, endPadding)
 		padding := newPadding(
 			buildRecommendedPaddingOpts(maxPaddingSize, streamOverhead+int(ss.payloadLen), t.send.BlockContext().UserName),
 		)
@@ -603,11 +603,11 @@ func (t *StreamUnderlay) writeOneSegment(seg *segment) error {
 		metrics.OutputPaddingBytes.Add(int64(len(padding)))
 	} else if das, ok := toDataAckStruct(seg.metadata); ok {
 		padding1 := newPadding(paddingOpts{
-			maxLen: MaxPaddingSize(t.mtu, t.TransportProtocol(), int(das.payloadLen), 0),
+			maxLen: maxPaddingSizeWithTrafficPattern(t.mtu, t.TransportProtocol(), int(das.payloadLen), 0, t.trafficPattern, middlePadding),
 			ascii:  &asciiPaddingOpts{},
 		})
 		padding2 := newPadding(paddingOpts{
-			maxLen: MaxPaddingSize(t.mtu, t.TransportProtocol(), int(das.payloadLen), len(padding1)),
+			maxLen: maxPaddingSizeWithTrafficPattern(t.mtu, t.TransportProtocol(), int(das.payloadLen), len(padding1), t.trafficPattern, endPadding),
 			ascii:  &asciiPaddingOpts{},
 		})
 		das.prefixLen = uint8(len(padding1))

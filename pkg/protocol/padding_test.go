@@ -20,9 +20,130 @@ import (
 	mrand "math/rand"
 	"testing"
 
+	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/rng"
+	"google.golang.org/protobuf/proto"
 )
+
+func TestMaxPaddingSizeWithTrafficPattern(t *testing.T) {
+	testcases := []struct {
+		name                string
+		mtu                 int
+		transport           common.TransportProtocol
+		fragmentSize        int
+		existingPaddingSize int
+		trafficPattern      *appctlpb.TrafficPattern
+		position            paddingPosition
+		want                int
+	}{
+		{
+			name:           "nil_traffic_pattern",
+			mtu:            1400,
+			transport:      common.StreamTransport,
+			fragmentSize:   128,
+			trafficPattern: nil,
+			position:       middlePadding,
+			want:           maxPaddingSize(1400, common.StreamTransport, 128, 0),
+		},
+		{
+			name:           "nil_padding_pattern",
+			mtu:            1400,
+			transport:      common.StreamTransport,
+			fragmentSize:   128,
+			trafficPattern: &appctlpb.TrafficPattern{},
+			position:       endPadding,
+			want:           maxPaddingSize(1400, common.StreamTransport, 128, 0),
+		},
+		{
+			name:         "nil_selected_field",
+			mtu:          1400,
+			transport:    common.StreamTransport,
+			fragmentSize: 128,
+			trafficPattern: &appctlpb.TrafficPattern{
+				Padding: &appctlpb.PaddingPattern{
+					MaxEndPaddingLen: proto.Int32(12),
+				},
+			},
+			position: middlePadding,
+			want:     maxPaddingSize(1400, common.StreamTransport, 128, 0),
+		},
+		{
+			name:         "configured_zero",
+			mtu:          1400,
+			transport:    common.StreamTransport,
+			fragmentSize: 128,
+			trafficPattern: &appctlpb.TrafficPattern{
+				Padding: &appctlpb.PaddingPattern{
+					MaxMiddlePaddingLen: proto.Int32(0),
+				},
+			},
+			position: middlePadding,
+			want:     0,
+		},
+		{
+			name:         "configured_small_cap",
+			mtu:          1400,
+			transport:    common.StreamTransport,
+			fragmentSize: 128,
+			trafficPattern: &appctlpb.TrafficPattern{
+				Padding: &appctlpb.PaddingPattern{
+					MaxEndPaddingLen: proto.Int32(7),
+				},
+			},
+			position: endPadding,
+			want:     7,
+		},
+		{
+			name:         "negative_configured_value",
+			mtu:          1400,
+			transport:    common.StreamTransport,
+			fragmentSize: 128,
+			trafficPattern: &appctlpb.TrafficPattern{
+				Padding: &appctlpb.PaddingPattern{
+					MaxMiddlePaddingLen: proto.Int32(-1),
+				},
+			},
+			position: middlePadding,
+			want:     0,
+		},
+		{
+			name:         "udp_mtu_caps_configured_value",
+			mtu:          1400,
+			transport:    common.PacketTransport,
+			fragmentSize: 1400 - packetOverhead - 5,
+			trafficPattern: &appctlpb.TrafficPattern{
+				Padding: &appctlpb.PaddingPattern{
+					MaxEndPaddingLen: proto.Int32(255),
+				},
+			},
+			position: endPadding,
+			want:     5,
+		},
+		{
+			name:                "udp_existing_padding_caps_configured_value",
+			mtu:                 1400,
+			transport:           common.PacketTransport,
+			fragmentSize:        1400 - packetOverhead - 5,
+			existingPaddingSize: 3,
+			trafficPattern: &appctlpb.TrafficPattern{
+				Padding: &appctlpb.PaddingPattern{
+					MaxEndPaddingLen: proto.Int32(255),
+				},
+			},
+			position: endPadding,
+			want:     2,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := maxPaddingSizeWithTrafficPattern(tc.mtu, tc.transport, tc.fragmentSize, tc.existingPaddingSize, tc.trafficPattern, tc.position)
+			if got != tc.want {
+				t.Errorf("maxPaddingSizeWithTrafficPattern() = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
 
 func TestMaxPaddingSize(t *testing.T) {
 	testcases := []struct {
@@ -55,7 +176,7 @@ func TestMaxPaddingSize(t *testing.T) {
 		},
 	}
 	for _, tc := range testcases {
-		got := MaxPaddingSize(tc.mtu, tc.transport, tc.fragmentSize, tc.existingPaddingSize)
+		got := maxPaddingSize(tc.mtu, tc.transport, tc.fragmentSize, tc.existingPaddingSize)
 		if got != tc.want {
 			t.Errorf("MaxPaddingSize() = %d, want %d", got, tc.want)
 		}

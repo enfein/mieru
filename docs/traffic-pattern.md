@@ -55,6 +55,10 @@ Then restart the proxy service to make the changes effective.
                     "applyToAllUDPPacket": true,
                     "minLen": 6,
                     "maxLen": 8
+                },
+                "padding": {
+                    "maxMiddlePaddingLen": 64,
+                    "maxEndPaddingLen": 128
                 }
             }
         }
@@ -90,6 +94,10 @@ Then restart the proxy service to make the changes effective.
         "nonce": {
             "type": "NONCE_TYPE_FIXED",
             "customHexStrings": ["00010203", "04050607"]
+        },
+        "padding": {
+            "maxMiddlePaddingLen": 0,
+            "maxEndPaddingLen": 255
         }
     }
 }
@@ -103,6 +111,7 @@ The `trafficPattern` object supports the following fields:
 2. [Optional] `unlockAll` - A boolean that controls the value range of implicit traffic pattern generation. When set to `true`, implicit patterns can use all possible options. When set to `false` (default), implicit patterns use only limited, conservative options.
 3. [Optional] `tcpFragment` - An object that configures TCP fragmentation. This has no impact to UDP proxy protocol.
 4. [Optional] `nonce` - An object that configures nonce prefix manipulation.
+5. [Optional] `padding` - An object that configures padding length limits for network segments.
 
 ## TCP Fragmentation
 
@@ -153,6 +162,26 @@ Example with fixed nonce prefix:
 "nonce": {
     "type": "NONCE_TYPE_FIXED",
     "customHexStrings": ["00010203", "04050607"]
+}
+```
+
+## Padding Pattern
+
+> This feature is not released yet.
+
+The padding pattern feature controls how many padding bytes mieru / mita may add to network segments. The `padding` object supports the following fields:
+
+1. [Optional] `maxMiddlePaddingLen` - The maximum number of padding bytes in the middle of a network segment. The value must be between 0 and 255. Set it to `0` to disable middle padding.
+2. [Optional] `maxEndPaddingLen` - The maximum number of padding bytes at the end of a network segment. The value must be between 0 and 255. Set it to `0` to disable end padding.
+
+These fields set upper limits. The actual padding length can be smaller due to random selection, MTU limits, packet overhead, and payload size. If a field is not set, mieru uses implicit pattern generation to choose a value.
+
+Example:
+
+```js
+"padding": {
+    "maxMiddlePaddingLen": 64,
+    "maxEndPaddingLen": 128
 }
 ```
 

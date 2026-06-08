@@ -20,6 +20,7 @@ import (
 	"fmt"
 	mrand "math/rand"
 
+	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/mathext"
 	"github.com/enfein/mieru/v3/pkg/rng"
@@ -28,6 +29,13 @@ import (
 var (
 	recommendedConsecutiveASCIILen = 24 + rng.FixedIntVH(17)
 	recommendedTargetProbability   = 0.325
+)
+
+type paddingPosition int
+
+const (
+	middlePadding paddingPosition = iota
+	endPadding
 )
 
 type paddingOpts struct {
@@ -58,8 +66,33 @@ type entropyPaddingOpts struct {
 	targetProbability float64
 }
 
-// MaxPaddingSize returns the maximum padding size of a segment.
-func MaxPaddingSize(mtu int, transport common.TransportProtocol, fragmentSize int, existingPaddingSize int) int {
+// maxPaddingSizeWithTrafficPattern returns the maximum padding size.
+func maxPaddingSizeWithTrafficPattern(mtu int, transport common.TransportProtocol, fragmentSize int, existingPaddingSize int, trafficPattern *appctlpb.TrafficPattern, position paddingPosition) int {
+	maxPaddingSize := maxPaddingSize(mtu, transport, fragmentSize, existingPaddingSize)
+	if trafficPattern == nil || trafficPattern.Padding == nil {
+		return maxPaddingSize
+	}
+
+	var configured *int32
+	switch position {
+	case middlePadding:
+		configured = trafficPattern.Padding.MaxMiddlePaddingLen
+	case endPadding:
+		configured = trafficPattern.Padding.MaxEndPaddingLen
+	default:
+		return maxPaddingSize
+	}
+	if configured == nil {
+		return maxPaddingSize
+	}
+	if *configured < 0 {
+		return 0
+	}
+	return mathext.Min(maxPaddingSize, int(*configured))
+}
+
+// maxPaddingSize returns the maximum padding size without considering traffic pattern.
+func maxPaddingSize(mtu int, transport common.TransportProtocol, fragmentSize int, existingPaddingSize int) int {
 	if transport == common.StreamTransport {
 		// No limit.
 		return 255
