@@ -46,10 +46,6 @@ const (
 	// Maximum number of segments in a queue or buffer.
 	segmentTreeCapacity = 4096
 
-	// Use a very large value for receive queue, because application may be lazy
-	// and only read received segments on demand.
-	segmentTreeRecvQueueCapacity = 1024 * 1024
-
 	minWindowSize = 16
 	maxWindowSize = segmentTreeCapacity
 
@@ -184,7 +180,7 @@ func NewSession(id uint32, isClient bool, mtu int, users map[string]*appctlpb.Us
 		sendQueue:          newSegmentTree(segmentTreeCapacity),
 		sendBuf:            newSegmentTree(segmentTreeCapacity),
 		recvBuf:            newSegmentTree(segmentTreeCapacity),
-		recvQueue:          newSegmentTree(segmentTreeRecvQueueCapacity),
+		recvQueue:          newSegmentTree(segmentTreeCapacity),
 		recvChan:           make(chan *segment, segmentChanCapacity),
 		rttStat:            rttStat,
 		cubicSendAlgorithm: congestion.NewCubicSendAlgorithm(minWindowSize, maxWindowSize),
@@ -209,29 +205,15 @@ func (s *Session) String() string {
 func (s *Session) Read(b []byte) (n int, err error) {
 	s.rLock.Lock()
 	defer s.rLock.Unlock()
-
 	defer func() {
 		s.readDeadline.Store(0)
 	}()
-	if log.IsLevelEnabled(log.TraceLevel) {
-		log.Tracef("%v trying to read %d bytes", s, len(b))
+	if len(b) == 0 {
+		return 0, nil
 	}
 
-	// Read remaining data that application failed to read last time.
-	if len(s.unreadBuf) > 0 {
-		n = copy(b, s.unreadBuf)
-		if n == len(s.unreadBuf) {
-			s.unreadBuf = nil
-		} else {
-			s.unreadBuf = s.unreadBuf[n:]
-		}
-		if log.IsLevelEnabled(log.TraceLevel) {
-			log.Tracef("%v read %d bytes", s, n)
-		}
-		if !s.isClient && s.uploadBytes != nil {
-			s.uploadBytes.Add(int64(n))
-		}
-		return n, nil
+	if log.IsLevelEnabled(log.TraceLevel) {
+		log.Tracef("%v trying to read %d bytes", s, len(b))
 	}
 
 	// Stop reading when deadline is reached.
@@ -241,26 +223,44 @@ func (s *Session) Read(b []byte) (n int, err error) {
 	}
 
 	for {
-		if s.recvQueue.Len() > 0 {
-			// Some segments in segment tree are ready to read.
-			for {
-				seg, ok := s.recvQueue.DeleteMin()
-				if !ok {
-					break
-				}
-				if s.isClient && seg.metadata.Protocol() == openSessionResponse && s.isState(sessionAttached) {
-					s.forwardStateTo(sessionEstablished)
-				}
-				if s.unreadBuf == nil {
-					s.unreadBuf = make([]byte, 0)
-				}
-				s.unreadBuf = append(s.unreadBuf, seg.payload...)
+		// Read remaining data that application left last time.
+		if len(s.unreadBuf) > 0 {
+			copied := copy(b[n:], s.unreadBuf)
+			n += copied
+			if copied == len(s.unreadBuf) {
+				s.unreadBuf = nil
+			} else {
+				s.unreadBuf = s.unreadBuf[copied:]
 			}
-			if len(s.unreadBuf) > 0 {
+			if n == len(b) || len(s.unreadBuf) > 0 {
+				break
+			}
+		}
+
+		if s.recvQueue.Len() > 0 {
+			// Read segments from recv queue.
+			seg, ok := s.recvQueue.DeleteMin()
+			if !ok {
+				continue
+			}
+			if s.isClient && seg.metadata.Protocol() == openSessionResponse && s.isState(sessionAttached) {
+				s.forwardStateTo(sessionEstablished)
+			}
+			copied := copy(b[n:], seg.payload)
+			n += copied
+			if copied < len(seg.payload) {
+				s.unreadBuf = seg.payload[copied:]
+			}
+			if n == len(b) {
 				break
 			}
 		} else {
-			// Wait for incoming segments.
+			if n > 0 {
+				break
+			}
+
+			// recvQueue is empty and we haven't read anything.
+			// Wait for incoming segments to fill the recvQueue.
 			select {
 			case <-s.closedChan:
 				return 0, io.EOF
@@ -274,12 +274,6 @@ func (s *Session) Read(b []byte) (n int, err error) {
 		}
 	}
 
-	n = copy(b, s.unreadBuf)
-	if n == len(s.unreadBuf) {
-		s.unreadBuf = nil
-	} else {
-		s.unreadBuf = s.unreadBuf[n:]
-	}
 	if log.IsLevelEnabled(log.TraceLevel) {
 		log.Tracef("%v read %d bytes", s, n)
 	}
@@ -929,15 +923,10 @@ func (s *Session) inputData(seg *segment) error {
 	switch s.transportProtocol {
 	case common.StreamTransport:
 		// Deliver the segment directly to recvQueue.
-		for {
-			if s.recvQueue.Remaining() <= 1 {
-				time.Sleep(backPressureDelay)
-			} else {
-				break
+		if s.waitForRecvQueueSpace() {
+			if !s.recvQueue.Insert(seg) {
+				return fmt.Errorf("inputData() failed: insert %v to receive queue failed", seg)
 			}
-		}
-		if !s.recvQueue.Insert(seg) {
-			return fmt.Errorf("inputData() failed: insert %v to receive queue failed", seg)
 		}
 	case common.PacketTransport:
 		// Delete all previous acknowledged segments from sendBuf.
@@ -964,43 +953,26 @@ func (s *Session) inputData(seg *segment) error {
 		}
 
 		// Deliver the segment to recvBuf.
-		for {
-			if s.recvBuf.Remaining() <= 1 {
-				time.Sleep(backPressureDelay)
-			} else {
-				break
+		s.ackOnDataRecv.Store(true)
+		if s.receiveWindowSize() <= 0 {
+			if log.IsLevelEnabled(log.TraceLevel) {
+				log.Tracef("%v dropped %v because the receive window size is 0", s, seg)
 			}
+			return nil
 		}
 		if !s.recvBuf.Insert(seg) {
-			return fmt.Errorf("inputData() failed: insert %v to receive buffer failed", seg)
+			if log.IsLevelEnabled(log.TraceLevel) {
+				log.Tracef("%v dropped %v because insert to receive buffer failed", s, seg)
+			}
+			return nil
 		}
 
-		// Move recvBuf to recvQueue.
-		for {
-			if s.recvQueue.Remaining() <= 1 {
-				break
-			}
-
-			seg3, deleted := s.recvBuf.DeleteMinIf(func(iter *segment) bool {
-				seq, _ := iter.Seq()
-				return seq <= s.nextRecv.Load()
-			})
-			if seg3 == nil || !deleted {
-				break
-			}
-			seq, _ := seg3.Seq()
-			if seq == s.nextRecv.Load() {
-				if !s.recvQueue.Insert(seg3) {
-					return fmt.Errorf("inputData() failed: insert %v to receive queue failed", seg3)
-				}
-				s.nextRecv.Add(1)
-				das, ok := seg3.metadata.(*dataAckStruct)
-				if ok {
-					s.remoteWindowSize.Store(uint32(das.windowSize))
-				}
+		// Move segments from recvBuf to recvQueue.
+		if s.waitForRecvQueueSpace() {
+			if err := s.moveRecvBufToRecvQueue(); err != nil {
+				return fmt.Errorf("inputData() failed: %w", err)
 			}
 		}
-		s.ackOnDataRecv.Store(true)
 	default:
 		return fmt.Errorf("unsupported transport protocol %v", s.transportProtocol)
 	}
@@ -1233,7 +1205,62 @@ func (s *Session) sendWindowSize() int {
 
 // receiveWindowSize determines how many more packets this session can receive.
 func (s *Session) receiveWindowSize() int {
-	return mathext.Max(0, int(s.cubicSendAlgorithm.CongestionWindowSize())-s.recvBuf.Len())
+	return mathext.Max(0, segmentTreeCapacity-s.recvBuf.Len()-s.recvQueue.Len())
+}
+
+// waitForRecvQueueSpace returns true when the recv queue has empty space.
+// It returns false when the session is closed.
+func (s *Session) waitForRecvQueueSpace() bool {
+	for {
+		select {
+		case <-s.closedChan:
+			return false
+		default:
+		}
+		if s.recvQueue.Remaining() > 0 {
+			return true
+		}
+		select {
+		case <-s.closedChan:
+			return false
+		case <-time.After(backPressureDelay):
+		}
+	}
+}
+
+func (s *Session) moveRecvBufToRecvQueue() error {
+	for {
+		if s.recvQueue.Remaining() <= 0 {
+			return nil
+		}
+
+		nextRecv := s.nextRecv.Load()
+		seg, deleted := s.recvBuf.DeleteMinIf(func(iter *segment) bool {
+			seq, _ := iter.Seq()
+			return seq <= nextRecv
+		})
+		if seg == nil || !deleted {
+			return nil
+		}
+		seq, _ := seg.Seq()
+		if seq < nextRecv {
+			continue // ignore this segment
+		}
+		if !s.recvQueue.Insert(seg) {
+			// Can't move to recvQueue, try insert back to recvBuf.
+			if !s.recvBuf.Insert(seg) {
+				return fmt.Errorf("insert %v from receive queue back to receive buffer failed", seg)
+			}
+			return nil
+		}
+		s.nextRecv.Add(1)
+
+		// Update remote window size.
+		das, ok := seg.metadata.(*dataAckStruct)
+		if ok {
+			s.remoteWindowSize.Store(uint32(das.windowSize))
+		}
+	}
 }
 
 func (s *Session) checkQuota(userName string) (ok bool, err error) {
