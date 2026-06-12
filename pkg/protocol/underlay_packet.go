@@ -224,7 +224,7 @@ func (u *PacketUnderlay) RunEventLoop(ctx context.Context) error {
 					return fmt.Errorf("onCloseSession() failed: %w", err)
 				}
 			default:
-				panic(fmt.Sprintf("Protocol %d is a session protocol but not recognized by packet underlay", seg.metadata.Protocol()))
+				return fmt.Errorf("protocol %d is a session protocol but not recognized by packet underlay", seg.metadata.Protocol())
 			}
 		} else if isDataAckProtocol(seg.metadata.Protocol()) {
 			das, _ := toDataAckStruct(seg.metadata)
@@ -252,7 +252,7 @@ func (u *PacketUnderlay) RunEventLoop(ctx context.Context) error {
 				}
 				continue
 			}
-			session.(*Session).recvChan <- seg
+			u.deliverSegmentToSession(session.(*Session), seg)
 		} else {
 			log.Debugf("Ignore unknown protocol %d", seg.metadata.Protocol())
 		}
@@ -272,13 +272,15 @@ func (u *PacketUnderlay) onOpenSessionRequest(seg *segment, remoteAddr net.Addr)
 	}
 	_, found := u.sessionMap.Load(sessionID)
 	if found {
-		log.Debugf("%v received open session request, but session ID %d is already used", u, sessionID)
+		log.Debugf("%v received openSessionRequest, but session ID %d is already used", u, sessionID)
 		return nil
 	}
 	session := NewSession(sessionID, false, u.MTU(), u.users, u.trafficPattern)
-	u.AddSession(session, remoteAddr)
-	session.recvChan <- seg
-	u.readySessions <- session
+	if err := u.AddSession(session, remoteAddr); err == nil {
+		if u.deliverSegmentToSession(session, seg) {
+			u.readySessions <- session
+		}
+	}
 	return nil
 }
 
@@ -292,7 +294,9 @@ func (u *PacketUnderlay) onOpenSessionResponse(seg *segment) error {
 	if !found {
 		return fmt.Errorf("session ID %d is not found", sessionID)
 	}
-	session.(*Session).recvChan <- seg
+	if !u.deliverSegmentToSession(session.(*Session), seg) && log.IsLevelEnabled(log.TraceLevel) {
+		log.Tracef("%v ignored openSessionResponse segment for closed session %d", u, sessionID)
+	}
 	return nil
 }
 
@@ -307,7 +311,9 @@ func (u *PacketUnderlay) onCloseSession(seg *segment) error {
 		return nil
 	}
 	s := session.(*Session)
-	s.recvChan <- seg
+	if !u.deliverSegmentToSession(s, seg) && log.IsLevelEnabled(log.TraceLevel) {
+		log.Tracef("%v ignored closeSessionRequest or closeSessionResponse segment for closed session %d", u, sessionID)
+	}
 	return nil
 }
 

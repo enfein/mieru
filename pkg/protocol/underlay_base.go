@@ -214,3 +214,16 @@ func (b *baseUnderlay) Scheduler() *ScheduleController {
 func (b *baseUnderlay) Done() chan struct{} {
 	return b.done
 }
+
+// deliverSegmentToSession blocks for live sessions to preserve back pressure,
+// but returns when the session or underlay has been closed.
+func (b *baseUnderlay) deliverSegmentToSession(s *Session, seg *segment) bool {
+	select {
+	case s.recvChan <- seg:
+		return true
+	case <-s.closedChan:
+		return false
+	case <-b.done:
+		return false
+	}
+}
