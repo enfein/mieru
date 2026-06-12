@@ -1,16 +1,19 @@
 name: 'packet drop test'
 on:
   workflow_dispatch:
-    inputs:
-      handshake_no_wait:
-        description: 'Handshake no wait mode (y/n)'
-        required: false
-        default: 'n'
-        type: string
 jobs:
   run-test:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: handshake standard
+            handshake_no_wait: false
+          - name: handshake no wait
+            handshake_no_wait: true
     steps:
       - name: Check out repository code
         uses: actions/checkout@v6
@@ -21,7 +24,7 @@ jobs:
       - name: Build test binaries
         run: make test-binary
       - name: Set env
-        if: github.event.inputs.handshake_no_wait == 'y'
+        if: matrix.handshake_no_wait
         run: echo "MIERU_HANDSHAKE_NO_WAIT=1" >> $GITHUB_ENV
       - name: Run packet drop test
         run: sudo -E ./test/deploy/packetdrop/test.sh

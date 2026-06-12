@@ -65,9 +65,9 @@ export MITA_INSECURE_UDS=1
 ip netns exec sim ./bin/mita run &
 sleep 1
 
-# Add 100ms delay.
-tc qdisc add dev veth-client root netem delay 50ms 10ms distribution normal
-ip netns exec sim tc qdisc add dev veth-server root netem delay 50ms 10ms distribution normal
+# Add 100ms delay with 10ms jitter.
+tc qdisc add dev veth-client root netem delay 50ms 5ms distribution normal
+ip netns exec sim tc qdisc add dev veth-server root netem delay 50ms 5ms distribution normal
 
 # Randomly drop 0.1% of packets in both directions.
 ip netns exec sim iptables -F INPUT
