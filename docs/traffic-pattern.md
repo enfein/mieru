@@ -167,8 +167,6 @@ Example with fixed nonce prefix:
 
 ## Padding Pattern
 
-> This feature is not released yet.
-
 The padding pattern feature controls how many padding bytes mieru / mita may add to network segments. The `padding` object supports the following fields:
 
 1. [Optional] `maxMiddlePaddingLen` - The maximum number of padding bytes in the middle of a network segment. The value must be between 0 and 255. Set it to `0` to disable middle padding.
