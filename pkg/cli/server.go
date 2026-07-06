@@ -28,17 +28,14 @@ import (
 	"syscall"
 	"time"
 
-	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/trafficpattern"
 	"github.com/enfein/mieru/v3/pkg/appctl"
-	"github.com/enfein/mieru/v3/pkg/appctl/appctlcommon"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlgrpc"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/metrics"
-	"github.com/enfein/mieru/v3/pkg/protocol"
 	"github.com/enfein/mieru/v3/pkg/socks5"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 	"github.com/enfein/mieru/v3/pkg/version/updater"
@@ -484,85 +481,11 @@ var serverRunFunc = func(s []string) error {
 
 	// Start proxy if server config is valid.
 	if err = appctl.ValidateFullServerConfig(config); err == nil {
-		appctl.SetAppStatus(appctlpb.AppStatus_STARTING)
-
-		trafficPattern, err := trafficpattern.NewConfig(config.TrafficPattern)
-		if err != nil {
-			return err
+		if err = appctl.StartServerProxy(config); err != nil {
+			log.Errorf("Start mita server proxy failed: %v", err)
+		} else {
+			log.Debugf("Started proxy after %v", appctl.Elapsed())
 		}
-		mux := protocol.NewMux(false).
-			SetTrafficPattern(trafficPattern).
-			SetServerUsers(appctlcommon.UserListToMap(config.GetUsers())).
-			SetServerUserHintIsMandatory(config.GetAdvancedSettings().GetUserHintIsMandatory())
-		appctl.SetServerMuxRef(mux)
-		mtu := common.DefaultMTU
-		if config.GetMtu() != 0 {
-			mtu = int(config.GetMtu())
-		}
-		endpoints, err := appctlcommon.PortBindingsToUnderlayProperties(config.GetPortBindings(), mtu)
-		if err != nil {
-			return err
-		}
-		mux.SetEndpoints(endpoints)
-
-		dnsHosts, err := appctlcommon.TransformDNSHosts(config.GetDns())
-		if err != nil {
-			return err
-		}
-
-		// Create the egress socks5 server.
-		socks5Config := &socks5.Config{
-			AuthOpts: socks5.Auth{
-				ClientSideAuthentication: true,
-			},
-			DualStackPreference: common.DualStackPreference(config.GetDns().GetDualStack()),
-			Egress:              config.GetEgress(),
-			HandshakeTimeout:    10 * time.Second,
-			Resolver:            apicommon.HostMapResolver{Resolver: &net.Resolver{}, Hosts: dnsHosts},
-			Users:               appctlcommon.UserListToMap(config.GetUsers()),
-		}
-		socks5Server, err := socks5.New(socks5Config)
-		if err != nil {
-			return fmt.Errorf(stderror.CreateSocks5ServerFailedErr, err)
-		}
-		appctl.SetSocks5Server(socks5Server)
-
-		// Run the egress socks5 server in the background.
-		var proxyTasks sync.WaitGroup
-		var initProxyTasks sync.WaitGroup
-		proxyTasks.Add(1)
-		initProxyTasks.Add(1)
-		go func() {
-			if err = mux.Start(); err != nil {
-				log.Fatalf("socks5 server listening failed: %v", err)
-			}
-			initProxyTasks.Done()
-
-			log.Infof("mita server daemon socks5 server is running")
-			if err = socks5Server.Serve(mux); err != nil {
-				log.Fatalf("run socks5 server failed: %v", err)
-			}
-			log.Infof("mita server daemon socks5 server is stopped")
-			proxyTasks.Done()
-		}()
-
-		initProxyTasks.Wait()
-
-		if config.GetAdvancedSettings().GetMetricsLoggingInterval() != "" {
-			metricsDuration, err := time.ParseDuration(config.GetAdvancedSettings().GetMetricsLoggingInterval())
-			if err != nil {
-				log.Warnf("Failed to parse metrics logging interval %q from server configuration: %v", config.GetAdvancedSettings().GetMetricsLoggingInterval(), err)
-			} else {
-				if err := metrics.SetLoggingDuration(metricsDuration); err != nil {
-					log.Warnf("Failed to set metrics logging duration: %v", err)
-				}
-			}
-		}
-		metrics.EnableLogging()
-
-		appctl.SetAppStatus(appctlpb.AppStatus_RUNNING)
-		log.Debugf("Started proxy after %v", appctl.Elapsed())
-		proxyTasks.Wait()
 	}
 
 	// If fails to validate server configuration, do nothing.

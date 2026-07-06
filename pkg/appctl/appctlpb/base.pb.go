@@ -48,6 +48,8 @@ const (
 	AppStatus_RUNNING AppStatus = 3
 	// Proxy is being stopped.
 	AppStatus_STOPPING AppStatus = 4
+	// Proxy is stopped due to error. RPC service is still available.
+	AppStatus_STOPPED AppStatus = 5
 )
 
 // Enum value maps for AppStatus.
@@ -58,6 +60,7 @@ var (
 		2: "STARTING",
 		3: "RUNNING",
 		4: "STOPPING",
+		5: "STOPPED",
 	}
 	AppStatus_value = map[string]int32{
 		"UNKNOWN":  0,
@@ -65,6 +68,7 @@ var (
 		"STARTING": 2,
 		"RUNNING":  3,
 		"STOPPING": 4,
+		"STOPPED":  5,
 	}
 )
 
@@ -1045,13 +1049,14 @@ const file_appctl_proto_base_proto_rawDesc = "" +
 	"\x13maxMiddlePaddingLen\x18\x01 \x01(\x05H\x00R\x13maxMiddlePaddingLen\x88\x01\x01\x12/\n" +
 	"\x10maxEndPaddingLen\x18\x02 \x01(\x05H\x01R\x10maxEndPaddingLen\x88\x01\x01B\x16\n" +
 	"\x14_maxMiddlePaddingLenB\x13\n" +
-	"\x11_maxEndPaddingLen*K\n" +
+	"\x11_maxEndPaddingLen*X\n" +
 	"\tAppStatus\x12\v\n" +
 	"\aUNKNOWN\x10\x00\x12\b\n" +
 	"\x04IDLE\x10\x01\x12\f\n" +
 	"\bSTARTING\x10\x02\x12\v\n" +
 	"\aRUNNING\x10\x03\x12\f\n" +
-	"\bSTOPPING\x10\x04*[\n" +
+	"\bSTOPPING\x10\x04\x12\v\n" +
+	"\aSTOPPED\x10\x05*[\n" +
 	"\fLoggingLevel\x12\v\n" +
 	"\aDEFAULT\x10\x00\x12\t\n" +
 	"\x05FATAL\x10\x01\x12\t\n" +

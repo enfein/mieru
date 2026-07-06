@@ -37,6 +37,9 @@ enum AppStatus {
 
     // Proxy is being stopped.
     STOPPING = 4;
+
+    // Proxy is stopped due to error. RPC service is still available.
+    STOPPED = 5;
 }
 
 enum LoggingLevel {

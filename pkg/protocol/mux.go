@@ -317,7 +317,7 @@ func (m *Mux) Addr() net.Addr {
 
 // Start listens on all the server addresses for incoming connections.
 // Call this method in client results in an error.
-// This method doesn't block.
+// Mux is automatically closed when accept underlay fails.
 func (m *Mux) Start() error {
 	if m.isClient {
 		return stderror.ErrInvalidOperation
@@ -335,7 +335,6 @@ func (m *Mux) Start() error {
 	}
 
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	m.used = true
 	var wg sync.WaitGroup
 	for _, p := range m.endpoints {
@@ -343,6 +342,14 @@ func (m *Mux) Start() error {
 		go m.acceptUnderlayLoop(m.ctx, p, &wg)
 	}
 	wg.Wait()
+	hasErr := m.acceptHasErr.Load()
+	m.mu.Unlock()
+	if hasErr {
+		if err := m.Close(); err != nil {
+			log.Warnf("mux Close() failed: %v", err)
+		}
+		return fmt.Errorf("mux server listener failed")
+	}
 	return nil
 }
 

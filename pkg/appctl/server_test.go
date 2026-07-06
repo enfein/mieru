@@ -17,6 +17,7 @@ package appctl
 
 import (
 	"context"
+	"net"
 	"os"
 	"strings"
 	"testing"
@@ -347,6 +348,62 @@ func TestServerStopClearsMuxRef(t *testing.T) {
 	}
 	if serverMuxRef.Load() != nil {
 		t.Fatal("server mux ref is not cleared after Stop()")
+	}
+}
+
+func TestServerProxyStartFailure(t *testing.T) {
+	beforeServerTest(t)
+	defer afterServerTest(t)
+
+	listener, err := net.Listen("tcp", "0.0.0.0:0")
+	if err != nil {
+		t.Fatalf("net.Listen() failed: %v", err)
+	}
+	defer listener.Close()
+	tcpAddr, ok := listener.Addr().(*net.TCPAddr)
+	if !ok {
+		t.Fatalf("listener address type is %T, want *net.TCPAddr", listener.Addr())
+	}
+
+	config := &pb.ServerConfig{
+		PortBindings: []*pb.PortBinding{
+			{
+				Port:     proto.Int32(int32(tcpAddr.Port)),
+				Protocol: pb.TransportProtocol_TCP.Enum(),
+			},
+		},
+		Users: []*pb.User{
+			{
+				Name:     proto.String("hello"),
+				Password: proto.String("world"),
+			},
+		},
+	}
+	if err := StoreServerConfig(config); err != nil {
+		t.Fatalf("StoreServerConfig() failed: %v", err)
+	}
+
+	SetAppStatus(pb.AppStatus_IDLE)
+	SetServerMuxRef(nil)
+	SetSocks5Server(nil)
+	t.Cleanup(func() {
+		SetServerMuxRef(nil)
+		SetSocks5Server(nil)
+		SetAppStatus(pb.AppStatus_IDLE)
+	})
+
+	rpcServer := NewServerManagementService()
+	if _, err := rpcServer.Start(context.Background(), &emptypb.Empty{}); err == nil {
+		t.Fatal("Start() succeeded with occupied server port")
+	}
+	if got := GetAppStatus(); got != pb.AppStatus_STOPPED {
+		t.Fatalf("app status = %s, want %s", got, pb.AppStatus_STOPPED)
+	}
+	if serverMuxRef.Load() != nil {
+		t.Fatal("server mux ref is not cleared after proxy start failure")
+	}
+	if socks5ServerRef.Load() != nil {
+		t.Fatal("socks5 server ref is not cleared after proxy start failure")
 	}
 }
 

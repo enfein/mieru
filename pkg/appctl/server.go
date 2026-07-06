@@ -78,6 +78,132 @@ func SetServerMuxRef(mux *protocol.Mux) {
 	serverMuxRef.Store(mux)
 }
 
+// serverProxy is an object that bundles server mux and associated socks5 server.
+type serverProxy struct {
+	mux          *protocol.Mux
+	socks5Server *socks5.Server
+}
+
+func newServerProxy(config *pb.ServerConfig) (*serverProxy, error) {
+	trafficPattern, err := trafficpattern.NewConfig(config.TrafficPattern)
+	if err != nil {
+		return nil, err
+	}
+	mux := protocol.NewMux(false).
+		SetTrafficPattern(trafficPattern).
+		SetServerUsers(appctlcommon.UserListToMap(config.GetUsers())).
+		SetServerUserHintIsMandatory(config.GetAdvancedSettings().GetUserHintIsMandatory())
+	mtu := common.DefaultMTU
+	if config.GetMtu() != 0 {
+		mtu = int(config.GetMtu())
+	}
+	endpoints, err := appctlcommon.PortBindingsToUnderlayProperties(config.GetPortBindings(), mtu)
+	if err != nil {
+		mux.Close()
+		return nil, err
+	}
+	mux.SetEndpoints(endpoints)
+
+	dnsHosts, err := appctlcommon.TransformDNSHosts(config.GetDns())
+	if err != nil {
+		mux.Close()
+		return nil, err
+	}
+
+	// Create the egress socks5 server.
+	socks5Config := &socks5.Config{
+		AuthOpts: socks5.Auth{
+			ClientSideAuthentication: true,
+		},
+		DualStackPreference: common.DualStackPreference(config.GetDns().GetDualStack()),
+		Egress:              config.GetEgress(),
+		HandshakeTimeout:    10 * time.Second,
+		Resolver:            apicommon.HostMapResolver{Resolver: &net.Resolver{}, Hosts: dnsHosts},
+		Users:               appctlcommon.UserListToMap(config.GetUsers()),
+	}
+	socks5Server, err := socks5.New(socks5Config)
+	if err != nil {
+		mux.Close()
+		return nil, fmt.Errorf(stderror.CreateSocks5ServerFailedErr, err)
+	}
+	return &serverProxy{mux: mux, socks5Server: socks5Server}, nil
+}
+
+func cleanupFailedServerProxy(proxy *serverProxy) {
+	if proxy != nil {
+		if proxy.socks5Server != nil && socks5ServerRef.Load() == proxy.socks5Server {
+			SetSocks5Server(nil)
+			if err := proxy.socks5Server.Close(); err != nil {
+				log.Errorf("socks5 server Close() failed: %v", err)
+			}
+		}
+		if proxy.mux != nil && serverMuxRef.Load() == proxy.mux {
+			SetServerMuxRef(nil)
+			if err := proxy.mux.Close(); err != nil {
+				log.Errorf("server mux Close() failed: %v", err)
+			}
+		}
+	}
+}
+
+// StartServerProxy starts the mita proxy service.
+func StartServerProxy(config *pb.ServerConfig) error {
+	if socks5ServerRef.Load() != nil {
+		log.Infof("socks5 server already exist")
+		return nil
+	}
+
+	SetAppStatus(pb.AppStatus_STARTING)
+
+	proxy, err := newServerProxy(config)
+	if err != nil {
+		SetAppStatus(pb.AppStatus_STOPPED)
+		return err
+	}
+
+	startErr := make(chan error, 1)
+	go func() {
+		if err := proxy.mux.Start(); err != nil {
+			log.Errorf("server mux listening failed: %v", err)
+			startErr <- err
+			return
+		}
+		SetServerMuxRef(proxy.mux)
+		SetSocks5Server(proxy.socks5Server)
+		startErr <- nil
+
+		log.Infof("mita server daemon socks5 server is running")
+		if err := proxy.socks5Server.Serve(proxy.mux); err != nil {
+			log.Errorf("Run socks5 server failed: %v", err)
+			cleanupFailedServerProxy(proxy)
+			SetAppStatus(pb.AppStatus_STOPPED)
+			return
+		}
+		log.Infof("mita server daemon socks5 server is stopped")
+	}()
+
+	if err := <-startErr; err != nil {
+		cleanupFailedServerProxy(proxy)
+		SetAppStatus(pb.AppStatus_STOPPED)
+		return err
+	}
+
+	if config.GetAdvancedSettings().GetMetricsLoggingInterval() != "" {
+		metricsDuration, err := time.ParseDuration(config.GetAdvancedSettings().GetMetricsLoggingInterval())
+		if err != nil {
+			log.Warnf("Failed to parse metrics logging interval %q from server configuration: %v", config.GetAdvancedSettings().GetMetricsLoggingInterval(), err)
+		} else {
+			if err := metrics.SetLoggingDuration(metricsDuration); err != nil {
+				log.Warnf("Failed to set metrics logging duration: %v", err)
+			}
+		}
+	}
+	metrics.EnableLogging()
+
+	SetAppStatus(pb.AppStatus_RUNNING)
+	return nil
+}
+
 // ServerUDS returns the UNIX domain socket that mita server
 // is listening to RPC requests.
 func ServerUDS() string {
@@ -111,85 +237,9 @@ func (s *serverManagementService) Start(ctx context.Context, req *emptypb.Empty)
 	if loggingLevel != pb.LoggingLevel_DEFAULT.String() {
 		log.SetLevel(loggingLevel)
 	}
-	if socks5ServerRef.Load() != nil {
-		log.Infof("socks5 server already exist")
-		return &emptypb.Empty{}, nil
-	}
-
-	SetAppStatus(pb.AppStatus_STARTING)
-
-	trafficPattern, err := trafficpattern.NewConfig(config.TrafficPattern)
-	if err != nil {
+	if err := StartServerProxy(config); err != nil {
 		return &emptypb.Empty{}, err
 	}
-	mux := protocol.NewMux(false).
-		SetTrafficPattern(trafficPattern).
-		SetServerUsers(appctlcommon.UserListToMap(config.GetUsers())).
-		SetServerUserHintIsMandatory(config.GetAdvancedSettings().GetUserHintIsMandatory())
-	mtu := common.DefaultMTU
-	if config.GetMtu() != 0 {
-		mtu = int(config.GetMtu())
-	}
-	endpoints, err := appctlcommon.PortBindingsToUnderlayProperties(config.GetPortBindings(), mtu)
-	if err != nil {
-		return &emptypb.Empty{}, err
-	}
-	mux.SetEndpoints(endpoints)
-
-	dnsHosts, err := appctlcommon.TransformDNSHosts(config.GetDns())
-	if err != nil {
-		return &emptypb.Empty{}, err
-	}
-
-	// Create the egress socks5 server.
-	socks5Config := &socks5.Config{
-		AuthOpts: socks5.Auth{
-			ClientSideAuthentication: true,
-		},
-		DualStackPreference: common.DualStackPreference(config.GetDns().GetDualStack()),
-		Egress:              config.GetEgress(),
-		HandshakeTimeout:    10 * time.Second,
-		Resolver:            apicommon.HostMapResolver{Resolver: &net.Resolver{}, Hosts: dnsHosts},
-		Users:               appctlcommon.UserListToMap(config.GetUsers()),
-	}
-	socks5Server, err := socks5.New(socks5Config)
-	if err != nil {
-		return &emptypb.Empty{}, fmt.Errorf(stderror.CreateSocks5ServerFailedErr, err)
-	}
-	SetSocks5Server(socks5Server)
-
-	// Run the egress socks5 server in the background.
-	var initProxyTasks sync.WaitGroup
-	initProxyTasks.Add(1)
-	go func() {
-		if err := mux.Start(); err != nil {
-			log.Fatalf("socks5 server listening failed: %v", err)
-		}
-		SetServerMuxRef(mux)
-		initProxyTasks.Done()
-
-		log.Infof("mita server daemon socks5 server is running")
-		if err := socks5Server.Serve(mux); err != nil {
-			log.Fatalf("run socks5 server failed: %v", err)
-		}
-		log.Infof("mita server daemon socks5 server is stopped")
-	}()
-
-	initProxyTasks.Wait()
-
-	if config.GetAdvancedSettings().GetMetricsLoggingInterval() != "" {
-		metricsDuration, err := time.ParseDuration(config.GetAdvancedSettings().GetMetricsLoggingInterval())
-		if err != nil {
-			log.Warnf("Failed to parse metrics logging interval %q from server configuration: %v", config.GetAdvancedSettings().GetMetricsLoggingInterval(), err)
-		} else {
-			if err := metrics.SetLoggingDuration(metricsDuration); err != nil {
-				log.Warnf("Failed to set metrics logging duration: %v", err)
-			}
-		}
-	}
-	metrics.EnableLogging()
-
-	SetAppStatus(pb.AppStatus_RUNNING)
 	log.Infof("completed Start request from RPC caller")
 	return &emptypb.Empty{}, nil
 }
