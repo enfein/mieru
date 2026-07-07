@@ -63,6 +63,7 @@ type Mux struct {
 	ctxCancelFunc         context.CancelFunc // function to cancel master context when mux is closed
 	mu                    sync.Mutex
 	cleaner               *time.Ticker
+	wg                    sync.WaitGroup // track background goroutines
 
 	// ---- client only fields ----
 	username        string
@@ -100,7 +101,9 @@ func NewMux(isClinet bool) *Mux {
 	mux.ctx, mux.ctxCancelFunc = context.WithCancel(context.Background())
 
 	// Run maintenance tasks in the background.
+	mux.wg.Add(1)
 	go func() {
+		defer mux.wg.Done()
 		for {
 			select {
 			case <-mux.cleaner.C:
@@ -307,6 +310,7 @@ func (m *Mux) Close() error {
 	m.underlays = make([]Underlay, 0)
 	m.ctxCancelFunc()
 	close(m.done)
+	m.wg.Wait()
 	return nil
 }
 
@@ -681,6 +685,7 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 
 	m.mu.Lock()
 	m.underlays = append(m.underlays, underlay)
+	m.wg.Add(1)
 	m.mu.Unlock()
 	UnderlayActiveOpens.Add(1)
 	currEst := UnderlayCurrEstablished.Add(1)
@@ -689,8 +694,11 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 		UnderlayMaxConn.Store(currEst)
 	}
 	go func() {
-		// This is a long running loop, detach from client dial context.
-		err := underlay.RunEventLoop(context.Background())
+		defer m.wg.Done()
+		// DSO: use mux context with detached child to prevent blocking on client ctx.
+		underlayCtx, cancel := context.WithCancel(m.ctx)
+		defer cancel()
+		err := underlay.RunEventLoop(underlayCtx)
 		if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
 			log.Debugf("%v RunEventLoop(): %v", underlay, err)
 		}

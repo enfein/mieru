@@ -19,6 +19,8 @@ import (
 	"context"
 	"io"
 	"time"
+
+	"github.com/enfein/mieru/v3/pkg/pool"
 )
 
 type SetReadDeadlineInterface interface {
@@ -38,7 +40,8 @@ func SetReadTimeout(conn SetReadDeadlineInterface, timeout time.Duration) {
 // ReadAllAndDiscard reads from r until an error or EOF.
 // All the data are discarded.
 func ReadAllAndDiscard(r io.Reader) {
-	b := make([]byte, 1024)
+	b := pool.GetBuf1k()
+	defer pool.PutBuf1k(b)
 	for {
 		_, err := r.Read(b)
 		if err != nil {

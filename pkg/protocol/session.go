@@ -217,9 +217,13 @@ func (s *Session) Read(b []byte) (n int, err error) {
 	}
 
 	// Stop reading when deadline is reached.
+	var timer *time.Timer
 	var timeC <-chan time.Time
 	if readDeadline := s.readDeadline.Load(); readDeadline != 0 {
-		timeC = time.After(time.Until(time.UnixMicro(readDeadline)))
+		d := time.Until(time.UnixMicro(readDeadline))
+		timer = time.NewTimer(d)
+		timeC = timer.C
+		defer timer.Stop()
 	}
 
 	for {
@@ -306,16 +310,15 @@ func (s *Session) Write(b []byte) (n int, err error) {
 	// Open session request is sent only once. Underlay may retry if the packet is lost.
 	if s.isClient && s.isState(sessionAttached) && !s.openSessionRequestSent.Swap(true) {
 		s.oLock.Lock()
-		seg := &segment{
-			metadata: &sessionStruct{
-				baseStruct: baseStruct{
-					protocol: uint8(openSessionRequest),
-				},
-				sessionID: s.id,
-				seq:       s.nextSend.Load(),
+		seg := getSegment()
+		seg.metadata = &sessionStruct{
+			baseStruct: baseStruct{
+				protocol: uint8(openSessionRequest),
 			},
-			transport: s.transportProtocol,
+			sessionID: s.id,
+			seq:       s.nextSend.Load(),
 		}
+		seg.transport = s.transportProtocol
 		s.nextSend.Add(1)
 		// Allow open session request to carry payload.
 		if len(b) <= MaxSessionOpenPayload {
@@ -506,9 +509,13 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 	}
 
 	// Stop writing when deadline is reached.
+	var timer *time.Timer
 	var timeC <-chan time.Time
 	if writeDeadline := s.writeDeadline.Load(); writeDeadline != 0 {
-		timeC = time.After(time.Until(time.UnixMicro(writeDeadline)))
+		d := time.Until(time.UnixMicro(writeDeadline))
+		timer = time.NewTimer(d)
+		timeC = timer.C
+		defer timer.Stop()
 	}
 
 	seqBeforeWrite, _ := s.sendQueue.MinSeq()
@@ -555,22 +562,21 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 		}
 		partLen := mathext.Min(fragmentSize, len(ptr))
 		part := ptr[:partLen]
-		seg := &segment{
-			metadata: &dataAckStruct{
-				baseStruct: baseStruct{
-					protocol: protocol,
-				},
-				sessionID:  s.id,
-				seq:        s.nextSend.Load(),
-				unAckSeq:   s.nextRecv.Load(),
-				windowSize: uint16(s.receiveWindowSize()),
-				fragment:   uint8(i),
-				payloadLen: uint16(partLen),
+		seg := getSegment()
+		seg.metadata = &dataAckStruct{
+			baseStruct: baseStruct{
+				protocol: protocol,
 			},
-			payload:   make([]byte, partLen),
-			transport: s.transportProtocol,
+			sessionID:  s.id,
+			seq:        s.nextSend.Load(),
+			unAckSeq:   s.nextRecv.Load(),
+			windowSize: uint16(s.receiveWindowSize()),
+			fragment:   uint8(i),
+			payloadLen: uint16(partLen),
 		}
+		seg.payload = make([]byte, partLen)
 		copy(seg.payload, part)
+		seg.transport = s.transportProtocol
 		s.nextSend.Add(1)
 		if !s.sendQueue.Insert(seg) {
 			s.oLock.Unlock()
@@ -837,15 +843,15 @@ func (s *Session) runOutputOncePacket() {
 			baseStruct.protocol = uint8(ackServerToClient)
 		}
 		s.oLock.Lock()
-		ackSeg := &segment{
-			metadata: &dataAckStruct{
-				baseStruct: baseStruct,
-				sessionID:  s.id,
-				seq:        uint32(mathext.Max(0, int(s.nextSend.Load())-1)),
-				unAckSeq:   s.nextRecv.Load(),
-				windowSize: uint16(s.receiveWindowSize()),
-			},
-			transport: s.transportProtocol}
+		ackSeg := getSegment()
+		ackSeg.metadata = &dataAckStruct{
+			baseStruct: baseStruct,
+			sessionID:  s.id,
+			seq:        uint32(mathext.Max(0, int(s.nextSend.Load())-1)),
+			unAckSeq:   s.nextRecv.Load(),
+			windowSize: uint16(s.receiveWindowSize()),
+		}
+		ackSeg.transport = s.transportProtocol
 		err := s.output(ackSeg, s.RemoteAddr())
 		s.oLock.Unlock()
 		if err != nil {
@@ -995,16 +1001,15 @@ func (s *Session) inputData(seg *segment) error {
 					return nil
 				}
 			}
-			seg4 := &segment{
-				metadata: &sessionStruct{
-					baseStruct: baseStruct{
-						protocol: uint8(openSessionResponse),
-					},
-					sessionID: s.id,
-					seq:       s.nextSend.Load(),
+			seg4 := getSegment()
+			seg4.metadata = &sessionStruct{
+				baseStruct: baseStruct{
+					protocol: uint8(openSessionResponse),
 				},
-				transport: s.transportProtocol,
+				sessionID: s.id,
+				seq:       s.nextSend.Load(),
 			}
+			seg4.transport = s.transportProtocol
 			s.nextSend.Add(1)
 			if log.IsLevelEnabled(log.TraceLevel) {
 				log.Tracef("%v writing open session response", s)
@@ -1069,18 +1074,17 @@ func (s *Session) inputClose(seg *segment) error {
 	s.oLock.Lock()
 	if seg.metadata.Protocol() == closeSessionRequest {
 		// Send close session response.
-		seg2 := &segment{
-			metadata: &sessionStruct{
-				baseStruct: baseStruct{
-					protocol: uint8(closeSessionResponse),
-				},
-				sessionID:  s.id,
-				seq:        s.nextSend.Load(),
-				statusCode: uint8(statusOK),
-				payloadLen: 0,
+		seg2 := getSegment()
+		seg2.metadata = &sessionStruct{
+			baseStruct: baseStruct{
+				protocol: uint8(closeSessionResponse),
 			},
-			transport: s.transportProtocol,
+			sessionID:  s.id,
+			seq:        s.nextSend.Load(),
+			statusCode: uint8(statusOK),
+			payloadLen: 0,
 		}
+		seg2.transport = s.transportProtocol
 		s.nextSend.Add(1)
 		// The response will not retry if it is not delivered.
 		if err := s.output(seg2, s.RemoteAddr()); err != nil {
@@ -1148,17 +1152,16 @@ func (s *Session) closeWithError(err error) error {
 		// because the underlay connection may be already broken.
 		s.oLock.Lock()
 		closeRequestSeq := s.nextSend.Load()
-		seg := &segment{
-			metadata: &sessionStruct{
-				baseStruct: baseStruct{
-					protocol: uint8(closeSessionRequest),
-				},
-				sessionID:  s.id,
-				seq:        closeRequestSeq,
-				statusCode: uint8(s.status),
+		seg := getSegment()
+		seg.metadata = &sessionStruct{
+			baseStruct: baseStruct{
+				protocol: uint8(closeSessionRequest),
 			},
-			transport: s.transportProtocol,
+			sessionID:  s.id,
+			seq:        closeRequestSeq,
+			statusCode: uint8(s.status),
 		}
+		seg.transport = s.transportProtocol
 		s.nextSend.Add(1)
 
 		var gracefulCloseSuccess bool
@@ -1211,6 +1214,8 @@ func (s *Session) receiveWindowSize() int {
 // waitForRecvQueueSpace returns true when the recv queue has empty space.
 // It returns false when the session is closed.
 func (s *Session) waitForRecvQueueSpace() bool {
+	timer := time.NewTimer(backPressureDelay)
+	defer timer.Stop()
 	for {
 		select {
 		case <-s.closedChan:
@@ -1220,10 +1225,11 @@ func (s *Session) waitForRecvQueueSpace() bool {
 		if s.recvQueue.Remaining() > 0 {
 			return true
 		}
+		timer.Reset(backPressureDelay)
 		select {
 		case <-s.closedChan:
 			return false
-		case <-time.After(backPressureDelay):
+		case <-timer.C:
 		}
 	}
 }

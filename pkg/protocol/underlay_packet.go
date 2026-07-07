@@ -29,6 +29,7 @@ import (
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/metrics"
+	"github.com/enfein/mieru/v3/pkg/pool"
 	"github.com/enfein/mieru/v3/pkg/replay"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
@@ -130,6 +131,7 @@ func (u *PacketUnderlay) Close() error {
 	// Unblock any pending I/O before closing sessions.
 	u.conn.SetReadDeadline(time.Now())
 	u.baseUnderlay.Close()
+	u.conn.Close()
 	return nil
 }
 
@@ -233,19 +235,18 @@ func (u *PacketUnderlay) RunEventLoop(ctx context.Context) error {
 				log.Debugf("Session %d is not registered to %v", das.sessionID, u)
 				if seg.block != nil {
 					// Request the peer to close the session.
-					closeReq := &segment{
-						metadata: &sessionStruct{
-							baseStruct: baseStruct{
-								protocol: uint8(closeSessionRequest),
-							},
-							sessionID:  das.sessionID,
-							seq:        das.unAckSeq,
-							statusCode: 0,
-							payloadLen: 0,
+					closeReq := getSegment()
+					closeReq.metadata = &sessionStruct{
+						baseStruct: baseStruct{
+							protocol: uint8(closeSessionRequest),
 						},
-						transport: u.TransportProtocol(),
-						block:     seg.block,
+						sessionID:  das.sessionID,
+						seq:        das.unAckSeq,
+						statusCode: 0,
+						payloadLen: 0,
 					}
+					closeReq.transport = u.TransportProtocol()
+					closeReq.block = seg.block
 					if err := u.writeOneSegment(closeReq, addr); err != nil {
 						return fmt.Errorf("writeOneSegment() failed: %w", err)
 					}
@@ -325,9 +326,8 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 		default:
 		}
 
-		// Peer may select a different MTU.
-		// Use the largest possible value here to avoid error.
-		b := make([]byte, 1500)
+		// Use pooled buffer instead of per-read allocation.
+		b := pool.GetBuf1500()
 		common.SetReadTimeout(u.conn, readOneSegmentTimeout)
 		n, addr, err := u.conn.ReadFrom(b)
 		if err != nil {
@@ -534,11 +534,11 @@ func (u *PacketUnderlay) parseSessionSegment(ss *sessionStruct, nonce, remaining
 		}
 	}
 
-	return &segment{
-		metadata:  ss,
-		payload:   decryptedPayload,
-		transport: common.PacketTransport,
-	}, nil
+	seg := getSegment()
+	seg.metadata = ss
+	seg.payload = decryptedPayload
+	seg.transport = common.PacketTransport
+	return seg, nil
 }
 
 func (u *PacketUnderlay) parseDataAckSegment(das *dataAckStruct, nonce, remaining []byte, blockCipher cipher.BlockCipher) (*segment, error) {
@@ -583,11 +583,11 @@ func (u *PacketUnderlay) parseDataAckSegment(das *dataAckStruct, nonce, remainin
 		}
 	}
 
-	return &segment{
-		metadata:  das,
-		payload:   decryptedPayload,
-		transport: common.PacketTransport,
-	}, nil
+	seg := getSegment()
+	seg.metadata = das
+	seg.payload = decryptedPayload
+	seg.transport = common.PacketTransport
+	return seg, nil
 }
 
 func (u *PacketUnderlay) writeOneSegment(seg *segment, addr net.Addr) error {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
@@ -190,10 +191,18 @@ func (s *Server) acceptLoop() {
 	for {
 		conn, err := s.listener.Accept()
 		if err != nil {
-			s.chAcceptErr <- err
+			select {
+			case s.chAcceptErr <- err:
+			case <-s.die:
+			}
 			return
 		}
-		s.chAccept <- conn
+		select {
+		case s.chAccept <- conn:
+		case <-s.die:
+			conn.Close()
+			return
+		}
 		if log.IsLevelEnabled(log.TraceLevel) {
 			log.Tracef("socks5 server accepted connection [%v - %v]", conn.LocalAddr(), conn.RemoteAddr())
 		}
@@ -275,7 +284,9 @@ func (s *Server) clientServeConn(userConn net.Conn) error {
 		}
 	}
 
-	proxyConn, err := s.config.ProxyDialer.DialContext(context.Background())
+	dialCtx, dialCancel := context.WithCancel(context.Background())
+	defer dialCancel()
+	proxyConn, err := s.config.ProxyDialer.DialContext(dialCtx)
 	if err != nil {
 		return fmt.Errorf("proxy dialer DialContext() failed: %w", err)
 	}
@@ -284,6 +295,7 @@ func (s *Server) clientServeConn(userConn net.Conn) error {
 		if err := s.proxySocks5AuthReq(userConn, proxyConn); err != nil {
 			HandshakeErrors.Add(1)
 			proxyConn.Close()
+			dialCancel()
 			return err
 		}
 	}
@@ -291,6 +303,7 @@ func (s *Server) clientServeConn(userConn net.Conn) error {
 	if err != nil {
 		HandshakeErrors.Add(1)
 		proxyConn.Close()
+		dialCancel()
 		return err
 	}
 	if udpAssociateConn == nil {
@@ -301,9 +314,14 @@ func (s *Server) clientServeConn(userConn net.Conn) error {
 	}
 	log.Debugf("UDP association is listening on %v", udpAssociateConn.LocalAddr())
 	userConn.(apicommon.HierarchyConn).Add(udpAssociateConn)
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		common.ReadAllAndDiscard(userConn)
 		userConn.Close()
 	}()
-	return BidiCopyUDP(udpAssociateConn, apicommon.NewPacketOverStreamTunnel(proxyConn))
+	err = BidiCopyUDP(udpAssociateConn, apicommon.NewPacketOverStreamTunnel(proxyConn))
+	wg.Wait()
+	return err
 }

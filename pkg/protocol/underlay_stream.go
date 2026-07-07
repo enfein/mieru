@@ -129,6 +129,7 @@ func (t *StreamUnderlay) Close() error {
 	// Unblock any pending I/O before closing sessions.
 	t.conn.SetDeadline(time.Now())
 	t.baseUnderlay.Close()
+	t.conn.Close()
 	return nil
 }
 
@@ -248,18 +249,17 @@ func (t *StreamUnderlay) RunEventLoop(ctx context.Context) error {
 			if !ok {
 				log.Debugf("Session %d is not registered to %v", das.sessionID, t)
 				// Request the peer to close the session.
-				closeReq := &segment{
-					metadata: &sessionStruct{
-						baseStruct: baseStruct{
-							protocol: uint8(closeSessionRequest),
-						},
-						sessionID:  das.sessionID,
-						seq:        das.unAckSeq,
-						statusCode: 0,
-						payloadLen: 0,
+				closeReq := getSegment()
+				closeReq.metadata = &sessionStruct{
+					baseStruct: baseStruct{
+						protocol: uint8(closeSessionRequest),
 					},
-					transport: t.TransportProtocol(),
+					sessionID:  das.sessionID,
+					seq:        das.unAckSeq,
+					statusCode: 0,
+					payloadLen: 0,
 				}
+				closeReq.transport = t.TransportProtocol()
 				if err := t.writeOneSegment(closeReq); err != nil {
 					return fmt.Errorf("writeOneSegment() failed: %w", err)
 				}
@@ -484,12 +484,12 @@ func (t *StreamUnderlay) readSessionSegment(ss *sessionStruct) (*segment, error)
 		}
 	}
 
-	return &segment{
-		metadata:  ss,
-		payload:   decryptedPayload,
-		transport: common.StreamTransport,
-		block:     t.recv,
-	}, nil
+	seg := getSegment()
+	seg.metadata = ss
+	seg.payload = decryptedPayload
+	seg.transport = common.StreamTransport
+	seg.block = t.recv
+	return seg, nil
 }
 
 func (t *StreamUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error) {
@@ -554,12 +554,12 @@ func (t *StreamUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error
 		}
 	}
 
-	return &segment{
-		metadata:  das,
-		payload:   decryptedPayload,
-		transport: common.StreamTransport,
-		block:     t.recv,
-	}, nil
+	seg := getSegment()
+	seg.metadata = das
+	seg.payload = decryptedPayload
+	seg.transport = common.StreamTransport
+	seg.block = t.recv
+	return seg, nil
 }
 
 func (t *StreamUnderlay) writeOneSegment(seg *segment) error {

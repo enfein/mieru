@@ -63,6 +63,27 @@ type segment struct {
 	block     cipher.BlockCipher       // cipher block to encrypt or decrypt the payload
 }
 
+// segmentPool reuses segment structs to reduce GC pressure.
+var segmentPool = &sync.Pool{
+	New: func() any { return &segment{} },
+}
+
+func getSegment() *segment {
+	return segmentPool.Get().(*segment)
+}
+
+func putSegment(s *segment) {
+	s.metadata = nil
+	s.payload = nil
+	s.transport = 0
+	s.ackCount = 0
+	s.txCount = 0
+	s.txTime = 0
+	s.txTimeout = 0
+	s.block = nil
+	segmentPool.Put(s)
+}
+
 // Protocol returns the protocol of the segment.
 func (s *segment) Protocol() protocolType {
 	return s.metadata.Protocol()

@@ -19,12 +19,14 @@ import (
 	"fmt"
 	mrand "math/rand"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 const (
 	cacheValidInterval    = KeyRefreshInterval / 4
 	cacheValidMaxJitterMs = 5000
+	cacheMaxEntries       = 65536
 )
 
 type cachedCiphers struct {
@@ -33,6 +35,7 @@ type cachedCiphers struct {
 }
 
 var blockCipherCache = sync.Map{}
+var cacheEntryCount atomic.Int32
 
 // getBlockCipherList returns three BlockCipher.
 // It uses cache so it doesn't need to generate BlockCipher each time.
@@ -45,6 +48,8 @@ func getBlockCipherList(password []byte, stateless bool) ([]BlockCipher, error) 
 		// Check if the cached entry is expired.
 		jitter := time.Duration(mrand.Intn(cacheValidMaxJitterMs)) * time.Millisecond
 		if c.(cachedCiphers).createTime.Add(cacheValidInterval - jitter).Before(time.Now()) {
+			blockCipherCache.Delete(pw)
+			cacheEntryCount.Add(-1)
 			ok = false
 		}
 	}
@@ -66,12 +71,32 @@ func getBlockCipherList(password []byte, stateless bool) ([]BlockCipher, error) 
 		return nil, fmt.Errorf("newBlockCipherList() failed: %v", err)
 	}
 
+	// Evict oldest if at capacity.
+	if cacheEntryCount.Load() >= cacheMaxEntries {
+		var oldestKey string
+		var oldestTime time.Time
+		first := true
+		blockCipherCache.Range(func(k, v any) bool {
+			if first || v.(cachedCiphers).createTime.Before(oldestTime) {
+				oldestKey = k.(string)
+				oldestTime = v.(cachedCiphers).createTime
+				first = false
+			}
+			return true
+		})
+		if oldestKey != "" {
+			blockCipherCache.Delete(oldestKey)
+			cacheEntryCount.Add(-1)
+		}
+	}
+
 	// Insert to cache.
 	entry := cachedCiphers{
 		cipherList: blockCiphers,
 		createTime: t,
 	}
 	blockCipherCache.Store(pw, entry)
+	cacheEntryCount.Add(1)
 
 	if stateless {
 		return blockCiphers, nil

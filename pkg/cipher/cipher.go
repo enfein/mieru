@@ -125,10 +125,14 @@ func (c *AEADBlockCipher) Encrypt(plaintext []byte) ([]byte, error) {
 		nonce = c.addUserHintToNonce(nonce)
 	}
 
-	dst := c.aead.Seal(nil, nonce, plaintext, nil)
+	var dst []byte
 	if needSendNonce {
-		return append(nonce, dst...), nil
+		dst = make([]byte, len(nonce)+len(plaintext)+c.aead.Overhead())
+		copy(dst, nonce)
+		c.aead.Seal(dst[:len(nonce)], nonce, plaintext, nil)
+		return dst, nil
 	}
+	dst = c.aead.Seal(nil, nonce, plaintext, nil)
 	return dst, nil
 }
 

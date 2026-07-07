@@ -24,6 +24,7 @@ import (
 	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/log"
+	"github.com/enfein/mieru/v3/pkg/pool"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
 
@@ -35,7 +36,8 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *apicommon.PacketOverStreamTun
 
 	go func() {
 		// udpConn -> tunnelConn
-		buf := make([]byte, 1<<16)
+		buf := pool.GetBuf64k()
+		defer pool.PutBuf64k(buf)
 		for {
 			n, a, err := udpConn.ReadFrom(buf)
 			if err != nil {
@@ -62,7 +64,8 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *apicommon.PacketOverStreamTun
 	}()
 	go func() {
 		// tunnelConn -> udpConn
-		buf := make([]byte, 1<<16)
+		buf := pool.GetBuf64k()
+		defer pool.PutBuf64k(buf)
 		for {
 			n, err := tunnelConn.Read(buf)
 			if err != nil {
@@ -109,7 +112,8 @@ func BidiCopySocks5(conn, proxyConn io.ReadWriteCloser, pendingReq []byte) error
 
 	go func() {
 		// conn -> proxyConn
-		buf := make([]byte, 1<<16)
+		buf := pool.GetBuf64k()
+		defer pool.PutBuf64k(buf)
 		reqLen := len(pendingReq)
 		if reqLen > 0 {
 			log.Debugf("HANDSHAKE_NO_WAIT mode socks5 client request: %v", pendingReq)

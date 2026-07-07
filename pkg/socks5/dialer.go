@@ -25,6 +25,7 @@ import (
 	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/apis/model"
+	"github.com/enfein/mieru/v3/pkg/pool"
 )
 
 // ClientDialer connects to upstream endpoints through a socks5 proxy.
@@ -177,8 +178,10 @@ type clientPacketConn struct {
 var _ net.PacketConn = (*clientPacketConn)(nil)
 
 func (c *clientPacketConn) ReadFrom(p []byte) (int, net.Addr, error) {
-	buf := make([]byte, 65536)
-	for {
+	buf := pool.GetBuf64k()
+	defer pool.PutBuf64k(buf)
+	for i := 0; i < 65536; i++ {
+		c.udpConn.SetReadDeadline(time.Now().Add(5 * time.Second))
 		n, addr, err := c.udpConn.ReadFromUDP(buf)
 		if err != nil {
 			return 0, nil, err
@@ -196,6 +199,7 @@ func (c *clientPacketConn) ReadFrom(p []byte) (int, net.Addr, error) {
 		copy(p, payload)
 		return len(payload), c.remoteAddr, nil
 	}
+	return 0, nil, io.ErrNoProgress
 }
 
 func (c *clientPacketConn) WriteTo(p []byte, addr net.Addr) (int, error) {
