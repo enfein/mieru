@@ -430,7 +430,7 @@ func (t *StreamUnderlay) readOneSegment() (*segment, error) {
 		}
 		return t.readDataAckSegment(das)
 	} else {
-		err = fmt.Errorf("unable to handle protocol %d", p)
+		err = fmt.Errorf("unable to handle unknown protocol %d", p)
 		return nil, stderror.WrapErrorWithType(err, stderror.PROTOCOL_ERROR)
 	}
 }

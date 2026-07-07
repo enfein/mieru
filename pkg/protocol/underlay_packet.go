@@ -485,12 +485,8 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 			}
 			return seg, addr, nil
 		} else {
-			if u.isClient {
-				return nil, nil, fmt.Errorf("unable to handle protocol %d", p)
-			} else {
-				log.Debugf("%v unable to handle protocol %d", u, p)
-				continue
-			}
+			log.Debugf("%v unable to handle unknown protocol %d", u, p)
+			continue
 		}
 	}
 }
