@@ -50,6 +50,7 @@ func (d UDPDialer) ListenPacket(ctx context.Context, network, laddr, raddr strin
 	}
 	if d.Control != nil {
 		if err := sockopts.ApplyUDPControl(conn, d.Control); err != nil {
+			conn.Close()
 			return nil, fmt.Errorf("ApplyUDPControl() failed: %w", err)
 		}
 	}
