@@ -20,12 +20,26 @@ import (
 	"io"
 	"net"
 	"sync/atomic"
+	"time"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/model"
+	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
+
+// timeoutReader wraps a net.Conn and sets a read deadline before each read.
+type timeoutReader struct {
+	r       io.Reader
+	conn    net.Conn
+	timeout time.Duration
+}
+
+func (tr *timeoutReader) Read(p []byte) (int, error) {
+	tr.conn.SetReadDeadline(time.Now().Add(tr.timeout))
+	return tr.r.Read(p)
+}
 
 // BidiCopyUDP does bi-directional data copy between a proxy client UDP endpoint
 // and the proxy tunnel.
@@ -107,6 +121,12 @@ func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *apicommon.PacketOverStreamTun
 func BidiCopySocks5(conn, proxyConn io.ReadWriteCloser, pendingReq []byte) error {
 	errCh := make(chan error, 2)
 
+	// Apply idle timeout to prevent hanging on unresponsive connections.
+	var proxyNet, connNet net.Conn
+	var idleTimeout time.Duration = common.DefaultIdleTimeout
+	proxyNet, _ = proxyConn.(net.Conn)
+	connNet, _ = conn.(net.Conn)
+
 	go func() {
 		// conn -> proxyConn
 		buf := make([]byte, 1<<16)
@@ -115,7 +135,11 @@ func BidiCopySocks5(conn, proxyConn io.ReadWriteCloser, pendingReq []byte) error
 			log.Debugf("HANDSHAKE_NO_WAIT mode socks5 client request: %v", pendingReq)
 			reqLen = copy(buf, pendingReq)
 		}
-		n, err := conn.Read(buf[reqLen:])
+		reader := io.Reader(conn)
+		if connNet != nil {
+			reader = &timeoutReader{r: conn, conn: connNet, timeout: idleTimeout}
+		}
+		n, err := reader.Read(buf[reqLen:])
 		if err != nil {
 			proxyConn.Close()
 			errCh <- fmt.Errorf("failed to read connection request from the client: %w", err)
@@ -128,21 +152,33 @@ func BidiCopySocks5(conn, proxyConn io.ReadWriteCloser, pendingReq []byte) error
 			errCh <- fmt.Errorf("failed to write connection request to the server: %w", err)
 			return
 		}
-		_, err = io.Copy(proxyConn, conn)
+		reader = io.Reader(conn)
+		if connNet != nil {
+			reader = &timeoutReader{r: conn, conn: connNet, timeout: idleTimeout}
+		}
+		_, err = io.Copy(proxyConn, reader)
 		proxyConn.Close()
 		errCh <- err
 	}()
 
 	go func() {
 		// proxyConn -> conn
-		connResp, err := model.ReadSocks5Response(proxyConn)
+		reader := io.Reader(proxyConn)
+		if proxyNet != nil {
+			reader = &timeoutReader{r: proxyConn, conn: proxyNet, timeout: idleTimeout}
+		}
+		connResp, err := model.ReadSocks5Response(reader)
 		if err != nil {
 			conn.Close()
 			errCh <- fmt.Errorf("failed to read connection response from the server: %w", err)
 			return
 		}
 		log.Debugf("HANDSHAKE_NO_WAIT mode socks5 server reply: %v", connResp.Raw)
-		_, err = io.Copy(conn, proxyConn)
+		reader = io.Reader(proxyConn)
+		if proxyNet != nil {
+			reader = &timeoutReader{r: proxyConn, conn: proxyNet, timeout: idleTimeout}
+		}
+		_, err = io.Copy(conn, reader)
 		conn.Close()
 		errCh <- err
 	}()
