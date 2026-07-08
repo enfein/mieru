@@ -415,6 +415,9 @@ func (s *Server) proxySocks5ConnReq(userConn, proxyConn net.Conn) (*net.UDPConn,
 	}
 
 	if _, err := userConn.Write(connResp.Raw); err != nil {
+		if udpConn != nil {
+			udpConn.Close()
+		}
 		return nil, nil, fmt.Errorf("failed to write connection response to the socks5 client: %w", err)
 	}
 	return udpConn, nil, nil
