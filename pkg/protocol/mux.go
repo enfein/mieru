@@ -23,7 +23,6 @@ import (
 	"net"
 	"reflect"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
@@ -55,8 +54,7 @@ type Mux struct {
 	packetListenerFactory apicommon.PacketListenerFactory
 	trafficPattern        *trafficpattern.Config
 	chAccept              chan net.Conn
-	acceptHasErr          atomic.Bool
-	acceptErr             chan error // this channel is closed when accept has error
+	acceptErr             *muxAcceptErr
 	used                  bool
 	done                  chan struct{}
 	ctx                   context.Context    // mux master context
@@ -93,7 +91,7 @@ func NewMux(isClinet bool) *Mux {
 		streamListenerFactory: &net.ListenConfig{Control: sockopts.DefaultListenerControl()},
 		packetListenerFactory: &net.ListenConfig{Control: sockopts.DefaultListenerControl()},
 		chAccept:              make(chan net.Conn, sessionChanCapacity),
-		acceptErr:             make(chan error),
+		acceptErr:             newMuxAcceptErr(),
 		done:                  make(chan struct{}),
 		cleaner:               time.NewTicker(underlayCleanInterval),
 	}
@@ -278,7 +276,7 @@ func (m *Mux) SetServerUserHintIsMandatory(userHintIsMandatory bool) *Mux {
 
 func (m *Mux) Accept() (net.Conn, error) {
 	select {
-	case <-m.acceptErr:
+	case <-m.acceptErr.done:
 		return nil, io.ErrClosedPipe
 	case conn := <-m.chAccept:
 		return conn, nil
@@ -342,13 +340,13 @@ func (m *Mux) Start() error {
 		go m.acceptUnderlayLoop(m.ctx, p, &wg)
 	}
 	wg.Wait()
-	hasErr := m.acceptHasErr.Load()
+	acceptErr := m.acceptErr.get()
 	m.mu.Unlock()
-	if hasErr {
+	if acceptErr != nil {
 		if err := m.Close(); err != nil {
 			log.Warnf("mux Close() failed: %v", err)
 		}
-		return fmt.Errorf("mux server listener failed")
+		return fmt.Errorf("mux server listener failed: %w", acceptErr)
 	}
 	return nil
 }
@@ -442,10 +440,9 @@ func (m *Mux) newEndpoints(old, new []UnderlayProperties) []UnderlayProperties {
 func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayProperties, wg *sync.WaitGroup) {
 	laddr := properties.LocalAddr().String()
 	if laddr == "" {
-		log.Errorf("Underlay local address is empty")
-		if m.acceptHasErr.CompareAndSwap(false, true) {
-			close(m.acceptErr)
-		}
+		err := fmt.Errorf("underlay local address is empty")
+		log.Errorf("%v", err)
+		m.acceptErr.set(err)
 		wg.Done()
 		return
 	}
@@ -455,19 +452,17 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 	case "tcp", "tcp4", "tcp6":
 		tcpAddr, err := apicommon.ResolveTCPAddr(ctx, m.resolver, "tcp", laddr)
 		if err != nil {
-			log.Errorf("ResolveTCPAddr() failed: %v", err)
-			if m.acceptHasErr.CompareAndSwap(false, true) {
-				close(m.acceptErr)
-			}
+			err = fmt.Errorf("resolve TCP address %q failed: %w", laddr, err)
+			log.Errorf("%v", err)
+			m.acceptErr.set(err)
 			wg.Done()
 			return
 		}
 		rawListener, err := m.streamListenerFactory.Listen(ctx, tcpAddr.Network(), tcpAddr.String())
 		if err != nil {
-			log.Errorf("Listen() failed: %v", err)
-			if m.acceptHasErr.CompareAndSwap(false, true) {
-				close(m.acceptErr)
-			}
+			err = fmt.Errorf("listen %s %s failed: %w", tcpAddr.Network(), tcpAddr.String(), err)
+			log.Errorf("%v", err)
+			m.acceptErr.set(err)
 			wg.Done()
 			return
 		}
@@ -531,19 +526,17 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 	case "udp", "udp4", "udp6":
 		udpAddr, err := apicommon.ResolveUDPAddr(ctx, m.resolver, "udp", laddr)
 		if err != nil {
-			log.Errorf("ResolveUDPAddr() failed: %v", err)
-			if m.acceptHasErr.CompareAndSwap(false, true) {
-				close(m.acceptErr)
-			}
+			err = fmt.Errorf("resolve UDP address %q failed: %w", laddr, err)
+			log.Errorf("%v", err)
+			m.acceptErr.set(err)
 			wg.Done()
 			return
 		}
 		conn, err := m.packetListenerFactory.ListenPacket(ctx, udpAddr.Network(), udpAddr.String())
 		if err != nil {
-			log.Errorf("ListenPacket() failed: %v", err)
-			if m.acceptHasErr.CompareAndSwap(false, true) {
-				close(m.acceptErr)
-			}
+			err = fmt.Errorf("listen %s %s failed: %w", udpAddr.Network(), udpAddr.String(), err)
+			log.Errorf("%v", err)
+			m.acceptErr.set(err)
 			wg.Done()
 			return
 		}
@@ -600,10 +593,9 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 			}
 		}(ctx, underlay)
 	default:
-		log.Errorf("Unsupported underlay network type %q", network)
-		if m.acceptHasErr.CompareAndSwap(false, true) {
-			close(m.acceptErr)
-		}
+		err := fmt.Errorf("unsupported underlay network type %q", network)
+		log.Errorf("%v", err)
+		m.acceptErr.set(err)
 		wg.Done()
 	}
 }
@@ -768,4 +760,32 @@ func (m *Mux) cleanUnderlay(alsoDisableIdleOrOverloadUnderlay bool) {
 	if disable > 0 {
 		log.Debugf("Mux disabled scheduling from %d underlays", disable)
 	}
+}
+
+type muxAcceptErr struct {
+	done chan struct{}
+	once sync.Once
+	mu   sync.Mutex
+	err  error
+}
+
+func newMuxAcceptErr() *muxAcceptErr {
+	return &muxAcceptErr{
+		done: make(chan struct{}),
+	}
+}
+
+func (e *muxAcceptErr) set(err error) {
+	e.once.Do(func() {
+		e.mu.Lock()
+		e.err = err
+		e.mu.Unlock()
+		close(e.done)
+	})
+}
+
+func (e *muxAcceptErr) get() error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.err
 }

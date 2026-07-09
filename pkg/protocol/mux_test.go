@@ -22,6 +22,7 @@ import (
 	mrand "math/rand"
 	"net"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -217,6 +218,33 @@ func TestIPv6UDPUnderlay(t *testing.T) {
 	runClient(t, clientProperties, []byte("xiaochitang"), []byte("kuiranbudong"), 4)
 	if err := serverMux.Close(); err != nil {
 		t.Errorf("Server mux close failed: %v", err)
+	}
+}
+
+func TestMuxStartReturnsListenerError(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("net.Listen() failed: %v", err)
+	}
+	defer listener.Close()
+	tcpAddr, ok := listener.Addr().(*net.TCPAddr)
+	if !ok {
+		t.Fatalf("listener address type is %T, want *net.TCPAddr", listener.Addr())
+	}
+
+	serverProperties := NewUnderlayProperties(1400, common.StreamTransport, tcpAddr, nil)
+	serverMux := NewMux(false).
+		SetServerUsers(users).
+		SetEndpoints([]UnderlayProperties{serverProperties})
+
+	err = serverMux.Start()
+	if err == nil {
+		t.Fatal("Start() succeeded with occupied server port")
+	}
+	for _, want := range []string{"mux server listener failed", listener.Addr().String()} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("Start() error = %q, want error string contains %q", err.Error(), want)
+		}
 	}
 }
 
