@@ -150,6 +150,9 @@ message TrafficPattern {
 
     // Define padding behavior.
     optional PaddingPattern padding = 5;
+
+    // Define low entropy traffic behavior.
+    optional LowEntropyPattern lowEntropy = 6;
 }
 
 message TCPFragment {
@@ -223,4 +226,78 @@ message PaddingPattern {
     // Set it to 0 to disable end padding.
     // It not set, an internal value is used.
     optional int32 maxEndPaddingLen = 2;
+}
+
+message LowEntropyPattern {
+
+    // If low entropy is enabled, and how much entropy is reduced.
+    optional LowEntropyMode mode = 1;
+
+    // Low entropy uses a 64-bit long mask to determine the position of padding bits.
+    // This determines how to rotate the mask between two adjacent chunks.
+    // It has no effect if low entropy mode is disabled.
+    optional LowEntropyMaskRotation maskRotation = 2;
+}
+
+enum LowEntropyMode {
+
+    // Low entropy is disabled.
+    LOW_ENTROPY_MODE_OFF = 0;
+
+    // 32 bits of data is encoded into 64 bits chunk.
+    // 32 bits padding is added.
+    LOW_ENTROPY_MODE_32 = 1;
+
+    // 40 bits of data is encoded into 64 bits chunk.
+    // 24 bits padding is added.
+    LOW_ENTROPY_MODE_40 = 2;
+
+    // 48 bits of data is encoded into 64 bits chunk.
+    // 16 bits padding is added.
+    LOW_ENTROPY_MODE_48 = 3;
+
+    // 56 bits of data is encoded into 64 bits chunk.
+    // 8 bits padding is added.
+    LOW_ENTROPY_MODE_56 = 4;
+}
+
+enum LowEntropyMaskRotation {
+    // Mask doesn't change for each 64 bits chunk.
+    LOW_ENTROPY_MASK_NO_ROTATION = 0;
+
+    // The 4 least significant bits determine how many bits to rotate right
+    // for each 64 bits chunk.
+    LOW_ENTROPY_MASK_ROTATE_RIGHT_1 = 1;
+    LOW_ENTROPY_MASK_ROTATE_RIGHT_2 = 2;
+    LOW_ENTROPY_MASK_ROTATE_RIGHT_3 = 3;
+    LOW_ENTROPY_MASK_ROTATE_RIGHT_4 = 4;
+    LOW_ENTROPY_MASK_ROTATE_RIGHT_5 = 5;
+    LOW_ENTROPY_MASK_ROTATE_RIGHT_6 = 6;
+    LOW_ENTROPY_MASK_ROTATE_RIGHT_7 = 7;
+    LOW_ENTROPY_MASK_ROTATE_RIGHT_8 = 8;
+    LOW_ENTROPY_MASK_ROTATE_RIGHT_9 = 9;
+    LOW_ENTROPY_MASK_ROTATE_RIGHT_10 = 10;
+    LOW_ENTROPY_MASK_ROTATE_RIGHT_11 = 11;
+    LOW_ENTROPY_MASK_ROTATE_RIGHT_12 = 12;
+    LOW_ENTROPY_MASK_ROTATE_RIGHT_13 = 13;
+    LOW_ENTROPY_MASK_ROTATE_RIGHT_14 = 14;
+    LOW_ENTROPY_MASK_ROTATE_RIGHT_15 = 15;
+
+    // The 4 most significant bits determine how many bits to rotate left
+    // for each 64 bits chunk.
+    LOW_ENTROPY_MASK_ROTATE_LEFT_1 = 16;
+    LOW_ENTROPY_MASK_ROTATE_LEFT_2 = 32;
+    LOW_ENTROPY_MASK_ROTATE_LEFT_3 = 48;
+    LOW_ENTROPY_MASK_ROTATE_LEFT_4 = 64;
+    LOW_ENTROPY_MASK_ROTATE_LEFT_5 = 80;
+    LOW_ENTROPY_MASK_ROTATE_LEFT_6 = 96;
+    LOW_ENTROPY_MASK_ROTATE_LEFT_7 = 112;
+    LOW_ENTROPY_MASK_ROTATE_LEFT_8 = 128;
+    LOW_ENTROPY_MASK_ROTATE_LEFT_9 = 144;
+    LOW_ENTROPY_MASK_ROTATE_LEFT_10 = 160;
+    LOW_ENTROPY_MASK_ROTATE_LEFT_11 = 176;
+    LOW_ENTROPY_MASK_ROTATE_LEFT_12 = 192;
+    LOW_ENTROPY_MASK_ROTATE_LEFT_13 = 208;
+    LOW_ENTROPY_MASK_ROTATE_LEFT_14 = 224;
+    LOW_ENTROPY_MASK_ROTATE_LEFT_15 = 240;
 }

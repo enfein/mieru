@@ -42,6 +42,10 @@ func TestExplicitValuesPreserved(t *testing.T) {
 			MaxMiddlePaddingLen: proto.Int32(64),
 			MaxEndPaddingLen:    proto.Int32(128),
 		},
+		LowEntropy: &appctlpb.LowEntropyPattern{
+			Mode:         appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_48.Enum(),
+			MaskRotation: appctlpb.LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_LEFT_3.Enum(),
+		},
 	}
 
 	cfg, _ := NewConfig(origin)
@@ -75,6 +79,12 @@ func TestExplicitValuesPreserved(t *testing.T) {
 	}
 	if cfg.effective.Padding.GetMaxEndPaddingLen() != 128 {
 		t.Errorf("expected padding.maxEndPaddingLen 128, got %d", cfg.effective.Padding.GetMaxEndPaddingLen())
+	}
+	if cfg.effective.LowEntropy.GetMode() != appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_48 {
+		t.Errorf("expected lowEntropy.mode LOW_ENTROPY_MODE_48, got %v", cfg.effective.LowEntropy.GetMode())
+	}
+	if cfg.effective.LowEntropy.GetMaskRotation() != appctlpb.LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_LEFT_3 {
+		t.Errorf("expected lowEntropy.maskRotation LOW_ENTROPY_MASK_ROTATE_LEFT_3, got %v", cfg.effective.LowEntropy.GetMaskRotation())
 	}
 }
 
@@ -120,6 +130,17 @@ func TestImplicitValuesGenerated(t *testing.T) {
 	}
 	if cfg.effective.Padding.MaxEndPaddingLen == nil {
 		t.Error("expected padding.maxEndPaddingLen to be generated")
+	}
+
+	// LowEntropyPattern should be initialized
+	if cfg.effective.LowEntropy == nil {
+		t.Fatal("expected lowEntropy to be initialized")
+	}
+	if cfg.effective.LowEntropy.Mode == nil {
+		t.Error("expected lowEntropy.mode to be generated")
+	}
+	if cfg.effective.LowEntropy.MaskRotation == nil {
+		t.Error("expected lowEntropy.maskRotation to be generated")
 	}
 }
 
@@ -194,6 +215,26 @@ func TestPartialPaddingPatternPreserved(t *testing.T) {
 	}
 }
 
+func TestPartialLowEntropyPatternPreserved(t *testing.T) {
+	origin := &appctlpb.TrafficPattern{
+		Seed: proto.Int32(42),
+		LowEntropy: &appctlpb.LowEntropyPattern{
+			Mode: appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_40.Enum(),
+		},
+	}
+
+	cfg, err := NewConfig(origin)
+	if err != nil {
+		t.Fatalf("NewConfig() failed: %v", err)
+	}
+	if cfg.effective.LowEntropy.GetMode() != appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_40 {
+		t.Errorf("expected lowEntropy.mode to be preserved as LOW_ENTROPY_MODE_40, got %v", cfg.effective.LowEntropy.GetMode())
+	}
+	if cfg.effective.LowEntropy.MaskRotation == nil {
+		t.Error("expected lowEntropy.maskRotation to be generated")
+	}
+}
+
 func TestDeterministicGeneration(t *testing.T) {
 	origin := &appctlpb.TrafficPattern{}
 
@@ -223,6 +264,12 @@ func TestDeterministicGeneration(t *testing.T) {
 	}
 	if cfg1.effective.Padding.GetMaxEndPaddingLen() != cfg2.effective.Padding.GetMaxEndPaddingLen() {
 		t.Error("padding.maxEndPaddingLen should be deterministic")
+	}
+	if cfg1.effective.LowEntropy.GetMode() != cfg2.effective.LowEntropy.GetMode() {
+		t.Error("lowEntropy.mode should be deterministic")
+	}
+	if cfg1.effective.LowEntropy.GetMaskRotation() != cfg2.effective.LowEntropy.GetMaskRotation() {
+		t.Error("lowEntropy.maskRotation should be deterministic")
 	}
 }
 
@@ -527,6 +574,34 @@ func TestValidate(t *testing.T) {
 				},
 			},
 			wantErrString: "maxEndPaddingLen -1 is negative",
+		},
+		{
+			name: "valid_low_entropy_pattern",
+			pattern: &appctlpb.TrafficPattern{
+				LowEntropy: &appctlpb.LowEntropyPattern{
+					Mode:         appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_56.Enum(),
+					MaskRotation: appctlpb.LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_RIGHT_15.Enum(),
+				},
+			},
+			wantErrString: "",
+		},
+		{
+			name: "low_entropy_mode_invalid",
+			pattern: &appctlpb.TrafficPattern{
+				LowEntropy: &appctlpb.LowEntropyPattern{
+					Mode: appctlpb.LowEntropyMode(5).Enum(),
+				},
+			},
+			wantErrString: "mode 5 is invalid",
+		},
+		{
+			name: "low_entropy_mask_rotation_invalid",
+			pattern: &appctlpb.TrafficPattern{
+				LowEntropy: &appctlpb.LowEntropyPattern{
+					MaskRotation: appctlpb.LowEntropyMaskRotation(17).Enum(),
+				},
+			},
+			wantErrString: "maskRotation 17 is invalid",
 		},
 		{
 			name: "valid_full_pattern",

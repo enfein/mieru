@@ -102,6 +102,9 @@ func Validate(pattern *appctlpb.TrafficPattern) error {
 	if err := validatePaddingPattern(pattern.GetPadding()); err != nil {
 		return err
 	}
+	if err := validateLowEntropyPattern(pattern.GetLowEntropy()); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -114,6 +117,7 @@ func (c *Config) generateImplicitTrafficPattern() {
 	c.generateTCPFragment(seed, unlockAll)
 	c.generateNoncePattern(seed, unlockAll)
 	c.generatePaddingPattern(seed, unlockAll)
+	c.generateLowEntropyPattern(seed, unlockAll)
 }
 
 func (c *Config) generateTCPFragment(seed int, unlockAll bool) {
@@ -205,6 +209,35 @@ func (c *Config) generatePaddingPattern(seed int, unlockAll bool) {
 	}
 }
 
+func (c *Config) generateLowEntropyPattern(seed int, unlockAll bool) {
+	if c.effective.LowEntropy == nil {
+		c.effective.LowEntropy = &appctlpb.LowEntropyPattern{}
+	}
+	lowEntropy := c.effective.LowEntropy
+
+	if c.original.LowEntropy == nil || c.original.LowEntropy.Mode == nil {
+		if unlockAll {
+			modeCount := len(appctlpb.LowEntropyMode_name)
+			lowEntropy.Mode = appctlpb.LowEntropyMode(rng.FixedInt(modeCount, fmt.Sprintf("%d:lowEntropy.mode", seed))).Enum()
+		} else {
+			lowEntropy.Mode = appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_OFF.Enum()
+		}
+	}
+
+	if c.original.LowEntropy == nil || c.original.LowEntropy.MaskRotation == nil {
+		rotationIndex := rng.FixedInt(len(appctlpb.LowEntropyMaskRotation_name), fmt.Sprintf("%d:lowEntropy.maskRotation", seed))
+		var rotation appctlpb.LowEntropyMaskRotation
+		if rotationIndex <= 15 {
+			// No rotation or rotate right.
+			rotation = appctlpb.LowEntropyMaskRotation(rotationIndex)
+		} else {
+			// Rotate left.
+			rotation = appctlpb.LowEntropyMaskRotation((rotationIndex - 15) * 16)
+		}
+		lowEntropy.MaskRotation = rotation.Enum()
+	}
+}
+
 func validateTCPFragment(fragment *appctlpb.TCPFragment) error {
 	if fragment == nil {
 		return nil
@@ -275,6 +308,23 @@ func validatePaddingPattern(padding *appctlpb.PaddingPattern) error {
 		}
 		if padding.GetMaxEndPaddingLen() > maxPaddingLen {
 			return fmt.Errorf("PaddingPattern maxEndPaddingLen %d exceeds maximum value %d", padding.GetMaxEndPaddingLen(), maxPaddingLen)
+		}
+	}
+	return nil
+}
+
+func validateLowEntropyPattern(lowEntropy *appctlpb.LowEntropyPattern) error {
+	if lowEntropy == nil {
+		return nil
+	}
+	if lowEntropy.Mode != nil {
+		if _, ok := appctlpb.LowEntropyMode_name[int32(lowEntropy.GetMode())]; !ok {
+			return fmt.Errorf("LowEntropyPattern mode %d is invalid", lowEntropy.GetMode())
+		}
+	}
+	if lowEntropy.MaskRotation != nil {
+		if _, ok := appctlpb.LowEntropyMaskRotation_name[int32(lowEntropy.GetMaskRotation())]; !ok {
+			return fmt.Errorf("LowEntropyPattern maskRotation %d is invalid", lowEntropy.GetMaskRotation())
 		}
 	}
 	return nil

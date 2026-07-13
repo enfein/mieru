@@ -368,6 +368,208 @@ func (NonceType) EnumDescriptor() ([]byte, []int) {
 	return file_appctl_proto_base_proto_rawDescGZIP(), []int{5}
 }
 
+type LowEntropyMode int32
+
+const (
+	// Low entropy is disabled.
+	LowEntropyMode_LOW_ENTROPY_MODE_OFF LowEntropyMode = 0
+	// 32 bits of data is encoded into 64 bits chunk.
+	// 32 bits padding is added.
+	LowEntropyMode_LOW_ENTROPY_MODE_32 LowEntropyMode = 1
+	// 40 bits of data is encoded into 64 bits chunk.
+	// 24 bits padding is added.
+	LowEntropyMode_LOW_ENTROPY_MODE_40 LowEntropyMode = 2
+	// 48 bits of data is encoded into 64 bits chunk.
+	// 16 bits padding is added.
+	LowEntropyMode_LOW_ENTROPY_MODE_48 LowEntropyMode = 3
+	// 56 bits of data is encoded into 64 bits chunk.
+	// 8 bits padding is added.
+	LowEntropyMode_LOW_ENTROPY_MODE_56 LowEntropyMode = 4
+)
+
+// Enum value maps for LowEntropyMode.
+var (
+	LowEntropyMode_name = map[int32]string{
+		0: "LOW_ENTROPY_MODE_OFF",
+		1: "LOW_ENTROPY_MODE_32",
+		2: "LOW_ENTROPY_MODE_40",
+		3: "LOW_ENTROPY_MODE_48",
+		4: "LOW_ENTROPY_MODE_56",
+	}
+	LowEntropyMode_value = map[string]int32{
+		"LOW_ENTROPY_MODE_OFF": 0,
+		"LOW_ENTROPY_MODE_32":  1,
+		"LOW_ENTROPY_MODE_40":  2,
+		"LOW_ENTROPY_MODE_48":  3,
+		"LOW_ENTROPY_MODE_56":  4,
+	}
+)
+
+func (x LowEntropyMode) Enum() *LowEntropyMode {
+	p := new(LowEntropyMode)
+	*p = x
+	return p
+}
+
+func (x LowEntropyMode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (LowEntropyMode) Descriptor() protoreflect.EnumDescriptor {
+	return file_appctl_proto_base_proto_enumTypes[6].Descriptor()
+}
+
+func (LowEntropyMode) Type() protoreflect.EnumType {
+	return &file_appctl_proto_base_proto_enumTypes[6]
+}
+
+func (x LowEntropyMode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use LowEntropyMode.Descriptor instead.
+func (LowEntropyMode) EnumDescriptor() ([]byte, []int) {
+	return file_appctl_proto_base_proto_rawDescGZIP(), []int{6}
+}
+
+type LowEntropyMaskRotation int32
+
+const (
+	// Mask doesn't change for each 64 bits chunk.
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_NO_ROTATION LowEntropyMaskRotation = 0
+	// The 4 least significant bits determine how many bits to rotate right
+	// for each 64 bits chunk.
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_RIGHT_1  LowEntropyMaskRotation = 1
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_RIGHT_2  LowEntropyMaskRotation = 2
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_RIGHT_3  LowEntropyMaskRotation = 3
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_RIGHT_4  LowEntropyMaskRotation = 4
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_RIGHT_5  LowEntropyMaskRotation = 5
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_RIGHT_6  LowEntropyMaskRotation = 6
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_RIGHT_7  LowEntropyMaskRotation = 7
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_RIGHT_8  LowEntropyMaskRotation = 8
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_RIGHT_9  LowEntropyMaskRotation = 9
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_RIGHT_10 LowEntropyMaskRotation = 10
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_RIGHT_11 LowEntropyMaskRotation = 11
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_RIGHT_12 LowEntropyMaskRotation = 12
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_RIGHT_13 LowEntropyMaskRotation = 13
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_RIGHT_14 LowEntropyMaskRotation = 14
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_RIGHT_15 LowEntropyMaskRotation = 15
+	// The 4 most significant bits determine how many bits to rotate left
+	// for each 64 bits chunk.
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_LEFT_1  LowEntropyMaskRotation = 16
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_LEFT_2  LowEntropyMaskRotation = 32
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_LEFT_3  LowEntropyMaskRotation = 48
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_LEFT_4  LowEntropyMaskRotation = 64
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_LEFT_5  LowEntropyMaskRotation = 80
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_LEFT_6  LowEntropyMaskRotation = 96
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_LEFT_7  LowEntropyMaskRotation = 112
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_LEFT_8  LowEntropyMaskRotation = 128
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_LEFT_9  LowEntropyMaskRotation = 144
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_LEFT_10 LowEntropyMaskRotation = 160
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_LEFT_11 LowEntropyMaskRotation = 176
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_LEFT_12 LowEntropyMaskRotation = 192
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_LEFT_13 LowEntropyMaskRotation = 208
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_LEFT_14 LowEntropyMaskRotation = 224
+	LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_LEFT_15 LowEntropyMaskRotation = 240
+)
+
+// Enum value maps for LowEntropyMaskRotation.
+var (
+	LowEntropyMaskRotation_name = map[int32]string{
+		0:   "LOW_ENTROPY_MASK_NO_ROTATION",
+		1:   "LOW_ENTROPY_MASK_ROTATE_RIGHT_1",
+		2:   "LOW_ENTROPY_MASK_ROTATE_RIGHT_2",
+		3:   "LOW_ENTROPY_MASK_ROTATE_RIGHT_3",
+		4:   "LOW_ENTROPY_MASK_ROTATE_RIGHT_4",
+		5:   "LOW_ENTROPY_MASK_ROTATE_RIGHT_5",
+		6:   "LOW_ENTROPY_MASK_ROTATE_RIGHT_6",
+		7:   "LOW_ENTROPY_MASK_ROTATE_RIGHT_7",
+		8:   "LOW_ENTROPY_MASK_ROTATE_RIGHT_8",
+		9:   "LOW_ENTROPY_MASK_ROTATE_RIGHT_9",
+		10:  "LOW_ENTROPY_MASK_ROTATE_RIGHT_10",
+		11:  "LOW_ENTROPY_MASK_ROTATE_RIGHT_11",
+		12:  "LOW_ENTROPY_MASK_ROTATE_RIGHT_12",
+		13:  "LOW_ENTROPY_MASK_ROTATE_RIGHT_13",
+		14:  "LOW_ENTROPY_MASK_ROTATE_RIGHT_14",
+		15:  "LOW_ENTROPY_MASK_ROTATE_RIGHT_15",
+		16:  "LOW_ENTROPY_MASK_ROTATE_LEFT_1",
+		32:  "LOW_ENTROPY_MASK_ROTATE_LEFT_2",
+		48:  "LOW_ENTROPY_MASK_ROTATE_LEFT_3",
+		64:  "LOW_ENTROPY_MASK_ROTATE_LEFT_4",
+		80:  "LOW_ENTROPY_MASK_ROTATE_LEFT_5",
+		96:  "LOW_ENTROPY_MASK_ROTATE_LEFT_6",
+		112: "LOW_ENTROPY_MASK_ROTATE_LEFT_7",
+		128: "LOW_ENTROPY_MASK_ROTATE_LEFT_8",
+		144: "LOW_ENTROPY_MASK_ROTATE_LEFT_9",
+		160: "LOW_ENTROPY_MASK_ROTATE_LEFT_10",
+		176: "LOW_ENTROPY_MASK_ROTATE_LEFT_11",
+		192: "LOW_ENTROPY_MASK_ROTATE_LEFT_12",
+		208: "LOW_ENTROPY_MASK_ROTATE_LEFT_13",
+		224: "LOW_ENTROPY_MASK_ROTATE_LEFT_14",
+		240: "LOW_ENTROPY_MASK_ROTATE_LEFT_15",
+	}
+	LowEntropyMaskRotation_value = map[string]int32{
+		"LOW_ENTROPY_MASK_NO_ROTATION":     0,
+		"LOW_ENTROPY_MASK_ROTATE_RIGHT_1":  1,
+		"LOW_ENTROPY_MASK_ROTATE_RIGHT_2":  2,
+		"LOW_ENTROPY_MASK_ROTATE_RIGHT_3":  3,
+		"LOW_ENTROPY_MASK_ROTATE_RIGHT_4":  4,
+		"LOW_ENTROPY_MASK_ROTATE_RIGHT_5":  5,
+		"LOW_ENTROPY_MASK_ROTATE_RIGHT_6":  6,
+		"LOW_ENTROPY_MASK_ROTATE_RIGHT_7":  7,
+		"LOW_ENTROPY_MASK_ROTATE_RIGHT_8":  8,
+		"LOW_ENTROPY_MASK_ROTATE_RIGHT_9":  9,
+		"LOW_ENTROPY_MASK_ROTATE_RIGHT_10": 10,
+		"LOW_ENTROPY_MASK_ROTATE_RIGHT_11": 11,
+		"LOW_ENTROPY_MASK_ROTATE_RIGHT_12": 12,
+		"LOW_ENTROPY_MASK_ROTATE_RIGHT_13": 13,
+		"LOW_ENTROPY_MASK_ROTATE_RIGHT_14": 14,
+		"LOW_ENTROPY_MASK_ROTATE_RIGHT_15": 15,
+		"LOW_ENTROPY_MASK_ROTATE_LEFT_1":   16,
+		"LOW_ENTROPY_MASK_ROTATE_LEFT_2":   32,
+		"LOW_ENTROPY_MASK_ROTATE_LEFT_3":   48,
+		"LOW_ENTROPY_MASK_ROTATE_LEFT_4":   64,
+		"LOW_ENTROPY_MASK_ROTATE_LEFT_5":   80,
+		"LOW_ENTROPY_MASK_ROTATE_LEFT_6":   96,
+		"LOW_ENTROPY_MASK_ROTATE_LEFT_7":   112,
+		"LOW_ENTROPY_MASK_ROTATE_LEFT_8":   128,
+		"LOW_ENTROPY_MASK_ROTATE_LEFT_9":   144,
+		"LOW_ENTROPY_MASK_ROTATE_LEFT_10":  160,
+		"LOW_ENTROPY_MASK_ROTATE_LEFT_11":  176,
+		"LOW_ENTROPY_MASK_ROTATE_LEFT_12":  192,
+		"LOW_ENTROPY_MASK_ROTATE_LEFT_13":  208,
+		"LOW_ENTROPY_MASK_ROTATE_LEFT_14":  224,
+		"LOW_ENTROPY_MASK_ROTATE_LEFT_15":  240,
+	}
+)
+
+func (x LowEntropyMaskRotation) Enum() *LowEntropyMaskRotation {
+	p := new(LowEntropyMaskRotation)
+	*p = x
+	return p
+}
+
+func (x LowEntropyMaskRotation) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (LowEntropyMaskRotation) Descriptor() protoreflect.EnumDescriptor {
+	return file_appctl_proto_base_proto_enumTypes[7].Descriptor()
+}
+
+func (LowEntropyMaskRotation) Type() protoreflect.EnumType {
+	return &file_appctl_proto_base_proto_enumTypes[7]
+}
+
+func (x LowEntropyMaskRotation) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use LowEntropyMaskRotation.Descriptor instead.
+func (LowEntropyMaskRotation) EnumDescriptor() ([]byte, []int) {
+	return file_appctl_proto_base_proto_rawDescGZIP(), []int{7}
+}
+
 type AppStatusMsg struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Status        *AppStatus             `protobuf:"varint,1,opt,name=status,proto3,enum=mieru.appctl.AppStatus,oneof" json:"status,omitempty"`
@@ -697,7 +899,9 @@ type TrafficPattern struct {
 	// Manipulate nonce prefix.
 	Nonce *NoncePattern `protobuf:"bytes,4,opt,name=nonce,proto3,oneof" json:"nonce,omitempty"`
 	// Define padding behavior.
-	Padding       *PaddingPattern `protobuf:"bytes,5,opt,name=padding,proto3,oneof" json:"padding,omitempty"`
+	Padding *PaddingPattern `protobuf:"bytes,5,opt,name=padding,proto3,oneof" json:"padding,omitempty"`
+	// Define low entropy traffic behavior.
+	LowEntropy    *LowEntropyPattern `protobuf:"bytes,6,opt,name=lowEntropy,proto3,oneof" json:"lowEntropy,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -763,6 +967,13 @@ func (x *TrafficPattern) GetNonce() *NoncePattern {
 func (x *TrafficPattern) GetPadding() *PaddingPattern {
 	if x != nil {
 		return x.Padding
+	}
+	return nil
+}
+
+func (x *TrafficPattern) GetLowEntropy() *LowEntropyPattern {
+	if x != nil {
+		return x.LowEntropy
 	}
 	return nil
 }
@@ -976,6 +1187,62 @@ func (x *PaddingPattern) GetMaxEndPaddingLen() int32 {
 	return 0
 }
 
+type LowEntropyPattern struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// If low entropy is enabled, and how much entropy is reduced.
+	Mode *LowEntropyMode `protobuf:"varint,1,opt,name=mode,proto3,enum=mieru.appctl.LowEntropyMode,oneof" json:"mode,omitempty"`
+	// Low entropy uses a 64-bit long mask to determine the position of padding bits.
+	// This determines how to rotate the mask between two adjacent chunks.
+	// It has no effect if low entropy mode is disabled.
+	MaskRotation  *LowEntropyMaskRotation `protobuf:"varint,2,opt,name=maskRotation,proto3,enum=mieru.appctl.LowEntropyMaskRotation,oneof" json:"maskRotation,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LowEntropyPattern) Reset() {
+	*x = LowEntropyPattern{}
+	mi := &file_appctl_proto_base_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LowEntropyPattern) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LowEntropyPattern) ProtoMessage() {}
+
+func (x *LowEntropyPattern) ProtoReflect() protoreflect.Message {
+	mi := &file_appctl_proto_base_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LowEntropyPattern.ProtoReflect.Descriptor instead.
+func (*LowEntropyPattern) Descriptor() ([]byte, []int) {
+	return file_appctl_proto_base_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *LowEntropyPattern) GetMode() LowEntropyMode {
+	if x != nil && x.Mode != nil {
+		return *x.Mode
+	}
+	return LowEntropyMode_LOW_ENTROPY_MODE_OFF
+}
+
+func (x *LowEntropyPattern) GetMaskRotation() LowEntropyMaskRotation {
+	if x != nil && x.MaskRotation != nil {
+		return *x.MaskRotation
+	}
+	return LowEntropyMaskRotation_LOW_ENTROPY_MASK_NO_ROTATION
+}
+
 var File_appctl_proto_base_proto protoreflect.FileDescriptor
 
 const file_appctl_proto_base_proto_rawDesc = "" +
@@ -1014,20 +1281,24 @@ const file_appctl_proto_base_proto_rawDesc = "" +
 	"\x04user\x18\x01 \x01(\tH\x00R\x04user\x88\x01\x01\x12\x1f\n" +
 	"\bpassword\x18\x02 \x01(\tH\x01R\bpassword\x88\x01\x01B\a\n" +
 	"\x05_userB\v\n" +
-	"\t_password\"\xbf\x02\n" +
+	"\t_password\"\x94\x03\n" +
 	"\x0eTrafficPattern\x12\x17\n" +
 	"\x04seed\x18\x01 \x01(\x05H\x00R\x04seed\x88\x01\x01\x12!\n" +
 	"\tunlockAll\x18\x02 \x01(\bH\x01R\tunlockAll\x88\x01\x01\x12@\n" +
 	"\vtcpFragment\x18\x03 \x01(\v2\x19.mieru.appctl.TCPFragmentH\x02R\vtcpFragment\x88\x01\x01\x125\n" +
 	"\x05nonce\x18\x04 \x01(\v2\x1a.mieru.appctl.NoncePatternH\x03R\x05nonce\x88\x01\x01\x12;\n" +
-	"\apadding\x18\x05 \x01(\v2\x1c.mieru.appctl.PaddingPatternH\x04R\apadding\x88\x01\x01B\a\n" +
+	"\apadding\x18\x05 \x01(\v2\x1c.mieru.appctl.PaddingPatternH\x04R\apadding\x88\x01\x01\x12D\n" +
+	"\n" +
+	"lowEntropy\x18\x06 \x01(\v2\x1f.mieru.appctl.LowEntropyPatternH\x05R\n" +
+	"lowEntropy\x88\x01\x01B\a\n" +
 	"\x05_seedB\f\n" +
 	"\n" +
 	"_unlockAllB\x0e\n" +
 	"\f_tcpFragmentB\b\n" +
 	"\x06_nonceB\n" +
 	"\n" +
-	"\b_padding\"i\n" +
+	"\b_paddingB\r\n" +
+	"\v_lowEntropy\"i\n" +
 	"\vTCPFragment\x12\x1b\n" +
 	"\x06enable\x18\x01 \x01(\bH\x00R\x06enable\x88\x01\x01\x12#\n" +
 	"\n" +
@@ -1049,7 +1320,12 @@ const file_appctl_proto_base_proto_rawDesc = "" +
 	"\x13maxMiddlePaddingLen\x18\x01 \x01(\x05H\x00R\x13maxMiddlePaddingLen\x88\x01\x01\x12/\n" +
 	"\x10maxEndPaddingLen\x18\x02 \x01(\x05H\x01R\x10maxEndPaddingLen\x88\x01\x01B\x16\n" +
 	"\x14_maxMiddlePaddingLenB\x13\n" +
-	"\x11_maxEndPaddingLen*X\n" +
+	"\x11_maxEndPaddingLen\"\xb3\x01\n" +
+	"\x11LowEntropyPattern\x125\n" +
+	"\x04mode\x18\x01 \x01(\x0e2\x1c.mieru.appctl.LowEntropyModeH\x00R\x04mode\x88\x01\x01\x12M\n" +
+	"\fmaskRotation\x18\x02 \x01(\x0e2$.mieru.appctl.LowEntropyMaskRotationH\x01R\fmaskRotation\x88\x01\x01B\a\n" +
+	"\x05_modeB\x0f\n" +
+	"\r_maskRotation*X\n" +
 	"\tAppStatus\x12\v\n" +
 	"\aUNKNOWN\x10\x00\x12\b\n" +
 	"\x04IDLE\x10\x01\x12\f\n" +
@@ -1082,7 +1358,46 @@ const file_appctl_proto_base_proto_rawDesc = "" +
 	"\x11NONCE_TYPE_RANDOM\x10\x00\x12\x18\n" +
 	"\x14NONCE_TYPE_PRINTABLE\x10\x01\x12\x1f\n" +
 	"\x1bNONCE_TYPE_PRINTABLE_SUBSET\x10\x02\x12\x14\n" +
-	"\x10NONCE_TYPE_FIXED\x10\x03B0Z.github.com/enfein/mieru/v3/pkg/appctl/appctlpbb\x06proto3"
+	"\x10NONCE_TYPE_FIXED\x10\x03*\x8e\x01\n" +
+	"\x0eLowEntropyMode\x12\x18\n" +
+	"\x14LOW_ENTROPY_MODE_OFF\x10\x00\x12\x17\n" +
+	"\x13LOW_ENTROPY_MODE_32\x10\x01\x12\x17\n" +
+	"\x13LOW_ENTROPY_MODE_40\x10\x02\x12\x17\n" +
+	"\x13LOW_ENTROPY_MODE_48\x10\x03\x12\x17\n" +
+	"\x13LOW_ENTROPY_MODE_56\x10\x04*\x95\t\n" +
+	"\x16LowEntropyMaskRotation\x12 \n" +
+	"\x1cLOW_ENTROPY_MASK_NO_ROTATION\x10\x00\x12#\n" +
+	"\x1fLOW_ENTROPY_MASK_ROTATE_RIGHT_1\x10\x01\x12#\n" +
+	"\x1fLOW_ENTROPY_MASK_ROTATE_RIGHT_2\x10\x02\x12#\n" +
+	"\x1fLOW_ENTROPY_MASK_ROTATE_RIGHT_3\x10\x03\x12#\n" +
+	"\x1fLOW_ENTROPY_MASK_ROTATE_RIGHT_4\x10\x04\x12#\n" +
+	"\x1fLOW_ENTROPY_MASK_ROTATE_RIGHT_5\x10\x05\x12#\n" +
+	"\x1fLOW_ENTROPY_MASK_ROTATE_RIGHT_6\x10\x06\x12#\n" +
+	"\x1fLOW_ENTROPY_MASK_ROTATE_RIGHT_7\x10\a\x12#\n" +
+	"\x1fLOW_ENTROPY_MASK_ROTATE_RIGHT_8\x10\b\x12#\n" +
+	"\x1fLOW_ENTROPY_MASK_ROTATE_RIGHT_9\x10\t\x12$\n" +
+	" LOW_ENTROPY_MASK_ROTATE_RIGHT_10\x10\n" +
+	"\x12$\n" +
+	" LOW_ENTROPY_MASK_ROTATE_RIGHT_11\x10\v\x12$\n" +
+	" LOW_ENTROPY_MASK_ROTATE_RIGHT_12\x10\f\x12$\n" +
+	" LOW_ENTROPY_MASK_ROTATE_RIGHT_13\x10\r\x12$\n" +
+	" LOW_ENTROPY_MASK_ROTATE_RIGHT_14\x10\x0e\x12$\n" +
+	" LOW_ENTROPY_MASK_ROTATE_RIGHT_15\x10\x0f\x12\"\n" +
+	"\x1eLOW_ENTROPY_MASK_ROTATE_LEFT_1\x10\x10\x12\"\n" +
+	"\x1eLOW_ENTROPY_MASK_ROTATE_LEFT_2\x10 \x12\"\n" +
+	"\x1eLOW_ENTROPY_MASK_ROTATE_LEFT_3\x100\x12\"\n" +
+	"\x1eLOW_ENTROPY_MASK_ROTATE_LEFT_4\x10@\x12\"\n" +
+	"\x1eLOW_ENTROPY_MASK_ROTATE_LEFT_5\x10P\x12\"\n" +
+	"\x1eLOW_ENTROPY_MASK_ROTATE_LEFT_6\x10`\x12\"\n" +
+	"\x1eLOW_ENTROPY_MASK_ROTATE_LEFT_7\x10p\x12#\n" +
+	"\x1eLOW_ENTROPY_MASK_ROTATE_LEFT_8\x10\x80\x01\x12#\n" +
+	"\x1eLOW_ENTROPY_MASK_ROTATE_LEFT_9\x10\x90\x01\x12$\n" +
+	"\x1fLOW_ENTROPY_MASK_ROTATE_LEFT_10\x10\xa0\x01\x12$\n" +
+	"\x1fLOW_ENTROPY_MASK_ROTATE_LEFT_11\x10\xb0\x01\x12$\n" +
+	"\x1fLOW_ENTROPY_MASK_ROTATE_LEFT_12\x10\xc0\x01\x12$\n" +
+	"\x1fLOW_ENTROPY_MASK_ROTATE_LEFT_13\x10\xd0\x01\x12$\n" +
+	"\x1fLOW_ENTROPY_MASK_ROTATE_LEFT_14\x10\xe0\x01\x12$\n" +
+	"\x1fLOW_ENTROPY_MASK_ROTATE_LEFT_15\x10\xf0\x01B0Z.github.com/enfein/mieru/v3/pkg/appctl/appctlpbb\x06proto3"
 
 var (
 	file_appctl_proto_base_proto_rawDescOnce sync.Once
@@ -1096,38 +1411,44 @@ func file_appctl_proto_base_proto_rawDescGZIP() []byte {
 	return file_appctl_proto_base_proto_rawDescData
 }
 
-var file_appctl_proto_base_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_appctl_proto_base_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_appctl_proto_base_proto_enumTypes = make([]protoimpl.EnumInfo, 8)
+var file_appctl_proto_base_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_appctl_proto_base_proto_goTypes = []any{
-	(AppStatus)(0),         // 0: mieru.appctl.AppStatus
-	(LoggingLevel)(0),      // 1: mieru.appctl.LoggingLevel
-	(DualStack)(0),         // 2: mieru.appctl.DualStack
-	(TransportProtocol)(0), // 3: mieru.appctl.TransportProtocol
-	(ProxyProtocol)(0),     // 4: mieru.appctl.ProxyProtocol
-	(NonceType)(0),         // 5: mieru.appctl.NonceType
-	(*AppStatusMsg)(nil),   // 6: mieru.appctl.AppStatusMsg
-	(*PortBinding)(nil),    // 7: mieru.appctl.PortBinding
-	(*User)(nil),           // 8: mieru.appctl.User
-	(*Quota)(nil),          // 9: mieru.appctl.Quota
-	(*Auth)(nil),           // 10: mieru.appctl.Auth
-	(*TrafficPattern)(nil), // 11: mieru.appctl.TrafficPattern
-	(*TCPFragment)(nil),    // 12: mieru.appctl.TCPFragment
-	(*NoncePattern)(nil),   // 13: mieru.appctl.NoncePattern
-	(*PaddingPattern)(nil), // 14: mieru.appctl.PaddingPattern
+	(AppStatus)(0),              // 0: mieru.appctl.AppStatus
+	(LoggingLevel)(0),           // 1: mieru.appctl.LoggingLevel
+	(DualStack)(0),              // 2: mieru.appctl.DualStack
+	(TransportProtocol)(0),      // 3: mieru.appctl.TransportProtocol
+	(ProxyProtocol)(0),          // 4: mieru.appctl.ProxyProtocol
+	(NonceType)(0),              // 5: mieru.appctl.NonceType
+	(LowEntropyMode)(0),         // 6: mieru.appctl.LowEntropyMode
+	(LowEntropyMaskRotation)(0), // 7: mieru.appctl.LowEntropyMaskRotation
+	(*AppStatusMsg)(nil),        // 8: mieru.appctl.AppStatusMsg
+	(*PortBinding)(nil),         // 9: mieru.appctl.PortBinding
+	(*User)(nil),                // 10: mieru.appctl.User
+	(*Quota)(nil),               // 11: mieru.appctl.Quota
+	(*Auth)(nil),                // 12: mieru.appctl.Auth
+	(*TrafficPattern)(nil),      // 13: mieru.appctl.TrafficPattern
+	(*TCPFragment)(nil),         // 14: mieru.appctl.TCPFragment
+	(*NoncePattern)(nil),        // 15: mieru.appctl.NoncePattern
+	(*PaddingPattern)(nil),      // 16: mieru.appctl.PaddingPattern
+	(*LowEntropyPattern)(nil),   // 17: mieru.appctl.LowEntropyPattern
 }
 var file_appctl_proto_base_proto_depIdxs = []int32{
 	0,  // 0: mieru.appctl.AppStatusMsg.status:type_name -> mieru.appctl.AppStatus
 	3,  // 1: mieru.appctl.PortBinding.protocol:type_name -> mieru.appctl.TransportProtocol
-	9,  // 2: mieru.appctl.User.quotas:type_name -> mieru.appctl.Quota
-	12, // 3: mieru.appctl.TrafficPattern.tcpFragment:type_name -> mieru.appctl.TCPFragment
-	13, // 4: mieru.appctl.TrafficPattern.nonce:type_name -> mieru.appctl.NoncePattern
-	14, // 5: mieru.appctl.TrafficPattern.padding:type_name -> mieru.appctl.PaddingPattern
-	5,  // 6: mieru.appctl.NoncePattern.type:type_name -> mieru.appctl.NonceType
-	7,  // [7:7] is the sub-list for method output_type
-	7,  // [7:7] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	11, // 2: mieru.appctl.User.quotas:type_name -> mieru.appctl.Quota
+	14, // 3: mieru.appctl.TrafficPattern.tcpFragment:type_name -> mieru.appctl.TCPFragment
+	15, // 4: mieru.appctl.TrafficPattern.nonce:type_name -> mieru.appctl.NoncePattern
+	16, // 5: mieru.appctl.TrafficPattern.padding:type_name -> mieru.appctl.PaddingPattern
+	17, // 6: mieru.appctl.TrafficPattern.lowEntropy:type_name -> mieru.appctl.LowEntropyPattern
+	5,  // 7: mieru.appctl.NoncePattern.type:type_name -> mieru.appctl.NonceType
+	6,  // 8: mieru.appctl.LowEntropyPattern.mode:type_name -> mieru.appctl.LowEntropyMode
+	7,  // 9: mieru.appctl.LowEntropyPattern.maskRotation:type_name -> mieru.appctl.LowEntropyMaskRotation
+	10, // [10:10] is the sub-list for method output_type
+	10, // [10:10] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_appctl_proto_base_proto_init() }
@@ -1144,13 +1465,14 @@ func file_appctl_proto_base_proto_init() {
 	file_appctl_proto_base_proto_msgTypes[6].OneofWrappers = []any{}
 	file_appctl_proto_base_proto_msgTypes[7].OneofWrappers = []any{}
 	file_appctl_proto_base_proto_msgTypes[8].OneofWrappers = []any{}
+	file_appctl_proto_base_proto_msgTypes[9].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_appctl_proto_base_proto_rawDesc), len(file_appctl_proto_base_proto_rawDesc)),
-			NumEnums:      6,
-			NumMessages:   9,
+			NumEnums:      8,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
