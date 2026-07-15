@@ -29,18 +29,6 @@ import (
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
 
-// timeoutReader wraps a net.Conn and sets a read deadline before each read.
-type timeoutReader struct {
-	r       io.Reader
-	conn    net.Conn
-	timeout time.Duration
-}
-
-func (tr *timeoutReader) Read(p []byte) (int, error) {
-	tr.conn.SetReadDeadline(time.Now().Add(tr.timeout))
-	return tr.r.Read(p)
-}
-
 // BidiCopyUDP does bi-directional data copy between a proxy client UDP endpoint
 // and the proxy tunnel.
 func BidiCopyUDP(udpConn *net.UDPConn, tunnelConn *apicommon.PacketOverStreamTunnel) error {
@@ -122,10 +110,21 @@ func BidiCopySocks5(conn, proxyConn io.ReadWriteCloser, pendingReq []byte) error
 	errCh := make(chan error, 2)
 
 	// Apply idle timeout to prevent hanging on unresponsive connections.
+	// Use TimeoutConn which resets both read+write deadlines on any I/O activity,
+	// so asymmetric transfers (e.g. long download with no upload) are not killed.
 	var proxyNet, connNet net.Conn
 	var idleTimeout time.Duration = common.DefaultIdleTimeout
 	proxyNet, _ = proxyConn.(net.Conn)
 	connNet, _ = conn.(net.Conn)
+
+	// Wrap connections with timeout if available.
+	var wrappedConn, wrappedProxy io.ReadWriteCloser = conn, proxyConn
+	if connNet != nil {
+		wrappedConn = common.NewTimeoutConn(connNet, idleTimeout)
+	}
+	if proxyNet != nil {
+		wrappedProxy = common.NewTimeoutConn(proxyNet, idleTimeout)
+	}
 
 	go func() {
 		// conn -> proxyConn
@@ -135,11 +134,7 @@ func BidiCopySocks5(conn, proxyConn io.ReadWriteCloser, pendingReq []byte) error
 			log.Debugf("HANDSHAKE_NO_WAIT mode socks5 client request: %v", pendingReq)
 			reqLen = copy(buf, pendingReq)
 		}
-		reader := io.Reader(conn)
-		if connNet != nil {
-			reader = &timeoutReader{r: conn, conn: connNet, timeout: idleTimeout}
-		}
-		n, err := reader.Read(buf[reqLen:])
+		n, err := wrappedConn.Read(buf[reqLen:])
 		if err != nil {
 			proxyConn.Close()
 			errCh <- fmt.Errorf("failed to read connection request from the client: %w", err)
@@ -152,33 +147,21 @@ func BidiCopySocks5(conn, proxyConn io.ReadWriteCloser, pendingReq []byte) error
 			errCh <- fmt.Errorf("failed to write connection request to the server: %w", err)
 			return
 		}
-		reader = io.Reader(conn)
-		if connNet != nil {
-			reader = &timeoutReader{r: conn, conn: connNet, timeout: idleTimeout}
-		}
-		_, err = io.Copy(proxyConn, reader)
+		_, err = io.Copy(proxyConn, wrappedConn)
 		proxyConn.Close()
 		errCh <- err
 	}()
 
 	go func() {
 		// proxyConn -> conn
-		reader := io.Reader(proxyConn)
-		if proxyNet != nil {
-			reader = &timeoutReader{r: proxyConn, conn: proxyNet, timeout: idleTimeout}
-		}
-		connResp, err := model.ReadSocks5Response(reader)
+		connResp, err := model.ReadSocks5Response(wrappedProxy)
 		if err != nil {
 			conn.Close()
 			errCh <- fmt.Errorf("failed to read connection response from the server: %w", err)
 			return
 		}
 		log.Debugf("HANDSHAKE_NO_WAIT mode socks5 server reply: %v", connResp.Raw)
-		reader = io.Reader(proxyConn)
-		if proxyNet != nil {
-			reader = &timeoutReader{r: proxyConn, conn: proxyNet, timeout: idleTimeout}
-		}
-		_, err = io.Copy(conn, reader)
+		_, err = io.Copy(conn, wrappedProxy)
 		conn.Close()
 		errCh <- err
 	}()
