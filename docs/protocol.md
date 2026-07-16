@@ -46,7 +46,7 @@ The encrypted segment must fit into a single UDP packet. The size of the segment
 
 ## Metadata Format
 
-Each segment must contain metadata, and the length of the metadata is fixed at 32 bytes. The current version of mieru defines two types of metadata as follows.
+Each segment must contain metadata, and the length of the metadata is fixed at 32 bytes. The current version of mieru defines three types of metadata as follows.
 
 ### Session Metadata
 
@@ -89,6 +89,25 @@ The definitions and usage of `timestamp`, `session ID`, and `sequence number` ar
 `sequence number`, `unack sequence number`, and `window size` are used for flow control.
 
 `prefix length` determines the length of `padding 1`, while `suffix length` determines the length of `padding 2`.
+
+### Data Metadata (Low Entropy Extension)
+
+The low entropy extension uses the same structure as data metadata, with the following fields replacing the previously unused bytes:
+
+| protocol type | low entropy mode | timestamp | session ID | sequence number | unack sequence number | window size | fragment number | prefix length | payload length | suffix length | low entropy mask | extracted payload length | low entropy mask rotation |
+| :----: | :----: | :----: | :----: | :----: | :----: | :----: | :----: | :----: | :----: | :----: | :----: | :----: | :----: |
+| 1 | 1 | 4 | 4 | 4 | 4 | 2 | 1 | 1 | 2 | 1 | 4 | 2 | 1 |
+
+This extension is used for the following two `protocol type` values:
+
+- `dataClientToServerLowEntropy` = 10
+- `dataServerToClientLowEntropy` = 11
+
+`low entropy mode` is 1, 2, 3, or 4 when each 64-bit low entropy chunk contains 32, 40, 48, or 56 payload bits, respectively; the remaining bits are padding. A value of 0 disables low entropy encoding.
+
+The 4-byte `low entropy mask` is repeated once to form the 8-byte mask, where each 1-bit identifies a payload position in each chunk, and each 0-bit identifies a padding position. `payload length` includes the low entropy padding, while `extracted payload length` records the payload size after the padding is removed.
+
+`low entropy mask rotation` controls how the 8-byte mask rotates between adjacent 64-bit chunks. A value from 1 through 15 (lower 4 bits) rotates the mask right by that many bits; a value equal to 16 times a number from 1 through 15 (higher 4 bits) rotates it left by that number of bits. A value of 0 keeps the mask unchanged.
 
 ## UDP Associate Encapsulation
 
