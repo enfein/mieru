@@ -16,6 +16,8 @@
 package rng
 
 import (
+	"math/bits"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -40,6 +42,30 @@ func TestRandTime(t *testing.T) {
 	randTime := RandTime(begin, end)
 	if randTime.Before(begin) || randTime.After(end) {
 		t.Errorf("generated rand time is out of range")
+	}
+}
+
+func TestUint32WithBits(t *testing.T) {
+	for n := 0; n <= 32; n++ {
+		for i := 0; i < 100; i++ {
+			got := Uint32WithBits(n)
+			if count := bits.OnesCount32(got); count != n {
+				t.Fatalf("Uint32WithBits(%d) returned %032b with %d bits set", n, got, count)
+			}
+		}
+	}
+}
+
+func TestUint32WithBitsPanic(t *testing.T) {
+	for _, n := range []int{-1, 33} {
+		t.Run("n="+strconv.Itoa(n), func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("Uint32WithBits(%d) did not panic", n)
+				}
+			}()
+			Uint32WithBits(n)
+		})
 	}
 }
 

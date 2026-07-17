@@ -87,6 +87,7 @@ echo "Scanning for license headers..."
 
 # Check different file types
 check_files_by_pattern "*.go"
+check_files_by_pattern "*.s"
 check_files_by_pattern "*.py"
 check_files_by_pattern "*.sh"
 check_files_by_pattern "*.proto"

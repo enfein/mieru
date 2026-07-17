@@ -60,7 +60,29 @@ func RandTime(begin, end time.Time) time.Time {
 	return time.Unix(randSec, randNano)
 }
 
-// FixedInt returns an integer in [0, n) that always stays the same.
+// Uint32WithBits returns a random uint32 with exactly n bits set to 1.
+// It panics if n is outside [0, 32].
+func Uint32WithBits(n int) uint32 {
+	if n < 0 || n > 32 {
+		panic("number of set bits must be between 0 and 32")
+	}
+
+	var bitPositions [32]uint32
+	for i := range bitPositions {
+		bitPositions[i] = uint32(i)
+	}
+
+	var result uint32
+	for i := 0; i < n; i++ {
+		j := i + mrand.Intn(len(bitPositions)-i)
+		bitPositions[i], bitPositions[j] = bitPositions[j], bitPositions[i]
+		result |= uint32(1) << bitPositions[i]
+	}
+	return result
+}
+
+// FixedInt returns an integer in [0, n) that stays the same
+// if the same hint is provided.
 //
 // The returned value is not bigger than math.MaxInt32.
 //

@@ -49,6 +49,7 @@ linters:
             - "**/pkg/mathext/**"
           allow:
             - $gostd
+            - golang.org/x/sys/cpu
         pkg-stderror:
           files:
             - "**/pkg/stderror/**"
