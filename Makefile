@@ -17,6 +17,10 @@ ROOT=$(shell git rev-parse --show-toplevel)
 SHORT_SHA=$(shell git rev-parse --short HEAD)
 PROJECT_NAME=$(shell basename "${ROOT}")
 TEST_BINARY_PREREQ = test-binary
+BENCH_TIME ?= 10s
+FUZZ_TIME ?= 10s
+BENCH_PACKAGES ?= ./pkg/cipher ./pkg/protocol
+FUZZ_PACKAGES ?= ./pkg/protocol
 
 # If this version is changed, also change the version in
 #
@@ -75,7 +79,20 @@ lint:
 .PHONY: bench
 bench:
 	go clean -testcache
-	CGO_ENABLED=0 go test -bench=. -benchtime=10s ./pkg/cipher
+	CGO_ENABLED=0 go test -run='^$$' -bench=. -benchtime=${BENCH_TIME} ${BENCH_PACKAGES}
+
+# Run fuzz tests.
+.PHONY: fuzz
+fuzz:
+	set -e
+	for pkg in ${FUZZ_PACKAGES}; do
+		fuzz_tests=$$(CGO_ENABLED=0 go test -list='^Fuzz' "$$pkg")
+		for fuzz_test in $$fuzz_tests; do
+			case "$$fuzz_test" in
+				Fuzz*) CGO_ENABLED=0 go test -run='^$$' -fuzz="^$${fuzz_test}$$" -fuzztime=${FUZZ_TIME} "$$pkg" ;;
+			esac
+		done
+	done
 
 # Generate vendor directory.
 .PHONY: vendor

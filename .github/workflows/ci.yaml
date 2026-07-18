@@ -19,6 +19,8 @@ jobs:
         run: make vendor
       - name: Run benchmark
         run: make bench
+      - name: Run fuzz tests
+        run: make fuzz
       - name: Build binaries
         run: make build
       - name: Upload artifacts
