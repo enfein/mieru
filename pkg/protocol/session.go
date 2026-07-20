@@ -107,20 +107,17 @@ type Session struct {
 	state             atomic.Int32             // session state
 	status            statusCode               // session status
 
-	users          map[string]*appctlpb.User // all registered users, only used by server
-	userName       atomic.Pointer[string]    // user that owns this session, only used by server
-	trafficPattern *appctlpb.TrafficPattern  // traffic pattern
+	trafficPattern *appctlpb.TrafficPattern
 
-	ready                  chan struct{} // indicate the session is ready to use
-	openSessionRequestSent atomic.Bool   // whether open session request has been sent, only used by client
-	closeRequested         atomic.Bool   // the session is being closed or has been closed
-	closedChan             chan struct{} // indicate the session is closed
-	readDeadline           atomic.Int64  // read deadline, in microseconds since Unix epoch
-	writeDeadline          atomic.Int64  // write deadline, in microseconds since Unix epoch
-	inputHasErr            atomic.Bool   // input has error
-	inputErr               chan error    // this channel is closed when input has error
-	outputHasErr           atomic.Bool   // output has error
-	outputErr              chan error    // this channel is closed when output has error
+	ready          chan struct{} // indicate the session is ready to use
+	closeRequested atomic.Bool   // the session is being closed or has been closed
+	closedChan     chan struct{} // indicate the session is closed
+	readDeadline   atomic.Int64  // read deadline, in microseconds since Unix epoch
+	writeDeadline  atomic.Int64  // write deadline, in microseconds since Unix epoch
+	inputHasErr    atomic.Bool   // input has error
+	inputErr       chan error    // this channel is closed when input has error
+	outputHasErr   atomic.Bool   // output has error
+	outputErr      chan error    // this channel is closed when output has error
 
 	sendQueue *segmentTree  // segments waiting to send
 	sendBuf   *segmentTree  // segments sent but not acknowledged
@@ -138,9 +135,6 @@ type Session struct {
 	ackOnDataRecv          atomic.Bool   // whether ack should be sent due to receive of new data
 	unreadBuf              []byte        // payload removed from the recvQueue that haven't been read by application
 
-	uploadBytes   metrics.Metric // number of bytes from client to server, only used by server
-	downloadBytes metrics.Metric // number of bytes from server to client, only used by server
-
 	rttStat            *congestion.RTTStats
 	cubicSendAlgorithm *congestion.CubicSendAlgorithm
 	remoteWindowSize   atomic.Uint32
@@ -149,6 +143,16 @@ type Session struct {
 	rLock sync.Mutex // serialize application read
 	wLock sync.Mutex // serialize application write
 	oLock sync.Mutex // serialize the output sequence
+
+	// ---- client fields ----
+	openSessionRequestSent atomic.Bool // whether open session request has been sent
+
+	// ---- server fields ----
+	users               map[string]*appctlpb.User // all registered users
+	userName            atomic.Pointer[string]    // user that owns this session
+	clientUseLowEntropy atomic.Bool               // whether the server received low entropy data from client
+	uploadBytes         metrics.Metric            // number of bytes from client to server
+	downloadBytes       metrics.Metric            // number of bytes from server to client
 }
 
 var (
@@ -866,11 +870,11 @@ func (s *Session) runOutputOncePacket() {
 func (s *Session) input(seg *segment) error {
 	protocol := seg.Protocol()
 	if s.isClient {
-		if protocol != openSessionResponse && protocol != dataServerToClient && protocol != ackServerToClient && protocol != closeSessionRequest && protocol != closeSessionResponse {
+		if protocol != openSessionResponse && protocol != dataServerToClient && protocol != dataServerToClientLowEntropy && protocol != ackServerToClient && protocol != closeSessionRequest && protocol != closeSessionResponse {
 			return stderror.ErrInvalidArgument
 		}
 	} else {
-		if protocol != openSessionRequest && protocol != dataClientToServer && protocol != ackClientToServer && protocol != closeSessionRequest && protocol != closeSessionResponse {
+		if protocol != openSessionRequest && protocol != dataClientToServer && protocol != dataClientToServerLowEntropy && protocol != ackClientToServer && protocol != closeSessionRequest && protocol != closeSessionResponse {
 			return stderror.ErrInvalidArgument
 		}
 	}
@@ -909,9 +913,12 @@ func (s *Session) input(seg *segment) error {
 	}
 
 	s.lastRXTime.Store(time.Now().UnixMicro())
-	if protocol == openSessionRequest || protocol == openSessionResponse || protocol == dataServerToClient || protocol == dataClientToServer {
+	if !s.isClient && protocol == dataClientToServerLowEntropy {
+		s.clientUseLowEntropy.Store(true)
+	}
+	if protocol == openSessionRequest || protocol == openSessionResponse || isDataProtocol(protocol) {
 		return s.inputData(seg)
-	} else if protocol == ackServerToClient || protocol == ackClientToServer {
+	} else if isAckProtocol(protocol) {
 		return s.inputAck(seg)
 	} else if protocol == closeSessionRequest || protocol == closeSessionResponse {
 		return s.inputClose(seg)

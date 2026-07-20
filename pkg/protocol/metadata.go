@@ -20,22 +20,25 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/mathext"
 )
 
 type protocolType byte
 
 const (
-	closeConnRequest     protocolType = 0
-	closeConnResponse    protocolType = 1
-	openSessionRequest   protocolType = 2
-	openSessionResponse  protocolType = 3
-	closeSessionRequest  protocolType = 4
-	closeSessionResponse protocolType = 5
-	dataClientToServer   protocolType = 6
-	dataServerToClient   protocolType = 7
-	ackClientToServer    protocolType = 8
-	ackServerToClient    protocolType = 9
+	closeConnRequest             protocolType = 0
+	closeConnResponse            protocolType = 1
+	openSessionRequest           protocolType = 2
+	openSessionResponse          protocolType = 3
+	closeSessionRequest          protocolType = 4
+	closeSessionResponse         protocolType = 5
+	dataClientToServer           protocolType = 6
+	dataServerToClient           protocolType = 7
+	ackClientToServer            protocolType = 8
+	ackServerToClient            protocolType = 9
+	dataClientToServerLowEntropy protocolType = 10
+	dataServerToClientLowEntropy protocolType = 11
 )
 
 func (p protocolType) Equals(other byte) bool {
@@ -64,6 +67,10 @@ func (p protocolType) String() string {
 		return "ackClientToServer"
 	case ackServerToClient:
 		return "ackServerToClient"
+	case dataClientToServerLowEntropy:
+		return "dataClientToServerLowEntropy"
+	case dataServerToClientLowEntropy:
+		return "dataServerToClientLowEntropy"
 	default:
 		return "UNKNOWN"
 	}
@@ -119,7 +126,7 @@ var (
 // baseStruct is shared by all metadata struct.
 type baseStruct struct {
 	protocol  uint8  // byte 0: protocol type
-	_         uint8  // byte 1: reserved
+	_         uint8  // byte 1: type-specific; low entropy mode for low entropy data, otherwise reserved
 	timestamp uint32 // byte 2 - 5: timestamp, number of minutes after UNIX epoch
 }
 
@@ -196,14 +203,18 @@ func toSessionStruct(m metadata) (*sessionStruct, bool) {
 // dataAckStruct is used by data and ack protocols.
 type dataAckStruct struct {
 	baseStruct
-	sessionID  uint32 // byte 6 - 9: session ID number
-	seq        uint32 // byte 10 - 13: sequence number or ack number
-	unAckSeq   uint32 // byte 14 - 17: unacknowledged sequence number; sequences smaller than this are acknowledged
-	windowSize uint16 // byte 18 - 19: receive window size, in number of segments
-	fragment   uint8  // byte 20: fragment number; this number reduces over time, 0 is the last fragment
-	prefixLen  uint8  // byte 21: length of prefix padding
-	payloadLen uint16 // byte 22 - 23: length of encapsulated payload, not including auth tag
-	suffixLen  uint8  // byte 24: length of suffix padding
+	lowEntropyMode         uint8  // byte 1 for low entropy data: low entropy mode
+	sessionID              uint32 // byte 6 - 9: session ID number
+	seq                    uint32 // byte 10 - 13: sequence number or ack number
+	unAckSeq               uint32 // byte 14 - 17: unacknowledged sequence number; sequences smaller than this are acknowledged
+	windowSize             uint16 // byte 18 - 19: receive window size, in number of segments
+	fragment               uint8  // byte 20: fragment number; this number reduces over time, 0 is the last fragment
+	prefixLen              uint8  // byte 21: length of prefix padding
+	payloadLen             uint16 // byte 22 - 23: length of encapsulated payload, not including auth tag
+	suffixLen              uint8  // byte 24: length of suffix padding
+	lowEntropyMask         uint32 // byte 25 - 28: initial 32-bit half-mask
+	extractedPayloadLen    uint16 // byte 29 - 30: payload length after low entropy padding is removed
+	lowEntropyMaskRotation uint8  // byte 31: low entropy mask rotation
 }
 
 func (das *dataAckStruct) Protocol() protocolType {
@@ -213,6 +224,9 @@ func (das *dataAckStruct) Protocol() protocolType {
 func (das *dataAckStruct) Marshal() []byte {
 	b := make([]byte, MetadataLength)
 	b[0] = das.baseStruct.protocol
+	if isLowEntropyProtocol(das.Protocol()) {
+		b[1] = das.lowEntropyMode
+	}
 	das.baseStruct.timestamp = uint32(time.Now().Unix() / 60)
 	binary.BigEndian.PutUint32(b[2:], das.baseStruct.timestamp)
 	binary.BigEndian.PutUint32(b[6:], das.sessionID)
@@ -223,6 +237,11 @@ func (das *dataAckStruct) Marshal() []byte {
 	b[21] = das.prefixLen
 	binary.BigEndian.PutUint16(b[22:], das.payloadLen)
 	b[24] = das.suffixLen
+	if isLowEntropyProtocol(das.Protocol()) {
+		binary.BigEndian.PutUint32(b[25:], das.lowEntropyMask)
+		binary.BigEndian.PutUint16(b[29:], das.extractedPayloadLen)
+		b[31] = das.lowEntropyMaskRotation
+	}
 	return b
 }
 
@@ -231,7 +250,8 @@ func (das *dataAckStruct) Unmarshal(b []byte) error {
 	if len(b) != MetadataLength {
 		return fmt.Errorf("input bytes: %d, want %d", len(b), MetadataLength)
 	}
-	if !dataClientToServer.Equals(b[0]) && !dataServerToClient.Equals(b[0]) && !ackClientToServer.Equals(b[0]) && !ackServerToClient.Equals(b[0]) {
+	protocol := protocolType(b[0])
+	if !isDataAckProtocol(protocol) {
 		return fmt.Errorf("invalid protocol %d", b[0])
 	}
 	originalTimestamp := binary.BigEndian.Uint32(b[2:])
@@ -240,9 +260,32 @@ func (das *dataAckStruct) Unmarshal(b []byte) error {
 		return fmt.Errorf("invalid timestamp %d", originalTimestamp*60)
 	}
 
+	var lowEntropyMode uint8
+	var lowEntropyMask uint32
+	var extractedPayloadLen uint16
+	var lowEntropyMaskRotation uint8
+	if isLowEntropyProtocol(protocol) {
+		lowEntropyMode = b[1]
+		lowEntropyMask = binary.BigEndian.Uint32(b[25:])
+		extractedPayloadLen = binary.BigEndian.Uint16(b[29:])
+		lowEntropyMaskRotation = b[31]
+		candidate := &dataAckStruct{
+			baseStruct:             baseStruct{protocol: b[0]},
+			lowEntropyMode:         lowEntropyMode,
+			payloadLen:             binary.BigEndian.Uint16(b[22:]),
+			lowEntropyMask:         lowEntropyMask,
+			extractedPayloadLen:    extractedPayloadLen,
+			lowEntropyMaskRotation: lowEntropyMaskRotation,
+		}
+		if err := validateLowEntropyDataAckMetadata(candidate); err != nil {
+			return err
+		}
+	}
+
 	// Do unmarshal.
-	das.baseStruct.protocol = b[0]
+	das.baseStruct.protocol = uint8(protocol)
 	das.baseStruct.timestamp = originalTimestamp
+	das.lowEntropyMode = lowEntropyMode
 	das.sessionID = binary.BigEndian.Uint32(b[6:])
 	das.seq = binary.BigEndian.Uint32(b[10:])
 	das.unAckSeq = binary.BigEndian.Uint32(b[14:])
@@ -251,15 +294,34 @@ func (das *dataAckStruct) Unmarshal(b []byte) error {
 	das.prefixLen = b[21]
 	das.payloadLen = binary.BigEndian.Uint16(b[22:])
 	das.suffixLen = b[24]
+	das.lowEntropyMask = lowEntropyMask
+	das.extractedPayloadLen = extractedPayloadLen
+	das.lowEntropyMaskRotation = lowEntropyMaskRotation
 	return nil
 }
 
 func (das *dataAckStruct) String() string {
-	return fmt.Sprintf("dataAckStruct{protocol=%v, sessionID=%v, seq=%v, unAckSeq=%v, windowSize=%v, fragment=%v, prefixLen=%v, payloadLen=%v, suffixLen=%v}", protocolType(das.protocol), das.sessionID, das.seq, das.unAckSeq, das.windowSize, das.fragment, das.prefixLen, das.payloadLen, das.suffixLen)
+	result := fmt.Sprintf("dataAckStruct{protocol=%v, sessionID=%v, seq=%v, unAckSeq=%v, windowSize=%v, fragment=%v, prefixLen=%v, payloadLen=%v, suffixLen=%v", protocolType(das.protocol), das.sessionID, das.seq, das.unAckSeq, das.windowSize, das.fragment, das.prefixLen, das.payloadLen, das.suffixLen)
+	if das.lowEntropyMode == uint8(appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_OFF) {
+		return result + "}"
+	}
+	return fmt.Sprintf("%s, lowEntropyMode=%v, lowEntropyMask=%08x, extractedPayloadLen=%v, lowEntropyMaskRotation=%v}", result, appctlpb.LowEntropyMode(das.lowEntropyMode), das.lowEntropyMask, das.extractedPayloadLen, appctlpb.LowEntropyMaskRotation(das.lowEntropyMaskRotation))
+}
+
+func isLowEntropyProtocol(p protocolType) bool {
+	return p == dataClientToServerLowEntropy || p == dataServerToClientLowEntropy
+}
+
+func isDataProtocol(p protocolType) bool {
+	return p == dataClientToServer || p == dataServerToClient || isLowEntropyProtocol(p)
+}
+
+func isAckProtocol(p protocolType) bool {
+	return p == ackClientToServer || p == ackServerToClient
 }
 
 func isDataAckProtocol(p protocolType) bool {
-	return p == dataClientToServer || p == dataServerToClient || p == ackClientToServer || p == ackServerToClient
+	return isDataProtocol(p) || isAckProtocol(p)
 }
 
 func toDataAckStruct(m metadata) (*dataAckStruct, bool) {
@@ -267,4 +329,33 @@ func toDataAckStruct(m metadata) (*dataAckStruct, bool) {
 		return m.(*dataAckStruct), true
 	}
 	return nil, false
+}
+
+func validateLowEntropyDataAckMetadata(das *dataAckStruct) error {
+	if !isLowEntropyProtocol(das.Protocol()) {
+		return fmt.Errorf("protocol %d is not low entropy data", das.Protocol())
+	}
+	if int(das.extractedPayloadLen) > maxPDU {
+		return fmt.Errorf("invalid extracted payload length %d", das.extractedPayloadLen)
+	}
+	if das.payloadLen%lowEntropyChunkLen != 0 {
+		return fmt.Errorf("invalid low entropy payload length %d", das.payloadLen)
+	}
+	if _, err := validateLowEntropyCodecParams(appctlpb.LowEntropyMode(das.lowEntropyMode), das.lowEntropyMask, appctlpb.LowEntropyMaskRotation(das.lowEntropyMaskRotation)); err != nil {
+		return err
+	}
+	if das.extractedPayloadLen == 0 {
+		if das.payloadLen != 0 {
+			return fmt.Errorf("low entropy payload length is %d, want 0", das.payloadLen)
+		}
+		return nil
+	}
+	expectedPayloadLen, err := lowEntropyEncodedPayloadLen(int(das.extractedPayloadLen), appctlpb.LowEntropyMode(das.lowEntropyMode))
+	if err != nil {
+		return err
+	}
+	if das.payloadLen != expectedPayloadLen {
+		return fmt.Errorf("low entropy payload length is %d, want %d", das.payloadLen, expectedPayloadLen)
+	}
+	return nil
 }

@@ -510,9 +510,10 @@ func (t *StreamUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error
 		}
 	}
 	if das.payloadLen > 0 {
-		encryptedPayload := make([]byte, das.payloadLen+cipher.DefaultOverhead)
+		wirePayloadLen := int(das.payloadLen) + cipher.DefaultOverhead
+		encryptedPayload := make([]byte, wirePayloadLen)
 		if _, err := io.ReadFull(t.conn, encryptedPayload); err != nil {
-			err = fmt.Errorf("payload: read %d bytes from StreamUnderlay failed: %w", das.payloadLen+cipher.DefaultOverhead, err)
+			err = fmt.Errorf("payload: read %d bytes from StreamUnderlay failed: %w", wirePayloadLen, err)
 			return nil, stderror.WrapErrorWithType(err, stderror.NETWORK_ERROR)
 		}
 		t.inBytes.Add(int64(len(encryptedPayload)))
@@ -520,6 +521,13 @@ func (t *StreamUnderlay) readDataAckSegment(das *dataAckStruct) (*segment, error
 			metrics.DownloadBytes.Add(int64(len(encryptedPayload)))
 		} else {
 			metrics.UploadBytes.Add(int64(len(encryptedPayload)))
+		}
+		if isLowEntropyProtocol(das.Protocol()) {
+			encryptedPayload, err = decodeLowEntropyEncryptedPayload(encryptedPayload, das)
+			if err != nil {
+				err = fmt.Errorf("decode low entropy payload failed: %w", err)
+				return nil, stderror.WrapErrorWithType(err, stderror.PROTOCOL_ERROR)
+			}
 		}
 		if streamReplayCache.IsDuplicate(encryptedPayload[:cipher.DefaultOverhead], replay.EmptyTag) {
 			replay.KnownSession.Add(1)
@@ -609,6 +617,9 @@ func (t *StreamUnderlay) writeOneSegment(seg *segment) error {
 		}
 		metrics.OutputPaddingBytes.Add(int64(len(padding)))
 	} else if das, ok := toDataAckStruct(seg.metadata); ok {
+		if isLowEntropyProtocol(das.Protocol()) {
+			return fmt.Errorf("sending low entropy data over a stream is not implemented: %w", stderror.ErrUnsupported)
+		}
 		padding1 := newPadding(paddingOpts{
 			maxLen: maxPaddingSizeWithTrafficPattern(t.mtu, t.TransportProtocol(), int(das.payloadLen), 0, t.trafficPattern, middlePadding),
 			ascii:  &asciiPaddingOpts{},

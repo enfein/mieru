@@ -541,12 +541,24 @@ func (u *PacketUnderlay) parseDataAckSegment(das *dataAckStruct, nonce, remainin
 	var decryptedPayload []byte
 	var err error
 
+	if isLowEntropyProtocol(das.Protocol()) {
+		if err := validateLowEntropyDataAckMetadata(das); err != nil {
+			return nil, err
+		}
+	}
 	if das.prefixLen > 0 {
+		if int(das.prefixLen) > len(remaining) {
+			return nil, fmt.Errorf("padding: prefix length %d exceeds remaining packet size %d", das.prefixLen, len(remaining))
+		}
 		remaining = remaining[das.prefixLen:]
 	}
 	if das.payloadLen > 0 {
-		if len(remaining) < int(das.payloadLen)+cipher.DefaultOverhead {
+		wirePayloadLen := int(das.payloadLen) + cipher.DefaultOverhead
+		if len(remaining) < wirePayloadLen {
 			return nil, fmt.Errorf("payload: received incomplete packet")
+		}
+		if len(remaining) != wirePayloadLen+int(das.suffixLen) {
+			return nil, fmt.Errorf("padding: size not match")
 		}
 		if blockCipher == nil {
 			if u.isClient {
@@ -555,7 +567,13 @@ func (u *PacketUnderlay) parseDataAckSegment(das *dataAckStruct, nonce, remainin
 				panic("PacketUnderlay readDataAckSegment(): block is nil")
 			}
 		}
-		encryptedPayload := remaining[:das.payloadLen+cipher.DefaultOverhead]
+		encryptedPayload := remaining[:wirePayloadLen]
+		if isLowEntropyProtocol(das.Protocol()) {
+			encryptedPayload, err = decodeLowEntropyEncryptedPayload(encryptedPayload, das)
+			if err != nil {
+				return nil, fmt.Errorf("decode low entropy payload failed: %w", err)
+			}
+		}
 		decryptedPayload, err = blockCipher.DecryptWithNonce(encryptedPayload, nonce)
 		if u.isClient {
 			cipher.ClientDirectDecrypt.Add(1)
@@ -569,9 +587,6 @@ func (u *PacketUnderlay) parseDataAckSegment(das *dataAckStruct, nonce, remainin
 				cipher.ServerFailedDirectDecrypt.Add(1)
 			}
 			return nil, fmt.Errorf("DecryptWithNonce() failed: %w", err)
-		}
-		if int(das.payloadLen)+cipher.DefaultOverhead+int(das.suffixLen) != len(remaining) {
-			return nil, fmt.Errorf("padding: size not match")
 		}
 	} else {
 		if int(das.suffixLen) != len(remaining) {
@@ -666,6 +681,9 @@ func (u *PacketUnderlay) writeOneSegment(seg *segment, addr net.Addr) error {
 		}
 		metrics.OutputPaddingBytes.Add(int64(len(padding)))
 	} else if das, ok := toDataAckStruct(seg.metadata); ok {
+		if isLowEntropyProtocol(das.Protocol()) {
+			return fmt.Errorf("sending low entropy data over a packet underlay is not implemented: %w", stderror.ErrUnsupported)
+		}
 		padding1 := newPadding(paddingOpts{
 			maxLen: maxPaddingSizeWithTrafficPattern(u.mtu, u.TransportProtocol(), int(das.payloadLen), 0, u.trafficPattern, middlePadding),
 			ascii:  &asciiPaddingOpts{},

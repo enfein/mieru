@@ -328,14 +328,8 @@ func (t *segmentTree) checkSeq(seg *segment) {
 
 func (t *segmentTree) checkProtocolType(seg *segment) {
 	protocol := seg.metadata.Protocol()
-	switch protocol {
-	case openSessionRequest:
-	case openSessionResponse:
-	case closeSessionRequest:
-	case closeSessionResponse:
-	case dataClientToServer:
-	case dataServerToClient:
-	default:
-		panic(fmt.Sprintf("Inserting segment with unsupported type %v to the segment tree", protocol))
+	if isSessionProtocol(protocol) || isDataProtocol(protocol) {
+		return
 	}
+	panic(fmt.Sprintf("Inserting segment with unsupported type %v to the segment tree", protocol))
 }

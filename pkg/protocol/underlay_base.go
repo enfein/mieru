@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
+	"github.com/enfein/mieru/v3/pkg/cipher"
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 	"github.com/enfein/mieru/v3/pkg/rng"
@@ -226,4 +227,34 @@ func (b *baseUnderlay) deliverSegmentToSession(s *Session, seg *segment) bool {
 	case <-b.done:
 		return false
 	}
+}
+
+// decodeLowEntropyEncryptedPayload removes low entropy padding from the
+// encrypted payload body and appends the original AEAD tag unchanged.
+func decodeLowEntropyEncryptedPayload(encryptedPayload []byte, das *dataAckStruct) ([]byte, error) {
+	if das == nil {
+		return nil, stderror.ErrNullPointer
+	}
+	if err := validateLowEntropyDataAckMetadata(das); err != nil {
+		return nil, err
+	}
+	wirePayloadLen := int(das.payloadLen) + cipher.DefaultOverhead
+	if len(encryptedPayload) != wirePayloadLen {
+		return nil, fmt.Errorf("low entropy encrypted payload length is %d, want %d", len(encryptedPayload), wirePayloadLen)
+	}
+
+	decodedBody, err := decodeLowEntropyPayload(
+		encryptedPayload[:das.payloadLen],
+		int(das.extractedPayloadLen),
+		appctlpb.LowEntropyMode(das.lowEntropyMode),
+		das.lowEntropyMask,
+		appctlpb.LowEntropyMaskRotation(das.lowEntropyMaskRotation),
+	)
+	if err != nil {
+		return nil, err
+	}
+	reconstructed := make([]byte, 0, len(decodedBody)+cipher.DefaultOverhead)
+	reconstructed = append(reconstructed, decodedBody...)
+	reconstructed = append(reconstructed, encryptedPayload[das.payloadLen:]...)
+	return reconstructed, nil
 }
