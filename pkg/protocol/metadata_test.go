@@ -211,3 +211,23 @@ func TestLowEntropyDataAckStructRejectsInvalidMetadata(t *testing.T) {
 		})
 	}
 }
+
+func FuzzDataAckStructUnmarshal(f *testing.F) {
+	f.Add((&dataAckStruct{
+		baseStruct: baseStruct{protocol: uint8(dataClientToServer)},
+		payloadLen: 4,
+	}).Marshal())
+	f.Add((&dataAckStruct{
+		baseStruct:             baseStruct{protocol: uint8(dataServerToClientLowEntropy)},
+		lowEntropyMode:         uint8(appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_32),
+		payloadLen:             8,
+		lowEntropyMask:         0x0f0f0f0f,
+		extractedPayloadLen:    4,
+		lowEntropyMaskRotation: uint8(appctlpb.LowEntropyMaskRotation_LOW_ENTROPY_MASK_NO_ROTATION),
+	}).Marshal())
+	f.Add([]byte{byte(dataClientToServerLowEntropy)})
+
+	f.Fuzz(func(t *testing.T, b []byte) {
+		_ = (&dataAckStruct{}).Unmarshal(b)
+	})
+}

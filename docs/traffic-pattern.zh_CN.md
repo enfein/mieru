@@ -59,6 +59,10 @@ mita apply config <FILE>
                 "padding": {
                     "maxMiddlePaddingLen": 64,
                     "maxEndPaddingLen": 128
+                },
+                "lowEntropy": {
+                    "mode": "LOW_ENTROPY_MODE_32",
+                    "maskRotation": "LOW_ENTROPY_MASK_ROTATE_RIGHT_7"
                 }
             }
         }
@@ -98,6 +102,10 @@ mita apply config <FILE>
         "padding": {
             "maxMiddlePaddingLen": 0,
             "maxEndPaddingLen": 255
+        },
+        "lowEntropy": {
+            "mode": "LOW_ENTROPY_MODE_56",
+            "maskRotation": "LOW_ENTROPY_MASK_ROTATE_LEFT_7"
         }
     }
 }
@@ -112,6 +120,7 @@ mita apply config <FILE>
 3. 【可选】`tcpFragment` - 配置 TCP 分片的对象。它不影响 UDP 代理协议。
 4. 【可选】`nonce` - 配置 Nonce 前缀操纵的对象。
 5. 【可选】`padding` - 配置网络数据段填充长度限制的对象。
+6. 【可选】`lowEntropy` - 使用低熵位模式扩展加密数据正文的对象。
 
 ## TCP 分片
 
@@ -182,6 +191,39 @@ Nonce 模式功能操纵加密数据包中的 Nonce 前缀。`nonce` 对象支�
     "maxEndPaddingLen": 128
 }
 ```
+
+## 低熵模式
+
+> 该功能尚未发布。
+
+低熵模式会扩展加密数据正文，使每个 64 位数据块中只有配置数量的位承载密文。TCP 和 UDP 代理传输均支持此功能。`lowEntropy` 对象包含以下字段：
+
+1. 【可选】`mode` - 选择每个 64 位编码块承载的源数据量：
+   - `LOW_ENTROPY_MODE_OFF` - 禁用低熵发送。
+   - `LOW_ENTROPY_MODE_32` - 承载 32 位数据并添加 32 位填充。
+   - `LOW_ENTROPY_MODE_40` - 承载 40 位数据并添加 24 位填充。
+   - `LOW_ENTROPY_MODE_48` - 承载 48 位数据并添加 16 位填充。
+   - `LOW_ENTROPY_MODE_56` - 承载 56 位数据并添加 8 位填充。
+2. 【可选】`maskRotation` - 控制相邻 64 位数据块之间载荷位置的移动方式。`LOW_ENTROPY_MASK_NO_ROTATION` 保持掩码不变；`LOW_ENTROPY_MASK_ROTATE_RIGHT_1` 至 `_15` 将掩码向右旋转；`LOW_ENTROPY_MASK_ROTATE_LEFT_1` 至 `_15` 将掩码向左旋转。
+
+示例：
+
+```js
+"lowEntropy": {
+    "mode": "LOW_ENTROPY_MODE_32",
+    "maskRotation": "LOW_ENTROPY_MASK_ROTATE_RIGHT_7"
+}
+```
+
+客户端和服务端配置的控制方向不同：
+
+- 客户端配置控制客户端到服务端的应用数据。
+- 服务端配置使服务端到客户端的数据具备使用低熵模式的条件。只有在同一会话中认证通过一个低熵请求后，服务端才会启用该模式。服务端使用自己的模式与旋转设置，它们可以与客户端不同。
+- 接收行为不依赖本地的发送设置。当前版本的接收端既接受普通数据，也接受所有有效的低熵模式。
+
+低熵模式只作用于加密后的应用数据正文。它不会变换 Nonce、加密元数据、AEAD 认证标签、会话控制载荷、纯 ACK 数据段，也不会变换由 `padding` 配置的独立中间填充和末尾填充。
+
+模式 32、40、48 和 56 的完整数据块正文扩展倍数依次约为 2.0、1.6、1.34 和 1.15。最后一个不完整数据块始终占用 8 字节，因此短数据分片的扩展比例可能更高。模式 32 将单个 TCP 应用分片限制为 32764 字节；更大的写入会被安全拆分。使用 UDP 时，mieru 会缩小明文分片，使扩展后的正文、认证标签、元数据、Nonce 和可选填充仍处于配置的 MTU 之内。因此，启用此功能会增加带宽与处理开销，并可能降低有效 UDP 载荷大小。
 
 ## 隐式模式生成
 

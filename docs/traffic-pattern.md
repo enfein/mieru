@@ -59,6 +59,10 @@ Then restart the proxy service to make the changes effective.
                 "padding": {
                     "maxMiddlePaddingLen": 64,
                     "maxEndPaddingLen": 128
+                },
+                "lowEntropy": {
+                    "mode": "LOW_ENTROPY_MODE_32",
+                    "maskRotation": "LOW_ENTROPY_MASK_ROTATE_RIGHT_7"
                 }
             }
         }
@@ -98,6 +102,10 @@ Then restart the proxy service to make the changes effective.
         "padding": {
             "maxMiddlePaddingLen": 0,
             "maxEndPaddingLen": 255
+        },
+        "lowEntropy": {
+            "mode": "LOW_ENTROPY_MODE_56",
+            "maskRotation": "LOW_ENTROPY_MASK_ROTATE_LEFT_7"
         }
     }
 }
@@ -112,6 +120,7 @@ The `trafficPattern` object supports the following fields:
 3. [Optional] `tcpFragment` - An object that configures TCP fragmentation. This has no impact to UDP proxy protocol.
 4. [Optional] `nonce` - An object that configures nonce prefix manipulation.
 5. [Optional] `padding` - An object that configures padding length limits for network segments.
+6. [Optional] `lowEntropy` - An object that expands encrypted data bodies with a lower-entropy bit pattern.
 
 ## TCP Fragmentation
 
@@ -182,6 +191,39 @@ Example:
     "maxEndPaddingLen": 128
 }
 ```
+
+## Low Entropy Pattern
+
+> This feature is not released yet.
+
+The low entropy pattern expands encrypted data bodies so only a configured number of bits in each 64-bit chunk carry ciphertext. It supports TCP and UDP proxy transports. The `lowEntropy` object has these fields:
+
+1. [Optional] `mode` - Selects the source data carried by each 64-bit encoded chunk:
+   - `LOW_ENTROPY_MODE_OFF` - Disable low entropy transmission.
+   - `LOW_ENTROPY_MODE_32` - Carry 32 data bits and add 32 padding bits.
+   - `LOW_ENTROPY_MODE_40` - Carry 40 data bits and add 24 padding bits.
+   - `LOW_ENTROPY_MODE_48` - Carry 48 data bits and add 16 padding bits.
+   - `LOW_ENTROPY_MODE_56` - Carry 56 data bits and add 8 padding bits.
+2. [Optional] `maskRotation` - Controls how payload positions move between adjacent 64-bit chunks. `LOW_ENTROPY_MASK_NO_ROTATION` keeps the mask fixed. `LOW_ENTROPY_MASK_ROTATE_RIGHT_1` through `_15` rotate it right, while `LOW_ENTROPY_MASK_ROTATE_LEFT_1` through `_15` rotate it left.
+
+Example:
+
+```js
+"lowEntropy": {
+    "mode": "LOW_ENTROPY_MODE_32",
+    "maskRotation": "LOW_ENTROPY_MASK_ROTATE_RIGHT_7"
+}
+```
+
+Client and server settings have different ownership:
+
+- The client setting controls client-to-server application data.
+- The server setting makes server-to-client low entropy data eligible. A server uses it only after it has authenticated a low entropy request on the same session. It then uses its own mode and rotation, which may differ from the client's.
+- Receiving does not depend on the local outgoing setting. A current receiver accepts normal data and all valid low entropy modes.
+
+Low entropy mode applies only to the encrypted application-data body. It does not transform nonces, encrypted metadata, AEAD authentication tags, session-control payloads, ACK-only segments, or the separate middle and end padding configured by `padding`.
+
+The approximate full-chunk body expansion is 2.0x, 1.6x, 1.34x, and 1.15x for modes 32, 40, 48, and 56 respectively. A final partial chunk is always 8 bytes, so short data fragments can have a higher ratio. Mode 32 limits a single TCP application fragment to 32764 bytes; larger writes are split safely. With UDP, mieru reduces the plaintext fragment size so the expanded body, authentication tags, metadata, nonce, and optional padding remain within the configured MTU. Enabling the feature therefore increases bandwidth use and processing work and may reduce effective UDP payload size.
 
 ## Implicit Pattern Generation
 

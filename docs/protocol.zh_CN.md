@@ -26,9 +26,9 @@ mieru 协议允许使用任何 [AEAD](https://en.wikipedia.org/wiki/Authenticate
 
 mieru 收到用户的网络访问请求后，会将原始数据流量切分成小段（fragment），经过加密封装发送到互联网上。每个数据段（segment）中的数据项（field）及其长度如下表所示。
 
-| padding 0 | nonce | encrypted metadata | auth tag of encrypted metadata | padding 1 | encrypted payload | auth tag of encrypted payload | padding 2 |
+| padding 0 | nonce | encrypted metadata | auth tag of encrypted metadata | padding 1 | encrypted or low entropy encoded payload body | auth tag of encrypted payload | padding 2 |
 | :----: | :----: | :----: | :----: | :----: | :----: | :----: | :----: |
-| ? | 0 or 24 | 32 | 16 | ? | size of original fragment | 16 | ? |
+| ? | 0 or 24 | 32 | 16 | ? | original or encoded body size | 16 | ? |
 
 这其中，`encrypted metadata` 和 `auth tag of encrypted metadata` 会出现在每一个数据段中，其它的数据项则不是必须的。`padding 0`, `padding 1` 和 `padding 2` 是随机生成的非加密内容，mieru 使用这些填充数据调节数据段的信息熵，以及连续可打印字符的长度等信息。
 
@@ -36,7 +36,7 @@ mieru 收到用户的网络访问请求后，会将原始数据流量切分成�
 
 使用 TCP 协议时，nonce 在 TCP 连接的每个方向（客户端到服务器、服务器到客户端）只会在第一个数据段出现一次。每传输一个数据段，会进行一次或者两次加密操作，得到加密的元数据，以及（如果有）加密的原始数据载荷。每进行一次加密，nonce 的值会增加 1，变更后的 nonce 将会参与下一组加密的计算。
 
-把原始数据切分成小段时，单个小段的最大长度是 32768 字节。
+把原始数据切分成小段时，单个小段的最大长度是 32768 字节。低熵模式 `LOW_ENTROPY_MODE_32` 是例外，其上限为 32764 字节，以确保编码后的长度能装入 16 位的 `payload length` 字段。该模式下，32768 字节的应用写入会被拆分到多个数据段中。
 
 ### UDP 数据段的规则
 
@@ -108,6 +108,38 @@ mieru 收到用户的网络访问请求后，会将原始数据流量切分成�
 将 4 字节的 `low entropy mask` 重复一次，组成 8 字节的掩码，其中值为 1 的位用于标识每个数据块中的载荷位置，值为 0 的位用于标识填充位置。`payload length` 包含低熵填充，而 `extracted payload length` 记录移除填充后的载荷长度。
 
 `low entropy mask rotation` 控制相邻 64 位数据块之间 8 字节掩码的旋转方式。值为 1 至 15 时（低 4 位），掩码向右旋转相应的位数；值为 1 至 15 中某个数的 16 倍时（高 4 位），掩码向左旋转该数对应的位数。值为 0 时掩码保持不变。
+
+#### 低熵载荷编码
+
+低熵编码仅用于协议类型 10 和 11。发送端首先进行普通的载荷 AEAD 加密，然后将结果拆分为密文正文和 16 字节认证标签。只有密文正文参与低熵编码。保持不变的认证标签紧跟在编码后的正文之后，既不计入 `payload length`，也不参与低熵变换。`extracted payload length` 是扩展前的密文正文长度；由于 AEAD 加密保持明文长度不变，它也等于应用分片长度。
+
+模式决定每个 8 字节编码块的源数据容量 `C`：
+
+| 模式 | 配置值 | 源数据字节数 `C` | 32 位半掩码中的 1 位数 | 完整块扩展倍数 |
+| :----: | :---- | :----: | :----: | :----: |
+| 1 | `LOW_ENTROPY_MODE_32` | 4 | 16 | 2.0 倍 |
+| 2 | `LOW_ENTROPY_MODE_40` | 5 | 20 | 1.6 倍 |
+| 3 | `LOW_ENTROPY_MODE_48` | 6 | 24 | 约 1.34 倍 |
+| 4 | `LOW_ENTROPY_MODE_56` | 7 | 28 | 约 1.15 倍 |
+
+对于长度为 `N` 字节的待提取正文，`payload length` 等于 `ceil(N / C) * 8`。最后一个不完整的源数据块仍占用 8 字节。
+
+每次发送时，发送端生成一个 32 位半掩码，其中 1 的数量由模式决定，再将其重复一次组成初始 64 位掩码。第 0 个数据块直接使用该掩码。第 `i` 个数据块按照 `low entropy mask rotation` 编码的方向，将初始掩码旋转 `i * R` 位；每次旋转都从初始掩码计算。
+
+每个源数据块按大端字节序解释，并放入源数值的低位。发送端把这些位存入当前掩码值为 1 的位置。其余所有位置都使用同一个填充值。该值可以是 0 或 1，并且对于给定的发送主机和 mieru 版本保持稳定。最后一个不完整数据块中，掩码选中但未被实际数据使用的位置也属于填充。
+
+接收端从第一个数据块推断填充值，并要求所有数据块中的每个非数据位置都使用该值。混合填充、无效模式或旋转、掩码中的 1 位数错误，以及编码长度与提取长度不一致，都会使数据段无效。对掩码选中的密文位或保持不变的认证标签所做的修改，则会被 AEAD 认证拒绝。
+
+所有多字节元数据字段及编码后的 64 位数据块在线路上均使用大端字节序。下面是 `LOW_ENTROPY_MODE_32` 模式的完整示例：
+
+```text
+半掩码：                 0x0f0f0f0f
+64 位掩码：              0x0f0f0f0f0f0f0f0f
+旋转：                   0
+源数据：                 12 34 56 78
+填充值为 0 的编码结果：  01 02 03 04 05 06 07 08
+填充值为 1 的编码结果：  f1 f2 f3 f4 f5 f6 f7 f8
+```
 
 ## UDP Associate 的封装
 

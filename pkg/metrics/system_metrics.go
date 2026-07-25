@@ -47,4 +47,7 @@ var (
 
 	// Number of padding bytes send to proxy connections.
 	OutputPaddingBytes = RegisterMetric("traffic", "OutputPaddingBytes", COUNTER)
+
+	// Number of low entropy expansion bytes sent to proxy connections.
+	OutputLowEntropyPaddingBytes = RegisterMetric("traffic", "OutputLowEntropyPaddingBytes", COUNTER)
 )

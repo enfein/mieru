@@ -34,7 +34,56 @@ var lowEntropyTestMasks = map[appctlpb.LowEntropyMode]uint32{
 	appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_56: 0x7f7f7f7f,
 }
 
-func TestLowEntropyParams(t *testing.T) {
+func TestExtractLowEntropyConfig(t *testing.T) {
+	tests := []struct {
+		name         string
+		pattern      *appctlpb.TrafficPattern
+		wantMode     appctlpb.LowEntropyMode
+		wantRotation appctlpb.LowEntropyMaskRotation
+		wantEnabled  bool
+	}{
+		{
+			name:         "nil pattern",
+			wantMode:     appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_OFF,
+			wantRotation: appctlpb.LowEntropyMaskRotation_LOW_ENTROPY_MASK_NO_ROTATION,
+		},
+		{
+			name:         "nil low entropy pattern",
+			pattern:      &appctlpb.TrafficPattern{},
+			wantMode:     appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_OFF,
+			wantRotation: appctlpb.LowEntropyMaskRotation_LOW_ENTROPY_MASK_NO_ROTATION,
+		},
+		{
+			name: "explicit off",
+			pattern: &appctlpb.TrafficPattern{LowEntropy: &appctlpb.LowEntropyPattern{
+				Mode:         appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_OFF.Enum(),
+				MaskRotation: appctlpb.LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_RIGHT_7.Enum(),
+			}},
+			wantMode:     appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_OFF,
+			wantRotation: appctlpb.LowEntropyMaskRotation_LOW_ENTROPY_MASK_NO_ROTATION,
+		},
+		{
+			name: "enabled",
+			pattern: &appctlpb.TrafficPattern{LowEntropy: &appctlpb.LowEntropyPattern{
+				Mode:         appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_48.Enum(),
+				MaskRotation: appctlpb.LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_LEFT_3.Enum(),
+			}},
+			wantMode:     appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_48,
+			wantRotation: appctlpb.LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_LEFT_3,
+			wantEnabled:  true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mode, rotation, enabled := extractLowEntropyConfig(test.pattern)
+			if mode != test.wantMode || rotation != test.wantRotation || enabled != test.wantEnabled {
+				t.Errorf("extractLowEntropyConfig() = (%v, %v, %v), want (%v, %v, %v)", mode, rotation, enabled, test.wantMode, test.wantRotation, test.wantEnabled)
+			}
+		})
+	}
+}
+
+func TestBuildLowEntropyParams(t *testing.T) {
 	tests := []struct {
 		mode      appctlpb.LowEntropyMode
 		sourceLen int
@@ -52,10 +101,10 @@ func TestLowEntropyParams(t *testing.T) {
 		t.Run(fmt.Sprintf("mode_%d", test.mode), func(t *testing.T) {
 			got, err := buildLowEntropyParams(test.mode)
 			if (err != nil) != test.wantErr {
-				t.Fatalf("lowEntropyParams(%d) error = %v, wantErr %v", test.mode, err, test.wantErr)
+				t.Fatalf("buildLowEntropyParams(%d) error = %v, wantErr %v", test.mode, err, test.wantErr)
 			}
 			if err == nil && (got.sourceBytesPerChunk != test.sourceLen || got.halfMaskOnes != test.maskOnes) {
-				t.Errorf("lowEntropyParams(%d) = %+v, want source length %d and mask one-bits %d", test.mode, got, test.sourceLen, test.maskOnes)
+				t.Errorf("buildLowEntropyParams(%d) = %+v, want source length %d and mask one-bits %d", test.mode, got, test.sourceLen, test.maskOnes)
 			}
 		})
 	}

@@ -321,8 +321,10 @@ func (s *Session) Write(b []byte) (n int, err error) {
 			transport: s.transportProtocol,
 		}
 		s.nextSend.Add(1)
-		// Allow open session request to carry payload.
-		if len(b) <= MaxSessionOpenPayload {
+		// Low entropy metadata doesn't fit in a session-control message.
+		// Do not piggyback when low entropy is enabled.
+		_, _, sendLowEntropy := s.lowEntropySendConfig()
+		if !sendLowEntropy && len(b) <= MaxSessionOpenPayload {
 			seg.metadata.(*sessionStruct).payloadLen = uint16(len(b))
 			seg.payload = make([]byte, len(b))
 			copy(seg.payload, b)
@@ -508,6 +510,7 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 	if len(b) > maxPDU {
 		return 0, io.ErrShortWrite
 	}
+	lowEntropyMode, lowEntropyRotation, sendLowEntropy := s.lowEntropySendConfig()
 
 	// Stop writing when deadline is reached.
 	var timeC <-chan time.Time
@@ -519,7 +522,10 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 
 	// Determine number of fragments to write.
 	nFragment := 1
-	fragmentSize := MaxFragmentSize(s.mtu, s.transportProtocol)
+	fragmentSize, err := maxFragmentSizeWithLowEntropy(s.mtu, s.transportProtocol, lowEntropyMode)
+	if err != nil {
+		return 0, err
+	}
 	if len(b) > fragmentSize {
 		nFragment = (len(b)-1)/fragmentSize + 1
 	}
@@ -551,26 +557,46 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 			return 0, stderror.ErrTimeout
 		default:
 		}
-		var protocol uint8
+		var protocol protocolType
 		if s.isClient {
-			protocol = uint8(dataClientToServer)
+			protocol = dataClientToServer
+			if sendLowEntropy {
+				protocol = dataClientToServerLowEntropy
+			}
 		} else {
-			protocol = uint8(dataServerToClient)
+			protocol = dataServerToClient
+			if sendLowEntropy {
+				protocol = dataServerToClientLowEntropy
+			}
 		}
 		partLen := mathext.Min(fragmentSize, len(ptr))
 		part := ptr[:partLen]
-		seg := &segment{
-			metadata: &dataAckStruct{
-				baseStruct: baseStruct{
-					protocol: protocol,
-				},
-				sessionID:  s.id,
-				seq:        s.nextSend.Load(),
-				unAckSeq:   s.nextRecv.Load(),
-				windowSize: uint16(s.receiveWindowSize()),
-				fragment:   uint8(i),
-				payloadLen: uint16(partLen),
+		payloadLen := uint16(partLen)
+		if sendLowEntropy {
+			payloadLen, err = lowEntropyEncodedPayloadLen(partLen, lowEntropyMode)
+			if err != nil {
+				s.oLock.Unlock()
+				return 0, err
+			}
+		}
+		das := &dataAckStruct{
+			baseStruct: baseStruct{
+				protocol: uint8(protocol),
 			},
+			sessionID:  s.id,
+			seq:        s.nextSend.Load(),
+			unAckSeq:   s.nextRecv.Load(),
+			windowSize: uint16(s.receiveWindowSize()),
+			fragment:   uint8(i),
+			payloadLen: payloadLen,
+		}
+		if sendLowEntropy {
+			das.lowEntropyMode = uint8(lowEntropyMode)
+			das.extractedPayloadLen = uint16(partLen)
+			das.lowEntropyMaskRotation = uint8(lowEntropyRotation)
+		}
+		seg := &segment{
+			metadata:  das,
 			payload:   make([]byte, partLen),
 			transport: s.transportProtocol,
 		}
@@ -610,6 +636,19 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 		s.readDeadline.Store(time.Now().Add(serverRespTimeout).UnixMicro())
 	}
 	return len(b), nil
+}
+
+// lowEntropySendConfig snapshots the effective send decision for this
+// session.
+func (s *Session) lowEntropySendConfig() (appctlpb.LowEntropyMode, appctlpb.LowEntropyMaskRotation, bool) {
+	mode, rotation, enabled := extractLowEntropyConfig(s.trafficPattern)
+	if !enabled {
+		return appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_OFF, appctlpb.LowEntropyMaskRotation_LOW_ENTROPY_MASK_NO_ROTATION, false
+	}
+	if !s.isClient && !s.clientUseLowEntropy.Load() {
+		return appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_OFF, appctlpb.LowEntropyMaskRotation_LOW_ENTROPY_MASK_NO_ROTATION, false
+	}
+	return mode, rotation, true
 }
 
 func (s *Session) runInputLoop(ctx context.Context) error {
@@ -788,6 +827,10 @@ func (s *Session) runOutputOncePacket() {
 				s.oLock.Unlock()
 				break
 			}
+			if s.shouldDeferNextPacketData() {
+				s.oLock.Unlock()
+				break
+			}
 
 			seg, deleted := s.sendQueue.DeleteMinIf(func(iter *segment) bool {
 				return totalTransmissionCount < s.sendWindowSize()
@@ -833,7 +876,7 @@ func (s *Session) runOutputOncePacket() {
 	// ACK is not limited by window.
 	jitteredInterval := sessionHeartbeatInterval + s.heartbeatJitter
 	exceedHeartbeatInterval := time.Now().UnixMicro()-s.lastTXTime.Load() > jitteredInterval.Microseconds()
-	if s.ackOnDataRecv.Load() || exceedHeartbeatInterval {
+	if !s.isClientPacketSessionOpening() && (s.ackOnDataRecv.Load() || exceedHeartbeatInterval) {
 		baseStruct := baseStruct{}
 		if s.isClient {
 			baseStruct.protocol = uint8(ackClientToServer)
@@ -917,7 +960,16 @@ func (s *Session) input(seg *segment) error {
 		s.clientUseLowEntropy.Store(true)
 	}
 	if protocol == openSessionRequest || protocol == openSessionResponse || isDataProtocol(protocol) {
-		return s.inputData(seg)
+		if err := s.inputData(seg); err != nil {
+			return err
+		}
+		if s.isClientPacketSessionOpenResponse(seg) {
+			s.forwardStateTo(sessionEstablished)
+			if s.sendQueue.Len() > 0 {
+				s.sendQueue.notifyNotEmpty()
+			}
+		}
+		return nil
 	} else if isAckProtocol(protocol) {
 		return s.inputAck(seg)
 	} else if protocol == closeSessionRequest || protocol == closeSessionResponse {
@@ -1203,6 +1255,31 @@ func (s *Session) closeWithError(err error) error {
 	log.Debugf("Closed %v", s)
 	metrics.CurrEstablished.Add(-1)
 	return nil
+}
+
+// shouldDeferNextPacketData reports whether the next queued packet is data
+// that must wait for the server to acknowledge session establishment. This
+// can happen when open session request is sent by the client by not
+// acknowledged by the server. In this state, the open session request remains
+// eligible for transmission and retransmission.
+func (s *Session) shouldDeferNextPacketData() bool {
+	if !s.isClientPacketSessionOpening() {
+		return false
+	}
+	deferData := false
+	s.sendQueue.Ascend(func(iter *segment) bool {
+		deferData = isDataProtocol(iter.Protocol())
+		return false // Check the first segment in send queue.
+	})
+	return deferData
+}
+
+func (s *Session) isClientPacketSessionOpening() bool {
+	return s.isClient && s.transportProtocol == common.PacketTransport && s.isState(sessionAttached)
+}
+
+func (s *Session) isClientPacketSessionOpenResponse(seg *segment) bool {
+	return s.isClientPacketSessionOpening() && seg.Protocol() == openSessionResponse
 }
 
 // sendWindowSize determines how many more packets this session can send.

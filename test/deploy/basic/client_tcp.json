@@ -31,6 +31,11 @@
             ],
             "multiplexing": {
                 "level": "MULTIPLEXING_HIGH"
+            },
+            "trafficPattern": {
+                "lowEntropy": {
+                    "mode": "LOW_ENTROPY_MODE_32"
+                }
             }
         }
     ],

@@ -89,7 +89,10 @@ fuzz:
 		fuzz_tests=$$(CGO_ENABLED=0 go test -list='^Fuzz' "$$pkg")
 		for fuzz_test in $$fuzz_tests; do
 			case "$$fuzz_test" in
-				Fuzz*) CGO_ENABLED=0 go test -run='^$$' -fuzz="^$${fuzz_test}$$" -fuzztime=${FUZZ_TIME} "$$pkg" ;;
+				Fuzz*)
+					echo "Running $$fuzz_test"
+					CGO_ENABLED=0 go test -run='^$$' -fuzz="^$${fuzz_test}$$" -fuzztime=${FUZZ_TIME} "$$pkg"
+					;;
 			esac
 		done
 	done

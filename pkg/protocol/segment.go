@@ -17,10 +17,12 @@ package protocol
 
 import (
 	"fmt"
+	"math"
 	"net"
 	"sync"
 	"time"
 
+	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
@@ -40,8 +42,8 @@ const (
 	segmentTimeFormat = "15:04:05.999"
 )
 
-// MaxFragmentSize returns the maximum payload size in a fragment.
-func MaxFragmentSize(mtu int, transport common.TransportProtocol) int {
+// maxFragmentSize returns the maximum payload size in a fragment.
+func maxFragmentSize(mtu int, transport common.TransportProtocol) int {
 	if transport == common.StreamTransport {
 		// No fragment needed.
 		return maxPDU
@@ -49,6 +51,35 @@ func MaxFragmentSize(mtu int, transport common.TransportProtocol) int {
 
 	res := mtu - packetOverhead
 	return mathext.Max(0, res)
+}
+
+// maxFragmentSizeWithLowEntropy returns the maximum plaintext fragment size for the
+// selected low entropy send mode.
+func maxFragmentSizeWithLowEntropy(mtu int, transport common.TransportProtocol, mode appctlpb.LowEntropyMode) (int, error) {
+	if mode == appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_OFF {
+		return maxFragmentSize(mtu, transport), nil
+	}
+
+	params, err := buildLowEntropyParams(mode)
+	if err != nil {
+		return 0, err
+	}
+	maxEncodableChunkCount := math.MaxUint16 / lowEntropyChunkLen
+
+	switch transport {
+	case common.StreamTransport:
+		fragmentSize := maxFragmentSize(mtu, transport)
+		maxEncodableFragmentSize := maxEncodableChunkCount * params.sourceBytesPerChunk
+		return mathext.Min(fragmentSize, maxEncodableFragmentSize), nil
+	case common.PacketTransport:
+		mtuChunkCount := (mtu - packetOverhead) / lowEntropyChunkLen
+		if mtuChunkCount <= 0 {
+			return 0, fmt.Errorf("MTU %d has no capacity for a low entropy payload chunk", mtu)
+		}
+		return mtuChunkCount * params.sourceBytesPerChunk, nil
+	default:
+		return maxFragmentSize(mtu, transport), nil
+	}
 }
 
 // segment contains metadata and actual payload.

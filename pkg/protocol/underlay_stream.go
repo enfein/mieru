@@ -617,8 +617,11 @@ func (t *StreamUnderlay) writeOneSegment(seg *segment) error {
 		}
 		metrics.OutputPaddingBytes.Add(int64(len(padding)))
 	} else if das, ok := toDataAckStruct(seg.metadata); ok {
-		if isLowEntropyProtocol(das.Protocol()) {
-			return fmt.Errorf("sending low entropy data over a stream is not implemented: %w", stderror.ErrUnsupported)
+		lowEntropy := isLowEntropyProtocol(das.Protocol())
+		if lowEntropy {
+			if err := prepareLowEntropyDataAckForSend(das, len(seg.payload)); err != nil {
+				return fmt.Errorf("prepare low entropy payload failed: %w", err)
+			}
 		}
 		padding1 := newPadding(paddingOpts{
 			maxLen: maxPaddingSizeWithTrafficPattern(t.mtu, t.TransportProtocol(), int(das.payloadLen), 0, t.trafficPattern, middlePadding),
@@ -648,6 +651,12 @@ func (t *StreamUnderlay) writeOneSegment(seg *segment) error {
 			if err != nil {
 				return fmt.Errorf("Encrypt() failed: %w", err)
 			}
+			if lowEntropy {
+				encryptedPayload, err = encodeLowEntropyEncryptedPayload(encryptedPayload, das)
+				if err != nil {
+					return fmt.Errorf("encode low entropy payload failed: %w", err)
+				}
+			}
 			dataToSend = append(dataToSend, encryptedPayload...)
 		}
 		dataToSend = append(dataToSend, padding2...)
@@ -662,6 +671,9 @@ func (t *StreamUnderlay) writeOneSegment(seg *segment) error {
 		}
 		metrics.OutputPaddingBytes.Add(int64(len(padding1)))
 		metrics.OutputPaddingBytes.Add(int64(len(padding2)))
+		if lowEntropy {
+			metrics.OutputLowEntropyPaddingBytes.Add(int64(das.payloadLen) - int64(das.extractedPayloadLen))
+		}
 	} else {
 		return stderror.ErrInvalidArgument
 	}

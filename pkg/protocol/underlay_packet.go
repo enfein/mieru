@@ -681,8 +681,11 @@ func (u *PacketUnderlay) writeOneSegment(seg *segment, addr net.Addr) error {
 		}
 		metrics.OutputPaddingBytes.Add(int64(len(padding)))
 	} else if das, ok := toDataAckStruct(seg.metadata); ok {
-		if isLowEntropyProtocol(das.Protocol()) {
-			return fmt.Errorf("sending low entropy data over a packet underlay is not implemented: %w", stderror.ErrUnsupported)
+		lowEntropy := isLowEntropyProtocol(das.Protocol())
+		if lowEntropy {
+			if err := prepareLowEntropyDataAckForSend(das, len(seg.payload)); err != nil {
+				return fmt.Errorf("prepare low entropy payload failed: %w", err)
+			}
 		}
 		padding1 := newPadding(paddingOpts{
 			maxLen: maxPaddingSizeWithTrafficPattern(u.mtu, u.TransportProtocol(), int(das.payloadLen), 0, u.trafficPattern, middlePadding),
@@ -710,9 +713,18 @@ func (u *PacketUnderlay) writeOneSegment(seg *segment, addr net.Addr) error {
 			if err != nil {
 				return fmt.Errorf("EncryptWithNonce() failed: %w", err)
 			}
+			if lowEntropy {
+				encryptedPayload, err = encodeLowEntropyEncryptedPayload(encryptedPayload, das)
+				if err != nil {
+					return fmt.Errorf("encode low entropy payload failed: %w", err)
+				}
+			}
 			dataToSend = append(dataToSend, encryptedPayload...)
 		}
 		dataToSend = append(dataToSend, padding2...)
+		if lowEntropy && len(dataToSend) > u.mtu {
+			return fmt.Errorf("low entropy datagram length %d exceeds MTU %d", len(dataToSend), u.mtu)
+		}
 		if _, err := u.conn.WriteTo(dataToSend, addr); err != nil {
 			return fmt.Errorf("WriteTo() failed: %w", err)
 		}
@@ -724,6 +736,9 @@ func (u *PacketUnderlay) writeOneSegment(seg *segment, addr net.Addr) error {
 		}
 		metrics.OutputPaddingBytes.Add(int64(len(padding1)))
 		metrics.OutputPaddingBytes.Add(int64(len(padding2)))
+		if lowEntropy {
+			metrics.OutputLowEntropyPaddingBytes.Add(int64(das.payloadLen) - int64(das.extractedPayloadLen))
+		}
 	} else {
 		return stderror.ErrInvalidArgument
 	}

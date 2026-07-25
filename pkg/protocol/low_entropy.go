@@ -38,6 +38,20 @@ type lowEntropyModeParams struct {
 	halfMaskOnes        int
 }
 
+// extractLowEntropyConfig returns the effective low entropy configuration.
+// A missing traffic pattern, a missing low entropy pattern, or mode OFF all
+// disable low entropy transmission.
+func extractLowEntropyConfig(pattern *appctlpb.TrafficPattern) (appctlpb.LowEntropyMode, appctlpb.LowEntropyMaskRotation, bool) {
+	if pattern == nil || pattern.LowEntropy == nil {
+		return appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_OFF, appctlpb.LowEntropyMaskRotation_LOW_ENTROPY_MASK_NO_ROTATION, false
+	}
+	mode := pattern.LowEntropy.GetMode()
+	if mode == appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_OFF {
+		return mode, appctlpb.LowEntropyMaskRotation_LOW_ENTROPY_MASK_NO_ROTATION, false
+	}
+	return mode, pattern.LowEntropy.GetMaskRotation(), true
+}
+
 func buildLowEntropyParams(mode appctlpb.LowEntropyMode) (lowEntropyModeParams, error) {
 	switch mode {
 	case appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_32:

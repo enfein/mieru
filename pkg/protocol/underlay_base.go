@@ -229,6 +229,35 @@ func (b *baseUnderlay) deliverSegmentToSession(s *Session, seg *segment) bool {
 	}
 }
 
+// encodeLowEntropyEncryptedPayload encodes the ciphertext body with
+// low entropy padding. The trailing AEAD tag is not changed.
+func encodeLowEntropyEncryptedPayload(encryptedPayload []byte, das *dataAckStruct) ([]byte, error) {
+	if das == nil {
+		return nil, stderror.ErrNullPointer
+	}
+	extractedPayloadLen := int(das.extractedPayloadLen)
+	expectedEncryptedLen := extractedPayloadLen + cipher.DefaultOverhead
+	if len(encryptedPayload) != expectedEncryptedLen {
+		return nil, fmt.Errorf("encrypted payload length is %d, want %d", len(encryptedPayload), expectedEncryptedLen)
+	}
+	encodedBody, err := encodeLowEntropyPayload(
+		encryptedPayload[:extractedPayloadLen],
+		appctlpb.LowEntropyMode(das.lowEntropyMode),
+		das.lowEntropyMask,
+		appctlpb.LowEntropyMaskRotation(das.lowEntropyMaskRotation),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if len(encodedBody) != int(das.payloadLen) {
+		return nil, fmt.Errorf("encoded payload length is %d, want %d", len(encodedBody), das.payloadLen)
+	}
+	wirePayload := make([]byte, 0, len(encodedBody)+cipher.DefaultOverhead)
+	wirePayload = append(wirePayload, encodedBody...)
+	wirePayload = append(wirePayload, encryptedPayload[extractedPayloadLen:]...)
+	return wirePayload, nil
+}
+
 // decodeLowEntropyEncryptedPayload removes low entropy padding from the
 // encrypted payload body and appends the original AEAD tag unchanged.
 func decodeLowEntropyEncryptedPayload(encryptedPayload []byte, das *dataAckStruct) ([]byte, error) {
@@ -257,4 +286,35 @@ func decodeLowEntropyEncryptedPayload(encryptedPayload []byte, das *dataAckStruc
 	reconstructed = append(reconstructed, decodedBody...)
 	reconstructed = append(reconstructed, encryptedPayload[das.payloadLen:]...)
 	return reconstructed, nil
+}
+
+// prepareLowEntropyDataAckForSend verifies the stable per-segment metadata and
+// generates the fresh half-mask used by this wire transmission.
+func prepareLowEntropyDataAckForSend(das *dataAckStruct, plaintextPayloadLen int) error {
+	if das == nil {
+		return stderror.ErrNullPointer
+	}
+	if !isLowEntropyProtocol(das.Protocol()) {
+		return fmt.Errorf("protocol %d is not low entropy data", das.Protocol())
+	}
+	if plaintextPayloadLen != int(das.extractedPayloadLen) {
+		return fmt.Errorf("plaintext payload length is %d, want %d", plaintextPayloadLen, das.extractedPayloadLen)
+	}
+	mode := appctlpb.LowEntropyMode(das.lowEntropyMode)
+	expectedPayloadLen, err := lowEntropyEncodedPayloadLen(plaintextPayloadLen, mode)
+	if err != nil {
+		return err
+	}
+	if das.payloadLen != expectedPayloadLen {
+		return fmt.Errorf("low entropy payload length is %d, want %d", das.payloadLen, expectedPayloadLen)
+	}
+	rotation := appctlpb.LowEntropyMaskRotation(das.lowEntropyMaskRotation)
+	if !isValidLowEntropyRotation(rotation) {
+		return fmt.Errorf("invalid low entropy mask rotation %d", rotation)
+	}
+	das.lowEntropyMask, err = newLowEntropyHalfMask(mode)
+	if err != nil {
+		return err
+	}
+	return validateLowEntropyDataAckMetadata(das)
 }
