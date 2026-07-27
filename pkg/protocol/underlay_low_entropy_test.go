@@ -455,6 +455,8 @@ func TestLowEntropyUnderlaysRejectCorruption(t *testing.T) {
 			if test.mutateWire != nil {
 				test.mutateWire(wire, bodyStart, bodyLen, das)
 			}
+			validPayload := []byte("valid packet after corruption")
+			validWire, _, _, _, _ := buildPacketLowEntropyWire(t, validPayload, 0, 0)
 
 			receiverConn, err := net.ListenPacket("udp", "127.0.0.1:0")
 			if err != nil {
@@ -475,8 +477,15 @@ func TestLowEntropyUnderlaysRejectCorruption(t *testing.T) {
 			if _, err := senderConn.WriteTo(wire, receiverConn.LocalAddr()); err != nil {
 				t.Fatalf("WriteTo() failed: %v", err)
 			}
-			if _, _, err := underlay.readOneSegment(); err == nil {
-				t.Fatal("readOneSegment() succeeded, want corruption error")
+			if _, err := senderConn.WriteTo(validWire, receiverConn.LocalAddr()); err != nil {
+				t.Fatalf("WriteTo() valid packet failed: %v", err)
+			}
+			seg, _, err := underlay.readOneSegment()
+			if err != nil {
+				t.Fatalf("readOneSegment() failed after corrupted packet: %v", err)
+			}
+			if !bytes.Equal(seg.payload, validPayload) {
+				t.Fatalf("received payload = %q, want %q", seg.payload, validPayload)
 			}
 		})
 	}

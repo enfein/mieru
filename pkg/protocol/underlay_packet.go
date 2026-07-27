@@ -213,26 +213,31 @@ func (u *PacketUnderlay) RunEventLoop(ctx context.Context) error {
 			switch seg.metadata.Protocol() {
 			case openSessionRequest:
 				if err := u.onOpenSessionRequest(seg, addr); err != nil {
-					return fmt.Errorf("onOpenSessionRequest() failed: %w", err)
+					log.Debugf("%v dropped openSessionRequest from peer %v: %v", u, addr, err)
+					continue
 				}
 			case openSessionResponse:
 				if err := u.onOpenSessionResponse(seg); err != nil {
-					return fmt.Errorf("onOpenSessionResponse() failed: %w", err)
+					log.Debugf("%v dropped openSessionResponse from peer %v: %v", u, addr, err)
+					continue
 				}
 			case closeSessionRequest, closeSessionResponse:
 				if err := u.onCloseSession(seg); err != nil {
-					return fmt.Errorf("onCloseSession() failed: %w", err)
+					log.Debugf("%v dropped close session message from peer %v: %v", u, addr, err)
+					continue
 				}
 			default:
-				return fmt.Errorf("protocol %d is a session protocol but not recognized by packet underlay", seg.metadata.Protocol())
+				log.Debugf("%v dropped unrecognized session protocol %d from peer %v", u, seg.metadata.Protocol(), addr)
+				continue
 			}
 		} else if isDataAckProtocol(seg.metadata.Protocol()) {
 			das, _ := toDataAckStruct(seg.metadata)
 			session, ok := u.sessionMap.Load(das.sessionID)
 			if !ok {
 				log.Debugf("Session %d is not registered to %v", das.sessionID, u)
-				if seg.block != nil {
+				if u.isClient || seg.block != nil {
 					// Request the peer to close the session.
+					// Client uses u.block so it is safe when seg.block is nil.
 					closeReq := &segment{
 						metadata: &sessionStruct{
 							baseStruct: baseStruct{
@@ -441,21 +446,13 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 		if isSessionProtocol(protocolType(p)) {
 			ss := &sessionStruct{}
 			if err := ss.Unmarshal(decryptedMeta); err != nil {
-				if u.isClient {
-					return nil, nil, fmt.Errorf("Unmarshal() to sessionStruct failed: %w", err)
-				} else {
-					log.Debugf("%v Unmarshal() to sessionStruct failed: %v", u, err)
-					continue
-				}
+				log.Debugf("%v Unmarshal() to sessionStruct failed: %v", u, err)
+				continue
 			}
 			seg, err = u.parseSessionSegment(ss, nonce, b[packetNonHeaderPosition:], blockCipher)
 			if err != nil {
-				if u.isClient {
-					return nil, nil, err
-				} else {
-					log.Debugf("%v parseSessionSegment() failed: %v", u, err)
-					continue
-				}
+				log.Debugf("%v parseSessionSegment() failed: %v", u, err)
+				continue
 			}
 			if blockCipher != nil {
 				seg.block = blockCipher
@@ -464,21 +461,13 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 		} else if isDataAckProtocol(protocolType(p)) {
 			das := &dataAckStruct{}
 			if err := das.Unmarshal(decryptedMeta); err != nil {
-				if u.isClient {
-					return nil, nil, fmt.Errorf("Unmarshal() to dataAckStruct failed: %w", err)
-				} else {
-					log.Debugf("%v Unmarshal() to dataAckStruct failed: %v", u, err)
-					continue
-				}
+				log.Debugf("%v Unmarshal() to dataAckStruct failed: %v", u, err)
+				continue
 			}
 			seg, err = u.parseDataAckSegment(das, nonce, b[packetNonHeaderPosition:], blockCipher)
 			if err != nil {
-				if u.isClient {
-					return nil, nil, err
-				} else {
-					log.Debugf("%v parseDataAckSegment() failed: %v", u, err)
-					continue
-				}
+				log.Debugf("%v parseDataAckSegment() failed: %v", u, err)
+				continue
 			}
 			if blockCipher != nil {
 				seg.block = blockCipher
