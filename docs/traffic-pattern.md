@@ -194,8 +194,6 @@ Example:
 
 ## Low Entropy Pattern
 
-> This feature is not released yet.
-
 The low entropy pattern expands encrypted data bodies so only a configured number of bits in each 64-bit chunk carry ciphertext. It supports TCP and UDP proxy transports. The `lowEntropy` object has these fields:
 
 1. [Optional] `mode` - Selects the source data carried by each 64-bit encoded chunk:
