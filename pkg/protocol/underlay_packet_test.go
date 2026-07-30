@@ -28,7 +28,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func TestPacketUnderlayServerDropsInvalidControlMessage(t *testing.T) {
+func TestPacketServerDropsInvalidControl(t *testing.T) {
 	serverConn, err := net.ListenPacket("udp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("net.ListenPacket() server failed: %v", err)
@@ -111,7 +111,7 @@ func TestPacketUnderlayServerDropsInvalidControlMessage(t *testing.T) {
 	}
 }
 
-func TestPacketUnderlayClientClosesUnknownSession(t *testing.T) {
+func TestPacketClientClosesUnknownSession(t *testing.T) {
 	clientConn, err := net.ListenPacket("udp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("net.ListenPacket() client failed: %v", err)

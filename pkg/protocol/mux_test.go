@@ -248,7 +248,7 @@ func TestMuxStartReturnsListenerError(t *testing.T) {
 	}
 }
 
-func TestNewEndpoints(t *testing.T) {
+func TestNewEndpointsReturnsOnlyAdditions(t *testing.T) {
 	cases := []struct {
 		old []UnderlayProperties
 		new []UnderlayProperties

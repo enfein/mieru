@@ -26,31 +26,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func TestSessionReceiveWindowSize(t *testing.T) {
-	s := NewSession(1, false, 1400, nil, nil)
-	if got := s.recvQueue.Remaining(); got != segmentTreeCapacity {
-		t.Fatalf("recvQueue capacity = %d, want %d", got, segmentTreeCapacity)
-	}
-	if got := s.receiveWindowSize(); got != segmentTreeCapacity {
-		t.Fatalf("receiveWindowSize() = %d, want %d", got, segmentTreeCapacity)
-	}
-
-	if !s.recvBuf.Insert(testDataSegment(1, 1, []byte("a"), common.PacketTransport)) {
-		t.Fatalf("insert segment to recvBuf failed")
-	}
-	if got := s.receiveWindowSize(); got != segmentTreeCapacity-1 {
-		t.Fatalf("receiveWindowSize() with recvBuf = %d, want %d", got, segmentTreeCapacity-1)
-	}
-
-	if !s.recvQueue.Insert(testDataSegment(1, 2, []byte("b"), common.PacketTransport)) {
-		t.Fatalf("insert segment to recvQueue failed")
-	}
-	if got := s.receiveWindowSize(); got != segmentTreeCapacity-2 {
-		t.Fatalf("receiveWindowSize() with recvBuf and recvQueue = %d, want %d", got, segmentTreeCapacity-2)
-	}
-}
-
-func TestDeliverSegmentToSessionUnblocksWhenSessionClosed(t *testing.T) {
+func TestDeliverSegmentUnblocksOnSessionClose(t *testing.T) {
 	underlay := newBaseUnderlay(false, 1400, nil)
 	session := NewSession(1, false, 1400, nil, nil)
 	seg := testDataSegment(1, 1, []byte("a"), common.StreamTransport)
@@ -84,7 +60,7 @@ func TestDeliverSegmentToSessionUnblocksWhenSessionClosed(t *testing.T) {
 	}
 }
 
-func TestStreamUnderlayIgnoresControlSegmentsForClosedClientSession(t *testing.T) {
+func TestStreamUnderlayIgnoresResponsesForClosedSession(t *testing.T) {
 	underlay := &StreamUnderlay{
 		baseUnderlay: *newBaseUnderlay(true, 1400, nil),
 	}
@@ -104,7 +80,7 @@ func TestStreamUnderlayIgnoresControlSegmentsForClosedClientSession(t *testing.T
 	}
 }
 
-func TestPacketUnderlayIgnoresControlSegmentsForClosedClientSession(t *testing.T) {
+func TestPacketUnderlayIgnoresResponsesForClosedSession(t *testing.T) {
 	underlay := &PacketUnderlay{
 		baseUnderlay: *newBaseUnderlay(true, 1400, nil),
 	}
@@ -124,7 +100,9 @@ func TestPacketUnderlayIgnoresControlSegmentsForClosedClientSession(t *testing.T
 	}
 }
 
-func TestStreamSessionLowEntropyWriteChunk(t *testing.T) {
+// TestStreamLowEntropyWriteChunk verifies framing metadata, fragmentation,
+// and plaintext preservation for all low-entropy modes.
+func TestStreamLowEntropyWriteChunk(t *testing.T) {
 	tests := []struct {
 		mode              appctlpb.LowEntropyMode
 		rotation          appctlpb.LowEntropyMaskRotation
@@ -185,7 +163,9 @@ func TestStreamSessionLowEntropyWriteChunk(t *testing.T) {
 	}
 }
 
-func TestPacketSessionLowEntropyWriteChunk(t *testing.T) {
+// TestPacketLowEntropyWriteChunk verifies framing metadata, MTU-bounded
+// fragmentation, and plaintext preservation for all low-entropy modes.
+func TestPacketLowEntropyWriteChunk(t *testing.T) {
 	tests := []struct {
 		mode     appctlpb.LowEntropyMode
 		rotation appctlpb.LowEntropyMaskRotation
@@ -203,9 +183,9 @@ func TestPacketSessionLowEntropyWriteChunk(t *testing.T) {
 		t.Run(test.mode.String(), func(t *testing.T) {
 			s := NewSession(1, true, 1400, nil, testLowEntropyTrafficPattern(test.mode, test.rotation))
 			s.transportProtocol = common.PacketTransport
-			fragmentSize, err := maxFragmentSizeWithLowEntropy(s.mtu, s.transportProtocol, test.mode)
+			fragmentSize, err := maxFragmentSize(s.mtu, s.transportProtocol, test.mode)
 			if err != nil {
-				t.Fatalf("maxFragmentSizeWithLowEntropy() failed: %v", err)
+				t.Fatalf("maxFragmentSize() failed: %v", err)
 			}
 			wantFragments := (len(payload)-1)/fragmentSize + 1
 			segments, n, err := collectSessionSegments(t, s, wantFragments, func() (int, error) {
@@ -242,9 +222,7 @@ func TestPacketSessionLowEntropyWriteChunk(t *testing.T) {
 	}
 }
 
-// In packet transport, verify data is piggyback to open session request
-// when low entropy is disabled.
-func TestSessionFirstPacketWritePiggyback(t *testing.T) {
+func TestFirstPacketWritePiggyback(t *testing.T) {
 	payload := []byte("first packet write")
 	s := NewSession(1, true, 1400, nil, nil)
 	s.transportProtocol = common.PacketTransport
@@ -261,9 +239,7 @@ func TestSessionFirstPacketWritePiggyback(t *testing.T) {
 	}
 }
 
-// In packet transport, verify data is not piggyback to open session request
-// when low entropy is enabled.
-func TestSessionFirstPacketWriteLowEntropyNoPiggyback(t *testing.T) {
+func TestLowEntropyFirstPacketNoPiggyback(t *testing.T) {
 	payload := []byte("low entropy first packet write")
 	s := NewSession(1, true, 1400, nil, testLowEntropyTrafficPattern(appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_32, appctlpb.LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_LEFT_3))
 	s.transportProtocol = common.PacketTransport
@@ -283,7 +259,7 @@ func TestSessionFirstPacketWriteLowEntropyNoPiggyback(t *testing.T) {
 	}
 }
 
-func TestSessionPacketLowEntropyDuplicateAndReordering(t *testing.T) {
+func TestPacketLowEntropyDuplicateAndReordering(t *testing.T) {
 	s := NewSession(1, true, 1400, nil, nil)
 	s.transportProtocol = common.PacketTransport
 	newSegment := func(seq uint32, payload string) *segment {
@@ -328,9 +304,9 @@ func TestSessionPacketLowEntropyDuplicateAndReordering(t *testing.T) {
 	}
 }
 
-// Verify that server stays with low entropy as long as client ever used low entropy.
-// This case shouldn't happen in actual deployment though.
-func TestSessionServerLowEntropySignalIsSticky(t *testing.T) {
+// TestServerLowEntropySignalIsSticky verifies that the server keeps using
+// low entropy after a client switches back to regular data segments.
+func TestServerLowEntropySignalIsSticky(t *testing.T) {
 	s := NewSession(1, false, 1400, nil, testLowEntropyTrafficPattern(
 		appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_48,
 		appctlpb.LowEntropyMaskRotation_LOW_ENTROPY_MASK_ROTATE_LEFT_1,
@@ -359,7 +335,33 @@ func TestSessionServerLowEntropySignalIsSticky(t *testing.T) {
 	}
 }
 
-func TestSessionLowEntropyApplicationAccountingAndQuota(t *testing.T) {
+func TestSessionReceiveWindowSize(t *testing.T) {
+	s := NewSession(1, false, 1400, nil, nil)
+	if got := s.recvQueue.Remaining(); got != segmentTreeCapacity {
+		t.Fatalf("recvQueue capacity = %d, want %d", got, segmentTreeCapacity)
+	}
+	if got := s.receiveWindowSize(); got != segmentTreeCapacity {
+		t.Fatalf("receiveWindowSize() = %d, want %d", got, segmentTreeCapacity)
+	}
+
+	if !s.recvBuf.Insert(testDataSegment(1, 1, []byte("a"), common.PacketTransport)) {
+		t.Fatalf("insert segment to recvBuf failed")
+	}
+	if got := s.receiveWindowSize(); got != segmentTreeCapacity-1 {
+		t.Fatalf("receiveWindowSize() with recvBuf = %d, want %d", got, segmentTreeCapacity-1)
+	}
+
+	if !s.recvQueue.Insert(testDataSegment(1, 2, []byte("b"), common.PacketTransport)) {
+		t.Fatalf("insert segment to recvQueue failed")
+	}
+	if got := s.receiveWindowSize(); got != segmentTreeCapacity-2 {
+		t.Fatalf("receiveWindowSize() with recvBuf and recvQueue = %d, want %d", got, segmentTreeCapacity-2)
+	}
+}
+
+// TestLowEntropyApplicationAccountingAndQuota verifies that accounting
+// and quota checks use application byte counts rather than encoded wire sizes.
+func TestLowEntropyApplicationAccountingAndQuota(t *testing.T) {
 	userName := t.Name() + "-" + time.Now().Format("150405.000000000")
 	user := &appctlpb.User{
 		Name: proto.String(userName),

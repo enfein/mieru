@@ -183,6 +183,8 @@ func TestMaxPaddingSize(t *testing.T) {
 	}
 }
 
+// TestNewASCIIPadding verifies the length bounds and minimum consecutive
+// printable content of generated padding.
 func TestNewASCIIPadding(t *testing.T) {
 	maxPaddingLen := rng.Intn(256)
 	minConsecutiveASCIILen := rng.IntRange(0, maxPaddingLen+1)
@@ -205,6 +207,8 @@ func TestNewASCIIPadding(t *testing.T) {
 	}
 }
 
+// TestNewEntropyPadding verifies that generated padding meets the target bit
+// distribution or falls back to uniform bits when the length cap prevents it.
 func TestNewEntropyPadding(t *testing.T) {
 	var meet, miss int
 	for i := 0; i < 1000; i++ {

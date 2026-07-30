@@ -27,36 +27,6 @@ import (
 )
 
 func TestMaxFragmentSize(t *testing.T) {
-	testcases := []struct {
-		mtu       int
-		transport common.TransportProtocol
-		want      int
-	}{
-		{
-			1400,
-			common.StreamTransport,
-			maxPDU,
-		},
-		{
-			1400,
-			common.PacketTransport,
-			1400 - packetOverhead,
-		},
-		{
-			1400,
-			common.UnknownTransport,
-			1400 - packetOverhead,
-		},
-	}
-	for _, tc := range testcases {
-		got := maxFragmentSize(tc.mtu, tc.transport)
-		if got != tc.want {
-			t.Errorf("maxFragmentSize() = %d, want %d", got, tc.want)
-		}
-	}
-}
-
-func TestMaxFragmentSizeWithLowEntropy(t *testing.T) {
 	tests := []struct {
 		name      string
 		mtu       int
@@ -83,14 +53,44 @@ func TestMaxFragmentSizeWithLowEntropy(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := maxFragmentSizeWithLowEntropy(test.mtu, test.transport, test.mode)
+			got, err := maxFragmentSize(test.mtu, test.transport, test.mode)
 			if (err != nil) != test.wantErr {
-				t.Fatalf("maxFragmentSizeWithLowEntropy() error = %v, wantErr %v", err, test.wantErr)
+				t.Fatalf("maxFragmentSize() error = %v, wantErr %v", err, test.wantErr)
 			}
 			if got != test.want {
-				t.Errorf("maxFragmentSizeWithLowEntropy() = %d, want %d", got, test.want)
+				t.Errorf("maxFragmentSize() = %d, want %d", got, test.want)
 			}
 		})
+	}
+}
+
+func TestMaxFragmentSizeInternal(t *testing.T) {
+	testcases := []struct {
+		mtu       int
+		transport common.TransportProtocol
+		want      int
+	}{
+		{
+			1400,
+			common.StreamTransport,
+			maxPDU,
+		},
+		{
+			1400,
+			common.PacketTransport,
+			1400 - packetOverhead,
+		},
+		{
+			1400,
+			common.UnknownTransport,
+			1400 - packetOverhead,
+		},
+	}
+	for _, tc := range testcases {
+		got := maxFragmentSizeInternal(tc.mtu, tc.transport)
+		if got != tc.want {
+			t.Errorf("maxFragmentSizeInternal() = %d, want %d", got, tc.want)
+		}
 	}
 }
 
@@ -110,6 +110,8 @@ func TestSegmentLessFunc(t *testing.T) {
 	}
 }
 
+// TestSegmentTree verifies capacity tracking, sequence bounds, removal, and
+// reset behavior.
 func TestSegmentTree(t *testing.T) {
 	seg := &segment{
 		metadata: &dataAckStruct{

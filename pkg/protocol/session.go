@@ -67,7 +67,7 @@ const (
 	earlyRetransmissionLimit = 1
 	// Send timeout back off multiplier.
 	txTimeoutBackOff = 1.5
-	// Maximum back off multiplier.
+	// Maximum back off duration.
 	maxBackOffDuration = 10 * time.Second
 )
 
@@ -506,6 +506,44 @@ func (s *Session) forwardStateTo(next sessionState) {
 	}
 }
 
+func (s *Session) isClientPacketSessionOpening() bool {
+	return s.isClient && s.transportProtocol == common.PacketTransport && s.isState(sessionAttached)
+}
+
+func (s *Session) isClientPacketSessionOpenResponse(seg *segment) bool {
+	return s.isClientPacketSessionOpening() && seg.Protocol() == openSessionResponse
+}
+
+// shouldDeferNextPacketData reports whether the next queued packet is data
+// that must wait for the server to acknowledge session establishment. This
+// can happen when open session request is sent by the client by not
+// acknowledged by the server. In this state, the open session request remains
+// eligible for transmission and retransmission.
+func (s *Session) shouldDeferNextPacketData() bool {
+	if !s.isClientPacketSessionOpening() {
+		return false
+	}
+	deferData := false
+	s.sendQueue.Ascend(func(iter *segment) bool {
+		deferData = isDataProtocol(iter.Protocol())
+		return false // Check the first segment in send queue.
+	})
+	return deferData
+}
+
+// lowEntropySendConfig snapshots the effective send decision for this
+// session.
+func (s *Session) lowEntropySendConfig() (appctlpb.LowEntropyMode, appctlpb.LowEntropyMaskRotation, bool) {
+	mode, rotation, enabled := extractLowEntropyConfig(s.trafficPattern)
+	if !enabled {
+		return appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_OFF, appctlpb.LowEntropyMaskRotation_LOW_ENTROPY_MASK_NO_ROTATION, false
+	}
+	if !s.isClient && !s.clientUseLowEntropy.Load() {
+		return appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_OFF, appctlpb.LowEntropyMaskRotation_LOW_ENTROPY_MASK_NO_ROTATION, false
+	}
+	return mode, rotation, true
+}
+
 func (s *Session) writeChunk(b []byte) (n int, err error) {
 	if len(b) > maxPDU {
 		return 0, io.ErrShortWrite
@@ -522,7 +560,7 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 
 	// Determine number of fragments to write.
 	nFragment := 1
-	fragmentSize, err := maxFragmentSizeWithLowEntropy(s.mtu, s.transportProtocol, lowEntropyMode)
+	fragmentSize, err := maxFragmentSize(s.mtu, s.transportProtocol, lowEntropyMode)
 	if err != nil {
 		return 0, err
 	}
@@ -636,19 +674,6 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 		s.readDeadline.Store(time.Now().Add(serverRespTimeout).UnixMicro())
 	}
 	return len(b), nil
-}
-
-// lowEntropySendConfig snapshots the effective send decision for this
-// session.
-func (s *Session) lowEntropySendConfig() (appctlpb.LowEntropyMode, appctlpb.LowEntropyMaskRotation, bool) {
-	mode, rotation, enabled := extractLowEntropyConfig(s.trafficPattern)
-	if !enabled {
-		return appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_OFF, appctlpb.LowEntropyMaskRotation_LOW_ENTROPY_MASK_NO_ROTATION, false
-	}
-	if !s.isClient && !s.clientUseLowEntropy.Load() {
-		return appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_OFF, appctlpb.LowEntropyMaskRotation_LOW_ENTROPY_MASK_NO_ROTATION, false
-	}
-	return mode, rotation, true
 }
 
 func (s *Session) runInputLoop(ctx context.Context) error {
@@ -1255,31 +1280,6 @@ func (s *Session) closeWithError(err error) error {
 	log.Debugf("Closed %v", s)
 	metrics.CurrEstablished.Add(-1)
 	return nil
-}
-
-// shouldDeferNextPacketData reports whether the next queued packet is data
-// that must wait for the server to acknowledge session establishment. This
-// can happen when open session request is sent by the client by not
-// acknowledged by the server. In this state, the open session request remains
-// eligible for transmission and retransmission.
-func (s *Session) shouldDeferNextPacketData() bool {
-	if !s.isClientPacketSessionOpening() {
-		return false
-	}
-	deferData := false
-	s.sendQueue.Ascend(func(iter *segment) bool {
-		deferData = isDataProtocol(iter.Protocol())
-		return false // Check the first segment in send queue.
-	})
-	return deferData
-}
-
-func (s *Session) isClientPacketSessionOpening() bool {
-	return s.isClient && s.transportProtocol == common.PacketTransport && s.isState(sessionAttached)
-}
-
-func (s *Session) isClientPacketSessionOpenResponse(seg *segment) bool {
-	return s.isClientPacketSessionOpening() && seg.Protocol() == openSessionResponse
 }
 
 // sendWindowSize determines how many more packets this session can send.

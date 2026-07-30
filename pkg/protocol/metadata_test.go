@@ -177,7 +177,7 @@ func TestLowEntropyDataAckStruct(t *testing.T) {
 	}
 }
 
-func TestLowEntropyDataAckStructRejectsInvalidMetadata(t *testing.T) {
+func TestLowEntropyDataAckRejectsInvalidMetadata(t *testing.T) {
 	valid := (&dataAckStruct{
 		baseStruct:             baseStruct{protocol: uint8(dataServerToClientLowEntropy)},
 		lowEntropyMode:         uint8(appctlpb.LowEntropyMode_LOW_ENTROPY_MODE_32),
