@@ -1,0 +1,15 @@
+name: benchmark
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  run-benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v6
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Run benchmark
+        run: make bench

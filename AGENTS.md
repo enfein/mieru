@@ -43,6 +43,8 @@ Use idiomatic Go formatted by `go fmt`; keep tabs for Go indentation.
 
 Package names are short, lowercase, and domain-oriented.
 
+Avoid very long names for functions, structs, and variables. If a concise name does not make the meaning obvious, add a brief Godoc comment explaining it.
+
 Test files use the standard `*_test.go` pattern beside the package they cover.
 
 Keep generated protobuf output in sync with `.proto` changes.
