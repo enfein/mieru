@@ -18,7 +18,6 @@ package protocol
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"math/bits"
 	"net"
@@ -30,7 +29,6 @@ import (
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 	"github.com/enfein/mieru/v3/pkg/stderror"
-	"google.golang.org/protobuf/proto"
 )
 
 func TestStreamLowEntropyReceive(t *testing.T) {
@@ -143,7 +141,7 @@ func TestStreamLowEntropySendReceive(t *testing.T) {
 			}
 			seg := &segment{metadata: das, payload: append([]byte(nil), payload...)}
 
-			password := []byte(fmt.Sprintf("%s-password", t.Name()))
+			password := cipher.HashPassword([]byte(fmt.Sprintf("%s-password", t.Name())), []byte("user"))
 			block, err := cipher.BlockCipherFromPassword(password, false)
 			if err != nil {
 				t.Fatalf("BlockCipherFromPassword() failed: %v", err)
@@ -166,10 +164,10 @@ func TestStreamLowEntropySendReceive(t *testing.T) {
 			}
 			if test.senderSide {
 				sender.block = block.Clone()
-				receiver.users = map[string]*appctlpb.User{"user": {
-					Name:           proto.String("user"),
-					HashedPassword: proto.String(hex.EncodeToString(password)),
-				}}
+				receiver.serverUsers, receiver.serverUserHintIsMandatory = testServerUserPublisher(
+					userMap(makeTestUser("user", password)),
+					false,
+				)
 			} else {
 				sender.recv = block.Clone()
 				receiver.block = block.Clone()

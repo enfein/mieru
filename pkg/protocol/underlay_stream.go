@@ -17,12 +17,12 @@ package protocol
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"math"
 	mrand "math/rand"
 	"net"
+	"sync/atomic"
 	"time"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
@@ -56,8 +56,9 @@ type StreamUnderlay struct {
 	block cipher.BlockCipher
 
 	// ---- server fields ----
-	users               map[string]*appctlpb.User
-	userHintIsMandatory bool
+	serverUsers               *atomic.Pointer[serverUserState]
+	serverUserHintIsMandatory *atomic.Bool
+	serverUserPolicy          serverUserPolicy
 }
 
 var _ Underlay = &StreamUnderlay{}
@@ -288,7 +289,7 @@ func (t *StreamUnderlay) onOpenSessionRequest(seg *segment) error {
 		log.Debugf("%v received openSessionRequest, but session ID %d is already used", t, sessionID)
 		return nil
 	}
-	session := NewSession(sessionID, false, t.MTU(), t.users, t.trafficPattern)
+	session := newSession(sessionID, false, t.MTU(), t.serverUserPolicy, nil, t.trafficPattern)
 	if err := t.AddSession(session, nil); err == nil {
 		if t.deliverSegmentToSession(session, seg) {
 			t.readySessions <- session
@@ -687,62 +688,21 @@ func (t *StreamUnderlay) serverInitRecvBlockCipherAndDecryptMetadata(encryptedMe
 	if t.recv != nil {
 		return nil, fmt.Errorf("recv cipher is already set")
 	}
-	nonce := encryptedMeta[:cipher.DefaultNonceSize]
-
-	var matchedBlock cipher.BlockCipher
-	var matchedUserName string
-
-	// First, try to narrow down the user using the nonce hint.
-	var hintUsers []*appctlpb.User
-	for _, user := range t.users {
-		if cipher.CheckUserFromHint([]byte(user.GetName()), nonce) {
-			hintUsers = append(hintUsers, user)
-		}
-	}
-	for _, hintUser := range hintUsers {
-		cipher.ServerHintMatchDecrypt.Add(1)
-		password, err := hex.DecodeString(hintUser.GetHashedPassword())
-		if err != nil {
-			log.Debugf("Unable to decode hashed password %q from user %q", hintUser.GetHashedPassword(), hintUser.GetName())
-			continue
-		}
-		if len(password) == 0 {
-			password = cipher.HashPassword([]byte(hintUser.GetPassword()), []byte(hintUser.GetName()))
-		}
-		matchedBlock, _, err = cipher.TryDecrypt(encryptedMeta, password, true)
-		if err == nil {
-			matchedUserName = hintUser.GetName()
-			break
-		} else {
-			cipher.ServerFailedHintMatchDecrypt.Add(1)
-		}
-	}
-
-	if matchedBlock == nil && !t.userHintIsMandatory {
-		// Fallback: try all registered users.
-		for _, user := range t.users {
-			password, err := hex.DecodeString(user.GetHashedPassword())
-			if err != nil {
-				continue
-			}
-			if len(password) == 0 {
-				password = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
-			}
-			matchedBlock, _, err = cipher.TryDecrypt(encryptedMeta, password, true)
-			if err == nil {
-				matchedUserName = user.GetName()
-				break
-			}
-		}
-	}
-	if matchedBlock == nil {
-		return nil, fmt.Errorf("cipher.TryDecrypt() failed for all users")
+	matchedBlock, _, matchedPolicy, err := discoverServerUser(
+		t.serverUsers,
+		t.serverUserHintIsMandatory,
+		encryptedMeta,
+		true,
+		nil,
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	// Clone only the matched cipher as stateful, and re-decrypt to capture nonce state.
 	t.recv = matchedBlock.Clone()
 	t.recv.SetBlockContext(cipher.BlockContext{
-		UserName: matchedUserName,
+		UserName: matchedPolicy.name,
 	})
 	if t.trafficPattern != nil {
 		t.recv.SetNoncePattern(t.trafficPattern.GetNonce())
@@ -753,6 +713,7 @@ func (t *StreamUnderlay) serverInitRecvBlockCipherAndDecryptMetadata(encryptedMe
 		t.recv = nil
 		return nil, fmt.Errorf("stateful Decrypt() failed: %w", err)
 	}
+	t.serverUserPolicy = matchedPolicy
 	return decryptedMeta, nil
 }
 

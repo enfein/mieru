@@ -29,13 +29,11 @@ const (
 	DefaultOverhead  = 16 // 16 bytes
 	DefaultKeyLen    = 32 // 256 bits
 
+	NoncePrefixLenForUserHint = 16 // 16 bytes user hint input
+	NonceSuffixLenForUserHint = 4  // 4 bytes user hint output
+
 	ClientDecryptionMetricGroupName = "cipher - client"
 	ServerDecryptionMetricGroupName = "cipher - server"
-)
-
-const (
-	noncePrefixLenForUserHint = 16 // 16 bytes user hint input
-	nonceSuffixLenForUserHint = 4  // 4 bytes user hint output
 )
 
 var (
@@ -190,10 +188,10 @@ func CheckUserFromHint(user, nonce []byte) bool {
 	if len(user) == 0 {
 		panic("user is empty")
 	}
-	if len(nonce) < noncePrefixLenForUserHint+nonceSuffixLenForUserHint {
+	if len(nonce) < NoncePrefixLenForUserHint+NonceSuffixLenForUserHint {
 		panic(fmt.Sprintf("nonce length %d is too short", len(nonce)))
 	}
-	input := append(user, nonce[:noncePrefixLenForUserHint]...)
+	input := append(user, nonce[:NoncePrefixLenForUserHint]...)
 	output := sha256.Sum256(input)
-	return bytes.Equal(output[:nonceSuffixLenForUserHint], nonce[len(nonce)-nonceSuffixLenForUserHint:])
+	return bytes.Equal(output[:NonceSuffixLenForUserHint], nonce[len(nonce)-NonceSuffixLenForUserHint:])
 }

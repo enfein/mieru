@@ -17,10 +17,10 @@ package protocol
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
+	"sync/atomic"
 	"time"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
@@ -54,8 +54,8 @@ type PacketUnderlay struct {
 	block      cipher.BlockCipher
 
 	// ---- server fields ----
-	users               map[string]*appctlpb.User
-	userHintIsMandatory bool
+	serverUsers               *atomic.Pointer[serverUserState]
+	serverUserHintIsMandatory *atomic.Bool
 }
 
 var _ Underlay = &PacketUnderlay{}
@@ -280,7 +280,7 @@ func (u *PacketUnderlay) onOpenSessionRequest(seg *segment, remoteAddr net.Addr)
 		log.Debugf("%v received openSessionRequest, but session ID %d is already used", u, sessionID)
 		return nil
 	}
-	session := NewSession(sessionID, false, u.MTU(), u.users, u.trafficPattern)
+	session := newSession(sessionID, false, u.MTU(), seg.serverUserPolicy, nil, u.trafficPattern)
 	if err := u.AddSession(session, remoteAddr); err == nil {
 		if u.deliverSegmentToSession(session, seg) {
 			u.readySessions <- session
@@ -381,6 +381,7 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 		// Decrypt metadata.
 		var decryptedMeta []byte
 		var blockCipher cipher.BlockCipher
+		var matchedPolicy serverUserPolicy
 		if u.isClient {
 			decryptedMeta, err = u.block.Decrypt(encryptedMeta)
 			cipher.ClientDirectDecrypt.Add(1)
@@ -397,11 +398,15 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 			// Try existing sessions.
 			u.sessionMap.Range(func(k, v any) bool {
 				session := v.(*Session)
-				if session.block.Load() != nil && session.RemoteAddr().String() == addr.String() {
-					decryptedMeta, err = (*session.block.Load()).Decrypt(encryptedMeta)
+				sessionBlock := session.block.Load()
+				if sessionBlock != nil && session.RemoteAddr().String() == addr.String() {
+					decryptedMeta, err = (*sessionBlock).Decrypt(encryptedMeta)
 					if err == nil {
 						decrypted = true
-						blockCipher = *session.block.Load()
+						blockCipher = *sessionBlock
+						if policy := session.userPolicy.Load(); policy != nil {
+							matchedPolicy = *policy
+						}
 						return false
 					}
 				}
@@ -411,7 +416,7 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 			if !decrypted {
 				// This is a new session.
 				cipher.ServerIterateDecrypt.Add(1)
-				blockCipher, decryptedMeta, err = u.serverTryDecryptMetadataForNewSession(encryptedMeta, nonce)
+				blockCipher, decryptedMeta, matchedPolicy, err = u.serverTryDecryptMetadataForNewSession(encryptedMeta, nonce)
 				if err == nil {
 					decrypted = true
 				}
@@ -456,6 +461,7 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 			}
 			if blockCipher != nil {
 				seg.block = blockCipher
+				seg.serverUserPolicy = matchedPolicy
 			}
 			return seg, addr, nil
 		} else if isDataAckProtocol(protocolType(p)) {
@@ -471,6 +477,7 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 			}
 			if blockCipher != nil {
 				seg.block = blockCipher
+				seg.serverUserPolicy = matchedPolicy
 			}
 			return seg, addr, nil
 		} else {
@@ -736,65 +743,26 @@ func (u *PacketUnderlay) writeOneSegment(seg *segment, addr net.Addr) error {
 
 // serverTryDecryptMetadataForNewSession attempts to decrypt the metadata of a new
 // session by iterating over registered users.
-func (u *PacketUnderlay) serverTryDecryptMetadataForNewSession(encryptedMeta, nonce []byte) (cipher.BlockCipher, []byte, error) {
-	var matchedBlock cipher.BlockCipher
-	var decryptedMeta []byte
-	var matchedUserName string
-
-	// First, try to narrow down the user using the nonce hint.
-	var hintUsers []*appctlpb.User
-	for _, user := range u.users {
-		if cipher.CheckUserFromHint([]byte(user.GetName()), nonce) {
-			hintUsers = append(hintUsers, user)
-		}
-	}
-	for _, hintUser := range hintUsers {
-		cipher.ServerHintMatchDecrypt.Add(1)
-		password, err := hex.DecodeString(hintUser.GetHashedPassword())
-		if err != nil {
-			log.Debugf("Unable to decode hashed password %q from user %q", hintUser.GetHashedPassword(), hintUser.GetName())
-			continue
-		}
-		if len(password) == 0 {
-			password = cipher.HashPassword([]byte(hintUser.GetPassword()), []byte(hintUser.GetName()))
-		}
-		matchedBlock, decryptedMeta, err = cipher.TryDecrypt(encryptedMeta, password, true)
-		if err == nil {
-			matchedUserName = hintUser.GetName()
-			break
-		} else {
-			cipher.ServerFailedHintMatchDecrypt.Add(1)
-		}
+func (u *PacketUnderlay) serverTryDecryptMetadataForNewSession(encryptedMeta, _ []byte) (cipher.BlockCipher, []byte, serverUserPolicy, error) {
+	matchedTemplate, decryptedMeta, matchedPolicy, err := discoverServerUser(
+		u.serverUsers,
+		u.serverUserHintIsMandatory,
+		encryptedMeta,
+		false,
+		nil,
+	)
+	if err != nil {
+		return nil, nil, serverUserPolicy{}, err
 	}
 
-	if matchedBlock == nil && !u.userHintIsMandatory {
-		// Fallback: try all registered users.
-		for _, user := range u.users {
-			password, err := hex.DecodeString(user.GetHashedPassword())
-			if err != nil {
-				continue
-			}
-			if len(password) == 0 {
-				password = cipher.HashPassword([]byte(user.GetPassword()), []byte(user.GetName()))
-			}
-			matchedBlock, decryptedMeta, err = cipher.TryDecrypt(encryptedMeta, password, true)
-			if err == nil {
-				matchedUserName = user.GetName()
-				break
-			}
-		}
-	}
-	if matchedBlock == nil {
-		return nil, nil, fmt.Errorf("cipher.TryDecrypt() failed for all users")
-	}
-
-	matchedBlock.SetBlockContext(cipher.BlockContext{
-		UserName: matchedUserName,
-	})
+	// Stateless cipher templates can be shared by the cipher cache. Retain a
+	// clone so session context never mutates a shared template.
+	matchedBlock := matchedTemplate.Clone()
+	matchedBlock.SetBlockContext(cipher.BlockContext{UserName: matchedPolicy.name})
 	if u.trafficPattern != nil {
 		matchedBlock.SetNoncePattern(u.trafficPattern.GetNonce())
 	}
-	return matchedBlock, decryptedMeta, nil
+	return matchedBlock, decryptedMeta, matchedPolicy, nil
 }
 
 func (u *PacketUnderlay) cleanSessions() {

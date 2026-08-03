@@ -148,11 +148,12 @@ type Session struct {
 	openSessionRequestSent atomic.Bool // whether open session request has been sent
 
 	// ---- server fields ----
-	users               map[string]*appctlpb.User // all registered users
-	userName            atomic.Pointer[string]    // user that owns this session
-	clientUseLowEntropy atomic.Bool               // whether the server received low entropy data from client
-	uploadBytes         metrics.Metric            // number of bytes from client to server
-	downloadBytes       metrics.Metric            // number of bytes from server to client
+	userName                  atomic.Pointer[string]           // user that owns this session
+	userPolicy                atomic.Pointer[serverUserPolicy] // matched immutable policy snapshot
+	pendingServerUserPolicies map[string]serverUserPolicy      // policy of all users; released after user identity is known
+	clientUseLowEntropy       atomic.Bool                      // whether the server received low entropy data from client
+	uploadBytes               metrics.Metric                   // number of bytes from client to server
+	downloadBytes             metrics.Metric                   // number of bytes from server to client
 }
 
 var (
@@ -165,35 +166,42 @@ var (
 
 // NewSession creates a new session.
 func NewSession(id uint32, isClient bool, mtu int, users map[string]*appctlpb.User, trafficPattern *appctlpb.TrafficPattern) *Session {
+	return newSession(id, isClient, mtu, serverUserPolicy{}, buildServerUserPolicies(users), trafficPattern)
+}
+
+func newSession(id uint32, isClient bool, mtu int, policy serverUserPolicy, pendingPolicies map[string]serverUserPolicy, trafficPattern *appctlpb.TrafficPattern) *Session {
 	rttStat := congestion.NewRTTStats()
 	rttStat.SetMaxAckDelay(periodicOutputInterval)
 	rttStat.SetRTOMultiplier(txTimeoutBackOff)
 	s := &Session{
-		conn:               nil,
-		block:              atomic.Pointer[cipher.BlockCipher]{},
-		id:                 id,
-		isClient:           isClient,
-		mtu:                mtu,
-		status:             statusOK,
-		users:              users,
-		trafficPattern:     trafficPattern,
-		ready:              make(chan struct{}),
-		closedChan:         make(chan struct{}),
-		inputErr:           make(chan error),
-		outputErr:          make(chan error),
-		sendQueue:          newSegmentTree(segmentTreeCapacity),
-		sendBuf:            newSegmentTree(segmentTreeCapacity),
-		recvBuf:            newSegmentTree(segmentTreeCapacity),
-		recvQueue:          newSegmentTree(segmentTreeCapacity),
-		recvChan:           make(chan *segment, segmentChanCapacity),
-		rttStat:            rttStat,
-		cubicSendAlgorithm: congestion.NewCubicSendAlgorithm(minWindowSize, maxWindowSize),
+		conn:                      nil,
+		block:                     atomic.Pointer[cipher.BlockCipher]{},
+		id:                        id,
+		isClient:                  isClient,
+		mtu:                       mtu,
+		status:                    statusOK,
+		pendingServerUserPolicies: pendingPolicies,
+		trafficPattern:            trafficPattern,
+		ready:                     make(chan struct{}),
+		closedChan:                make(chan struct{}),
+		inputErr:                  make(chan error),
+		outputErr:                 make(chan error),
+		sendQueue:                 newSegmentTree(segmentTreeCapacity),
+		sendBuf:                   newSegmentTree(segmentTreeCapacity),
+		recvBuf:                   newSegmentTree(segmentTreeCapacity),
+		recvQueue:                 newSegmentTree(segmentTreeCapacity),
+		recvChan:                  make(chan *segment, segmentChanCapacity),
+		rttStat:                   rttStat,
+		cubicSendAlgorithm:        congestion.NewCubicSendAlgorithm(minWindowSize, maxWindowSize),
 	}
 	now := time.Now().UnixMicro()
 	s.lastRXTime.Store(now)
 	s.lastTXTime.Store(now)
 	s.heartbeatJitter = randomHeartbeatJitter()
 	s.remoteWindowSize.Store(minWindowSize)
+	if policy.name != "" {
+		s.userPolicy.Store(&policy)
+	}
 	return s
 }
 
@@ -964,6 +972,26 @@ func (s *Session) input(seg *segment) error {
 		}
 
 		s.block.Store(&seg.block)
+		if !s.isClient {
+			policy := seg.serverUserPolicy
+			if policy.name == "" && s.pendingServerUserPolicies != nil {
+				policy = s.pendingServerUserPolicies[seg.block.BlockContext().UserName]
+			}
+			s.pendingServerUserPolicies = nil
+			if current := s.userPolicy.Load(); current != nil {
+				if current.name != seg.block.BlockContext().UserName {
+					panic(fmt.Sprintf("%v user policy name %q differs from cipher user name %q", s, current.name, seg.block.BlockContext().UserName))
+				}
+				if policy.name != "" && current.name != policy.name {
+					panic(fmt.Sprintf("%v retained user policy name %q differs from segment user policy name %q", s, current.name, policy.name))
+				}
+			} else if policy.name != "" {
+				if policy.name != seg.block.BlockContext().UserName {
+					panic(fmt.Sprintf("%v user policy name %q differs from cipher user name %q", s, policy.name, seg.block.BlockContext().UserName))
+				}
+				s.userPolicy.Store(&policy)
+			}
+		}
 		if s.UserName() == "" && seg.block.BlockContext().UserName != "" {
 			userName := seg.block.BlockContext().UserName
 			s.userName.Store(&userName)
@@ -1348,14 +1376,14 @@ func (s *Session) moveRecvBufToRecvQueue() error {
 }
 
 func (s *Session) checkQuota(userName string) (ok bool, err error) {
-	if len(s.users) == 0 {
+	policy := s.userPolicy.Load()
+	if policy == nil {
 		return true, fmt.Errorf("no registered user")
 	}
-	user, found := s.users[userName]
-	if !found {
+	if policy.name != userName {
 		return true, fmt.Errorf("user %s is not found", userName)
 	}
-	if len(user.GetQuotas()) == 0 {
+	if len(policy.quotas) == 0 {
 		return true, nil
 	}
 
@@ -1372,12 +1400,12 @@ func (s *Session) checkQuota(userName string) (ok bool, err error) {
 	if !found {
 		return true, fmt.Errorf("metric %s in group %s is not found", metrics.UserMetricDownloadBytes, metricGroupName)
 	}
-	for _, quota := range user.GetQuotas() {
+	for _, quota := range policy.quotas {
 		now := time.Now()
-		then := now.Add(-time.Duration(quota.GetDays()) * 24 * time.Hour)
+		then := now.Add(-time.Duration(quota.days) * 24 * time.Hour)
 		totalBytes := uploadBytes.(*metrics.Counter).DeltaBetween(then, now)
 		totalBytes += downloadBytes.(*metrics.Counter).DeltaBetween(then, now)
-		if totalBytes/1048576 > int64(quota.GetMegabytes()) {
+		if totalBytes/1048576 > int64(quota.megabytes) {
 			return false, nil
 		}
 	}

@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"sync/atomic"
 	"testing"
 
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
@@ -35,9 +36,10 @@ var discoveryTransports = []discoveryTransport{
 	{
 		name: "TCP",
 		discover: func(users map[string]*appctlpb.User, hintMandatory bool, encryptedMeta []byte) ([]byte, string, error) {
+			publisher, mandatory := testServerUserPublisher(users, hintMandatory)
 			underlay := &StreamUnderlay{
-				users:               users,
-				userHintIsMandatory: hintMandatory,
+				serverUsers:               publisher,
+				serverUserHintIsMandatory: mandatory,
 			}
 			decryptedMeta, err := underlay.serverInitRecvBlockCipherAndDecryptMetadata(encryptedMeta)
 			if err != nil {
@@ -52,11 +54,12 @@ var discoveryTransports = []discoveryTransport{
 	{
 		name: "UDP",
 		discover: func(users map[string]*appctlpb.User, hintMandatory bool, encryptedMeta []byte) ([]byte, string, error) {
+			publisher, mandatory := testServerUserPublisher(users, hintMandatory)
 			underlay := &PacketUnderlay{
-				users:               users,
-				userHintIsMandatory: hintMandatory,
+				serverUsers:               publisher,
+				serverUserHintIsMandatory: mandatory,
 			}
-			block, decryptedMeta, err := underlay.serverTryDecryptMetadataForNewSession(
+			block, decryptedMeta, _, err := underlay.serverTryDecryptMetadataForNewSession(
 				encryptedMeta,
 				encryptedMeta[:cipher.DefaultNonceSize],
 			)
@@ -69,6 +72,14 @@ var discoveryTransports = []discoveryTransport{
 			return decryptedMeta, block.BlockContext().UserName, nil
 		},
 	},
+}
+
+func testServerUserPublisher(users map[string]*appctlpb.User, hintMandatory bool) (*atomic.Pointer[serverUserState], *atomic.Bool) {
+	publisher := &atomic.Pointer[serverUserState]{}
+	publisher.Store(buildServerUserState(users, &sourceUserCacheStats{}))
+	mandatory := &atomic.Bool{}
+	mandatory.Store(hintMandatory)
+	return publisher, mandatory
 }
 
 // TestUserDiscoveryRequiresAuthentication records the authentication invariant:

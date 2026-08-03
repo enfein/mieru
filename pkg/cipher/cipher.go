@@ -337,11 +337,11 @@ func (c *AEADBlockCipher) addUserHintToNonce(nonce []byte) []byte {
 	if c.ctx.UserName == "" {
 		return nonce
 	}
-	if len(nonce) < noncePrefixLenForUserHint+nonceSuffixLenForUserHint {
+	if len(nonce) < NoncePrefixLenForUserHint+NonceSuffixLenForUserHint {
 		panic(fmt.Sprintf("nonce length %d is too short", len(nonce)))
 	}
-	input := append([]byte(c.ctx.UserName), nonce[:noncePrefixLenForUserHint]...)
+	input := append([]byte(c.ctx.UserName), nonce[:NoncePrefixLenForUserHint]...)
 	output := sha256.Sum256(input)
-	copy(nonce[len(nonce)-nonceSuffixLenForUserHint:], output[:nonceSuffixLenForUserHint])
+	copy(nonce[len(nonce)-NonceSuffixLenForUserHint:], output[:NonceSuffixLenForUserHint])
 	return nonce
 }

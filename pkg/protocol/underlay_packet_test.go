@@ -17,15 +17,12 @@ package protocol
 
 import (
 	"context"
-	"encoding/hex"
 	"net"
 	"testing"
 	"time"
 
-	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
 	"github.com/enfein/mieru/v3/pkg/common"
-	"google.golang.org/protobuf/proto"
 )
 
 func TestPacketServerDropsInvalidControl(t *testing.T) {
@@ -40,8 +37,8 @@ func TestPacketServerDropsInvalidControl(t *testing.T) {
 	}
 	defer senderConn.Close()
 
-	password := []byte(t.Name())
 	userName := "user"
+	password := cipher.HashPassword([]byte(t.Name()), []byte(userName))
 	block, err := cipher.BlockCipherFromPassword(password, true)
 	if err != nil {
 		serverConn.Close()
@@ -49,14 +46,13 @@ func TestPacketServerDropsInvalidControl(t *testing.T) {
 	}
 	block.SetBlockContext(cipher.BlockContext{UserName: userName})
 
+	publisher, mandatory := testServerUserPublisher(userMap(makeTestUser(userName, password)), false)
 	server := &PacketUnderlay{
-		baseUnderlay:       *newBaseUnderlay(false, 1400, nil),
-		conn:               serverConn,
-		sessionCleanTicker: time.NewTicker(sessionCleanInterval),
-		users: map[string]*appctlpb.User{userName: {
-			Name:           proto.String(userName),
-			HashedPassword: proto.String(hex.EncodeToString(password)),
-		}},
+		baseUnderlay:              *newBaseUnderlay(false, 1400, nil),
+		conn:                      serverConn,
+		sessionCleanTicker:        time.NewTicker(sessionCleanInterval),
+		serverUsers:               publisher,
+		serverUserHintIsMandatory: mandatory,
 	}
 	sender := &PacketUnderlay{
 		baseUnderlay: *newBaseUnderlay(true, 1400, nil),

@@ -92,6 +92,10 @@ type segment struct {
 	txTime    int64                    // most recent transmission time in microseconds since Unix epoch
 	txTimeout time.Duration            // need to receive ACK within this duration
 	block     cipher.BlockCipher       // cipher block to encrypt or decrypt the payload
+
+	// serverUserPolicy is set only when server-side UDP discovery authenticates
+	// a new session.
+	serverUserPolicy serverUserPolicy
 }
 
 // Protocol returns the protocol of the segment.

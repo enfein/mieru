@@ -23,6 +23,7 @@ import (
 	"net"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
@@ -68,8 +69,9 @@ type Mux struct {
 	multiplexFactor int
 
 	// ---- server only fields ----
-	users               map[string]*appctlpb.User
-	userHintIsMandatory bool
+	serverUsers               atomic.Pointer[serverUserState]
+	serverUserHintIsMandatory atomic.Bool
+	serverUserCacheStats      sourceUserCacheStats
 }
 
 var _ net.Listener = &Mux{}
@@ -241,36 +243,27 @@ func (m *Mux) SetClientMultiplexFactor(n int) *Mux {
 	return m
 }
 
-// SetServerUsers updates the registered users, even if mux is already started.
+// SetServerUsers builds and atomically updates the registered users.
 func (m *Mux) SetServerUsers(users map[string]*appctlpb.User) *Mux {
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	if m.isClient {
 		panic("Can't set server users in client mux")
 	}
-	m.users = users
-	if m.used {
-		// Update the users in UDPUnderlay.
-		// Don't update TCPUnderlay and Session, so existing connections still work.
-		// Newly established TCPUnderlay automatically pick up the updated users.
-		for _, underlay := range m.underlays {
-			if udpUnderlay, ok := underlay.(*PacketUnderlay); ok {
-				udpUnderlay.users = m.users
-			}
-		}
+	state := buildServerUserState(users, &m.serverUserCacheStats)
+	old := m.serverUsers.Swap(state)
+	if old != nil {
+		old.cache.retire()
 	}
 	return m
 }
 
-// SetServerUserHintIsMandatory sets whether the user hint is mandatory.
+// SetServerUserHintIsMandatory atomically sets whether the user hint is
+// mandatory.
 func (m *Mux) SetServerUserHintIsMandatory(userHintIsMandatory bool) *Mux {
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	if m.isClient {
 		panic("Can't set server user hint is mandatory in client mux")
 	}
-	m.userHintIsMandatory = userHintIsMandatory
-	log.Infof("Mux user hint is mandatory is set to %v", m.userHintIsMandatory)
+	m.serverUserHintIsMandatory.Store(userHintIsMandatory)
+	log.Infof("Mux user hint is mandatory is set to %v", userHintIsMandatory)
 	return m
 }
 
@@ -320,7 +313,8 @@ func (m *Mux) Start() error {
 	if m.isClient {
 		return stderror.ErrInvalidOperation
 	}
-	if len(m.users) == 0 {
+	serverUsers := m.serverUsers.Load()
+	if serverUsers == nil || len(serverUsers.users) == 0 {
 		return fmt.Errorf("no user found")
 	}
 	if len(m.endpoints) == 0 {
@@ -401,7 +395,7 @@ func (m *Mux) DialContext(ctx context.Context) (net.Conn, error) {
 	if m.trafficPattern != nil {
 		trafficPattern = m.trafficPattern.Effective()
 	}
-	session := NewSession(mrand.Uint32(), true, underlay.MTU(), m.users, trafficPattern)
+	session := NewSession(mrand.Uint32(), true, underlay.MTU(), nil, trafficPattern)
 	if err := underlay.AddSession(session, nil); err != nil {
 		return nil, fmt.Errorf("AddSession() failed: %v", err)
 	}
@@ -548,11 +542,11 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 			trafficPattern = m.trafficPattern.Effective()
 		}
 		underlay := &PacketUnderlay{
-			baseUnderlay:        *newBaseUnderlay(false, properties.MTU(), trafficPattern),
-			conn:                conn,
-			sessionCleanTicker:  time.NewTicker(sessionCleanInterval),
-			users:               m.users,
-			userHintIsMandatory: m.userHintIsMandatory,
+			baseUnderlay:              *newBaseUnderlay(false, properties.MTU(), trafficPattern),
+			conn:                      conn,
+			sessionCleanTicker:        time.NewTicker(sessionCleanInterval),
+			serverUsers:               &m.serverUsers,
+			serverUserHintIsMandatory: &m.serverUserHintIsMandatory,
 		}
 		log.Infof("Created new server underlay %v", underlay)
 		m.mu.Lock()
@@ -609,16 +603,16 @@ func (m *Mux) acceptTCPUnderlay(rawListener net.Listener, properties UnderlayPro
 	if m.trafficPattern != nil {
 		trafficPattern = m.trafficPattern.Effective()
 	}
-	return m.serverWrapTCPConn(rawConn, properties.MTU(), m.users, trafficPattern), nil
+	return m.serverWrapTCPConn(rawConn, properties.MTU(), trafficPattern), nil
 }
 
-func (m *Mux) serverWrapTCPConn(rawConn net.Conn, mtu int, users map[string]*appctlpb.User, trafficPattern *appctlpb.TrafficPattern) Underlay {
+func (m *Mux) serverWrapTCPConn(rawConn net.Conn, mtu int, trafficPattern *appctlpb.TrafficPattern) Underlay {
 	return &StreamUnderlay{
-		baseUnderlay:        *newBaseUnderlay(false, mtu, trafficPattern),
-		conn:                rawConn,
-		sessionCleanTicker:  time.NewTicker(sessionCleanInterval),
-		users:               users,
-		userHintIsMandatory: m.userHintIsMandatory,
+		baseUnderlay:              *newBaseUnderlay(false, mtu, trafficPattern),
+		conn:                      rawConn,
+		sessionCleanTicker:        time.NewTicker(sessionCleanInterval),
+		serverUsers:               &m.serverUsers,
+		serverUserHintIsMandatory: &m.serverUserHintIsMandatory,
 	}
 }
 
