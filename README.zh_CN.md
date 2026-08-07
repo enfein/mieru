@@ -71,5 +71,3 @@ mieru 的翻墙原理与 shadowsocks / v2ray 等软件类似，在客户端和�
 ## 许可证
 
 使用本软件需遵从 GPL-3 协议。
-
-[![Star History Chart](https://api.star-history.com/svg?repos=enfein/mieru&type=Date)](https://www.star-history.com/#enfein/mieru&Date)
