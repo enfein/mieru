@@ -21,6 +21,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
+	"sync"
 	"sync/atomic"
 
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
@@ -66,8 +67,10 @@ type serverUserState struct {
 // operations load table once; retirement prevents later operations from
 // starting while allowing an operation that already loaded the table to finish.
 type sourceUserCache struct {
-	table atomic.Pointer[sourceUserCacheTable]
-	stats *sourceUserCacheStats
+	table       atomic.Pointer[sourceUserCacheTable]
+	stats       *sourceUserCacheStats
+	tick        sourceUserCacheTickFunc
+	bucketLocks [sourceUserCacheLockStripes]sync.Mutex
 }
 
 // sourceUserCacheStats has Mux lifetime rather than generation lifetime.
@@ -83,6 +86,7 @@ const (
 	sourceUserCacheBucketCount = 16384
 	sourceUserCacheWays        = 4
 	sourceUserCacheUsers       = 10
+	sourceUserCacheLockStripes = 256
 )
 
 type sourceUserCacheTable struct {
@@ -100,9 +104,7 @@ type sourceUserCacheEntry struct {
 }
 
 func newSourceUserCache(stats *sourceUserCacheStats) *sourceUserCache {
-	c := &sourceUserCache{stats: stats}
-	c.table.Store(&sourceUserCacheTable{})
-	return c
+	return newSourceUserCacheWithTick(stats, sourceUserCacheCurrentTick)
 }
 
 func (c *sourceUserCache) loadTable() *sourceUserCacheTable {
