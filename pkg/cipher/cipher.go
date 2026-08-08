@@ -25,6 +25,7 @@ import (
 	mrand "math/rand"
 	"sync"
 
+	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/common"
 	"golang.org/x/crypto/chacha20poly1305"
@@ -337,11 +338,16 @@ func (c *AEADBlockCipher) addUserHintToNonce(nonce []byte) []byte {
 	if c.ctx.UserName == "" {
 		return nonce
 	}
+	if len(c.ctx.UserName) > constant.MaxUserNameLen {
+		panic(fmt.Sprintf("user name length %d exceeds maximum %d", len(c.ctx.UserName), constant.MaxUserNameLen))
+	}
 	if len(nonce) < NoncePrefixLenForUserHint+NonceSuffixLenForUserHint {
 		panic(fmt.Sprintf("nonce length %d is too short", len(nonce)))
 	}
-	input := append([]byte(c.ctx.UserName), nonce[:NoncePrefixLenForUserHint]...)
-	output := sha256.Sum256(input)
+	var input [constant.MaxUserNameLen + NoncePrefixLenForUserHint]byte
+	n := copy(input[:], c.ctx.UserName)
+	n += copy(input[n:], nonce[:NoncePrefixLenForUserHint])
+	output := sha256.Sum256(input[:n])
 	copy(nonce[len(nonce)-NonceSuffixLenForUserHint:], output[:NonceSuffixLenForUserHint])
 	return nonce
 }

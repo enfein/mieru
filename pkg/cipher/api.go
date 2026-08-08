@@ -20,6 +20,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 
+	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 )
@@ -140,23 +141,41 @@ func BlockCipherFromPassword(password []byte, stateless bool) (BlockCipher, erro
 	if err != nil {
 		return nil, err
 	}
-	return cipherList[1], nil
+	block := cipherList[1]
+	if stateless {
+		block = block.Clone()
+	}
+	return block, nil
 }
 
 // BlockCipherListFromPassword creates three BlockCipher objects using different salts
 // from the password with the default settings.
 func BlockCipherListFromPassword(password []byte, stateless bool) ([]BlockCipher, error) {
-	return getBlockCipherList(password, stateless)
+	blocks, err := getBlockCipherList(password, stateless)
+	if err != nil {
+		return nil, err
+	}
+	if stateless {
+		return CloneBlockCiphers(blocks), nil
+	}
+	return blocks, nil
 }
 
 // TryDecrypt tries to decrypt the data with all possible keys generated from the password.
 // If successful, returns the block cipher as well as the decrypted results.
 func TryDecrypt(data, password []byte, stateless bool) (BlockCipher, []byte, error) {
-	blocks, err := BlockCipherListFromPassword(password, stateless)
+	blocks, err := getBlockCipherList(password, stateless)
 	if err != nil {
-		return nil, nil, fmt.Errorf("BlockCipherListFromPassword() failed: %w", err)
+		return nil, nil, fmt.Errorf("getBlockCipherList() failed: %w", err)
 	}
-	return SelectDecrypt(data, blocks)
+	block, plaintext, err := SelectDecrypt(data, blocks)
+	if err != nil {
+		return nil, nil, err
+	}
+	if stateless {
+		block = block.Clone()
+	}
+	return block, plaintext, nil
 }
 
 // SelectDecrypt returns the appropriate cipher block that can decrypt the data,
@@ -183,15 +202,20 @@ func CloneBlockCiphers(blocks []BlockCipher) []BlockCipher {
 }
 
 // CheckUserFromHint checks if the user is the one associated with the nonce.
-// It panics if the user is empty or the nonce is too short.
+// It panics if the user is empty or too long, or the nonce is too short.
 func CheckUserFromHint(user, nonce []byte) bool {
 	if len(user) == 0 {
 		panic("user is empty")
 	}
+	if len(user) > constant.MaxUserNameLen {
+		panic(fmt.Sprintf("user name length %d exceeds maximum %d", len(user), constant.MaxUserNameLen))
+	}
 	if len(nonce) < NoncePrefixLenForUserHint+NonceSuffixLenForUserHint {
 		panic(fmt.Sprintf("nonce length %d is too short", len(nonce)))
 	}
-	input := append(user, nonce[:NoncePrefixLenForUserHint]...)
-	output := sha256.Sum256(input)
+	var input [constant.MaxUserNameLen + NoncePrefixLenForUserHint]byte
+	n := copy(input[:], user)
+	n += copy(input[n:], nonce[:NoncePrefixLenForUserHint])
+	output := sha256.Sum256(input[:n])
 	return bytes.Equal(output[:NonceSuffixLenForUserHint], nonce[len(nonce)-NonceSuffixLenForUserHint:])
 }

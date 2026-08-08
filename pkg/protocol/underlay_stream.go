@@ -682,16 +682,17 @@ func (t *StreamUnderlay) writeOneSegment(seg *segment) error {
 }
 
 // serverInitRecvBlockCipherAndDecryptMetadata performs decryption against all
-// registered users and, on success, initializes t.recv with a stateful clone
-// of the single matched cipher. It returns the decrypted metadata.
+// registered users and, on success, initializes t.recv from the mutable clone
+// returned for the single matched cipher. It returns the decrypted metadata.
 func (t *StreamUnderlay) serverInitRecvBlockCipherAndDecryptMetadata(encryptedMeta []byte) ([]byte, error) {
 	if t.recv != nil {
 		return nil, fmt.Errorf("recv cipher is already set")
 	}
-	matchedBlock, _, matchedPolicy, err := discoverServerUser(
+	result, err := discoverServerUser(
 		t.serverUsers,
 		t.serverUserHintIsMandatory,
 		encryptedMeta,
+		serverUserDiscoverySource{},
 		true,
 		nil,
 	)
@@ -699,11 +700,9 @@ func (t *StreamUnderlay) serverInitRecvBlockCipherAndDecryptMetadata(encryptedMe
 		return nil, err
 	}
 
-	// Clone only the matched cipher as stateful, and re-decrypt to capture nonce state.
-	t.recv = matchedBlock.Clone()
-	t.recv.SetBlockContext(cipher.BlockContext{
-		UserName: matchedPolicy.name,
-	})
+	// Re-decrypt with implicit nonce mode enabled to capture TCP nonce state.
+	t.recv = result.block
+	t.recv.SetBlockContext(result.userContext)
 	if t.trafficPattern != nil {
 		t.recv.SetNoncePattern(t.trafficPattern.GetNonce())
 	}
@@ -713,7 +712,7 @@ func (t *StreamUnderlay) serverInitRecvBlockCipherAndDecryptMetadata(encryptedMe
 		t.recv = nil
 		return nil, fmt.Errorf("stateful Decrypt() failed: %w", err)
 	}
-	t.serverUserPolicy = matchedPolicy
+	t.serverUserPolicy = result.policy
 	return decryptedMeta, nil
 }
 

@@ -18,8 +18,127 @@ package cipher
 import (
 	crand "crypto/rand"
 	"fmt"
+	"strings"
+	"sync"
 	"testing"
+
+	"github.com/enfein/mieru/v3/apis/constant"
 )
+
+func TestUserHintOperationsAllocateNoHeap(t *testing.T) {
+	user := []byte("allocation-free-user")
+	key := make([]byte, DefaultKeyLen)
+	c, err := newXChaCha20Poly1305BlockCipher(key)
+	if err != nil {
+		t.Fatalf("newXChaCha20Poly1305BlockCipher() failed: %v", err)
+	}
+	c.SetBlockContext(BlockContext{UserName: string(user)})
+	var baseNonce [DefaultNonceSize]byte
+	nonce := c.addUserHintToNonce(baseNonce[:])
+	if !CheckUserFromHint(user, nonce) {
+		t.Fatal("generated user hint did not match")
+	}
+
+	if allocs := testing.AllocsPerRun(1000, func() {
+		if !CheckUserFromHint(user, nonce) {
+			panic("user hint did not match")
+		}
+	}); allocs != 0 {
+		t.Fatalf("CheckUserFromHint() allocations = %v, want 0", allocs)
+	}
+
+	if allocs := testing.AllocsPerRun(1000, func() {
+		localNonce := baseNonce
+		c.addUserHintToNonce(localNonce[:])
+	}); allocs != 0 {
+		t.Fatalf("addUserHintToNonce() allocations = %v, want 0", allocs)
+	}
+}
+
+func TestUserHintOperationsPanicForLongUserName(t *testing.T) {
+	user := strings.Repeat("x", constant.MaxUserNameLen+1)
+	var nonce [DefaultNonceSize]byte
+	tests := []struct {
+		name string
+		fn   func()
+	}{
+		{
+			name: "CheckUserFromHint",
+			fn: func() {
+				CheckUserFromHint([]byte(user), nonce[:])
+			},
+		},
+		{
+			name: "addUserHintToNonce",
+			fn: func() {
+				c := &AEADBlockCipher{ctx: BlockContext{UserName: user}}
+				c.addUserHintToNonce(nonce[:])
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Fatal("operation did not panic")
+				}
+			}()
+			test.fn()
+		})
+	}
+}
+
+func TestConcurrentStatelessTrialsReturnIndependentCiphers(t *testing.T) {
+	password := HashPassword([]byte(t.Name()), []byte("parallel-user"))
+	block, err := BlockCipherFromPassword(password, true)
+	if err != nil {
+		t.Fatalf("BlockCipherFromPassword() failed: %v", err)
+	}
+	ciphertext, err := block.Encrypt([]byte("parallel plaintext"))
+	if err != nil {
+		t.Fatalf("Encrypt() failed: %v", err)
+	}
+
+	const trials = 64
+	var wg sync.WaitGroup
+	errCh := make(chan error, trials)
+	for i := 0; i < trials; i++ {
+		i := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			winner, _, err := TryDecrypt(ciphertext, password, true)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			if got := winner.BlockContext().UserName; got != "" {
+				errCh <- fmt.Errorf("trial %d inherited context %q", i, got)
+				return
+			}
+			want := fmt.Sprintf("trial-%d", i)
+			winner.SetBlockContext(BlockContext{UserName: want})
+			if got := winner.BlockContext().UserName; got != want {
+				errCh <- fmt.Errorf("trial %d context = %q, want %q", i, got, want)
+			}
+		}()
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Error(err)
+	}
+
+	templates, err := getBlockCipherList(password, true)
+	if err != nil {
+		t.Fatalf("getBlockCipherList() failed: %v", err)
+	}
+	for i, template := range templates {
+		if got := template.BlockContext().UserName; got != "" {
+			t.Fatalf("cached template %d context = %q after concurrent trials, want empty", i, got)
+		}
+	}
+}
 
 func Benchmark10KUserTryDecryptStateful(b *testing.B) {
 	const numUsers = 10000

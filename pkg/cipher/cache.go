@@ -34,8 +34,9 @@ type cachedCiphers struct {
 
 var blockCipherCache = sync.Map{}
 
-// getBlockCipherList returns three BlockCipher.
-// It uses cache so it doesn't need to generate BlockCipher each time.
+// getBlockCipherList returns three BlockCipher. Stateless results are
+// immutable cache templates and must never be consumed directly.
+// Stateful results are mutable clones.
 func getBlockCipherList(password []byte, stateless bool) ([]BlockCipher, error) {
 	pw := string(password)
 

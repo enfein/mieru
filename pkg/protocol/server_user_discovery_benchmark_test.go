@@ -220,6 +220,38 @@ func BenchmarkUserDiscoveryParallel10K(b *testing.B) {
 	})
 }
 
+func BenchmarkServerUserDiscoveryWarmCache(b *testing.B) {
+	for _, userCount := range []int{100, 1000, 10000} {
+		b.Run(fmt.Sprintf("Users_%d", userCount), func(b *testing.B) {
+			fixture := newUserDiscoveryBench(b, userCount)
+			users := make(map[string]*appctlpb.User, len(fixture.users))
+			for _, user := range fixture.users {
+				users[user.GetName()] = user
+			}
+			state := buildServerUserState(users, &sourceUserCacheStats{})
+			targetID := uint32(len(state.users))
+			for _, candidateCount := range []int{1, sourceUserCacheUsers} {
+				b.Run(fmt.Sprintf("Candidates_%d", candidateCount), func(b *testing.B) {
+					source := serverUserDiscoverySource{key: sourceUserCacheTestKey(uint64(400 + candidateCount)), valid: true}
+					for userID := uint32(1); userID < uint32(candidateCount); userID++ {
+						state.cache.recordAuthenticated(source.key, userID)
+					}
+					state.cache.recordAuthenticated(source.key, targetID)
+
+					b.ReportAllocs()
+					b.ResetTimer()
+					for i := 0; i < b.N; i++ {
+						result := tryServerUserState(state, fixture.validHintCiphertext, source, false)
+						if result.block == nil || result.origin != serverUserMatchCachedHint || result.userID != targetID {
+							b.Fatalf("warm discovery = (block nil=%t, origin=%d, userID=%d), want cached hint for %d", result.block == nil, result.origin, result.userID, targetID)
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
 // udpSessionBench is used to benchmark finding the correct session in
 // a single server PacketUnderlay.
 type udpSessionBench struct {

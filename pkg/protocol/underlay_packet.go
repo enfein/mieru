@@ -744,10 +744,11 @@ func (u *PacketUnderlay) writeOneSegment(seg *segment, addr net.Addr) error {
 // serverTryDecryptMetadataForNewSession attempts to decrypt the metadata of a new
 // session by iterating over registered users.
 func (u *PacketUnderlay) serverTryDecryptMetadataForNewSession(encryptedMeta, _ []byte) (cipher.BlockCipher, []byte, serverUserPolicy, error) {
-	matchedTemplate, decryptedMeta, matchedPolicy, err := discoverServerUser(
+	result, err := discoverServerUser(
 		u.serverUsers,
 		u.serverUserHintIsMandatory,
 		encryptedMeta,
+		serverUserDiscoverySource{},
 		false,
 		nil,
 	)
@@ -755,14 +756,12 @@ func (u *PacketUnderlay) serverTryDecryptMetadataForNewSession(encryptedMeta, _ 
 		return nil, nil, serverUserPolicy{}, err
 	}
 
-	// Stateless cipher templates can be shared by the cipher cache. Retain a
-	// clone so session context never mutates a shared template.
-	matchedBlock := matchedTemplate.Clone()
-	matchedBlock.SetBlockContext(cipher.BlockContext{UserName: matchedPolicy.name})
+	matchedBlock := result.block
+	matchedBlock.SetBlockContext(result.userContext)
 	if u.trafficPattern != nil {
 		matchedBlock.SetNoncePattern(u.trafficPattern.GetNonce())
 	}
-	return matchedBlock, decryptedMeta, matchedPolicy, nil
+	return matchedBlock, result.decryptedMetadata, result.policy, nil
 }
 
 func (u *PacketUnderlay) cleanSessions() {

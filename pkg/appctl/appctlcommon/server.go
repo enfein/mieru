@@ -18,6 +18,7 @@ package appctlcommon
 import (
 	"fmt"
 
+	"github.com/enfein/mieru/v3/apis/constant"
 	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 )
 
@@ -38,8 +39,8 @@ func ValidateServerConfigSingleUser(user *pb.User) error {
 	if user.GetPassword() == "" && user.GetHashedPassword() == "" {
 		return fmt.Errorf("user password is not set")
 	}
-	if len(user.GetName()) > 64 {
-		return fmt.Errorf("user name exceeds 64 bytes")
+	if len(user.GetName()) > constant.MaxUserNameLen {
+		return fmt.Errorf("user name exceeds %d bytes", constant.MaxUserNameLen)
 	}
 	if user.GetPassword() != "" && len(user.GetPassword()) > 64 {
 		return fmt.Errorf("user password exceeds 64 bytes")

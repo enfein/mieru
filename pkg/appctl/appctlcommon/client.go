@@ -22,6 +22,7 @@ import (
 	"strconv"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
+	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/apis/trafficpattern"
 	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
@@ -60,8 +61,8 @@ func ValidateClientConfigSingleProfile(profile *pb.ClientProfile) error {
 	if user.GetPassword() == "" && user.GetHashedPassword() == "" {
 		return fmt.Errorf("user password is not set")
 	}
-	if len(user.GetName()) > 64 {
-		return fmt.Errorf("user name exceeds 64 bytes")
+	if len(user.GetName()) > constant.MaxUserNameLen {
+		return fmt.Errorf("user name exceeds %d bytes", constant.MaxUserNameLen)
 	}
 	if user.GetPassword() != "" && len(user.GetPassword()) > 64 {
 		return fmt.Errorf("user password exceeds 64 bytes")
