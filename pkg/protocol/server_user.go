@@ -92,6 +92,83 @@ type serverUserDiscoveryResult struct {
 	attempts          int
 }
 
+// serverUserAuthentication is retained only while a newly authenticated
+// segment is structurally validated and dispatched. In particular, generation
+// must not be retained by an established underlay or session.
+type serverUserAuthentication struct {
+	userID     uint32
+	policy     serverUserPolicy
+	origin     serverUserMatchOrigin
+	generation *serverUserState
+	source     serverUserDiscoverySource
+}
+
+func (r serverUserDiscoveryResult) authentication(source serverUserDiscoverySource) serverUserAuthentication {
+	return serverUserAuthentication{
+		userID:     r.userID,
+		policy:     r.policy,
+		origin:     r.origin,
+		generation: r.generation,
+		source:     source,
+	}
+}
+
+func (a *serverUserAuthentication) valid() bool {
+	return a != nil && a.userID != 0 && a.generation != nil
+}
+
+// recordAuthenticated records only into the generation used for discovery.
+// A concurrent reload may already have retired that generation's cache, in
+// which case the update is intentionally a no-op.
+func (a *serverUserAuthentication) recordAuthenticated() {
+	if !a.valid() {
+		return
+	}
+	generation := a.generation
+	a.generation = nil
+	if a.source.valid && generation.cache != nil {
+		generation.cache.recordAuthenticated(a.source.key, a.userID)
+	}
+}
+
+// validateNewServerSessionSegment enforces the only protocol that may create a
+// server session. Callers run this after payload authentication and padding
+// validation, immediately before initial protocol dispatch.
+func validateNewServerSessionSegment(seg *segment) error {
+	if seg == nil || seg.metadata == nil {
+		return fmt.Errorf("new server session segment is nil")
+	}
+	ss, ok := seg.metadata.(*sessionStruct)
+	if !ok || ss.Protocol() != openSessionRequest {
+		return fmt.Errorf("protocol %v can't create a server session", seg.metadata.Protocol())
+	}
+	if ss.sessionID == 0 {
+		return fmt.Errorf("reserved session ID %d is used", ss.sessionID)
+	}
+	return nil
+}
+
+// validateServerSegmentDirection rejects protocols that can only be sent by a
+// server. Unknown-session UDP data and close messages in the client-to-server
+// direction remain dispatchable so the existing close-session behavior is
+// preserved, but they never create a source-user association.
+func validateServerSegmentDirection(seg *segment) error {
+	if seg == nil || seg.metadata == nil {
+		return fmt.Errorf("server segment is nil")
+	}
+	switch seg.metadata.Protocol() {
+	case openSessionRequest,
+		closeSessionRequest,
+		closeSessionResponse,
+		dataClientToServer,
+		dataClientToServerLowEntropy,
+		ackClientToServer:
+		return nil
+	default:
+		return fmt.Errorf("protocol %v has the wrong direction for a server", seg.metadata.Protocol())
+	}
+}
+
 // sourceUserCache owns an atomically detachable table. Cache lookup and update
 // operations load table once; retirement prevents later operations from
 // starting while allowing an operation that already loaded the table to finish.

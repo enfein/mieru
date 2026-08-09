@@ -58,6 +58,7 @@ type StreamUnderlay struct {
 	// ---- server fields ----
 	serverUsers               *atomic.Pointer[serverUserState]
 	serverUserHintIsMandatory *atomic.Bool
+	serverUserSource          serverUserDiscoverySource
 	serverUserPolicy          serverUserPolicy
 }
 
@@ -226,12 +227,18 @@ func (t *StreamUnderlay) RunEventLoop(ctx context.Context) error {
 		if log.IsLevelEnabled(log.TraceLevel) {
 			log.Tracef("%v received %v", t, seg)
 		}
+		if seg.serverUserAuthentication.valid() {
+			if err := validateNewServerSessionSegment(seg); err != nil {
+				return stderror.WrapErrorWithType(err, stderror.PROTOCOL_ERROR)
+			}
+		}
 		if isSessionProtocol(seg.metadata.Protocol()) {
 			switch seg.metadata.Protocol() {
 			case openSessionRequest:
 				if err := t.onOpenSessionRequest(seg); err != nil {
 					return fmt.Errorf("onOpenSessionRequest() failed: %w", err)
 				}
+				t.commitServerUserAuthentication(seg)
 			case openSessionResponse:
 				if err := t.onOpenSessionResponse(seg); err != nil {
 					return fmt.Errorf("onOpenSessionResponse() failed: %w", err)
@@ -289,13 +296,30 @@ func (t *StreamUnderlay) onOpenSessionRequest(seg *segment) error {
 		log.Debugf("%v received openSessionRequest, but session ID %d is already used", t, sessionID)
 		return nil
 	}
-	session := newSession(sessionID, false, t.MTU(), t.serverUserPolicy, nil, t.trafficPattern)
-	if err := t.AddSession(session, nil); err == nil {
-		if t.deliverSegmentToSession(session, seg) {
-			t.readySessions <- session
-		}
+	policy := t.serverUserPolicy
+	if seg.serverUserAuthentication.valid() {
+		policy = seg.serverUserAuthentication.policy
 	}
+	session := newSession(sessionID, false, t.MTU(), policy, nil, t.trafficPattern)
+	if err := t.AddSession(session, nil); err != nil {
+		return err
+	}
+	if !t.deliverSegmentToSession(session, seg) {
+		return fmt.Errorf("failed to deliver open session request for session %d", sessionID)
+	}
+	t.readySessions <- session
 	return nil
+}
+
+// commitServerUserAuthentication is the single TCP cache-recording point. The
+// caller invokes it only after the first segment has passed authentication,
+// replay, metadata, payload, padding, role, session-ID, and dispatch checks.
+func (t *StreamUnderlay) commitServerUserAuthentication(seg *segment) {
+	if seg == nil || !seg.serverUserAuthentication.valid() {
+		return
+	}
+	t.serverUserPolicy = seg.serverUserAuthentication.policy
+	seg.serverUserAuthentication.recordAuthenticated()
 }
 
 func (t *StreamUnderlay) onOpenSessionResponse(seg *segment) error {
@@ -372,11 +396,12 @@ func (t *StreamUnderlay) readOneSegment() (*segment, error) {
 
 	// Decrypt metadata.
 	var decryptedMeta []byte
+	var authentication serverUserAuthentication
 	if t.recv == nil && t.isClient {
 		t.recv = t.block.Clone()
 	}
 	if t.recv == nil {
-		decryptedMeta, err = t.serverInitRecvBlockCipherAndDecryptMetadata(encryptedMeta)
+		decryptedMeta, authentication, err = t.serverInitRecvBlockCipherAndDecryptMetadata(encryptedMeta)
 		cipher.ServerIterateDecrypt.Add(1)
 		if err != nil {
 			cipher.ServerFailedIterateDecrypt.Add(1)
@@ -416,24 +441,33 @@ func (t *StreamUnderlay) readOneSegment() (*segment, error) {
 
 	// Read payload and construct segment.
 	p := decryptedMeta[0]
+	var seg *segment
 	if isSessionProtocol(protocolType(p)) {
 		ss := &sessionStruct{}
 		if err := ss.Unmarshal(decryptedMeta); err != nil {
 			err = fmt.Errorf("Unmarshal() to sessionStruct failed: %w", err)
 			return nil, stderror.WrapErrorWithType(err, stderror.PROTOCOL_ERROR)
 		}
-		return t.readSessionSegment(ss)
+		seg, err = t.readSessionSegment(ss)
 	} else if isDataAckProtocol(protocolType(p)) {
 		das := &dataAckStruct{}
 		if err := das.Unmarshal(decryptedMeta); err != nil {
 			err = fmt.Errorf("Unmarshal() to dataAckStruct failed: %w", err)
 			return nil, stderror.WrapErrorWithType(err, stderror.PROTOCOL_ERROR)
 		}
-		return t.readDataAckSegment(das)
+		seg, err = t.readDataAckSegment(das)
 	} else {
 		err = fmt.Errorf("unable to handle unknown protocol %d", p)
 		return nil, stderror.WrapErrorWithType(err, stderror.PROTOCOL_ERROR)
 	}
+	if err != nil {
+		return nil, err
+	}
+	if authentication.valid() {
+		seg.serverUserPolicy = authentication.policy
+		seg.serverUserAuthentication = authentication
+	}
+	return seg, nil
 }
 
 func (t *StreamUnderlay) readSessionSegment(ss *sessionStruct) (*segment, error) {
@@ -681,23 +715,24 @@ func (t *StreamUnderlay) writeOneSegment(seg *segment) error {
 	return nil
 }
 
-// serverInitRecvBlockCipherAndDecryptMetadata performs decryption against all
-// registered users and, on success, initializes t.recv from the mutable clone
-// returned for the single matched cipher. It returns the decrypted metadata.
-func (t *StreamUnderlay) serverInitRecvBlockCipherAndDecryptMetadata(encryptedMeta []byte) ([]byte, error) {
+// serverInitRecvBlockCipherAndDecryptMetadata performs stateless discovery
+// against one current generation and then initializes t.recv from the mutable
+// winning clone. The returned authentication is temporary and must be recorded
+// only after the complete first segment is validated and dispatched.
+func (t *StreamUnderlay) serverInitRecvBlockCipherAndDecryptMetadata(encryptedMeta []byte) ([]byte, serverUserAuthentication, error) {
 	if t.recv != nil {
-		return nil, fmt.Errorf("recv cipher is already set")
+		return nil, serverUserAuthentication{}, fmt.Errorf("recv cipher is already set")
 	}
 	result, err := discoverServerUser(
 		t.serverUsers,
 		t.serverUserHintIsMandatory,
 		encryptedMeta,
-		serverUserDiscoverySource{},
+		t.serverUserSource,
 		true,
 		nil,
 	)
 	if err != nil {
-		return nil, err
+		return nil, serverUserAuthentication{}, err
 	}
 
 	// Re-decrypt with implicit nonce mode enabled to capture TCP nonce state.
@@ -710,10 +745,9 @@ func (t *StreamUnderlay) serverInitRecvBlockCipherAndDecryptMetadata(encryptedMe
 	decryptedMeta, err := t.recv.Decrypt(encryptedMeta)
 	if err != nil {
 		t.recv = nil
-		return nil, fmt.Errorf("stateful Decrypt() failed: %w", err)
+		return nil, serverUserAuthentication{}, fmt.Errorf("stateful Decrypt() failed: %w", err)
 	}
-	t.serverUserPolicy = result.policy
-	return decryptedMeta, nil
+	return decryptedMeta, result.authentication(t.serverUserSource), nil
 }
 
 func (t *StreamUnderlay) maybeInitSendBlockCipher() error {

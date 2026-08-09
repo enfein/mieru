@@ -33,7 +33,7 @@ func TestSessionStruct(t *testing.T) {
 		sessionID:  mrand.Uint32(),
 		statusCode: uint8(mrand.Uint32()),
 		seq:        mrand.Uint32(),
-		payloadLen: uint16(mrand.Uint32()),
+		payloadLen: uint16(mrand.Intn(MaxSessionOpenPayload + 1)),
 		suffixLen:  uint8(mrand.Uint32()),
 	}
 	b := s.Marshal()

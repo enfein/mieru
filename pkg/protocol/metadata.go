@@ -170,8 +170,9 @@ func (ss *sessionStruct) Unmarshal(b []byte) error {
 	if !mathext.WithinRange(currentTimestamp, originalTimestamp, 1) {
 		return fmt.Errorf("invalid timestamp %d", originalTimestamp*60)
 	}
-	if ss.payloadLen > MaxSessionOpenPayload {
-		return fmt.Errorf("payload size %d exceed maximum value %d", ss.payloadLen, MaxSessionOpenPayload)
+	payloadLen := binary.BigEndian.Uint16(b[15:])
+	if payloadLen > MaxSessionOpenPayload {
+		return fmt.Errorf("payload size %d exceed maximum value %d", payloadLen, MaxSessionOpenPayload)
 	}
 
 	// Do unmarshal.
@@ -180,7 +181,7 @@ func (ss *sessionStruct) Unmarshal(b []byte) error {
 	ss.sessionID = binary.BigEndian.Uint32(b[6:])
 	ss.seq = binary.BigEndian.Uint32(b[10:])
 	ss.statusCode = b[14]
-	ss.payloadLen = binary.BigEndian.Uint16(b[15:])
+	ss.payloadLen = payloadLen
 	ss.suffixLen = b[17]
 	return nil
 }

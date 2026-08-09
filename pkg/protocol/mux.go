@@ -607,12 +607,17 @@ func (m *Mux) acceptTCPUnderlay(rawListener net.Listener, properties UnderlayPro
 }
 
 func (m *Mux) serverWrapTCPConn(rawConn net.Conn, mtu int, trafficPattern *appctlpb.TrafficPattern) Underlay {
+	var source serverUserDiscoverySource
+	if rawConn != nil {
+		source.key, source.valid = sourceUserCacheKey(rawConn.RemoteAddr())
+	}
 	return &StreamUnderlay{
 		baseUnderlay:              *newBaseUnderlay(false, mtu, trafficPattern),
 		conn:                      rawConn,
 		sessionCleanTicker:        time.NewTicker(sessionCleanInterval),
 		serverUsers:               &m.serverUsers,
 		serverUserHintIsMandatory: &m.serverUserHintIsMandatory,
+		serverUserSource:          source,
 	}
 }
 

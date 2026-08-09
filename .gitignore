@@ -38,6 +38,3 @@ __pycache__/
 # code coverage
 /coverage.out
 /coverage.html
-
-# AI tools
-/.codex

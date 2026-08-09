@@ -281,12 +281,25 @@ func (u *PacketUnderlay) onOpenSessionRequest(seg *segment, remoteAddr net.Addr)
 		return nil
 	}
 	session := newSession(sessionID, false, u.MTU(), seg.serverUserPolicy, nil, u.trafficPattern)
-	if err := u.AddSession(session, remoteAddr); err == nil {
-		if u.deliverSegmentToSession(session, seg) {
-			u.readySessions <- session
-		}
+	if err := u.AddSession(session, remoteAddr); err != nil {
+		return err
 	}
+	if !u.deliverSegmentToSession(session, seg) {
+		return fmt.Errorf("failed to deliver open session request for session %d", sessionID)
+	}
+	u.readySessions <- session
+	u.commitServerUserAuthentication(seg)
 	return nil
+}
+
+// commitServerUserAuthentication is the single UDP cache-recording point. The
+// open-session handler invokes it only after new-session parsing and dispatch
+// succeed.
+func (u *PacketUnderlay) commitServerUserAuthentication(seg *segment) {
+	if seg == nil || !seg.serverUserAuthentication.valid() {
+		return
+	}
+	seg.serverUserAuthentication.recordAuthenticated()
 }
 
 func (u *PacketUnderlay) onOpenSessionResponse(seg *segment) error {
@@ -382,6 +395,7 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 		var decryptedMeta []byte
 		var blockCipher cipher.BlockCipher
 		var matchedPolicy serverUserPolicy
+		var authentication serverUserAuthentication
 		if u.isClient {
 			decryptedMeta, err = u.block.Decrypt(encryptedMeta)
 			cipher.ClientDirectDecrypt.Add(1)
@@ -414,11 +428,16 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 			})
 
 			if !decrypted {
-				// This is a new session.
+				// Existing-session lookup intentionally remains first and scans
+				// the session registry. Source-IP candidates are consulted only
+				// after that direct path fails.
 				cipher.ServerIterateDecrypt.Add(1)
-				blockCipher, decryptedMeta, matchedPolicy, err = u.serverTryDecryptMetadataForNewSession(encryptedMeta, nonce)
+				key, valid := sourceUserCacheKey(addr)
+				source := serverUserDiscoverySource{key: key, valid: valid}
+				blockCipher, decryptedMeta, authentication, err = u.serverTryDecryptMetadataForNewSession(encryptedMeta, source)
 				if err == nil {
 					decrypted = true
+					matchedPolicy = authentication.policy
 				}
 			}
 			if !decrypted {
@@ -463,6 +482,19 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 				seg.block = blockCipher
 				seg.serverUserPolicy = matchedPolicy
 			}
+			if authentication.valid() {
+				if err := validateServerSegmentDirection(seg); err != nil {
+					log.Debugf("%v dropped invalid new session from %v: %v", u, addr, err)
+					continue
+				}
+				if seg.metadata.Protocol() == openSessionRequest {
+					if err := validateNewServerSessionSegment(seg); err != nil {
+						log.Debugf("%v dropped invalid new session from %v: %v", u, addr, err)
+						continue
+					}
+					seg.serverUserAuthentication = authentication
+				}
+			}
 			return seg, addr, nil
 		} else if isDataAckProtocol(protocolType(p)) {
 			das := &dataAckStruct{}
@@ -478,6 +510,12 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 			if blockCipher != nil {
 				seg.block = blockCipher
 				seg.serverUserPolicy = matchedPolicy
+			}
+			if authentication.valid() {
+				if err := validateServerSegmentDirection(seg); err != nil {
+					log.Debugf("%v dropped invalid new session from %v: %v", u, addr, err)
+					continue
+				}
 			}
 			return seg, addr, nil
 		} else {
@@ -741,19 +779,19 @@ func (u *PacketUnderlay) writeOneSegment(seg *segment, addr net.Addr) error {
 	return nil
 }
 
-// serverTryDecryptMetadataForNewSession attempts to decrypt the metadata of a new
-// session by iterating over registered users.
-func (u *PacketUnderlay) serverTryDecryptMetadataForNewSession(encryptedMeta, _ []byte) (cipher.BlockCipher, []byte, serverUserPolicy, error) {
+// serverTryDecryptMetadataForNewSession attempts to decrypt metadata for an
+// unknown session using the source cache before the full user registry.
+func (u *PacketUnderlay) serverTryDecryptMetadataForNewSession(encryptedMeta []byte, source serverUserDiscoverySource) (cipher.BlockCipher, []byte, serverUserAuthentication, error) {
 	result, err := discoverServerUser(
 		u.serverUsers,
 		u.serverUserHintIsMandatory,
 		encryptedMeta,
-		serverUserDiscoverySource{},
+		source,
 		false,
 		nil,
 	)
 	if err != nil {
-		return nil, nil, serverUserPolicy{}, err
+		return nil, nil, serverUserAuthentication{}, err
 	}
 
 	matchedBlock := result.block
@@ -761,7 +799,7 @@ func (u *PacketUnderlay) serverTryDecryptMetadataForNewSession(encryptedMeta, _ 
 	if u.trafficPattern != nil {
 		matchedBlock.SetNoncePattern(u.trafficPattern.GetNonce())
 	}
-	return matchedBlock, result.decryptedMetadata, result.policy, nil
+	return matchedBlock, result.decryptedMetadata, result.authentication(source), nil
 }
 
 func (u *PacketUnderlay) cleanSessions() {

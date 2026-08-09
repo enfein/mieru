@@ -42,7 +42,7 @@ var discoveryTransports = []discoveryTransport{
 				serverUsers:               publisher,
 				serverUserHintIsMandatory: mandatory,
 			}
-			decryptedMeta, err := underlay.serverInitRecvBlockCipherAndDecryptMetadata(encryptedMeta)
+			decryptedMeta, _, err := underlay.serverInitRecvBlockCipherAndDecryptMetadata(encryptedMeta)
 			if err != nil {
 				if underlay.recv != nil {
 					return nil, "", fmt.Errorf("failed discovery retained a receive cipher")
@@ -60,10 +60,7 @@ var discoveryTransports = []discoveryTransport{
 				serverUsers:               publisher,
 				serverUserHintIsMandatory: mandatory,
 			}
-			block, decryptedMeta, _, err := underlay.serverTryDecryptMetadataForNewSession(
-				encryptedMeta,
-				encryptedMeta[:cipher.DefaultNonceSize],
-			)
+			block, decryptedMeta, _, err := underlay.serverTryDecryptMetadataForNewSession(encryptedMeta, serverUserDiscoverySource{})
 			if err != nil {
 				if block != nil {
 					return nil, "", fmt.Errorf("failed discovery returned a block cipher")

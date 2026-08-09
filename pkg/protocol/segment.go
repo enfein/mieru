@@ -93,9 +93,12 @@ type segment struct {
 	txTimeout time.Duration            // need to receive ACK within this duration
 	block     cipher.BlockCipher       // cipher block to encrypt or decrypt the payload
 
-	// serverUserPolicy is set only when server-side UDP discovery authenticates
-	// a new session.
+	// serverUserPolicy is set when server-side discovery authenticates a new session.
 	serverUserPolicy serverUserPolicy
+
+	// serverUserAuthentication is temporary and is consumed by the
+	// underlay event loop after successful initial protocol dispatch.
+	serverUserAuthentication serverUserAuthentication
 }
 
 // Protocol returns the protocol of the segment.

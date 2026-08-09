@@ -167,8 +167,10 @@ func TestTCPUnderlayAcceptedBeforeReloadUsesCurrentGeneration(t *testing.T) {
 	mux.SetServerUsers(newUsers)
 
 	encrypted := encryptDiscoveryMetadata(t, newCredential, newUser, newUsers, true, newDummyMetadata())
-	if _, err := underlay.serverInitRecvBlockCipherAndDecryptMetadata(encrypted); err != nil {
+	if _, authentication, err := underlay.serverInitRecvBlockCipherAndDecryptMetadata(encrypted); err != nil {
 		t.Fatalf("TCP discovery after reload failed: %v", err)
+	} else {
+		underlay.serverUserPolicy = authentication.policy
 	}
 	if got := underlay.recv.BlockContext().UserName; got != newUser {
 		t.Fatalf("TCP discovery user = %q, want %q", got, newUser)
@@ -250,10 +252,11 @@ func TestUDPDiscoveryUsesCurrentGenerationAndRetainsPolicySnapshot(t *testing.T)
 	mux.SetServerUsers(newUsers)
 
 	encrypted := encryptDiscoveryMetadata(t, newCredential, newUser, newUsers, true, newDummyMetadata())
-	block, _, policy, err := underlay.serverTryDecryptMetadataForNewSession(encrypted, encrypted[:cipher.DefaultNonceSize])
+	block, _, authentication, err := underlay.serverTryDecryptMetadataForNewSession(encrypted, serverUserDiscoverySource{})
 	if err != nil {
 		t.Fatalf("UDP discovery after reload failed: %v", err)
 	}
+	policy := authentication.policy
 	if block.BlockContext().UserName != newUser || policy.name != newUser {
 		t.Fatalf("UDP discovery selected block user %q and policy %q, want %q", block.BlockContext().UserName, policy.name, newUser)
 	}
