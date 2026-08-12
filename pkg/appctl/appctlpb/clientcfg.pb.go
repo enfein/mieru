@@ -168,8 +168,15 @@ type ClientConfig struct {
 	// A list of accounts that can authenticate mieru socks5 proxy service.
 	// If the list is empty, authentication is not required.
 	Socks5Authentication []*Auth `protobuf:"bytes,10,rep,name=socks5Authentication,proto3" json:"socks5Authentication,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// If set, mieru creates a virtual TUN interface to route all system traffic.
+	TunEnabled *bool `protobuf:"varint,11,opt,name=tunEnabled,proto3,oneof" json:"tunEnabled,omitempty"`
+	// The name of the virtual TUN interface.
+	// If empty and `tunEnabled` is true, the default name "mieru_tun0" is used.
+	TunInterfaceName *string `protobuf:"bytes,12,opt,name=tunInterfaceName,proto3,oneof" json:"tunInterfaceName,omitempty"`
+	// The DNS server used inside the virtual TUN interface.
+	TunDNS        *string `protobuf:"bytes,13,opt,name=tunDNS,proto3,oneof" json:"tunDNS,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ClientConfig) Reset() {
@@ -270,6 +277,27 @@ func (x *ClientConfig) GetSocks5Authentication() []*Auth {
 		return x.Socks5Authentication
 	}
 	return nil
+}
+
+func (x *ClientConfig) GetTunEnabled() bool {
+	if x != nil && x.TunEnabled != nil {
+		return *x.TunEnabled
+	}
+	return false
+}
+
+func (x *ClientConfig) GetTunInterfaceName() string {
+	if x != nil && x.TunInterfaceName != nil {
+		return *x.TunInterfaceName
+	}
+	return ""
+}
+
+func (x *ClientConfig) GetTunDNS() string {
+	if x != nil && x.TunDNS != nil {
+		return *x.TunDNS
+	}
+	return ""
 }
 
 type ClientProfile struct {
@@ -632,7 +660,7 @@ var File_appctl_proto_clientcfg_proto protoreflect.FileDescriptor
 
 const file_appctl_proto_clientcfg_proto_rawDesc = "" +
 	"\n" +
-	"\x1cappctl/proto/clientcfg.proto\x12\fmieru.appctl\x1a\x17appctl/proto/base.proto\"\xb9\x05\n" +
+	"\x1cappctl/proto/clientcfg.proto\x12\fmieru.appctl\x1a\x17appctl/proto/base.proto\"\xdb\x06\n" +
 	"\fClientConfig\x127\n" +
 	"\bprofiles\x18\x01 \x03(\v2\x1b.mieru.appctl.ClientProfileR\bprofiles\x12)\n" +
 	"\ractiveProfile\x18\x02 \x01(\tH\x00R\ractiveProfile\x88\x01\x01\x12\x1d\n" +
@@ -646,7 +674,13 @@ const file_appctl_proto_clientcfg_proto_rawDesc = "" +
 	"\rhttpProxyPort\x18\b \x01(\x05H\x06R\rhttpProxyPort\x88\x01\x01\x123\n" +
 	"\x12httpProxyListenLAN\x18\t \x01(\bH\aR\x12httpProxyListenLAN\x88\x01\x01\x12F\n" +
 	"\x14socks5Authentication\x18\n" +
-	" \x03(\v2\x12.mieru.appctl.AuthR\x14socks5AuthenticationB\x10\n" +
+	" \x03(\v2\x12.mieru.appctl.AuthR\x14socks5Authentication\x12#\n" +
+	"\n" +
+	"tunEnabled\x18\v \x01(\bH\bR\n" +
+	"tunEnabled\x88\x01\x01\x12/\n" +
+	"\x10tunInterfaceName\x18\f \x01(\tH\tR\x10tunInterfaceName\x88\x01\x01\x12\x1b\n" +
+	"\x06tunDNS\x18\r \x01(\tH\n" +
+	"R\x06tunDNS\x88\x01\x01B\x10\n" +
 	"\x0e_activeProfileB\n" +
 	"\n" +
 	"\b_rpcPortB\r\n" +
@@ -655,7 +689,10 @@ const file_appctl_proto_clientcfg_proto_rawDesc = "" +
 	"\r_loggingLevelB\x12\n" +
 	"\x10_socks5ListenLANB\x10\n" +
 	"\x0e_httpProxyPortB\x15\n" +
-	"\x13_httpProxyListenLAN\"\xab\x04\n" +
+	"\x13_httpProxyListenLANB\r\n" +
+	"\v_tunEnabledB\x13\n" +
+	"\x11_tunInterfaceNameB\t\n" +
+	"\a_tunDNS\"\xab\x04\n" +
 	"\rClientProfile\x12%\n" +
 	"\vprofileName\x18\x01 \x01(\tH\x00R\vprofileName\x88\x01\x01\x12+\n" +
 	"\x04user\x18\x02 \x01(\v2\x12.mieru.appctl.UserH\x01R\x04user\x88\x01\x01\x126\n" +

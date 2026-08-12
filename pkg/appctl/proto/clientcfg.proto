@@ -52,6 +52,16 @@ message ClientConfig {
     // A list of accounts that can authenticate mieru socks5 proxy service.
     // If the list is empty, authentication is not required.
     repeated Auth socks5Authentication = 10;
+
+    // If set, mieru creates a virtual TUN interface to route all system traffic.
+    optional bool tunEnabled = 11;
+
+    // The name of the virtual TUN interface.
+    // If empty and `tunEnabled` is true, the default name "mieru_tun0" is used.
+    optional string tunInterfaceName = 12;
+
+    // The DNS server used inside the virtual TUN interface.
+    optional string tunDNS = 13;
 }
 
 message ClientProfile {

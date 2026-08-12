@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"sort"
@@ -477,6 +478,18 @@ func ValidateFullClientConfig(config *pb.ClientConfig) error {
 			return fmt.Errorf("HTTP proxy port number %d is the same as socks5 port number", config.GetHttpProxyPort())
 		}
 	}
+	if config.GetTunEnabled() {
+		if len(config.GetTunInterfaceName()) > 15 {
+			return fmt.Errorf("TUN interface name cannot be longer than 15 characters")
+		}
+		tunDNS := config.GetTunDNS()
+		if len(tunDNS) == 0 {
+			return fmt.Errorf("TUN dns is not set")
+		}
+		if net.ParseIP(tunDNS) == nil {
+			return fmt.Errorf("invalid IP address format for 'tunDNS': %q. Examples: %q, %q", tunDNS, "1.1.1.1", "8.8.8.8")
+		}
+	}
 	return nil
 }
 
@@ -645,6 +658,19 @@ func mergeClientConfigByProfile(dst, src *pb.ClientConfig) {
 		socks5Authentication = src.Socks5Authentication
 	}
 
+	var tunEnabled *bool = dst.TunEnabled
+	if src.TunEnabled != nil {
+		tunEnabled = src.TunEnabled
+	}
+	var tunInterfaceName *string = dst.TunInterfaceName
+	if src.TunInterfaceName != nil {
+		tunInterfaceName = src.TunInterfaceName
+	}
+	var tunDNS *string = dst.TunDNS
+	if src.TunDNS != nil {
+		tunDNS = src.TunDNS
+	}
+
 	proto.Reset(dst)
 
 	dst.ActiveProfile = proto.String(activeProfile)
@@ -658,6 +684,10 @@ func mergeClientConfigByProfile(dst, src *pb.ClientConfig) {
 	dst.HttpProxyPort = httpProxyPort
 	dst.HttpProxyListenLAN = httpProxyListenLAN
 	dst.Socks5Authentication = socks5Authentication
+
+	dst.TunEnabled = tunEnabled
+	dst.TunInterfaceName = tunInterfaceName
+	dst.TunDNS = tunDNS
 }
 
 // deleteClientConfigFile deletes the client config file.
