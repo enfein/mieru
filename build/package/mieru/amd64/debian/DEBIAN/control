@@ -3,6 +3,6 @@ Version: 3.35.0
 Section: net
 Priority: optional
 Architecture: amd64
-Depends: bash
+Depends: bash, libcap2-bin
 Maintainer: Mieru Authors
 Description: Mieru proxy client

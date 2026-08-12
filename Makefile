@@ -173,6 +173,17 @@ client-linux-riscv64:
 	mv mieru_${VERSION}_linux_riscv64.tar.gz ../../
 	mv mieru_${VERSION}_linux_riscv64.tar.gz.sha256.txt ../../
 
+# Grant the CAP_NET_ADMIN capability to the linux client binaries so that the
+# TUN interface can be created without root. You will be prompted for the sudo
+# password:
+#   make setcap
+.PHONY: setcap
+setcap: client-linux
+	sudo setcap cap_net_admin+ep release/linux/amd64/mieru
+	sudo setcap cap_net_admin+ep release/linux/arm64/mieru
+	sudo setcap cap_net_admin+ep release/linux/armv7/mieru
+	sudo setcap cap_net_admin+ep release/linux/riscv64/mieru
+
 # Build MacOS clients.
 .PHONY: client-mac
 client-mac: client-mac-amd64 client-mac-arm64

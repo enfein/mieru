@@ -33,6 +33,10 @@ func StartEngine(ctx context.Context, name, socks5Addr, remoteServerIP, userDNS 
 		name = "mieru_tun0"
 	}
 
+	if err := checkTunPrivileges(); err != nil {
+		return err
+	}
+
 	if runtime.GOOS == "windows" {
 		log.Infof("TUN: Initializing Windows Wintun driver environmant")
 		if err := wintun.InitWintun(); err != nil {
