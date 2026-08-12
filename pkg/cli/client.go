@@ -44,6 +44,7 @@ import (
 	"github.com/enfein/mieru/v3/pkg/sockopts"
 	"github.com/enfein/mieru/v3/pkg/socks5"
 	"github.com/enfein/mieru/v3/pkg/stderror"
+	"github.com/enfein/mieru/v3/pkg/tun"
 	"github.com/enfein/mieru/v3/pkg/version/updater"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -454,10 +455,18 @@ var clientStartFunc = func(s []string) error {
 	}
 
 	if err = appctl.IsClientDaemonRunning(context.Background()); err == nil {
-		if config.GetSocks5ListenLAN() {
-			log.Infof("mieru client is running, listening to socks5://0.0.0.0:%d", config.GetSocks5Port())
+		if err == nil && config.GetTunEnabled() {
+			if config.GetTunInterfaceName() != "" {
+				log.Infof("mieru client is already running in VPN (TUN) mode via interface: %s", config.GetTunInterfaceName())
+			} else {
+				log.Infof("mieru client is already running in VPN (TUN) mode via default interface: mieru_tun0")
+			}
 		} else {
-			log.Infof("mieru client is running, listening to socks5://127.0.0.1:%d", config.GetSocks5Port())
+			if config.GetSocks5ListenLAN() {
+				log.Infof("mieru client is running, listening to socks5://0.0.0.0:%d", config.GetSocks5Port())
+			} else {
+				log.Infof("mieru client is running, listening to socks5://127.0.0.1:%d", config.GetSocks5Port())
+			}
 		}
 		return nil
 	}
@@ -482,6 +491,13 @@ var clientStartFunc = func(s []string) error {
 				log.Infof("mieru client is started, listening to socks5://0.0.0.0:%d", config.GetSocks5Port())
 			} else {
 				log.Infof("mieru client is started, listening to socks5://127.0.0.1:%d", config.GetSocks5Port())
+			}
+			if config.GetTunEnabled() {
+				if config.GetTunInterfaceName() != "" {
+					log.Infof("TUN mode is enabled, routing traffic via interface: %s", config.GetTunInterfaceName())
+				} else {
+					log.Infof("TUN mode is enabled, routing traffic via default interface: mieru_tun0")
+				}
 			}
 
 			if should, _ := clientShouldCheckUpdate(config); should {
@@ -675,6 +691,38 @@ var clientRunFunc = func(s []string) error {
 	}
 
 	<-appctl.ClientSocks5ServerStarted
+	if config.GetTunEnabled() {
+		wg.Add(1)
+		go func(socks5Addr string) {
+			defer wg.Done()
+
+			// Запускаем наш движок из пакета pkg/tun
+			// Передаем контекст, конфиг и адрес куда пересылать трафик компьютера
+			activeProfileName := config.GetActiveProfile()
+			for _, p := range config.GetProfiles() {
+				if activeProfileName == p.GetProfileName() {
+					activeProfile = p
+					break
+				}
+			}
+			var ipAdress string
+			for _, s := range activeProfile.GetServers() {
+				if len(s.GetIpAddress()) != 0 {
+					ipAdress = s.GetIpAddress()
+					break
+				}
+			}
+			if err := tun.StartEngine(
+				context.Background(),
+				*config.TunInterfaceName,
+				socks5Addr,
+				ipAdress,
+				"8.8.8.8",
+			); err != nil {
+				log.Fatalf("Fatal error in TUN engine: %v", err)
+			}
+		}(socks5Addr)
+	}
 
 	if config.GetAdvancedSettings().GetMetricsLoggingInterval() != "" {
 		metricsDuration, err := time.ParseDuration(config.GetAdvancedSettings().GetMetricsLoggingInterval())
