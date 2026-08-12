@@ -10,6 +10,9 @@
 *.dylib
 __pycache__/
 
+# generated windows resource files (UAC manifest)
+cmd/mieru/*.syso
+
 # deb and rpm packages
 *.deb
 *.rpm

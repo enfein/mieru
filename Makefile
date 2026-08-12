@@ -216,11 +216,25 @@ client-mac-arm64:
 .PHONY: client-windows
 client-windows: client-windows-x86 client-windows-amd64 client-windows-arm64
 
+# UAC manifest embedded into the Windows client executable so that it runs
+# with administrator privileges (required by the Wintun driver).
+WIN_CLIENT_MANIFEST = build/package/mieru/windows/mieru.exe.manifest
+RSRC_VERSION = v0.10.2
+
+cmd/mieru/rsrc_windows_386.syso: $(WIN_CLIENT_MANIFEST)
+	go run github.com/akavel/rsrc@$(RSRC_VERSION) -manifest $< -arch 386 -o $@
+
+cmd/mieru/rsrc_windows_amd64.syso: $(WIN_CLIENT_MANIFEST)
+	go run github.com/akavel/rsrc@$(RSRC_VERSION) -manifest $< -arch amd64 -o $@
+
+cmd/mieru/rsrc_windows_arm64.syso: $(WIN_CLIENT_MANIFEST)
+	go run github.com/akavel/rsrc@$(RSRC_VERSION) -manifest $< -arch arm64 -o $@
+
 # Build windows x86 client.
 .PHONY: client-windows-x86
-client-windows-x86:
+client-windows-x86: cmd/mieru/rsrc_windows_386.syso
 	mkdir -p release/windows/386
-	env GOOS=windows GOARCH=386 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/windows/386/mieru.exe cmd/mieru/mieru.go
+	env GOOS=windows GOARCH=386 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/windows/386/mieru.exe ./cmd/mieru
 	cd release/windows/386
 	sha256sum mieru.exe > mieru_${VERSION}_windows_x86.exe.sha256.txt
 	zip -r mieru_${VERSION}_windows_x86.zip mieru.exe
@@ -230,9 +244,9 @@ client-windows-x86:
 
 # Build windows amd64 client.
 .PHONY: client-windows-amd64
-client-windows-amd64:
+client-windows-amd64: cmd/mieru/rsrc_windows_amd64.syso
 	mkdir -p release/windows/amd64
-	env GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/windows/amd64/mieru.exe cmd/mieru/mieru.go
+	env GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/windows/amd64/mieru.exe ./cmd/mieru
 	cd release/windows/amd64
 	sha256sum mieru.exe > mieru_${VERSION}_windows_amd64.exe.sha256.txt
 	zip -r mieru_${VERSION}_windows_amd64.zip mieru.exe
@@ -242,9 +256,9 @@ client-windows-amd64:
 
 # Build windows arm64 client.
 .PHONY: client-windows-arm64
-client-windows-arm64:
+client-windows-arm64: cmd/mieru/rsrc_windows_arm64.syso
 	mkdir -p release/windows/arm64
-	env GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/windows/arm64/mieru.exe cmd/mieru/mieru.go
+	env GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/windows/arm64/mieru.exe ./cmd/mieru
 	cd release/windows/arm64
 	sha256sum mieru.exe > mieru_${VERSION}_windows_arm64.exe.sha256.txt
 	zip -r mieru_${VERSION}_windows_arm64.zip mieru.exe
