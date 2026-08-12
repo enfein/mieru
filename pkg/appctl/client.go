@@ -80,6 +80,12 @@ var (
 
 	// clientMuxRef holds a pointer to client multiplexier.
 	clientMuxRef atomic.Pointer[protocol.Mux]
+
+	// clientTunStopRef holds a function to stop the client TUN engine.
+	clientTunStopRef atomic.Pointer[func()]
+
+	// clientStopOnce ensures the client daemon shutdown logic runs only once.
+	clientStopOnce sync.Once
 )
 
 func SetClientRPCServerRef(server *grpc.Server) {
@@ -94,6 +100,12 @@ func SetClientMuxRef(mux *protocol.Mux) {
 	clientMuxRef.Store(mux)
 }
 
+// SetClientTunStopFunc registers a function that stops the client TUN engine.
+// It is called when the client daemon is stopped.
+func SetClientTunStopFunc(f func()) {
+	clientTunStopRef.Store(&f)
+}
+
 // clientManagementService implements ClientManagementService defined in rpc.proto.
 type clientManagementService struct {
 	appctlgrpc.UnimplementedClientManagementServiceServer
@@ -106,26 +118,41 @@ func (c *clientManagementService) GetStatus(ctx context.Context, req *emptypb.Em
 }
 
 func (c *clientManagementService) Exit(ctx context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
-	SetAppStatus(pb.AppStatus_STOPPING)
-	log.Infof("received Exit request from RPC caller")
-	socks5Server := clientSocks5ServerRef.Load()
-	if socks5Server != nil {
-		log.Infof("stopping socks5 server")
-		if err := socks5Server.Close(); err != nil {
-			log.Infof("socks5 server Close() failed: %v", err)
-		}
-	} else {
-		log.Infof("socks5 server reference not found")
-	}
-	grpcServer := clientRPCServerRef.Load()
-	if grpcServer != nil {
-		log.Infof("stopping RPC server")
-		go grpcServer.GracefulStop()
-	} else {
-		log.Infof("RPC server reference not found")
-	}
+	StopClientDaemon()
 	log.Infof("completed Exit request from RPC caller")
 	return &emptypb.Empty{}, nil
+}
+
+// StopClientDaemon gracefully stops the client daemon.
+// It can be called from the RPC Exit handler or from OS signal handlers.
+func StopClientDaemon() {
+	clientStopOnce.Do(func() {
+		SetAppStatus(pb.AppStatus_STOPPING)
+		log.Infof("stopping mieru client daemon")
+		socks5Server := clientSocks5ServerRef.Load()
+		if socks5Server != nil {
+			log.Infof("stopping socks5 server")
+			if err := socks5Server.Close(); err != nil {
+				log.Infof("socks5 server Close() failed: %v", err)
+			}
+		} else {
+			log.Infof("socks5 server reference not found")
+		}
+		tunStop := clientTunStopRef.Load()
+		if tunStop != nil {
+			log.Infof("stopping TUN engine")
+			(*tunStop)()
+		} else {
+			log.Infof("TUN engine stop function not found")
+		}
+		grpcServer := clientRPCServerRef.Load()
+		if grpcServer != nil {
+			log.Infof("stopping RPC server")
+			go grpcServer.GracefulStop()
+		} else {
+			log.Infof("RPC server reference not found")
+		}
+	})
 }
 
 func (c *clientManagementService) GetMetrics(ctx context.Context, req *emptypb.Empty) (*pb.Metrics, error) {

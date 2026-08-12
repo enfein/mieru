@@ -24,10 +24,12 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"runtime/pprof"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
@@ -693,33 +695,28 @@ var clientRunFunc = func(s []string) error {
 	<-appctl.ClientSocks5ServerStarted
 	if config.GetTunEnabled() {
 		wg.Add(1)
+		tunCtx, tunCancel := context.WithCancel(context.Background())
+		appctl.SetClientTunStopFunc(tunCancel)
 		go func(socks5Addr string) {
 			defer wg.Done()
 
 			// Запускаем наш движок из пакета pkg/tun
 			// Передаем контекст, конфиг и адрес куда пересылать трафик компьютера
-			activeProfileName := config.GetActiveProfile()
-			for _, p := range config.GetProfiles() {
-				if activeProfileName == p.GetProfileName() {
-					activeProfile = p
-					break
-				}
-			}
-			var ipAdress string
+			var ipAddress string
 			for _, s := range activeProfile.GetServers() {
 				if len(s.GetIpAddress()) != 0 {
-					ipAdress = s.GetIpAddress()
+					ipAddress = s.GetIpAddress()
 					break
 				}
 			}
 			if err := tun.StartEngine(
-				context.Background(),
-				*config.TunInterfaceName,
+				tunCtx,
+				config.GetTunInterfaceName(),
 				socks5Addr,
-				ipAdress,
-				"8.8.8.8",
-			); err != nil {
-				log.Fatalf("Fatal error in TUN engine: %v", err)
+				ipAddress,
+				config.GetTunDNS(),
+			); err != nil && !errors.Is(err, context.Canceled) {
+				log.Errorf("TUN engine failed: %v", err)
 			}
 		}(socks5Addr)
 	}
@@ -735,6 +732,15 @@ var clientRunFunc = func(s []string) error {
 		}
 	}
 	metrics.EnableLogging()
+
+	// Stop the client daemon gracefully when a signal is received.
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigCh
+		log.Infof("received termination signal, stopping mieru client")
+		appctl.StopClientDaemon()
+	}()
 
 	appctl.SetAppStatus(appctlpb.AppStatus_RUNNING)
 	log.Debugf("Started proxy after %v", appctl.Elapsed())
