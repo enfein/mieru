@@ -700,8 +700,8 @@ var clientRunFunc = func(s []string) error {
 		go func(socks5Addr string) {
 			defer wg.Done()
 
-			// Запускаем наш движок из пакета pkg/tun
-			// Передаем контекст, конфиг и адрес куда пересылать трафик компьютера
+			// Start our engine from the pkg/tun package
+			// Pass the context, config and the address to which computer traffic is forwarded
 			var ipAddress string
 			for _, s := range activeProfile.GetServers() {
 				if len(s.GetIpAddress()) != 0 {
