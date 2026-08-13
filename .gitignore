@@ -6,12 +6,10 @@
 /release
 *.exe
 *.dll
+!pkg/tun/wintun/bin/**/wintun.dll
 *.so
 *.dylib
 __pycache__/
-
-# generated windows resource files (UAC manifest)
-cmd/mieru/*.syso
 
 # deb and rpm packages
 *.deb
