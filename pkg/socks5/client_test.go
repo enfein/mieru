@@ -112,7 +112,7 @@ func TestSocks5Anonymous(t *testing.T) {
 	dialSocksProxy := Dial(fmt.Sprintf("socks5://127.0.0.1:%d?timeout=5s", port), constant.Socks5ConnectCmd)
 	tr := &http.Transport{Dial: dialSocksProxy}
 	httpClient := &http.Client{Transport: tr}
-	resp, err := httpClient.Get(fmt.Sprintf("http://localhost" + httpTestServer.Addr))
+	resp, err := httpClient.Get("http://localhost" + httpTestServer.Addr)
 	if err != nil {
 		panic(err)
 	}

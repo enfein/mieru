@@ -261,7 +261,7 @@ func LogMetricsNow() {
 	})
 	sort.Sort(list)
 	for _, group := range list {
-		log.WithFields(group.NewLogFields()).Infof(group.NewLogMsg())
+		log.WithFields(group.NewLogFields()).Infof("%s", group.NewLogMsg())
 	}
 }
 

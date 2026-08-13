@@ -506,7 +506,7 @@ var clientStartFunc = func(s []string) error {
 				msg, _ := clientCheckUpdateAndUpdateHistory(fmt.Sprintf("socks5://127.0.0.1:%d", config.GetSocks5Port()))
 				if msg != updater.UpToDateMessage {
 					log.Infof("")
-					log.Infof(msg)
+					log.Infof("%s", msg)
 				}
 			}
 			return nil

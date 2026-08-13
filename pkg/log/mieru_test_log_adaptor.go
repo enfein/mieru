@@ -30,7 +30,7 @@ var _ io.Writer = testingAdaptor{}
 
 func (a testingAdaptor) Write(p []byte) (n int, err error) {
 	s := string(p)
-	a.t.Logf(s)
+	a.t.Log(s)
 	return len(p), nil
 }
 
