@@ -18,13 +18,6 @@ type tunManager interface {
 	Teardown() error
 }
 
-type tunEngine struct {
-	tunIfaceName string
-	proxyIPStr   string
-	dnsStr       string
-	manager      tunManager
-}
-
 func StartEngine(ctx context.Context, name, socks5Addr, remoteServerIP, userDNS string) error {
 	if ip := net.ParseIP(userDNS); ip == nil || ip.To4() == nil {
 		userDNS = "8.8.8.8"

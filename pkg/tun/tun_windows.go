@@ -101,7 +101,9 @@ func newOSManager(remoteIPStr, gatewayStr, tunName, physName string) (tunManager
 func (m *windowsManager) SetupInterface(dnsStr string) error {
 
 	// 1. Get the LUIDs of the physical and virtual interfaces
-	m.ensureInterface()
+	if err := m.ensureInterface(); err != nil {
+		return fmt.Errorf("resolve interfaces: %w", err)
+	}
 
 	// 2. ASSIGN AN IP ADDRESS TO THE TUNNEL
 	tunIP := netip.MustParsePrefix("10.0.0.2/24")
