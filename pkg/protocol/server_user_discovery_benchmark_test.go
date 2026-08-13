@@ -252,6 +252,71 @@ func BenchmarkServerUserDiscoveryWarmCache(b *testing.B) {
 	}
 }
 
+func BenchmarkServerUserDiscoveryColdSourceCache(b *testing.B) {
+	for _, userCount := range []int{100, 1000, 10000} {
+		b.Run(fmt.Sprintf("Users_%d", userCount), func(b *testing.B) {
+			fixture := newUserDiscoveryBench(b, userCount)
+			users := make(map[string]*appctlpb.User, len(fixture.users))
+			for _, user := range fixture.users {
+				users[user.GetName()] = user
+			}
+			state := buildServerUserState(users, &sourceUserCacheStats{})
+			benchmarks := []struct {
+				name          string
+				encryptedMeta []byte
+			}{
+				{name: "ValidHint", encryptedMeta: fixture.validHintCiphertext},
+				{name: "FullTraversalEnd", encryptedMeta: fixture.fullTraversalEndCiphertext},
+			}
+			for _, benchmark := range benchmarks {
+				b.Run(benchmark.name, func(b *testing.B) {
+					// Populate each prepared decryptor lazily without recording a
+					// source association. The timed path therefore measures a source
+					// cache miss with current key-epoch material already available.
+					if result := tryServerUserState(state, benchmark.encryptedMeta, serverUserDiscoverySource{}, false); result.block == nil {
+						b.Fatal("failed to warm cipher trial material")
+					}
+
+					b.ReportAllocs()
+					b.ResetTimer()
+					for i := 0; i < b.N; i++ {
+						result := tryServerUserState(state, benchmark.encryptedMeta, serverUserDiscoverySource{}, false)
+						if result.block == nil || result.userID != uint32(len(state.users)) {
+							b.Fatalf("cold source discovery = (block nil=%t, userID=%d), want user %d", result.block == nil, result.userID, len(state.users))
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
+func BenchmarkServerUserDiscoveryWarmCacheParallel10K(b *testing.B) {
+	fixture := newUserDiscoveryBench(b, 10000)
+	users := make(map[string]*appctlpb.User, len(fixture.users))
+	for _, user := range fixture.users {
+		users[user.GetName()] = user
+	}
+	state := buildServerUserState(users, &sourceUserCacheStats{})
+	targetID := uint32(len(state.users))
+	source := serverUserDiscoverySource{key: sourceUserCacheTestKey(500), valid: true}
+	state.cache.recordAuthenticated(source.key, targetID)
+	if result := tryServerUserState(state, fixture.validHintCiphertext, source, false); result.block == nil {
+		b.Fatal("failed to warm server user discovery")
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			result := tryServerUserState(state, fixture.validHintCiphertext, source, false)
+			if result.block == nil || result.origin != serverUserMatchCachedHint || result.userID != targetID {
+				b.Errorf("parallel warm discovery = (block nil=%t, origin=%d, userID=%d), want cached hint for %d", result.block == nil, result.origin, result.userID, targetID)
+			}
+		}
+	})
+}
+
 // udpSessionBench is used to benchmark finding the correct session in
 // a single server PacketUnderlay.
 type udpSessionBench struct {

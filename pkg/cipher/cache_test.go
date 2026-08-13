@@ -15,10 +15,12 @@
 
 package cipher
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestGetBlockCipherList(t *testing.T) {
-	password := []byte{0x08, 0x09, 0x06, 0x04}
+	password := string([]byte{0x00, 0xff, 0x08, 0x09, 0x06, 0x04})
 	ciphers, err := getBlockCipherList(password, true)
 	if err != nil {
 		t.Fatalf("getBlockCipherList() failed: %v", err)

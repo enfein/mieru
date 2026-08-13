@@ -16,6 +16,7 @@
 package cipher
 
 import (
+	"bytes"
 	crand "crypto/rand"
 	"fmt"
 	"strings"
@@ -71,7 +72,7 @@ func TestUserHintOperationsPanicForLongUserName(t *testing.T) {
 		{
 			name: "addUserHintToNonce",
 			fn: func() {
-				c := &AEADBlockCipher{ctx: BlockContext{UserName: user}}
+				c := &aeadBlockCipher{ctx: BlockContext{UserName: user}}
 				c.addUserHintToNonce(nonce[:])
 			},
 		},
@@ -94,7 +95,8 @@ func TestConcurrentStatelessTrialsReturnIndependentCiphers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BlockCipherFromPassword() failed: %v", err)
 	}
-	ciphertext, err := block.Encrypt([]byte("parallel plaintext"))
+	plaintext := []byte("parallel plaintext")
+	ciphertext, err := block.Encrypt(plaintext)
 	if err != nil {
 		t.Fatalf("Encrypt() failed: %v", err)
 	}
@@ -120,6 +122,22 @@ func TestConcurrentStatelessTrialsReturnIndependentCiphers(t *testing.T) {
 			winner.SetBlockContext(BlockContext{UserName: want})
 			if got := winner.BlockContext().UserName; got != want {
 				errCh <- fmt.Errorf("trial %d context = %q, want %q", i, got, want)
+				return
+			}
+			nonce := make([]byte, DefaultNonceSize)
+			nonce[len(nonce)-1] = byte(i)
+			sealed, err := winner.EncryptWithNonce(plaintext, nonce)
+			if err != nil {
+				errCh <- fmt.Errorf("trial %d EncryptWithNonce() failed: %w", i, err)
+				return
+			}
+			opened, err := winner.DecryptWithNonce(sealed, nonce)
+			if err != nil {
+				errCh <- fmt.Errorf("trial %d DecryptWithNonce() failed: %w", i, err)
+				return
+			}
+			if !bytes.Equal(opened, plaintext) {
+				errCh <- fmt.Errorf("trial %d direct plaintext = %q, want %q", i, opened, plaintext)
 			}
 		}()
 	}
@@ -129,11 +147,70 @@ func TestConcurrentStatelessTrialsReturnIndependentCiphers(t *testing.T) {
 		t.Error(err)
 	}
 
-	templates, err := getBlockCipherList(password, true)
+	templates, err := getBlockCipherList(string(password), true)
 	if err != nil {
 		t.Fatalf("getBlockCipherList() failed: %v", err)
 	}
 	for i, template := range templates {
+		if got := template.BlockContext().UserName; got != "" {
+			t.Fatalf("cached template %d context = %q after concurrent trials, want empty", i, got)
+		}
+	}
+}
+
+// The cached XChaCha20-Poly1305 templates are immutable. Concurrent Open
+// calls share only their read-only key and create all working state per call.
+func TestConcurrentPreparedStatelessTrialsAreRaceFree(t *testing.T) {
+	password := HashPassword([]byte(t.Name()), []byte("parallel-prepared-user"))
+	block, err := BlockCipherFromPassword(password, true)
+	if err != nil {
+		t.Fatalf("BlockCipherFromPassword() failed: %v", err)
+	}
+	plaintext := []byte("parallel prepared plaintext")
+	ciphertext, err := block.Encrypt(plaintext)
+	if err != nil {
+		t.Fatalf("Encrypt() failed: %v", err)
+	}
+	decryptor, err := NewStatelessDecryptor(password)
+	if err != nil {
+		t.Fatalf("NewStatelessDecryptor() failed: %v", err)
+	}
+
+	const trials = 64
+	var wg sync.WaitGroup
+	errCh := make(chan error, trials)
+	for i := 0; i < trials; i++ {
+		i := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			winner, got, err := decryptor.TryDecrypt(ciphertext, make([]byte, 0, len(plaintext)))
+			if err != nil {
+				errCh <- err
+				return
+			}
+			if !bytes.Equal(got, plaintext) {
+				errCh <- fmt.Errorf("trial %d plaintext = %q, want %q", i, got, plaintext)
+				return
+			}
+			want := fmt.Sprintf("prepared-trial-%d", i)
+			winner.SetBlockContext(BlockContext{UserName: want})
+			if got := winner.BlockContext().UserName; got != want {
+				errCh <- fmt.Errorf("trial %d context = %q, want %q", i, got, want)
+			}
+		}()
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Error(err)
+	}
+
+	entry := decryptor.ciphers.Load()
+	if entry == nil {
+		t.Fatal("prepared decryptor did not retain trial material")
+	}
+	for i, template := range entry.cipherList {
 		if got := template.BlockContext().UserName; got != "" {
 			t.Fatalf("cached template %d context = %q after concurrent trials, want empty", i, got)
 		}
