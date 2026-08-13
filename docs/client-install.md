@@ -122,7 +122,7 @@ When TUN mode is enabled, the mieru client creates a virtual network interface a
   sudo setcap cap_net_admin+ep /path/to/mieru
   ```
   Without this capability, `mieru start` fails with a clear error message.
-- **Windows**: The client must run with administrator privileges. The released `mieru.exe` requests elevation via a UAC prompt automatically; confirm the prompt when starting the client.
+- **Windows**: The client must run with administrator privileges. Run `mieru.exe` as administrator manually (for example, right-click on it and choose "Run as administrator"). Without elevation, `mieru start` fails with a clear error message.
 - **macOS**: TUN mode is not supported.
 
 ## Test the Connection Between Client and Server

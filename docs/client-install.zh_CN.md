@@ -122,7 +122,7 @@ mieru stop
   sudo setcap cap_net_admin+ep /path/to/mieru
   ```
   如果没有该权限，`mieru start` 会失败并显示明确的错误信息。
-- **Windows**：客户端必须以管理员权限运行。发布的 `mieru.exe` 会自动通过 UAC 提示请求提升权限；启动客户端时确认该提示即可。
+- **Windows**：客户端必须以管理员权限运行。请手动以管理员身份运行 `mieru.exe`（例如右键点击该程序并选择「以管理员身份运行」）。如果没有提升权限，`mieru start` 会报出明确的错误信息。
 - **macOS**：不支持 TUN 模式。
 
 ## 测试客户端与服务器的连接
