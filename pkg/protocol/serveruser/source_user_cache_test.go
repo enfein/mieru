@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package protocol
+package serveruser
 
 import (
 	"encoding/binary"
@@ -114,6 +114,7 @@ func TestSourceUserCacheMRUDedupExpiryAndUserEviction(t *testing.T) {
 	clock := &sourceUserCacheTestClock{}
 	cache := newSourceUserCacheWithTick(&sourceUserCacheStats{}, clock.now)
 	key := sourceUserCacheTestKey(1)
+	newUserID := uint32(sourceUserCacheUsers + 1)
 	for userID := uint32(1); userID <= sourceUserCacheUsers; userID++ {
 		clock.set(1000 + userID)
 		cache.recordAuthenticated(key, userID)
@@ -122,10 +123,10 @@ func TestSourceUserCacheMRUDedupExpiryAndUserEviction(t *testing.T) {
 	clock.set(1020)
 	cache.recordAuthenticated(key, 3)
 	clock.set(1021)
-	cache.recordAuthenticated(key, 11)
+	cache.recordAuthenticated(key, newUserID)
 	candidates, count := cache.lookup(key)
-	if count != sourceUserCacheUsers || candidates[0] != 11 || candidates[1] != 3 {
-		t.Fatalf("MRU candidates = (%v, %d), want users 11 and 3 first", candidates, count)
+	if count != sourceUserCacheUsers || candidates[0] != newUserID || candidates[1] != 3 {
+		t.Fatalf("MRU candidates = (%v, %d), want users %d and 3 first", candidates, count, newUserID)
 	}
 	if sourceUserCacheContains(candidates, count, 1) {
 		t.Fatalf("oldest user 1 was not evicted: %v", candidates)
@@ -139,8 +140,8 @@ func TestSourceUserCacheMRUDedupExpiryAndUserEviction(t *testing.T) {
 	// once and retain the newer position.
 	entry.users[1].Store(sourceUserCachePackUser(3, 1010))
 	candidates, count = cache.lookup(key)
-	if count != sourceUserCacheUsers-1 || candidates[0] != 11 || candidates[1] != 3 {
-		t.Fatalf("deduplicated candidates = (%v, %d), want 9 users with 11 and 3 first", candidates, count)
+	if count != sourceUserCacheUsers-1 || candidates[0] != newUserID || candidates[1] != 3 {
+		t.Fatalf("deduplicated candidates = (%v, %d), want %d users with %d and 3 first", candidates, count, sourceUserCacheUsers-1, newUserID)
 	}
 
 	clock.set(1621)
@@ -154,18 +155,19 @@ func TestSourceUserCacheReusesExpiredUserBeforeLiveUser(t *testing.T) {
 	clock.set(1000)
 	cache := newSourceUserCacheWithTick(nil, clock.now)
 	key := sourceUserCacheTestKey(2)
+	newUserID := uint32(sourceUserCacheUsers + 1)
 	cache.recordAuthenticated(key, 1)
 	for userID := uint32(2); userID <= sourceUserCacheUsers; userID++ {
-		clock.set(1590 + userID)
+		clock.set(1000 + sourceUserCacheLifeSeconds - sourceUserCacheUsers + userID)
 		cache.recordAuthenticated(key, userID)
 	}
 	clock.set(1601)
-	cache.recordAuthenticated(key, 11)
+	cache.recordAuthenticated(key, newUserID)
 	candidates, count := cache.lookup(key)
 	if count != sourceUserCacheUsers || sourceUserCacheContains(candidates, count, 1) {
 		t.Fatalf("expired user was not reused before a live user: (%v, %d)", candidates, count)
 	}
-	for userID := uint32(2); userID <= 11; userID++ {
+	for userID := uint32(2); userID <= newUserID; userID++ {
 		if !sourceUserCacheContains(candidates, count, userID) {
 			t.Fatalf("live user %d was evicted: %v", userID, candidates)
 		}
@@ -454,7 +456,7 @@ func TestSourceUserCacheTransitionStats(t *testing.T) {
 			lookups:      3,
 			sourceHits:   1,
 			sourceMisses: 2,
-			insertions:   12,
+			insertions:   sourceUserCacheUsers + 2,
 			expiries:     1,
 			evictions:    1,
 		}
@@ -486,8 +488,14 @@ func TestSourceUserCacheTransitionStats(t *testing.T) {
 }
 
 func TestSourceUserCachePhysicalLimitAndUniformOccupancy(t *testing.T) {
-	if slots := sourceUserCacheBucketCount * sourceUserCacheWays; slots != 65536 {
-		t.Fatalf("physical source slots = %d, want 65536", slots)
+	if sourceUserCacheBucketCount&(sourceUserCacheBucketCount-1) != 0 {
+		t.Fatalf("source bucket count %d is not a power of two", sourceUserCacheBucketCount)
+	}
+	if sourceUserCacheLockStripes&(sourceUserCacheLockStripes-1) != 0 {
+		t.Fatalf("source lock stripe count %d is not a power of two", sourceUserCacheLockStripes)
+	}
+	if slots := sourceUserCacheBucketCount * sourceUserCacheWays; slots != 16384 {
+		t.Fatalf("physical source slots = %d, want 16384", slots)
 	}
 	wantTableSize := uintptr(sourceUserCacheBucketCount*sourceUserCacheWays) * unsafe.Sizeof(atomic.Pointer[sourceUserCacheEntry]{})
 	if tableSize := unsafe.Sizeof(sourceUserCacheTable{}); tableSize != wantTableSize {
@@ -516,8 +524,8 @@ func TestSourceUserCachePhysicalLimitAndUniformOccupancy(t *testing.T) {
 	if occupied >= sourceCount {
 		t.Fatalf("uniform occupancy = %d, want lower than physical limit due to bucket collisions", occupied)
 	}
-	if occupied < 48000 {
-		t.Fatalf("uniform occupancy = %d, want at least 48000", occupied)
+	if occupied < sourceCount*3/4 {
+		t.Fatalf("uniform occupancy = %d, want at least %d", occupied, sourceCount*3/4)
 	}
 	t.Logf("uniform occupancy = %d/%d; table = %d bytes; entry = %d bytes", occupied, sourceCount, unsafe.Sizeof(sourceUserCacheTable{}), unsafe.Sizeof(sourceUserCacheEntry{}))
 }

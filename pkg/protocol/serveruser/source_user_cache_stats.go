@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package protocol
+package serveruser
 
 import (
 	"sync/atomic"
@@ -24,7 +24,7 @@ import (
 const (
 	// SourceUserCacheMetricGroupName is the metrics group for server-side
 	// source-to-user decryption cache activity.
-	SourceUserCacheMetricGroupName         = "user_decrypt_cache"
+	SourceUserCacheMetricGroupName         = "server user decrypt cache"
 	sourceUserCacheMetricGroup             = SourceUserCacheMetricGroupName
 	sourceUserCacheLookupMetric            = "Lookups"
 	sourceUserCacheSourceHitMetric         = "SourceHits"

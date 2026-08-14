@@ -26,6 +26,7 @@ import (
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/mathext"
+	"github.com/enfein/mieru/v3/pkg/protocol/serveruser"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 	"github.com/google/btree"
 )
@@ -94,11 +95,11 @@ type segment struct {
 	block     cipher.BlockCipher       // cipher block to encrypt or decrypt the payload
 
 	// serverUserPolicy is set when server-side discovery authenticates a new session.
-	serverUserPolicy serverUserPolicy
+	serverUserPolicy serveruser.Policy
 
 	// serverUserAuthentication is temporary and is consumed by the
 	// underlay event loop after successful initial protocol dispatch.
-	serverUserAuthentication serverUserAuthentication
+	serverUserAuthentication serveruser.Authentication
 }
 
 // Protocol returns the protocol of the segment.

@@ -13,12 +13,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package protocol
+package serveruser
 
 import (
 	"encoding/hex"
 	"fmt"
-	"net"
 	"testing"
 
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
@@ -315,89 +314,4 @@ func BenchmarkServerUserDiscoveryWarmCacheParallel10K(b *testing.B) {
 			}
 		}
 	})
-}
-
-// udpSessionBench is used to benchmark finding the correct session in
-// a single server PacketUnderlay.
-type udpSessionBench struct {
-	underlay          *PacketUnderlay
-	remoteAddr        net.Addr
-	encryptedMetadata []byte
-}
-
-// newUDPSessionBench creates multiple sessions in the same PacketUnderlay.
-// The recommended max sessionCount is 10000.
-func newUDPSessionBench(b *testing.B, sessionCount int, sameSource bool) *udpSessionBench {
-	b.Helper()
-	remoteAddr := &net.UDPAddr{IP: net.IPv4(192, 168, 1, 1), Port: 20000}
-	wrongCredential := cipher.HashPassword([]byte("wrong-password"), []byte("wrong-session-user"))
-	wrongBlock, err := cipher.BlockCipherFromPassword(wrongCredential, true)
-	if err != nil {
-		b.Fatalf("BlockCipherFromPassword(wrong) failed: %v", err)
-	}
-	correctCredential := cipher.HashPassword([]byte("correct-password"), []byte("correct-user"))
-	users := userMap(makeTestUser("correct-user", correctCredential))
-	encryptedMetadata := encryptDiscoveryMetadata(b, correctCredential, "correct-user", users, true, newDummyMetadata())
-
-	underlay := &PacketUnderlay{baseUnderlay: *newBaseUnderlay(false, 1400, nil)}
-	for i := 0; i < sessionCount; i++ {
-		sessionAddr := net.Addr(remoteAddr)
-		if !sameSource {
-			sessionAddr = &net.UDPAddr{
-				IP:   net.IPv4(198, 51, byte(i>>8), byte(i)),
-				Port: 30000 + i,
-			}
-		}
-		session := &Session{remoteAddr: sessionAddr}
-		block := wrongBlock
-		session.block.Store(&block)
-		underlay.sessionMap.Store(uint32(i+1), session)
-	}
-	return &udpSessionBench{
-		underlay:          underlay,
-		remoteAddr:        remoteAddr,
-		encryptedMetadata: encryptedMetadata,
-	}
-}
-
-func baselineUDPSessionLookup(underlay *PacketUnderlay, remoteAddr net.Addr, encryptedMeta []byte) bool {
-	decrypted := false
-	underlay.sessionMap.Range(func(_, value any) bool {
-		session := value.(*Session)
-		if session.block.Load() != nil && session.RemoteAddr().String() == remoteAddr.String() {
-			if _, err := (*session.block.Load()).Decrypt(encryptedMeta); err == nil {
-				decrypted = true
-				return false
-			}
-		}
-		return true
-	})
-	return decrypted
-}
-
-func BenchmarkUDPSessionLookup(b *testing.B) {
-	for _, sessionCount := range []int{100, 1000, 10000} {
-		b.Run(fmt.Sprintf("Sessions_%d", sessionCount), func(b *testing.B) {
-			b.Run("AddressMiss", func(b *testing.B) {
-				fixture := newUDPSessionBench(b, sessionCount, false)
-				b.ReportAllocs()
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					if baselineUDPSessionLookup(fixture.underlay, fixture.remoteAddr, fixture.encryptedMetadata) {
-						b.Fatal("unexpected existing-session match")
-					}
-				}
-			})
-			b.Run("SameAddressDecryptMiss", func(b *testing.B) {
-				fixture := newUDPSessionBench(b, sessionCount, true)
-				b.ReportAllocs()
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					if baselineUDPSessionLookup(fixture.underlay, fixture.remoteAddr, fixture.encryptedMetadata) {
-						b.Fatal("unexpected existing-session match")
-					}
-				}
-			})
-		})
-	}
 }

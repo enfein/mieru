@@ -23,7 +23,6 @@ import (
 	"net"
 	"reflect"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
@@ -33,12 +32,14 @@ import (
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/mathext"
+	"github.com/enfein/mieru/v3/pkg/protocol/serveruser"
 	"github.com/enfein/mieru/v3/pkg/sockopts"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
 
 const (
-	underlayCleanInterval = 5 * time.Second
+	underlayCleanInterval      = 5 * time.Second
+	minUnderlayCapacityReclaim = 16
 )
 
 // Mux manages the sessions and underlays.
@@ -72,9 +73,7 @@ type Mux struct {
 	multiplexFactor int
 
 	// ---- server only fields ----
-	serverUsers               atomic.Pointer[serverUserState]
-	serverUserHintIsMandatory atomic.Bool
-	serverUserCacheStats      sourceUserCacheStats
+	serverUsers serveruser.Registry
 }
 
 var _ net.Listener = &Mux{}
@@ -130,7 +129,7 @@ func NewMux(isClinet bool) *Mux {
 }
 
 func (m *Mux) flushServerUserCacheMetrics() {
-	m.serverUserCacheStats.flushTo(registeredSourceUserCacheMetrics)
+	m.serverUsers.FlushMetrics()
 }
 
 // SetEndpoints updates the endpoints that mux is listening to.
@@ -261,11 +260,7 @@ func (m *Mux) SetServerUsers(users map[string]*appctlpb.User) *Mux {
 	if m.isClient {
 		panic("Can't set server users in client mux")
 	}
-	state := buildServerUserState(users, &m.serverUserCacheStats)
-	old := m.serverUsers.Swap(state)
-	if old != nil {
-		old.cache.retire()
-	}
+	m.serverUsers.SetUsers(users)
 	return m
 }
 
@@ -275,7 +270,7 @@ func (m *Mux) SetServerUserHintIsMandatory(userHintIsMandatory bool) *Mux {
 	if m.isClient {
 		panic("Can't set server user hint is mandatory in client mux")
 	}
-	m.serverUserHintIsMandatory.Store(userHintIsMandatory)
+	m.serverUsers.SetHintMandatory(userHintIsMandatory)
 	log.Infof("Mux user hint is mandatory is set to %v", userHintIsMandatory)
 	return m
 }
@@ -342,8 +337,7 @@ func (m *Mux) Start() error {
 	if m.isClient {
 		return stderror.ErrInvalidOperation
 	}
-	serverUsers := m.serverUsers.Load()
-	if serverUsers == nil || len(serverUsers.users) == 0 {
+	if !m.serverUsers.HasUsers() {
 		return fmt.Errorf("no user found")
 	}
 	if len(m.endpoints) == 0 {
@@ -570,11 +564,10 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 			trafficPattern = m.trafficPattern.Effective()
 		}
 		underlay := &PacketUnderlay{
-			baseUnderlay:              *newBaseUnderlay(false, properties.MTU(), trafficPattern),
-			conn:                      conn,
-			sessionCleanTicker:        time.NewTicker(sessionCleanInterval),
-			serverUsers:               &m.serverUsers,
-			serverUserHintIsMandatory: &m.serverUserHintIsMandatory,
+			baseUnderlay:       *newBaseUnderlay(false, properties.MTU(), trafficPattern),
+			conn:               conn,
+			sessionCleanTicker: time.NewTicker(sessionCleanInterval),
+			serverUsers:        &m.serverUsers,
 		}
 		log.Infof("Created new server underlay %v", underlay)
 		UnderlayPassiveOpens.Add(1)
@@ -634,17 +627,16 @@ func (m *Mux) acceptTCPUnderlay(rawListener net.Listener, properties UnderlayPro
 }
 
 func (m *Mux) serverWrapTCPConn(rawConn net.Conn, mtu int, trafficPattern *appctlpb.TrafficPattern) Underlay {
-	var source serverUserDiscoverySource
+	var source serveruser.Source
 	if rawConn != nil {
-		source.key, source.valid = sourceUserCacheKey(rawConn.RemoteAddr())
+		source = serveruser.SourceFromAddr(rawConn.RemoteAddr())
 	}
 	return &StreamUnderlay{
-		baseUnderlay:              *newBaseUnderlay(false, mtu, trafficPattern),
-		conn:                      rawConn,
-		sessionCleanTicker:        time.NewTicker(sessionCleanInterval),
-		serverUsers:               &m.serverUsers,
-		serverUserHintIsMandatory: &m.serverUserHintIsMandatory,
-		serverUserSource:          source,
+		baseUnderlay:       *newBaseUnderlay(false, mtu, trafficPattern),
+		conn:               rawConn,
+		sessionCleanTicker: time.NewTicker(sessionCleanInterval),
+		serverUsers:        &m.serverUsers,
+		serverUserSource:   source,
 	}
 }
 
@@ -761,9 +753,9 @@ func (m *Mux) maybePickExistingUnderlay() Underlay {
 // cleanUnderlay removes closed underlays.
 // This method MUST be called only when holding the mu lock.
 func (m *Mux) cleanUnderlay(alsoDisableIdleOrOverloadUnderlay bool) {
-	remaining := make([]Underlay, 0)
 	disable := 0
 	close := 0
+	n := 0
 	for _, underlay := range m.underlays {
 		select {
 		case <-underlay.Done():
@@ -773,7 +765,8 @@ func (m *Mux) cleanUnderlay(alsoDisableIdleOrOverloadUnderlay bool) {
 				underlay.Close()
 				close++
 			} else {
-				remaining = append(remaining, underlay)
+				m.underlays[n] = underlay
+				n++
 			}
 
 			if alsoDisableIdleOrOverloadUnderlay {
@@ -794,7 +787,19 @@ func (m *Mux) cleanUnderlay(alsoDisableIdleOrOverloadUnderlay bool) {
 			}
 		}
 	}
-	m.underlays = remaining
+
+	for i := n; i < len(m.underlays); i++ {
+		m.underlays[i] = nil
+	}
+	m.underlays = m.underlays[:n]
+
+	// Reclaim the backing array only when the slice capacity is large and most slots are empty.
+	if cap(m.underlays) > minUnderlayCapacityReclaim && len(m.underlays)*4 <= cap(m.underlays) {
+		reclaimed := make([]Underlay, len(m.underlays))
+		copy(reclaimed, m.underlays)
+		m.underlays = reclaimed
+	}
+
 	if close > 0 {
 		log.Debugf("Mux cleaned %d underlays", close)
 	}

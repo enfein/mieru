@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package protocol
+package serveruser
 
 import (
 	"bytes"
@@ -35,36 +35,26 @@ type discoveryTransport struct {
 
 var discoveryTransports = []discoveryTransport{
 	{
-		name: "TCP",
+		name: "CurrentGeneration",
 		discover: func(users map[string]*appctlpb.User, hintMandatory bool, encryptedMeta []byte) ([]byte, string, error) {
-			publisher, mandatory := testServerUserPublisher(users, hintMandatory)
-			underlay := &StreamUnderlay{
-				serverUsers:               publisher,
-				serverUserHintIsMandatory: mandatory,
-			}
-			decryptedMeta, _, err := underlay.serverInitRecvBlockCipherAndDecryptMetadata(encryptedMeta)
+			registry := &Registry{}
+			registry.SetUsers(users)
+			registry.SetHintMandatory(hintMandatory)
+			block, decryptedMeta, _, err := registry.Discover(encryptedMeta, Source{}, true)
 			if err != nil {
-				if underlay.recv != nil {
-					return nil, "", fmt.Errorf("failed discovery retained a receive cipher")
-				}
 				return nil, "", err
 			}
-			return decryptedMeta, underlay.recv.BlockContext().UserName, nil
+			return decryptedMeta, block.BlockContext().UserName, nil
 		},
 	},
 	{
-		name: "UDP",
+		name: "SnapshotGeneration",
 		discover: func(users map[string]*appctlpb.User, hintMandatory bool, encryptedMeta []byte) ([]byte, string, error) {
-			publisher, mandatory := testServerUserPublisher(users, hintMandatory)
-			underlay := &PacketUnderlay{
-				serverUsers:               publisher,
-				serverUserHintIsMandatory: mandatory,
-			}
-			block, decryptedMeta, _, err := underlay.serverTryDecryptMetadataForNewSession(encryptedMeta, serverUserDiscoverySource{})
+			registry := &Registry{}
+			registry.SetUsers(users)
+			registry.SetHintMandatory(hintMandatory)
+			block, decryptedMeta, _, err := registry.Discover(encryptedMeta, Source{}, false)
 			if err != nil {
-				if block != nil {
-					return nil, "", fmt.Errorf("failed discovery returned a block cipher")
-				}
 				return nil, "", err
 			}
 			return decryptedMeta, block.BlockContext().UserName, nil
@@ -472,7 +462,7 @@ func userMap(users ...*appctlpb.User) map[string]*appctlpb.User {
 }
 
 func newDummyMetadata() []byte {
-	metadata := make([]byte, MetadataLength)
+	metadata := make([]byte, metadataLength)
 	for i := range metadata {
 		metadata[i] = byte(i)
 	}

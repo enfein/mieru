@@ -41,7 +41,7 @@ import (
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/metrics"
-	"github.com/enfein/mieru/v3/pkg/protocol"
+	"github.com/enfein/mieru/v3/pkg/protocol/serveruser"
 	"github.com/enfein/mieru/v3/pkg/sockopts"
 	"github.com/enfein/mieru/v3/pkg/socks5"
 	"github.com/enfein/mieru/v3/pkg/stderror"
@@ -545,7 +545,7 @@ var clientRunFunc = func(s []string) error {
 	if serverDecryptionMetricGroup := metrics.GetMetricGroupByName(cipher.ServerDecryptionMetricGroupName); serverDecryptionMetricGroup != nil {
 		serverDecryptionMetricGroup.DisableLogging()
 	}
-	if sourceUserCacheMetricGroup := metrics.GetMetricGroupByName(protocol.SourceUserCacheMetricGroupName); sourceUserCacheMetricGroup != nil {
+	if sourceUserCacheMetricGroup := metrics.GetMetricGroupByName(serveruser.SourceUserCacheMetricGroupName); sourceUserCacheMetricGroup != nil {
 		sourceUserCacheMetricGroup.DisableLogging()
 	}
 

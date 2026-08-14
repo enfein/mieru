@@ -46,13 +46,11 @@ func TestPacketServerDropsInvalidControl(t *testing.T) {
 	}
 	block.SetBlockContext(cipher.BlockContext{UserName: userName})
 
-	publisher, mandatory := testServerUserPublisher(userMap(makeTestUser(userName, password)), false)
 	server := &PacketUnderlay{
-		baseUnderlay:              *newBaseUnderlay(false, 1400, nil),
-		conn:                      serverConn,
-		sessionCleanTicker:        time.NewTicker(sessionCleanInterval),
-		serverUsers:               publisher,
-		serverUserHintIsMandatory: mandatory,
+		baseUnderlay:       *newBaseUnderlay(false, 1400, nil),
+		conn:               serverConn,
+		sessionCleanTicker: time.NewTicker(sessionCleanInterval),
+		serverUsers:        testServerUserRegistry(userMap(makeTestUser(userName, password)), false),
 	}
 	sender := &PacketUnderlay{
 		baseUnderlay: *newBaseUnderlay(true, 1400, nil),

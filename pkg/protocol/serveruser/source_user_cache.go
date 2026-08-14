@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package protocol
+package serveruser
 
 import (
 	"hash/maphash"
@@ -88,6 +88,14 @@ func sourceUserCacheKey(addr net.Addr) ([16]byte, bool) {
 		return [16]byte{}, false
 	}
 	return parsed.Unmap().As16(), true
+}
+
+// SourceFromAddr returns a cache source derived from an IP address. Ports and
+// IPv6 zones are intentionally ignored. Unsupported or invalid addresses
+// produce a zero Source, which disables cache lookup.
+func SourceFromAddr(addr net.Addr) Source {
+	key, valid := sourceUserCacheKey(addr)
+	return Source{key: key, valid: valid}
 }
 
 func sourceUserCacheBucketIndex(key [16]byte) uint32 {

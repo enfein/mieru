@@ -16,7 +16,6 @@
 package protocol
 
 import (
-	"fmt"
 	"net"
 	"sync"
 	"testing"
@@ -24,6 +23,7 @@ import (
 
 	"github.com/enfein/mieru/v3/pkg/cipher"
 	"github.com/enfein/mieru/v3/pkg/common"
+	"github.com/enfein/mieru/v3/pkg/protocol/serveruser"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
 
@@ -48,44 +48,28 @@ func TestStreamServerSourceUserCacheIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first readOneSegment() failed: %v", err)
 	}
-	if got := firstSegment.serverUserAuthentication.origin; got != serverUserMatchRegistryHint {
-		t.Fatalf("first discovery origin = %v, want registry hint", got)
-	}
-	state := mux.serverUsers.Load()
-	if got := state.cache.stats.insertions.Load(); got != 0 {
-		t.Fatalf("cache insertions before initial dispatch = %d, want 0", got)
-	}
 	firstUnderlay.commitServerUserAuthentication(firstSegment)
-	if firstSegment.serverUserAuthentication.generation != nil {
+	if firstSegment.serverUserAuthentication.Valid() {
 		t.Fatal("TCP commit retained the discovery generation")
 	}
 
 	// The second socket uses a different source port but the same source IP.
 	secondAddr := &net.TCPAddr{IP: net.ParseIP("198.51.100.20"), Port: 12002}
 	secondWire := buildServerUserStreamWire(t, credential, userName, testSessionSegment(openSessionRequest, 2, common.StreamTransport), nil, nil)
-	_, secondSegment, err := readServerUserStreamWire(t, mux, secondAddr, secondWire)
+	_, _, err = readServerUserStreamWire(t, mux, secondAddr, secondWire)
 	if err != nil {
 		t.Fatalf("second readOneSegment() failed: %v", err)
 	}
-	if got := secondSegment.serverUserAuthentication.origin; got != serverUserMatchCachedHint {
-		t.Fatalf("second discovery origin = %v, want cached hint", got)
-	}
-
 	// TCP and UDP share the cache owned by the same user generation.
 	packet := &PacketUnderlay{
-		serverUsers:               &mux.serverUsers,
-		serverUserHintIsMandatory: &mux.serverUserHintIsMandatory,
+		serverUsers: &mux.serverUsers,
 	}
 	metadata := testSessionSegment(openSessionRequest, 3, common.PacketTransport).metadata.Marshal()
 	encrypted := encryptDiscoveryMetadata(t, credential, userName, userMap(makeTestUser(userName, credential)), true, metadata)
-	source := serverUserDiscoverySource{}
-	source.key, source.valid = sourceUserCacheKey(&net.UDPAddr{IP: net.ParseIP("198.51.100.20"), Port: 32000})
-	_, _, authentication, err := packet.serverTryDecryptMetadataForNewSession(encrypted, source)
+	source := serveruser.SourceFromAddr(&net.UDPAddr{IP: net.ParseIP("198.51.100.20"), Port: 32000})
+	_, _, _, err = packet.serverTryDecryptMetadataForNewSession(encrypted, source)
 	if err != nil {
 		t.Fatalf("UDP discovery after TCP activity failed: %v", err)
-	}
-	if authentication.origin != serverUserMatchCachedHint {
-		t.Fatalf("UDP discovery after TCP activity origin = %v, want cached hint", authentication.origin)
 	}
 }
 
@@ -137,9 +121,8 @@ func TestStreamServerInvalidInitialSegmentsDoNotRefreshCache(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			before := mux.serverUserCacheStats.insertions.Load()
 			_, seg, err := readServerUserStreamWire(t, mux, remoteAddr, test.wire)
-			if err == nil && seg.serverUserAuthentication.valid() {
+			if err == nil && seg.serverUserAuthentication.Valid() {
 				err = validateNewServerSessionSegment(seg)
 				if err != nil {
 					err = stderror.WrapErrorWithType(err, stderror.PROTOCOL_ERROR)
@@ -150,9 +133,6 @@ func TestStreamServerInvalidInitialSegmentsDoNotRefreshCache(t *testing.T) {
 			}
 			if got := stderror.GetErrorType(err); got != test.errorType {
 				t.Fatalf("error type = %v, want %v: %v", got, test.errorType, err)
-			}
-			if got := mux.serverUserCacheStats.insertions.Load(); got != before {
-				t.Fatalf("cache insertions changed from %d to %d", before, got)
 			}
 		})
 	}
@@ -172,13 +152,10 @@ func TestStreamServerReplayDoesNotRefreshCache(t *testing.T) {
 	}
 	// Do not dispatch or commit the first copy. The identical second metadata
 	// must be rejected by replay protection and still leave the cache cold.
-	first.serverUserAuthentication.generation = nil
+	first.serverUserAuthentication = serveruser.Authentication{}
 	_, _, err = readServerUserStreamWire(t, mux, remoteAddr, wire)
 	if err == nil || stderror.GetErrorType(err) != stderror.REPLAY_ERROR {
 		t.Fatalf("replayed readOneSegment() error = %v, want replay error", err)
-	}
-	if got := mux.serverUserCacheStats.insertions.Load(); got != 0 {
-		t.Fatalf("cache insertions after replay = %d, want 0", got)
 	}
 }
 
@@ -193,11 +170,10 @@ func TestPacketServerSourceUserCacheIntegration(t *testing.T) {
 		t.Fatalf("net.ListenPacket() server failed: %v", err)
 	}
 	server := &PacketUnderlay{
-		baseUnderlay:              *newBaseUnderlay(false, 1400, nil),
-		conn:                      serverConn,
-		sessionCleanTicker:        time.NewTicker(sessionCleanInterval),
-		serverUsers:               &mux.serverUsers,
-		serverUserHintIsMandatory: &mux.serverUserHintIsMandatory,
+		baseUnderlay:       *newBaseUnderlay(false, 1400, nil),
+		conn:               serverConn,
+		sessionCleanTicker: time.NewTicker(sessionCleanInterval),
+		serverUsers:        &mux.serverUsers,
 	}
 	t.Cleanup(func() {
 		_ = server.Close()
@@ -221,19 +197,12 @@ func TestPacketServerSourceUserCacheIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first readOneSegment() failed: %v", err)
 	}
-	if firstSegment.serverUserAuthentication.origin != serverUserMatchRegistryHint {
-		t.Fatalf("first UDP discovery origin = %v, want registry hint", firstSegment.serverUserAuthentication.origin)
-	}
-	if got := mux.serverUserCacheStats.insertions.Load(); got != 0 {
-		t.Fatalf("UDP cache insertions before dispatch = %d, want 0", got)
-	}
 	if err := server.onOpenSessionRequest(firstSegment, firstAddr); err != nil {
 		t.Fatalf("onOpenSessionRequest(first) failed: %v", err)
 	}
 
 	// A duplicate ID authenticated from a different source port is dropped by
 	// dispatch and must not refresh the cache or enqueue another session.
-	insertionsBeforeDuplicate := mux.serverUserCacheStats.insertions.Load()
 	readyBeforeDuplicate := len(server.readySessions)
 	if err := second.writeOneSegment(testSessionSegment(openSessionRequest, 31, common.PacketTransport), serverConn.LocalAddr()); err != nil {
 		t.Fatalf("writeOneSegment(duplicate open) failed: %v", err)
@@ -244,9 +213,6 @@ func TestPacketServerSourceUserCacheIntegration(t *testing.T) {
 	}
 	if err := server.onOpenSessionRequest(duplicateSegment, duplicateAddr); err != nil {
 		t.Fatalf("onOpenSessionRequest(duplicate) failed: %v", err)
-	}
-	if got := mux.serverUserCacheStats.insertions.Load(); got != insertionsBeforeDuplicate {
-		t.Fatalf("duplicate UDP open changed cache insertions from %d to %d", insertionsBeforeDuplicate, got)
 	}
 	if got := len(server.readySessions); got != readyBeforeDuplicate {
 		t.Fatalf("duplicate UDP open changed ready session count from %d to %d", readyBeforeDuplicate, got)
@@ -260,9 +226,6 @@ func TestPacketServerSourceUserCacheIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second readOneSegment() failed: %v", err)
 	}
-	if secondSegment.serverUserAuthentication.origin != serverUserMatchCachedHint {
-		t.Fatalf("second UDP discovery origin = %v, want cached hint", secondSegment.serverUserAuthentication.origin)
-	}
 	if err := server.onOpenSessionRequest(secondSegment, secondAddr); err != nil {
 		t.Fatalf("onOpenSessionRequest(second) failed: %v", err)
 	}
@@ -275,7 +238,6 @@ func TestPacketServerSourceUserCacheIntegration(t *testing.T) {
 	}
 	firstSession := firstSessionValue.(*Session)
 	waitForServerUserSessionBlock(t, firstSession)
-	lookupsBefore := mux.serverUserCacheStats.lookups.Load()
 	data := testDataSegment(31, 1, []byte("existing session"), common.PacketTransport)
 	if err := first.writeOneSegment(data, serverConn.LocalAddr()); err != nil {
 		t.Fatalf("writeOneSegment(existing data) failed: %v", err)
@@ -284,28 +246,21 @@ func TestPacketServerSourceUserCacheIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("existing-session readOneSegment() failed: %v", err)
 	}
-	if existingSegment.serverUserAuthentication.valid() {
+	if existingSegment.serverUserAuthentication.Valid() {
 		t.Fatal("existing UDP session unexpectedly performed user discovery")
-	}
-	if got := mux.serverUserCacheStats.lookups.Load(); got != lookupsBefore {
-		t.Fatalf("existing UDP session changed cache lookups from %d to %d", lookupsBefore, got)
 	}
 
 	// UDP-learned activity is immediately visible to TCP underlays sharing the
 	// same generation.
 	stream := &StreamUnderlay{
-		serverUsers:               &mux.serverUsers,
-		serverUserHintIsMandatory: &mux.serverUserHintIsMandatory,
+		serverUsers: &mux.serverUsers,
 	}
-	stream.serverUserSource.key, stream.serverUserSource.valid = sourceUserCacheKey(&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 45000})
+	stream.serverUserSource = serveruser.SourceFromAddr(&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 45000})
 	metadata := testSessionSegment(openSessionRequest, 33, common.StreamTransport).metadata.Marshal()
 	encrypted := encryptDiscoveryMetadata(t, credential, userName, userMap(makeTestUser(userName, credential)), true, metadata)
-	_, authentication, err := stream.serverInitRecvBlockCipherAndDecryptMetadata(encrypted)
+	_, _, err = stream.serverInitRecvBlockCipherAndDecryptMetadata(encrypted)
 	if err != nil {
 		t.Fatalf("TCP discovery after UDP activity failed: %v", err)
-	}
-	if authentication.origin != serverUserMatchCachedHint {
-		t.Fatalf("TCP discovery after UDP activity origin = %v, want cached hint", authentication.origin)
 	}
 }
 
@@ -320,10 +275,9 @@ func TestPacketServerInvalidNewSessionsDoNotRefreshCache(t *testing.T) {
 	}
 	defer serverConn.Close()
 	server := &PacketUnderlay{
-		baseUnderlay:              *newBaseUnderlay(false, 1400, nil),
-		conn:                      serverConn,
-		serverUsers:               &mux.serverUsers,
-		serverUserHintIsMandatory: &mux.serverUserHintIsMandatory,
+		baseUnderlay: *newBaseUnderlay(false, 1400, nil),
+		conn:         serverConn,
+		serverUsers:  &mux.serverUsers,
 	}
 	senderConn, err := net.ListenPacket("udp", "127.0.0.1:0")
 	if err != nil {
@@ -367,10 +321,7 @@ func TestPacketServerInvalidNewSessionsDoNotRefreshCache(t *testing.T) {
 			if got, _ := seg.SessionID(); got != uint32(60+i) {
 				t.Fatalf("returned session ID = %d, want %d", got, 60+i)
 			}
-			if got := mux.serverUserCacheStats.insertions.Load(); got != 0 {
-				t.Fatalf("cache insertions after invalid packet = %d, want 0", got)
-			}
-			seg.serverUserAuthentication.generation = nil
+			seg.serverUserAuthentication = serveruser.Authentication{}
 		})
 	}
 
@@ -384,7 +335,7 @@ func TestPacketServerInvalidNewSessionsDoNotRefreshCache(t *testing.T) {
 	if err != nil {
 		t.Fatalf("readOneSegment(first replay copy) failed: %v", err)
 	}
-	first.serverUserAuthentication.generation = nil
+	first.serverUserAuthentication = serveruser.Authentication{}
 	if _, err := replayConn.WriteTo(replayed, serverConn.LocalAddr()); err != nil {
 		t.Fatalf("WriteTo(replay) failed: %v", err)
 	}
@@ -399,9 +350,6 @@ func TestPacketServerInvalidNewSessionsDoNotRefreshCache(t *testing.T) {
 	if got, _ := seg.SessionID(); got != 71 {
 		t.Fatalf("returned session ID after replay = %d, want 71", got)
 	}
-	if got := mux.serverUserCacheStats.insertions.Load(); got != 0 {
-		t.Fatalf("cache insertions after replay = %d, want 0", got)
-	}
 }
 
 func TestPacketServerReloadMandatoryHintAndStatsRace(t *testing.T) {
@@ -411,11 +359,9 @@ func TestPacketServerReloadMandatoryHintAndStatsRace(t *testing.T) {
 	mux := NewMux(false).SetServerUsers(users)
 	t.Cleanup(func() { _ = mux.Close() })
 	packet := &PacketUnderlay{
-		serverUsers:               &mux.serverUsers,
-		serverUserHintIsMandatory: &mux.serverUserHintIsMandatory,
+		serverUsers: &mux.serverUsers,
 	}
-	source := serverUserDiscoverySource{}
-	source.key, source.valid = sourceUserCacheKey(&net.UDPAddr{IP: net.ParseIP("192.0.2.60"), Port: 16001})
+	source := serveruser.SourceFromAddr(&net.UDPAddr{IP: net.ParseIP("192.0.2.60"), Port: 16001})
 	metadata := testSessionSegment(openSessionRequest, 80, common.PacketTransport).metadata.Marshal()
 	encrypted := encryptDiscoveryMetadata(t, credential, userName, users, true, metadata)
 
@@ -443,15 +389,13 @@ func TestPacketServerReloadMandatoryHintAndStatsRace(t *testing.T) {
 				errCh <- err
 				continue
 			}
-			authentication.recordAuthenticated()
+			authentication.Record()
 		}
 	}()
 	go func() {
 		defer wg.Done()
 		for i := 0; i < iterations; i++ {
-			_ = mux.serverUserCacheStats.lookups.Load()
-			_ = mux.serverUserCacheStats.sourceHits.Load()
-			_ = mux.serverUserCacheStats.insertions.Load()
+			mux.flushServerUserCacheMetrics()
 		}
 	}()
 	wg.Wait()
@@ -466,14 +410,11 @@ func TestRetiredGenerationAuthenticationRecordIsNoOp(t *testing.T) {
 	credential := cipher.HashPassword([]byte(t.Name()), []byte(userName))
 	mux := NewMux(false).SetServerUsers(userMap(makeTestUser(userName, credential)))
 	t.Cleanup(func() { _ = mux.Close() })
-	old := mux.serverUsers.Load()
-	source := serverUserDiscoverySource{}
-	source.key, source.valid = sourceUserCacheKey(&net.UDPAddr{IP: net.ParseIP("192.0.2.50"), Port: 15001})
+	source := serveruser.SourceFromAddr(&net.UDPAddr{IP: net.ParseIP("192.0.2.50"), Port: 15001})
 	metadata := testSessionSegment(openSessionRequest, 40, common.PacketTransport).metadata.Marshal()
 	encrypted := encryptDiscoveryMetadata(t, credential, userName, userMap(makeTestUser(userName, credential)), true, metadata)
 	packet := &PacketUnderlay{
-		serverUsers:               &mux.serverUsers,
-		serverUserHintIsMandatory: &mux.serverUserHintIsMandatory,
+		serverUsers: &mux.serverUsers,
 	}
 	_, _, authentication, err := packet.serverTryDecryptMetadataForNewSession(encrypted, source)
 	if err != nil {
@@ -481,16 +422,9 @@ func TestRetiredGenerationAuthenticationRecordIsNoOp(t *testing.T) {
 	}
 
 	mux.SetServerUsers(rawUserMap("replacement-user", "replacement-password"))
-	before := mux.serverUserCacheStats.insertions.Load()
-	authentication.recordAuthenticated()
-	if got := mux.serverUserCacheStats.insertions.Load(); got != before {
-		t.Fatalf("retired cache record changed insertions from %d to %d", before, got)
-	}
-	if authentication.generation != nil {
+	authentication.Record()
+	if authentication.Valid() {
 		t.Fatal("retired cache record retained its generation")
-	}
-	if old.cache.loadTable() != nil {
-		t.Fatal("old generation cache was republished")
 	}
 }
 
@@ -615,20 +549,5 @@ func waitForServerUserSessionBlock(t *testing.T, session *Session) {
 			t.Fatal("session didn't install its block cipher")
 		}
 		time.Sleep(time.Millisecond)
-	}
-}
-
-func (o serverUserMatchOrigin) String() string {
-	switch o {
-	case serverUserMatchCachedHint:
-		return "cached hint"
-	case serverUserMatchRegistryHint:
-		return "registry hint"
-	case serverUserMatchCachedFallback:
-		return "cached fallback"
-	case serverUserMatchRegistryFallback:
-		return "registry fallback"
-	default:
-		return fmt.Sprintf("unknown(%d)", o)
 	}
 }

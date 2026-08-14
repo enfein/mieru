@@ -164,7 +164,7 @@ func TestStreamLowEntropySendReceive(t *testing.T) {
 			}
 			if test.senderSide {
 				sender.block = block.Clone()
-				receiver.serverUsers, receiver.serverUserHintIsMandatory = testServerUserPublisher(
+				receiver.serverUsers = testServerUserRegistry(
 					userMap(makeTestUser("user", password)),
 					false,
 				)

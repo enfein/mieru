@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package protocol
+package serveruser
 
 import (
 	"crypto/sha256"
@@ -29,6 +29,9 @@ import (
 	"github.com/enfein/mieru/v3/pkg/log"
 )
 
+// metadataLength is the fixed plaintext size of mieru protocol metadata.
+const metadataLength = 32
+
 // serverUser is the immutable authentication record used by server side user discovery.
 // IDs are dense within one generation and start at 1. ID 0 is reserved for an
 // empty source-user cache slot.
@@ -37,22 +40,36 @@ type serverUser struct {
 	name       string
 	credential [sha256.Size]byte
 	decryptor  *cipher.StatelessDecryptor
-	policy     serverUserPolicy
+	policy     Policy
 }
 
-// serverUserPolicy contains the value-based user settings retained after
+// Policy contains the value-based user settings retained after
 // authentication. It must not contain caller-owned maps or protobuf messages.
-type serverUserPolicy struct {
-	name            string
-	quotas          []serverUserQuota
-	allowPrivateIP  bool
-	allowLoopbackIP bool
+type Policy struct {
+	name   string
+	quotas []Quota
 }
 
-type serverUserQuota struct {
+// Quota is one traffic allowance in a server user policy.
+type Quota struct {
 	days      int32
 	megabytes int32
 }
+
+// Name returns the authenticated user name.
+func (p Policy) Name() string { return p.name }
+
+// Quotas returns the immutable traffic allowances in this policy.
+func (p Policy) Quotas() []Quota { return p.quotas }
+
+// Days returns the quota lookback period in days.
+func (q Quota) Days() int32 { return q.days }
+
+// Megabytes returns the quota allowance in megabytes.
+func (q Quota) Megabytes() int32 { return q.megabytes }
+
+type serverUserPolicy = Policy
+type serverUserQuota = Quota
 
 // serverUserState is immutable after publication, except for its explicitly
 // concurrent cache. A cache belongs to exactly one state generation.
@@ -61,12 +78,22 @@ type serverUserState struct {
 	cache *sourceUserCache
 }
 
-// serverUserDiscoverySource identifies an optional source-user cache lookup.
+// Registry owns the current server users and their source decryption cache.
+// Its zero value is ready to use.
+type Registry struct {
+	users         atomic.Pointer[serverUserState]
+	hintMandatory atomic.Bool
+	stats         sourceUserCacheStats
+}
+
+// Source identifies an optional source-user cache lookup.
 // A zero value disables the cache without changing authentication fallback.
-type serverUserDiscoverySource struct {
+type Source struct {
 	key   [16]byte
 	valid bool
 }
+
+type serverUserDiscoverySource = Source
 
 type serverUserMatchOrigin uint8
 
@@ -93,16 +120,18 @@ type serverUserDiscoveryResult struct {
 	attempts          int
 }
 
-// serverUserAuthentication is retained only while a newly authenticated
+// Authentication is retained only while a newly authenticated
 // segment is structurally validated and dispatched. In particular, generation
 // must not be retained by an established underlay or session.
-type serverUserAuthentication struct {
+type Authentication struct {
 	userID     uint32
-	policy     serverUserPolicy
+	policy     Policy
 	origin     serverUserMatchOrigin
 	generation *serverUserState
-	source     serverUserDiscoverySource
+	source     Source
 }
+
+type serverUserAuthentication = Authentication
 
 func (r serverUserDiscoveryResult) authentication(source serverUserDiscoverySource) serverUserAuthentication {
 	return serverUserAuthentication{
@@ -118,6 +147,12 @@ func (a *serverUserAuthentication) valid() bool {
 	return a != nil && a.userID != 0 && a.generation != nil
 }
 
+// Valid reports whether this value holds a pending authentication.
+func (a *Authentication) Valid() bool { return a.valid() }
+
+// Policy returns the immutable policy of the authenticated user.
+func (a Authentication) Policy() Policy { return a.policy }
+
 // recordAuthenticated records only into the generation used for discovery.
 // A concurrent reload may already have retired that generation's cache, in
 // which case the update is intentionally a no-op.
@@ -132,43 +167,9 @@ func (a *serverUserAuthentication) recordAuthenticated() {
 	}
 }
 
-// validateNewServerSessionSegment enforces the only protocol that may create a
-// server session. Callers run this after payload authentication and padding
-// validation, immediately before initial protocol dispatch.
-func validateNewServerSessionSegment(seg *segment) error {
-	if seg == nil || seg.metadata == nil {
-		return fmt.Errorf("new server session segment is nil")
-	}
-	ss, ok := seg.metadata.(*sessionStruct)
-	if !ok || ss.Protocol() != openSessionRequest {
-		return fmt.Errorf("protocol %v can't create a server session", seg.metadata.Protocol())
-	}
-	if ss.sessionID == 0 {
-		return fmt.Errorf("reserved session ID %d is used", ss.sessionID)
-	}
-	return nil
-}
-
-// validateServerSegmentDirection rejects protocols that can only be sent by a
-// server. Unknown-session UDP data and close messages in the client-to-server
-// direction remain dispatchable so the existing close-session behavior is
-// preserved, but they never create a source-user association.
-func validateServerSegmentDirection(seg *segment) error {
-	if seg == nil || seg.metadata == nil {
-		return fmt.Errorf("server segment is nil")
-	}
-	switch seg.metadata.Protocol() {
-	case openSessionRequest,
-		closeSessionRequest,
-		closeSessionResponse,
-		dataClientToServer,
-		dataClientToServerLowEntropy,
-		ackClientToServer:
-		return nil
-	default:
-		return fmt.Errorf("protocol %v has the wrong direction for a server", seg.metadata.Protocol())
-	}
-}
+// Record stores the authenticated source-to-user association. It is a no-op
+// when the source is unavailable or the user generation has been retired.
+func (a *Authentication) Record() { a.recordAuthenticated() }
 
 // sourceUserCache owns an atomically detachable table. Cache lookup and update
 // operations load table once; retirement prevents later operations from
@@ -181,9 +182,9 @@ type sourceUserCache struct {
 }
 
 const (
-	sourceUserCacheBucketCount = 16384
+	sourceUserCacheBucketCount = 4096
 	sourceUserCacheWays        = 4
-	sourceUserCacheUsers       = 10
+	sourceUserCacheUsers       = 16
 	sourceUserCacheLockStripes = 256
 )
 
@@ -216,6 +217,43 @@ func (c *sourceUserCache) retire() {
 	if c != nil {
 		c.table.Swap(nil)
 	}
+}
+
+// SetUsers compiles and atomically publishes a new server user generation.
+func (r *Registry) SetUsers(users map[string]*appctlpb.User) {
+	state := buildServerUserState(users, &r.stats)
+	old := r.users.Swap(state)
+	if old != nil {
+		old.cache.retire()
+	}
+}
+
+// SetHintMandatory sets whether discovery requires a matching user hint.
+func (r *Registry) SetHintMandatory(mandatory bool) {
+	r.hintMandatory.Store(mandatory)
+}
+
+// HasUsers reports whether the current generation contains a usable user.
+func (r *Registry) HasUsers() bool {
+	state := r.users.Load()
+	return state != nil && len(state.users) != 0
+}
+
+// Discover decrypts metadata with the current user registry. When
+// requireCurrent is true, discovery retries if users are reloaded before the
+// result is returned.
+func (r *Registry) Discover(encryptedMetadata []byte, source Source, requireCurrent bool) (cipher.BlockCipher, []byte, Authentication, error) {
+	result, err := discoverServerUser(&r.users, &r.hintMandatory, encryptedMetadata, source, requireCurrent, nil)
+	if err != nil {
+		return nil, nil, Authentication{}, err
+	}
+	result.block.SetBlockContext(result.userContext)
+	return result.block, result.decryptedMetadata, result.authentication(source), nil
+}
+
+// FlushMetrics publishes cache counter deltas to the metrics registry.
+func (r *Registry) FlushMetrics() {
+	r.stats.flushTo(registeredSourceUserCacheMetrics)
 }
 
 func buildServerUserState(users map[string]*appctlpb.User, stats *sourceUserCacheStats) *serverUserState {
@@ -316,11 +354,7 @@ func buildServerUserCredential(user *appctlpb.User, name string) ([sha256.Size]b
 }
 
 func buildServerUserPolicy(user *appctlpb.User) serverUserPolicy {
-	policy := serverUserPolicy{
-		name:            user.GetName(),
-		allowPrivateIP:  user.GetAllowPrivateIP(),
-		allowLoopbackIP: user.GetAllowLoopbackIP(),
-	}
+	policy := serverUserPolicy{name: user.GetName()}
 	if len(user.GetQuotas()) > 0 {
 		policy.quotas = make([]serverUserQuota, 0, len(user.GetQuotas()))
 		for _, quota := range user.GetQuotas() {
@@ -333,11 +367,12 @@ func buildServerUserPolicy(user *appctlpb.User) serverUserPolicy {
 	return policy
 }
 
-func buildServerUserPolicies(users map[string]*appctlpb.User) map[string]serverUserPolicy {
+// BuildPolicies snapshots the session policies for a user map.
+func BuildPolicies(users map[string]*appctlpb.User) map[string]Policy {
 	if len(users) == 0 {
 		return nil
 	}
-	policies := make(map[string]serverUserPolicy, len(users))
+	policies := make(map[string]Policy, len(users))
 	for _, user := range users {
 		if user == nil || user.GetName() == "" {
 			continue
@@ -345,6 +380,10 @@ func buildServerUserPolicies(users map[string]*appctlpb.User) map[string]serverU
 		policies[user.GetName()] = buildServerUserPolicy(user)
 	}
 	return policies
+}
+
+func buildServerUserPolicies(users map[string]*appctlpb.User) map[string]serverUserPolicy {
+	return BuildPolicies(users)
 }
 
 // discoverServerUser tries one immutable state generation. When requireCurrent
@@ -399,7 +438,7 @@ func discoverServerUser(
 // most once even when it appears in more than one phase.
 func tryServerUserState(state *serverUserState, encryptedMeta []byte, source serverUserDiscoverySource, hintMandatory bool) serverUserDiscoveryResult {
 	nonce := encryptedMeta[:cipher.DefaultNonceSize]
-	var trialPlaintext [MetadataLength]byte
+	var trialPlaintext [metadataLength]byte
 	var cachedIDs [sourceUserCacheUsers]uint32
 	cachedCount := 0
 	if source.valid && state.cache != nil {

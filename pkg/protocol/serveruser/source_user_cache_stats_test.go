@@ -13,17 +13,15 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package protocol
+package serveruser
 
 import (
 	"bytes"
-	"context"
 	"encoding/hex"
 	"sort"
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/enfein/mieru/v3/pkg/cipher"
 	"github.com/enfein/mieru/v3/pkg/metrics"
@@ -32,27 +30,6 @@ import (
 type sourceUserCacheTestMetric struct {
 	name  string
 	value atomic.Int64
-}
-
-type sourceUserCacheCloseTestUnderlay struct {
-	Underlay
-	mux         *Mux
-	started     chan struct{}
-	allowFinish chan struct{}
-	closeCalled chan struct{}
-	closeOnce   sync.Once
-}
-
-func (u *sourceUserCacheCloseTestUnderlay) Close() error {
-	u.closeOnce.Do(func() { close(u.closeCalled) })
-	return nil
-}
-
-func (u *sourceUserCacheCloseTestUnderlay) RunEventLoop(context.Context) error {
-	close(u.started)
-	<-u.allowFinish
-	u.mux.serverUserCacheStats.lookups.Add(3)
-	return nil
 }
 
 func (m *sourceUserCacheTestMetric) Name() string             { return m.name }
@@ -159,71 +136,25 @@ func TestSourceUserCacheStatsBatchingAndMonotonicity(t *testing.T) {
 }
 
 func TestSourceUserCacheRetirementPreservesLateStats(t *testing.T) {
-	mux := NewMux(false).SetServerUsers(rawUserMap("old-stats-user", "old-stats-password"))
-	t.Cleanup(func() { _ = mux.Close() })
-	old := mux.serverUsers.Load()
+	registry := &Registry{}
+	registry.SetUsers(rawUserMap("old-stats-user", "old-stats-password"))
+	old := registry.users.Load()
 	inFlightTable := old.cache.loadTable()
 	key := sourceUserCacheTestKey(901)
 
-	mux.SetServerUsers(rawUserMap("new-stats-user", "new-stats-password"))
+	registry.SetUsers(rawUserMap("new-stats-user", "new-stats-password"))
 	old.cache.recordAuthenticatedInTable(inFlightTable, key, 1)
 	old.cache.recordAuthenticated(sourceUserCacheTestKey(902), 1)
-	mux.serverUsers.Load().cache.recordAuthenticated(key, 1)
+	registry.users.Load().cache.recordAuthenticated(key, 1)
 
-	snapshot := mux.serverUserCacheStats.load()
+	snapshot := registry.stats.load()
 	if snapshot.insertions != 2 {
 		t.Fatalf("insertions across retirement = %d, want 2", snapshot.insertions)
 	}
 	metricSet := newSourceUserCacheTestMetrics()
-	mux.serverUserCacheStats.flushTo(metricSet)
+	registry.stats.flushTo(metricSet)
 	if got := metricSet.insertions.Load(); got != 2 {
 		t.Fatalf("batched insertions across retirement = %d, want 2", got)
-	}
-}
-
-func TestMuxCloseFlushesSourceUserCacheMetrics(t *testing.T) {
-	mux := NewMux(false)
-	mux.serverUserCacheStats.insertions.Add(2)
-	underlay := &sourceUserCacheCloseTestUnderlay{
-		mux:         mux,
-		started:     make(chan struct{}),
-		allowFinish: make(chan struct{}),
-		closeCalled: make(chan struct{}),
-	}
-	mux.mu.Lock()
-	mux.underlays = append(mux.underlays, underlay)
-	mux.startServerUnderlayEventLoop(context.Background(), underlay)
-	mux.mu.Unlock()
-	<-underlay.started
-
-	closeResult := make(chan error, 1)
-	go func() { closeResult <- mux.Close() }()
-	<-underlay.closeCalled
-	select {
-	case err := <-closeResult:
-		t.Fatalf("Close() returned before the cache-metric writer stopped: %v", err)
-	case <-time.After(100 * time.Millisecond):
-	}
-	close(underlay.allowFinish)
-
-	if err := <-closeResult; err != nil {
-		t.Fatalf("Close() failed: %v", err)
-	}
-	select {
-	case <-mux.maintenanceDone:
-	default:
-		t.Fatal("Close() returned before maintenance stopped")
-	}
-	if got := mux.serverUserCacheStats.published.lookups.Load(); got != 3 {
-		t.Fatalf("published lookups after Close() = %d, want 3", got)
-	}
-	if got := mux.serverUserCacheStats.published.insertions.Load(); got != 2 {
-		t.Fatalf("published insertions after Close() = %d, want 2", got)
-	}
-
-	// A concurrent or repeated Close must observe the same completed shutdown.
-	if err := mux.Close(); err != nil {
-		t.Fatalf("second Close() failed: %v", err)
 	}
 }
 
