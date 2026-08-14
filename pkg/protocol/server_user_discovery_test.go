@@ -332,6 +332,62 @@ func TestServerUserDiscoveryDoesNotRetryCachedHintFailure(t *testing.T) {
 	}
 }
 
+func TestServerUserDiscoveryCacheCounterClassification(t *testing.T) {
+	const (
+		cachedUser   = "cached-counter-user"
+		registryUser = "registry-counter-user"
+	)
+	cachedCredential := cipher.HashPassword([]byte(t.Name()+"-cached"), []byte(cachedUser))
+	registryCredential := cipher.HashPassword([]byte(t.Name()+"-registry"), []byte(registryUser))
+	users := userMap(
+		makeTestUser(cachedUser, cachedCredential),
+		makeTestUser(registryUser, registryCredential),
+	)
+	publisher, mandatory := testServerUserPublisher(users, false)
+	state := publisher.Load()
+	source := serverUserDiscoverySource{key: sourceUserCacheTestKey(309), valid: true}
+
+	// A cold query is a source miss and enters a full-registry phase.
+	cold := encryptDiscoveryMetadata(t, cachedCredential, cachedUser, users, true, newDummyMetadata())
+	if _, err := discoverServerUser(publisher, mandatory, cold, source, false, nil); err != nil {
+		t.Fatalf("cold discoverServerUser() failed: %v", err)
+	}
+	state.cache.recordAuthenticated(source.key, testServerUserID(t, state, cachedUser))
+
+	// A cached hint winner is both a source and authentication hit, and it
+	// returns before entering a full-registry phase.
+	if _, err := discoverServerUser(publisher, mandatory, cold, source, false, nil); err != nil {
+		t.Fatalf("warm hinted discoverServerUser() failed: %v", err)
+	}
+
+	// With no hint, discovery scans the registry hint phase before the cached
+	// optional fallback wins. Authentication hit and full fallback therefore
+	// intentionally overlap.
+	noHint := encryptDiscoveryMetadata(t, cachedCredential, "", users, false, newDummyMetadata())
+	if _, err := discoverServerUser(publisher, mandatory, noHint, source, false, nil); err != nil {
+		t.Fatalf("warm no-hint discoverServerUser() failed: %v", err)
+	}
+
+	// An exact source hit whose cached user does not win is not an
+	// authentication hit.
+	registry := encryptDiscoveryMetadata(t, registryCredential, registryUser, users, true, newDummyMetadata())
+	if _, err := discoverServerUser(publisher, mandatory, registry, source, false, nil); err != nil {
+		t.Fatalf("registry discoverServerUser() failed: %v", err)
+	}
+
+	want := sourceUserCacheStatsSnapshot{
+		lookups:            4,
+		sourceHits:         3,
+		sourceMisses:       1,
+		authenticationHits: 2,
+		fullFallbacks:      3,
+		insertions:         1,
+	}
+	if got := state.cache.stats.load(); got != want {
+		t.Fatalf("discovery stats = %+v, want %+v", got, want)
+	}
+}
+
 func TestServerUserDiscoverySharedCredentialContextsAreIndependent(t *testing.T) {
 	const (
 		userA = "shared-user-a"

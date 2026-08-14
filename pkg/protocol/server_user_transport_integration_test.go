@@ -52,8 +52,8 @@ func TestStreamServerSourceUserCacheIntegration(t *testing.T) {
 		t.Fatalf("first discovery origin = %v, want registry hint", got)
 	}
 	state := mux.serverUsers.Load()
-	if got := state.cache.stats.records.Load(); got != 0 {
-		t.Fatalf("cache records before initial dispatch = %d, want 0", got)
+	if got := state.cache.stats.insertions.Load(); got != 0 {
+		t.Fatalf("cache insertions before initial dispatch = %d, want 0", got)
 	}
 	firstUnderlay.commitServerUserAuthentication(firstSegment)
 	if firstSegment.serverUserAuthentication.generation != nil {
@@ -137,7 +137,7 @@ func TestStreamServerInvalidInitialSegmentsDoNotRefreshCache(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			before := mux.serverUserCacheStats.records.Load()
+			before := mux.serverUserCacheStats.insertions.Load()
 			_, seg, err := readServerUserStreamWire(t, mux, remoteAddr, test.wire)
 			if err == nil && seg.serverUserAuthentication.valid() {
 				err = validateNewServerSessionSegment(seg)
@@ -151,8 +151,8 @@ func TestStreamServerInvalidInitialSegmentsDoNotRefreshCache(t *testing.T) {
 			if got := stderror.GetErrorType(err); got != test.errorType {
 				t.Fatalf("error type = %v, want %v: %v", got, test.errorType, err)
 			}
-			if got := mux.serverUserCacheStats.records.Load(); got != before {
-				t.Fatalf("cache records changed from %d to %d", before, got)
+			if got := mux.serverUserCacheStats.insertions.Load(); got != before {
+				t.Fatalf("cache insertions changed from %d to %d", before, got)
 			}
 		})
 	}
@@ -177,8 +177,8 @@ func TestStreamServerReplayDoesNotRefreshCache(t *testing.T) {
 	if err == nil || stderror.GetErrorType(err) != stderror.REPLAY_ERROR {
 		t.Fatalf("replayed readOneSegment() error = %v, want replay error", err)
 	}
-	if got := mux.serverUserCacheStats.records.Load(); got != 0 {
-		t.Fatalf("cache records after replay = %d, want 0", got)
+	if got := mux.serverUserCacheStats.insertions.Load(); got != 0 {
+		t.Fatalf("cache insertions after replay = %d, want 0", got)
 	}
 }
 
@@ -224,8 +224,8 @@ func TestPacketServerSourceUserCacheIntegration(t *testing.T) {
 	if firstSegment.serverUserAuthentication.origin != serverUserMatchRegistryHint {
 		t.Fatalf("first UDP discovery origin = %v, want registry hint", firstSegment.serverUserAuthentication.origin)
 	}
-	if got := mux.serverUserCacheStats.records.Load(); got != 0 {
-		t.Fatalf("UDP cache records before dispatch = %d, want 0", got)
+	if got := mux.serverUserCacheStats.insertions.Load(); got != 0 {
+		t.Fatalf("UDP cache insertions before dispatch = %d, want 0", got)
 	}
 	if err := server.onOpenSessionRequest(firstSegment, firstAddr); err != nil {
 		t.Fatalf("onOpenSessionRequest(first) failed: %v", err)
@@ -233,7 +233,7 @@ func TestPacketServerSourceUserCacheIntegration(t *testing.T) {
 
 	// A duplicate ID authenticated from a different source port is dropped by
 	// dispatch and must not refresh the cache or enqueue another session.
-	recordsBeforeDuplicate := mux.serverUserCacheStats.records.Load()
+	insertionsBeforeDuplicate := mux.serverUserCacheStats.insertions.Load()
 	readyBeforeDuplicate := len(server.readySessions)
 	if err := second.writeOneSegment(testSessionSegment(openSessionRequest, 31, common.PacketTransport), serverConn.LocalAddr()); err != nil {
 		t.Fatalf("writeOneSegment(duplicate open) failed: %v", err)
@@ -245,8 +245,8 @@ func TestPacketServerSourceUserCacheIntegration(t *testing.T) {
 	if err := server.onOpenSessionRequest(duplicateSegment, duplicateAddr); err != nil {
 		t.Fatalf("onOpenSessionRequest(duplicate) failed: %v", err)
 	}
-	if got := mux.serverUserCacheStats.records.Load(); got != recordsBeforeDuplicate {
-		t.Fatalf("duplicate UDP open changed cache records from %d to %d", recordsBeforeDuplicate, got)
+	if got := mux.serverUserCacheStats.insertions.Load(); got != insertionsBeforeDuplicate {
+		t.Fatalf("duplicate UDP open changed cache insertions from %d to %d", insertionsBeforeDuplicate, got)
 	}
 	if got := len(server.readySessions); got != readyBeforeDuplicate {
 		t.Fatalf("duplicate UDP open changed ready session count from %d to %d", readyBeforeDuplicate, got)
@@ -367,8 +367,8 @@ func TestPacketServerInvalidNewSessionsDoNotRefreshCache(t *testing.T) {
 			if got, _ := seg.SessionID(); got != uint32(60+i) {
 				t.Fatalf("returned session ID = %d, want %d", got, 60+i)
 			}
-			if got := mux.serverUserCacheStats.records.Load(); got != 0 {
-				t.Fatalf("cache records after invalid packet = %d, want 0", got)
+			if got := mux.serverUserCacheStats.insertions.Load(); got != 0 {
+				t.Fatalf("cache insertions after invalid packet = %d, want 0", got)
 			}
 			seg.serverUserAuthentication.generation = nil
 		})
@@ -399,8 +399,8 @@ func TestPacketServerInvalidNewSessionsDoNotRefreshCache(t *testing.T) {
 	if got, _ := seg.SessionID(); got != 71 {
 		t.Fatalf("returned session ID after replay = %d, want 71", got)
 	}
-	if got := mux.serverUserCacheStats.records.Load(); got != 0 {
-		t.Fatalf("cache records after replay = %d, want 0", got)
+	if got := mux.serverUserCacheStats.insertions.Load(); got != 0 {
+		t.Fatalf("cache insertions after replay = %d, want 0", got)
 	}
 }
 
@@ -450,8 +450,8 @@ func TestPacketServerReloadMandatoryHintAndStatsRace(t *testing.T) {
 		defer wg.Done()
 		for i := 0; i < iterations; i++ {
 			_ = mux.serverUserCacheStats.lookups.Load()
-			_ = mux.serverUserCacheStats.hits.Load()
-			_ = mux.serverUserCacheStats.records.Load()
+			_ = mux.serverUserCacheStats.sourceHits.Load()
+			_ = mux.serverUserCacheStats.insertions.Load()
 		}
 	}()
 	wg.Wait()
@@ -481,10 +481,10 @@ func TestRetiredGenerationAuthenticationRecordIsNoOp(t *testing.T) {
 	}
 
 	mux.SetServerUsers(rawUserMap("replacement-user", "replacement-password"))
-	before := mux.serverUserCacheStats.records.Load()
+	before := mux.serverUserCacheStats.insertions.Load()
 	authentication.recordAuthenticated()
-	if got := mux.serverUserCacheStats.records.Load(); got != before {
-		t.Fatalf("retired cache record changed records from %d to %d", before, got)
+	if got := mux.serverUserCacheStats.insertions.Load(); got != before {
+		t.Fatalf("retired cache record changed insertions from %d to %d", before, got)
 	}
 	if authentication.generation != nil {
 		t.Fatal("retired cache record retained its generation")

@@ -39,8 +39,15 @@ type sourceUserCacheCandidate struct {
 }
 
 type sourceUserCacheWaySelection struct {
-	way   int
-	entry *sourceUserCacheEntry
+	way     int
+	entry   *sourceUserCacheEntry
+	expired bool
+}
+
+type sourceUserCacheRecordTransition struct {
+	inserted bool
+	expired  bool
+	evicted  bool
 }
 
 func sourceUserCacheCurrentTick() uint32 {
@@ -126,7 +133,7 @@ func (c *sourceUserCache) lookup(key [16]byte) ([sourceUserCacheUsers]uint32, in
 	table := c.loadTable()
 	if table == nil {
 		if c.stats != nil {
-			c.stats.misses.Add(1)
+			c.stats.sourceMisses.Add(1)
 		}
 		return result, 0
 	}
@@ -181,7 +188,7 @@ func (c *sourceUserCache) lookup(key [16]byte) ([sourceUserCacheUsers]uint32, in
 		}
 		if count > 0 {
 			if c.stats != nil {
-				c.stats.hits.Add(1)
+				c.stats.sourceHits.Add(1)
 			}
 			return result, count
 		}
@@ -189,7 +196,7 @@ func (c *sourceUserCache) lookup(key [16]byte) ([sourceUserCacheUsers]uint32, in
 	}
 
 	if c.stats != nil {
-		c.stats.misses.Add(1)
+		c.stats.sourceMisses.Add(1)
 	}
 	return result, 0
 }
@@ -202,6 +209,16 @@ func (c *sourceUserCache) recordAuthenticated(key [16]byte, userID uint32) {
 	}
 	table := c.loadTable()
 	if table == nil {
+		return
+	}
+	c.recordAuthenticatedInTable(table, key, userID)
+}
+
+// recordAuthenticatedInTable continues a record operation after its one table
+// load. Retirement may detach the table concurrently; an operation that
+// already loaded it may still complete and update the Mux-lifetime counters.
+func (c *sourceUserCache) recordAuthenticatedInTable(table *sourceUserCacheTable, key [16]byte, userID uint32) {
+	if c == nil || table == nil || userID == 0 {
 		return
 	}
 
@@ -227,16 +244,19 @@ func (c *sourceUserCache) recordAuthenticated(key [16]byte, userID uint32) {
 
 	if match >= 0 {
 		entry := ways[match]
-		userEvicted := c.recordUser(entry, userID, now)
+		sourceExpired := sourceUserCacheExpired(now, entry.lastActive.Load())
+		transition := c.recordUser(entry, userID, now)
+		if sourceExpired {
+			// The complete source was logically absent before this record, even
+			// if an individual slot happened to contain the same user ID.
+			transition.inserted = true
+			transition.expired = true
+			transition.evicted = false
+		}
 		// Writers for this bucket are serialized by bucketLock. Publish the
 		// current tick directly so numeric wraparound can't suppress a refresh.
 		entry.lastActive.Store(now)
-		if c.stats != nil {
-			c.stats.records.Add(1)
-			if userEvicted {
-				c.stats.evictions.Add(1)
-			}
-		}
+		c.recordTransition(transition)
 		return
 	}
 
@@ -245,17 +265,17 @@ func (c *sourceUserCache) recordAuthenticated(key [16]byte, userID uint32) {
 	replacement.lastActive.Store(now)
 	replacement.users[0].Store(sourceUserCachePackUser(userID, now))
 	bucket.ways[selection.way].Store(replacement)
-	if c.stats != nil {
-		c.stats.records.Add(1)
-		if selection.entry != nil {
-			c.stats.evictions.Add(1)
-		}
-	}
+	c.recordTransition(sourceUserCacheRecordTransition{
+		inserted: true,
+		expired:  selection.expired,
+		evicted:  selection.entry != nil && !selection.expired,
+	})
 }
 
 // recordUser refreshes userID or inserts it into a deterministic user slot.
-// It reports whether a live user association was evicted.
-func (c *sourceUserCache) recordUser(entry *sourceUserCacheEntry, userID, now uint32) bool {
+// It reports only completed state transitions; a live same-user refresh is not
+// an insertion, expiry, or eviction.
+func (c *sourceUserCache) recordUser(entry *sourceUserCacheEntry, userID, now uint32) sourceUserCacheRecordTransition {
 	for {
 		var slots [sourceUserCacheUsers]uint64
 		same := -1
@@ -295,13 +315,33 @@ func (c *sourceUserCache) recordUser(entry *sourceUserCacheEntry, userID, now ui
 		old := slots[slot]
 		oldID, oldTick := sourceUserCacheUnpackUser(old)
 		if oldID == userID && oldTick == now {
-			return false
+			return sourceUserCacheRecordTransition{}
 		}
 		if entry.users[slot].CompareAndSwap(old, sourceUserCachePackUser(userID, now)) {
-			return oldID != 0 && !sourceUserCacheExpired(now, oldTick) && oldID != userID
+			oldExpired := oldID != 0 && sourceUserCacheExpired(now, oldTick)
+			return sourceUserCacheRecordTransition{
+				inserted: oldID == 0 || oldExpired || oldID != userID,
+				expired:  oldExpired,
+				evicted:  oldID != 0 && !oldExpired && oldID != userID,
+			}
 		}
 		// A failed slot CAS invalidates the selection. Restart with a fresh
 		// snapshot so empty, expired, and LRU choices remain deterministic.
+	}
+}
+
+func (c *sourceUserCache) recordTransition(transition sourceUserCacheRecordTransition) {
+	if c.stats == nil {
+		return
+	}
+	if transition.inserted {
+		c.stats.insertions.Add(1)
+	}
+	if transition.expired {
+		c.stats.expiries.Add(1)
+	}
+	if transition.evicted {
+		c.stats.evictions.Add(1)
 	}
 }
 
@@ -316,7 +356,7 @@ func selectSourceUserCacheWay(ways [sourceUserCacheWays]*sourceUserCacheEntry, n
 	for way, entry := range ways {
 		ticks[way] = entry.lastActive.Load()
 		if sourceUserCacheExpired(now, ticks[way]) {
-			return sourceUserCacheWaySelection{way: way, entry: entry}
+			return sourceUserCacheWaySelection{way: way, entry: entry, expired: true}
 		}
 	}
 

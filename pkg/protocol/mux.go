@@ -58,9 +58,12 @@ type Mux struct {
 	acceptErr             *muxAcceptErr
 	used                  bool
 	done                  chan struct{}
+	closeDone             chan struct{}
+	maintenanceDone       chan struct{}
 	ctx                   context.Context    // mux master context
 	ctxCancelFunc         context.CancelFunc // function to cancel master context when mux is closed
 	mu                    sync.Mutex
+	serverUnderlayLoopWG  sync.WaitGroup
 	cleaner               *time.Ticker
 
 	// ---- client only fields ----
@@ -95,12 +98,15 @@ func NewMux(isClinet bool) *Mux {
 		chAccept:              make(chan net.Conn, sessionChanCapacity),
 		acceptErr:             newMuxAcceptErr(),
 		done:                  make(chan struct{}),
+		closeDone:             make(chan struct{}),
+		maintenanceDone:       make(chan struct{}),
 		cleaner:               time.NewTicker(underlayCleanInterval),
 	}
 	mux.ctx, mux.ctxCancelFunc = context.WithCancel(context.Background())
 
 	// Run maintenance tasks in the background.
 	go func() {
+		defer close(mux.maintenanceDone)
 		for {
 			select {
 			case <-mux.cleaner.C:
@@ -111,6 +117,9 @@ func NewMux(isClinet bool) *Mux {
 					mux.cleanUnderlay(false)
 				}
 				mux.mu.Unlock()
+				if !isClinet {
+					mux.flushServerUserCacheMetrics()
+				}
 			case <-mux.done:
 				mux.cleaner.Stop()
 				return
@@ -118,6 +127,10 @@ func NewMux(isClinet bool) *Mux {
 		}
 	}()
 	return mux
+}
+
+func (m *Mux) flushServerUserCacheMetrics() {
+	m.serverUserCacheStats.flushTo(registeredSourceUserCacheMetrics)
 }
 
 // SetEndpoints updates the endpoints that mux is listening to.
@@ -280,9 +293,11 @@ func (m *Mux) Accept() (net.Conn, error) {
 
 func (m *Mux) Close() error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	select {
 	case <-m.done:
+		closeDone := m.closeDone
+		m.mu.Unlock()
+		<-closeDone
 		return nil
 	default:
 	}
@@ -292,12 +307,26 @@ func (m *Mux) Close() error {
 	} else {
 		log.Infof("Closing server multiplexer")
 	}
+	// Signal shutdown while holding mu. Server underlay event loops are
+	// registered under the same lock, so no writer can be added after this
+	// point.
+	close(m.done)
+	m.ctxCancelFunc()
 	for _, underlay := range m.underlays {
 		underlay.Close()
 	}
 	m.underlays = make([]Underlay, 0)
-	m.ctxCancelFunc()
-	close(m.done)
+	m.mu.Unlock()
+
+	// Stop periodic publishing, then wait for all underlay event loops that can
+	// update the cache counters. The synchronous flush below is therefore the
+	// final publication for this Mux and is complete before Close returns.
+	<-m.maintenanceDone
+	m.serverUnderlayLoopWG.Wait()
+	if !m.isClient {
+		m.flushServerUserCacheMetrics()
+	}
+	close(m.closeDone)
 	return nil
 }
 
@@ -479,25 +508,24 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 				break
 			}
 			log.Debugf("Created new server underlay %v", underlay)
-			m.mu.Lock()
-			m.underlays = append(m.underlays, underlay)
-			m.cleanUnderlay(false)
-			m.mu.Unlock()
 			UnderlayPassiveOpens.Add(1)
 			currEst := UnderlayCurrEstablished.Add(1)
 			maxConn := UnderlayMaxConn.Load()
 			if currEst > maxConn {
 				UnderlayMaxConn.Store(currEst)
 			}
-
-			// Run underlay event loop.
-			go func(ctx context.Context, underlay Underlay) {
-				err := underlay.RunEventLoop(ctx)
-				if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
-					log.Debugf("%v RunEventLoop(): %v", underlay, err)
-				}
+			m.mu.Lock()
+			select {
+			case <-m.done:
+				m.mu.Unlock()
 				underlay.Close()
-			}(ctx, underlay)
+				return
+			default:
+			}
+			m.underlays = append(m.underlays, underlay)
+			m.cleanUnderlay(false)
+			m.startServerUnderlayEventLoop(ctx, underlay)
+			m.mu.Unlock()
 
 			// Accept sessions from the underlay.
 			go func(ctx context.Context, underlay Underlay) {
@@ -549,25 +577,24 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 			serverUserHintIsMandatory: &m.serverUserHintIsMandatory,
 		}
 		log.Infof("Created new server underlay %v", underlay)
-		m.mu.Lock()
-		m.underlays = append(m.underlays, underlay)
-		m.cleanUnderlay(false)
-		m.mu.Unlock()
 		UnderlayPassiveOpens.Add(1)
 		currEst := UnderlayCurrEstablished.Add(1)
 		maxConn := UnderlayMaxConn.Load()
 		if currEst > maxConn {
 			UnderlayMaxConn.Store(currEst)
 		}
-
-		// Run underlay event loop.
-		go func(ctx context.Context, underlay Underlay) {
-			err := underlay.RunEventLoop(ctx)
-			if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
-				log.Debugf("%v RunEventLoop(): %v", underlay, err)
-			}
+		m.mu.Lock()
+		select {
+		case <-m.done:
+			m.mu.Unlock()
 			underlay.Close()
-		}(ctx, underlay)
+			return
+		default:
+		}
+		m.underlays = append(m.underlays, underlay)
+		m.cleanUnderlay(false)
+		m.startServerUnderlayEventLoop(ctx, underlay)
+		m.mu.Unlock()
 
 		// Accept sessions from the underlay.
 		go func(ctx context.Context, underlay Underlay) {
@@ -688,6 +715,21 @@ func (m *Mux) newUnderlay(ctx context.Context) (Underlay, error) {
 		underlay.Close()
 	}()
 	return underlay, nil
+}
+
+// startServerUnderlayEventLoop registers and starts a server underlay event
+// loop. The caller must hold m.mu and must verify that m.done is still open
+// first. This keeps WaitGroup.Add ordered before the shutdown Wait.
+func (m *Mux) startServerUnderlayEventLoop(ctx context.Context, underlay Underlay) {
+	m.serverUnderlayLoopWG.Add(1)
+	go func() {
+		defer m.serverUnderlayLoopWG.Done()
+		err := underlay.RunEventLoop(ctx)
+		if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
+			log.Debugf("%v RunEventLoop(): %v", underlay, err)
+		}
+		underlay.Close()
+	}()
 }
 
 // maybePickExistingUnderlay returns either an existing underlay that

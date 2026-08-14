@@ -180,15 +180,6 @@ type sourceUserCache struct {
 	bucketLocks [sourceUserCacheLockStripes]sync.Mutex
 }
 
-// sourceUserCacheStats has Mux lifetime rather than generation lifetime.
-type sourceUserCacheStats struct {
-	lookups   atomic.Uint64
-	hits      atomic.Uint64
-	misses    atomic.Uint64
-	records   atomic.Uint64
-	evictions atomic.Uint64
-}
-
 const (
 	sourceUserCacheBucketCount = 16384
 	sourceUserCacheWays        = 4
@@ -394,6 +385,9 @@ func discoverServerUser(
 		if result.block == nil {
 			return serverUserDiscoveryResult{}, fmt.Errorf("cipher.TryDecrypt() failed for all users")
 		}
+		if state.cache != nil && state.cache.stats != nil && (result.origin == serverUserMatchCachedHint || result.origin == serverUserMatchCachedFallback) {
+			state.cache.stats.authenticationHits.Add(1)
+		}
 		result.generation = state
 		return result, nil
 	}
@@ -433,6 +427,11 @@ func tryServerUserState(state *serverUserState, encryptedMeta []byte, source ser
 
 	// All registry hint matches retain precedence over cached users whose
 	// names do not match the hint, including when credentials are shared.
+	// Reaching this point enters a complete-registry phase, whether or not a
+	// registry user ultimately wins.
+	if state.cache != nil && state.cache.stats != nil {
+		state.cache.stats.fullFallbacks.Add(1)
+	}
 	for i := range state.users {
 		user := &state.users[i]
 		if serverUserIDWasAttempted(&attemptedCachedIDs, attemptedCachedCount, user.id) || !cipher.CheckUserFromHint([]byte(user.name), nonce) {

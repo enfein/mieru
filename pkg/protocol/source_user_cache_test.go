@@ -366,9 +366,9 @@ func TestSourceUserCacheConcurrentOperationsAndRetirement(t *testing.T) {
 	stop.Store(true)
 	wg.Wait()
 
-	records := stats.records.Load()
+	insertions := stats.insertions.Load()
 	cache.recordAuthenticated(keys[0], 99)
-	if stats.records.Load() != records {
+	if stats.insertions.Load() != insertions {
 		t.Fatal("record started after retirement modified the detached table")
 	}
 	if candidates, count := cache.lookup(keys[0]); count != 0 {
@@ -410,8 +410,8 @@ func TestSourceUserCacheStatsAndZeroAllocationWarmPath(t *testing.T) {
 	if _, count := cache.lookup(key); count != 1 {
 		t.Fatal("recorded cache lookup missed")
 	}
-	if stats.lookups.Load() != 2 || stats.hits.Load() != 1 || stats.misses.Load() != 1 || stats.records.Load() != 1 {
-		t.Fatalf("unexpected stats: lookups=%d hits=%d misses=%d records=%d", stats.lookups.Load(), stats.hits.Load(), stats.misses.Load(), stats.records.Load())
+	if stats.lookups.Load() != 2 || stats.sourceHits.Load() != 1 || stats.sourceMisses.Load() != 1 || stats.insertions.Load() != 1 {
+		t.Fatalf("unexpected stats: lookups=%d sourceHits=%d sourceMisses=%d insertions=%d", stats.lookups.Load(), stats.sourceHits.Load(), stats.sourceMisses.Load(), stats.insertions.Load())
 	}
 
 	lookupAllocs := testing.AllocsPerRun(1000, func() {
@@ -426,6 +426,63 @@ func TestSourceUserCacheStatsAndZeroAllocationWarmPath(t *testing.T) {
 	if recordAllocs != 0 {
 		t.Fatalf("warm refresh allocations = %f, want 0", recordAllocs)
 	}
+}
+
+func TestSourceUserCacheTransitionStats(t *testing.T) {
+	t.Run("user associations", func(t *testing.T) {
+		clock := &sourceUserCacheTestClock{}
+		clock.set(100)
+		stats := &sourceUserCacheStats{}
+		cache := newSourceUserCacheWithTick(stats, clock.now)
+		key := sourceUserCacheTestKey(12)
+
+		cache.lookup(key)
+		cache.recordAuthenticated(key, 1)
+		clock.set(101)
+		cache.recordAuthenticated(key, 1) // A live refresh is not an insertion.
+		cache.lookup(key)
+		for userID := uint32(2); userID <= sourceUserCacheUsers; userID++ {
+			cache.recordAuthenticated(key, userID)
+		}
+		cache.recordAuthenticated(key, sourceUserCacheUsers+1)
+
+		clock.set(101 + sourceUserCacheLifeSeconds)
+		cache.lookup(key) // Observing expiry does not count a transition.
+		cache.recordAuthenticated(key, sourceUserCacheUsers+1)
+
+		want := sourceUserCacheStatsSnapshot{
+			lookups:      3,
+			sourceHits:   1,
+			sourceMisses: 2,
+			insertions:   12,
+			expiries:     1,
+			evictions:    1,
+		}
+		if got := stats.load(); got != want {
+			t.Fatalf("transition stats = %+v, want %+v", got, want)
+		}
+	})
+
+	t.Run("source ways", func(t *testing.T) {
+		clock := &sourceUserCacheTestClock{}
+		clock.set(200)
+		stats := &sourceUserCacheStats{}
+		cache := newSourceUserCacheWithTick(stats, clock.now)
+		keys := sourceUserCacheCollidingKeys(sourceUserCacheWays + 2)
+		for i := 0; i < sourceUserCacheWays; i++ {
+			cache.recordAuthenticated(keys[i], uint32(i+1))
+		}
+		cache.recordAuthenticated(keys[sourceUserCacheWays], 10)
+		if got := stats.load(); got.insertions != 5 || got.evictions != 1 || got.expiries != 0 {
+			t.Fatalf("live source replacement stats = %+v, want 5 insertions and 1 eviction", got)
+		}
+
+		clock.set(200 + sourceUserCacheLifeSeconds)
+		cache.recordAuthenticated(keys[sourceUserCacheWays+1], 11)
+		if got := stats.load(); got.insertions != 6 || got.evictions != 1 || got.expiries != 1 {
+			t.Fatalf("expired source replacement stats = %+v, want 6 insertions, 1 eviction, and 1 expiry", got)
+		}
+	})
 }
 
 func TestSourceUserCachePhysicalLimitAndUniformOccupancy(t *testing.T) {

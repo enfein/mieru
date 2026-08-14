@@ -287,7 +287,11 @@ func (u *PacketUnderlay) onOpenSessionRequest(seg *segment, remoteAddr net.Addr)
 	if !u.deliverSegmentToSession(session, seg) {
 		return fmt.Errorf("failed to deliver open session request for session %d", sessionID)
 	}
-	u.readySessions <- session
+	select {
+	case u.readySessions <- session:
+	case <-u.done:
+		return io.ErrClosedPipe
+	}
 	u.commitServerUserAuthentication(seg)
 	return nil
 }

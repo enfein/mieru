@@ -307,7 +307,11 @@ func (t *StreamUnderlay) onOpenSessionRequest(seg *segment) error {
 	if !t.deliverSegmentToSession(session, seg) {
 		return fmt.Errorf("failed to deliver open session request for session %d", sessionID)
 	}
-	t.readySessions <- session
+	select {
+	case t.readySessions <- session:
+	case <-t.done:
+		return io.ErrClosedPipe
+	}
 	return nil
 }
 
