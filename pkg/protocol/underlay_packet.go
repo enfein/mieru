@@ -413,22 +413,7 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 			var decrypted bool
 			var err error
 			// Try existing sessions.
-			u.sessionMap.Range(func(k, v any) bool {
-				session := v.(*Session)
-				sessionBlock := session.block.Load()
-				if sessionBlock != nil && session.RemoteAddr().String() == addr.String() {
-					decryptedMeta, err = (*sessionBlock).Decrypt(encryptedMeta)
-					if err == nil {
-						decrypted = true
-						blockCipher = *sessionBlock
-						if policy := session.userPolicy.Load(); policy != nil {
-							matchedPolicy = *policy
-						}
-						return false
-					}
-				}
-				return true
-			})
+			decryptedMeta, blockCipher, matchedPolicy, decrypted = u.tryDecryptExistingSession(encryptedMeta, addr)
 
 			if !decrypted {
 				// Existing-session lookup intentionally remains first and scans
@@ -801,6 +786,27 @@ func (u *PacketUnderlay) serverTryDecryptMetadataForNewSession(encryptedMeta []b
 		matchedBlock.SetNoncePattern(u.trafficPattern.GetNonce())
 	}
 	return matchedBlock, decryptedMetadata, authentication, nil
+}
+
+func (u *PacketUnderlay) tryDecryptExistingSession(encryptedMeta []byte, addr net.Addr) (decryptedMeta []byte, blockCipher cipher.BlockCipher, matchedPolicy serveruser.Policy, decrypted bool) {
+	u.sessionMap.Range(func(_, value any) bool {
+		session := value.(*Session)
+		sessionBlock := session.block.Load()
+		if sessionBlock != nil && session.RemoteAddr().String() == addr.String() {
+			plaintext, err := (*sessionBlock).Decrypt(encryptedMeta)
+			if err == nil {
+				decryptedMeta = plaintext
+				blockCipher = *sessionBlock
+				if policy := session.userPolicy.Load(); policy != nil {
+					matchedPolicy = *policy
+				}
+				decrypted = true
+				return false
+			}
+		}
+		return true
+	})
+	return
 }
 
 func (u *PacketUnderlay) cleanSessions() {

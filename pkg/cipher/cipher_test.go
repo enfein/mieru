@@ -418,6 +418,7 @@ func BenchmarkXChaCha20Poly1305Stateful(b *testing.B) {
 
 func benchmarkEncryptDecryptStateless(b *testing.B, block BlockCipher, data []byte) {
 	b.Helper()
+	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		ciphertext, err := block.Encrypt(data)
@@ -432,6 +433,7 @@ func benchmarkEncryptDecryptStateless(b *testing.B, block BlockCipher, data []by
 
 func benchmarkEncryptDecryptStateful(b *testing.B, sendBlock, recvBlock BlockCipher, data []byte) {
 	b.Helper()
+	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		ciphertext, err := sendBlock.Encrypt(data)

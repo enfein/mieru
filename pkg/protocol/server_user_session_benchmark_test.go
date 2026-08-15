@@ -58,30 +58,15 @@ func newUDPSessionBench(b *testing.B, sessionCount int, sameSource bool) *udpSes
 	return &udpSessionBench{underlay: underlay, remoteAddr: remoteAddr, encryptedMetadata: encryptedMetadata}
 }
 
-func baselineUDPSessionLookup(underlay *PacketUnderlay, remoteAddr net.Addr, encryptedMeta []byte) bool {
-	decrypted := false
-	underlay.sessionMap.Range(func(_, value any) bool {
-		session := value.(*Session)
-		if session.block.Load() != nil && session.RemoteAddr().String() == remoteAddr.String() {
-			if _, err := (*session.block.Load()).Decrypt(encryptedMeta); err == nil {
-				decrypted = true
-				return false
-			}
-		}
-		return true
-	})
-	return decrypted
-}
-
 func BenchmarkUDPSessionLookup(b *testing.B) {
-	for _, sessionCount := range []int{100, 1000, 10000} {
+	for _, sessionCount := range []int{100, 10000} {
 		b.Run(fmt.Sprintf("Sessions_%d", sessionCount), func(b *testing.B) {
 			b.Run("AddressMiss", func(b *testing.B) {
 				fixture := newUDPSessionBench(b, sessionCount, false)
 				b.ReportAllocs()
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
-					if baselineUDPSessionLookup(fixture.underlay, fixture.remoteAddr, fixture.encryptedMetadata) {
+					if _, _, _, decrypted := fixture.underlay.tryDecryptExistingSession(fixture.encryptedMetadata, fixture.remoteAddr); decrypted {
 						b.Fatal("unexpected existing-session match")
 					}
 				}
@@ -91,7 +76,7 @@ func BenchmarkUDPSessionLookup(b *testing.B) {
 				b.ReportAllocs()
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
-					if baselineUDPSessionLookup(fixture.underlay, fixture.remoteAddr, fixture.encryptedMetadata) {
+					if _, _, _, decrypted := fixture.underlay.tryDecryptExistingSession(fixture.encryptedMetadata, fixture.remoteAddr); decrypted {
 						b.Fatal("unexpected existing-session match")
 					}
 				}

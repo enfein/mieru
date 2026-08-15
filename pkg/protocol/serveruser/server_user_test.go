@@ -29,13 +29,13 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func TestBuildServerUserStateSorted(t *testing.T) {
+func TestBuildStateSorted(t *testing.T) {
 	users := map[string]*appctlpb.User{
 		"map-key-z": {Name: proto.String("z-user"), Password: proto.String("z-password")},
 		"map-key-a": {Name: proto.String("a-user"), Password: proto.String("a-password")},
 		"wrong-key": {Name: proto.String("m-user"), Password: proto.String("m-password")},
 	}
-	state := buildServerUserState(users, &sourceUserCacheStats{})
+	state := buildState(users, &sourceUserCacheStats{})
 	if len(state.users) != 3 {
 		t.Fatalf("compiled user count = %d, want 3", len(state.users))
 	}
@@ -47,11 +47,11 @@ func TestBuildServerUserStateSorted(t *testing.T) {
 	}
 }
 
-func TestBuildServerUserStateRawAndHashedCredential(t *testing.T) {
+func TestBuildStateRawAndHashedCredential(t *testing.T) {
 	const name, password = "equivalent-user", "equivalent-password"
 	prepared := cipher.HashPassword([]byte(password), []byte(name))
-	rawState := buildServerUserState(userMap(&appctlpb.User{Name: proto.String(name), Password: proto.String(password)}), &sourceUserCacheStats{})
-	hashedState := buildServerUserState(userMap(makeTestUser(name, prepared)), &sourceUserCacheStats{})
+	rawState := buildState(userMap(&appctlpb.User{Name: proto.String(name), Password: proto.String(password)}), &sourceUserCacheStats{})
+	hashedState := buildState(userMap(makeTestUser(name, prepared)), &sourceUserCacheStats{})
 	if len(rawState.users) != 1 || len(hashedState.users) != 1 {
 		t.Fatalf("compiled user counts = (%d, %d), want (1, 1)", len(rawState.users), len(hashedState.users))
 	}
@@ -60,8 +60,8 @@ func TestBuildServerUserStateRawAndHashedCredential(t *testing.T) {
 	}
 }
 
-func TestBuildServerUserStateRejectsMalformedCredentials(t *testing.T) {
-	state := buildServerUserState(map[string]*appctlpb.User{
+func TestBuildStateRejectsMalformedCredentials(t *testing.T) {
+	state := buildState(map[string]*appctlpb.User{
 		"malformed": {
 			Name:           proto.String("malformed-user"),
 			Password:       proto.String("raw-secret-that-must-not-be-used"),
@@ -77,10 +77,10 @@ func TestBuildServerUserStateRejectsMalformedCredentials(t *testing.T) {
 	}
 }
 
-func TestBuildServerUserStateRejectsInvalidNames(t *testing.T) {
+func TestBuildStateRejectsInvalidNames(t *testing.T) {
 	duplicateA := &appctlpb.User{Name: proto.String("duplicate"), Password: proto.String("password-a")}
 	duplicateB := &appctlpb.User{Name: proto.String("duplicate"), Password: proto.String("password-b")}
-	state := buildServerUserState(map[string]*appctlpb.User{
+	state := buildState(map[string]*appctlpb.User{
 		"empty":      {Password: proto.String("password")},
 		"long":       {Name: proto.String(strings.Repeat("x", constant.MaxUserNameLen+1)), Password: proto.String("password")},
 		"duplicate1": duplicateA,
@@ -101,13 +101,13 @@ func TestDiscoveryRetriesWhenGenerationChanges(t *testing.T) {
 	newUsers := userMap(makeTestUser(newUser, newCredential))
 	encrypted := encryptDiscoveryMetadata(t, newCredential, newUser, newUsers, true, newDummyMetadata())
 	var reload sync.Once
-	result, err := discoverServerUser(
+	result, err := discoverUser(
 		&registry.users,
 		&registry.hintMandatory,
 		encrypted,
 		Source{},
 		true,
-		func(*serverUserState) { reload.Do(func() { registry.SetUsers(newUsers) }) },
+		func(*state) { reload.Do(func() { registry.SetUsers(newUsers) }) },
 	)
 	if err != nil {
 		t.Fatalf("discovery with concurrent reload failed: %v", err)
@@ -134,15 +134,15 @@ func TestDiscoverySurvivesRepeatedReloads(t *testing.T) {
 	finalCredential := cipher.HashPassword([]byte(finalPassword), []byte(finalUser))
 	finalEncrypted := encryptDiscoveryMetadata(t, finalCredential, finalUser, reloadUsers[len(reloadUsers)-1], true, newDummyMetadata())
 
-	retired := make([]*serverUserState, 0, reloads)
+	retired := make([]*state, 0, reloads)
 	nextReload := 0
-	result, err := discoverServerUser(
+	result, err := discoverUser(
 		&registry.users,
 		&registry.hintMandatory,
 		finalEncrypted,
 		Source{},
 		true,
-		func(attempted *serverUserState) {
+		func(attempted *state) {
 			if nextReload < len(reloadUsers) {
 				retired = append(retired, attempted)
 				registry.SetUsers(reloadUsers[nextReload])

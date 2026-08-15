@@ -217,79 +217,45 @@ func TestConcurrentPreparedStatelessTrialsAreRaceFree(t *testing.T) {
 	}
 }
 
-func Benchmark10KUserTryDecryptStateful(b *testing.B) {
-	const numUsers = 10000
-	passwords := make([][]byte, numUsers)
-	for i := 0; i < numUsers; i++ {
-		passwords[i] = HashPassword(fmt.Appendf(nil, "password-%d", i), fmt.Appendf(nil, "user-%d", i))
-	}
-
+func BenchmarkTryDecrypt(b *testing.B) {
+	password := HashPassword([]byte("benchmark-password"), []byte("benchmark-user"))
 	data := make([]byte, 1500)
 	if _, err := crand.Read(data); err != nil {
 		b.Fatalf("failed to generate data: %v", err)
 	}
 
-	// Encrypt with a stateful cipher.
-	block, err := BlockCipherFromPassword(passwords[numUsers-1], false)
-	if err != nil {
-		b.Fatalf("BlockCipherFromPassword() failed: %v", err)
-	}
-	ciphertext, err := block.Encrypt(data)
-	if err != nil {
-		b.Fatalf("Encrypt() failed: %v", err)
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		for j := 0; j < numUsers; j++ {
-			_, _, err := TryDecrypt(ciphertext, passwords[j], false)
-			if err == nil {
-				break
+	for _, benchmark := range []struct {
+		name      string
+		stateless bool
+	}{
+		{name: "Stateful", stateless: false},
+		{name: "Stateless", stateless: true},
+	} {
+		b.Run(benchmark.name, func(b *testing.B) {
+			block, err := BlockCipherFromPassword(password, benchmark.stateless)
+			if err != nil {
+				b.Fatalf("BlockCipherFromPassword() failed: %v", err)
 			}
-		}
+			ciphertext, err := block.Encrypt(data)
+			if err != nil {
+				b.Fatalf("Encrypt() failed: %v", err)
+			}
+
+			b.ReportAllocs()
+			b.SetBytes(int64(len(data)))
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				winner, plaintext, err := TryDecrypt(ciphertext, password, benchmark.stateless)
+				if err != nil || winner == nil || len(plaintext) != len(data) {
+					b.Fatalf("TryDecrypt() = (block nil=%t, plaintext bytes=%d, %v)", winner == nil, len(plaintext), err)
+				}
+			}
+		})
 	}
 }
 
-func Benchmark10KUserTryDecryptStateless(b *testing.B) {
-	const numUsers = 10000
-	passwords := make([][]byte, numUsers)
-	for i := 0; i < numUsers; i++ {
-		passwords[i] = HashPassword(fmt.Appendf(nil, "password-%d", i), fmt.Appendf(nil, "user-%d", i))
-	}
-
-	data := make([]byte, 1500)
-	if _, err := crand.Read(data); err != nil {
-		b.Fatalf("failed to generate data: %v", err)
-	}
-
-	// Encrypt with a stateless cipher.
-	block, err := BlockCipherFromPassword(passwords[numUsers-1], true)
-	if err != nil {
-		b.Fatalf("BlockCipherFromPassword() failed: %v", err)
-	}
-	ciphertext, err := block.Encrypt(data)
-	if err != nil {
-		b.Fatalf("Encrypt() failed: %v", err)
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		for j := 0; j < numUsers; j++ {
-			_, _, err := TryDecrypt(ciphertext, passwords[j], true)
-			if err == nil {
-				break
-			}
-		}
-	}
-}
-
-func BenchmarkCheck10KUserFromHint(b *testing.B) {
-	const numUsers = 10000
-	users := make([][]byte, numUsers)
-	for i := 0; i < numUsers; i++ {
-		users[i] = fmt.Appendf(nil, "user-%d", i)
-	}
-
+func BenchmarkCheckUserFromHint(b *testing.B) {
+	user := []byte("benchmark-user")
 	key := make([]byte, 32)
 	if _, err := crand.Read(key); err != nil {
 		b.Fatalf("fail to generate key: %v", err)
@@ -298,19 +264,18 @@ func BenchmarkCheck10KUserFromHint(b *testing.B) {
 	if err != nil {
 		b.Fatalf("newXChaCha20Poly1305BlockCipher() failed: %v", err)
 	}
-	c.SetBlockContext(BlockContext{UserName: string(users[numUsers-1])})
+	c.SetBlockContext(BlockContext{UserName: string(user)})
 	nonce, err := c.newNonce()
 	if err != nil {
 		b.Fatalf("newNonce() failed: %v", err)
 	}
 	nonce = c.addUserHintToNonce(nonce)
 
+	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		for j := 0; j < numUsers; j++ {
-			if CheckUserFromHint(users[j], nonce) {
-				break
-			}
+		if !CheckUserFromHint(user, nonce) {
+			b.Fatal("user hint did not match")
 		}
 	}
 }

@@ -62,9 +62,9 @@ var discoveryTransports = []discoveryTransport{
 	},
 }
 
-func testServerUserPublisher(users map[string]*appctlpb.User, hintMandatory bool) (*atomic.Pointer[serverUserState], *atomic.Bool) {
-	publisher := &atomic.Pointer[serverUserState]{}
-	publisher.Store(buildServerUserState(users, &sourceUserCacheStats{}))
+func testPublisher(users map[string]*appctlpb.User, hintMandatory bool) (*atomic.Pointer[state], *atomic.Bool) {
+	publisher := &atomic.Pointer[state]{}
+	publisher.Store(buildState(users, &sourceUserCacheStats{}))
 	mandatory := &atomic.Bool{}
 	mandatory.Store(hintMandatory)
 	return publisher, mandatory
@@ -161,7 +161,7 @@ func TestUserDiscoveryHintPrecedence(t *testing.T) {
 	}
 }
 
-func TestServerUserDiscoveryWarmCachedHintMatch(t *testing.T) {
+func TestDiscoveryWarmCachedHintMatch(t *testing.T) {
 	const target = "warm-target"
 	credential := cipher.HashPassword([]byte(t.Name()), []byte(target))
 	users := userMap(
@@ -169,91 +169,91 @@ func TestServerUserDiscoveryWarmCachedHintMatch(t *testing.T) {
 		makeTestUser("registry-user-b", cipher.HashPassword([]byte("b"), []byte("registry-user-b"))),
 		makeTestUser(target, credential),
 	)
-	publisher, mandatory := testServerUserPublisher(users, false)
+	publisher, mandatory := testPublisher(users, false)
 	state := publisher.Load()
-	source := serverUserDiscoverySource{key: sourceUserCacheTestKey(301), valid: true}
-	state.cache.recordAuthenticated(source.key, testServerUserID(t, state, target))
+	source := Source{key: sourceUserCacheTestKey(301), valid: true}
+	state.cache.recordAuthenticated(source.key, testUserID(t, state, target))
 	encrypted := encryptDiscoveryMetadata(t, credential, target, users, true, newDummyMetadata())
 
-	result, err := discoverServerUser(publisher, mandatory, encrypted, source, false, nil)
+	result, err := discoverUser(publisher, mandatory, encrypted, source, false, nil)
 	if err != nil {
-		t.Fatalf("discoverServerUser() failed: %v", err)
+		t.Fatalf("discoverUser() failed: %v", err)
 	}
-	assertServerUserDiscovery(t, result, target, serverUserMatchCachedHint, 1)
+	assertDiscovery(t, result, target, matchCachedHint, 1)
 }
 
-func TestServerUserDiscoveryOptionalCachedFallback(t *testing.T) {
+func TestDiscoveryOptionalCachedFallback(t *testing.T) {
 	const target = "cached-fallback"
 	credential := cipher.HashPassword([]byte(t.Name()), []byte(target))
 	users := userMap(makeTestUser(target, credential))
-	publisher, mandatory := testServerUserPublisher(users, false)
+	publisher, mandatory := testPublisher(users, false)
 	state := publisher.Load()
-	source := serverUserDiscoverySource{key: sourceUserCacheTestKey(302), valid: true}
-	state.cache.recordAuthenticated(source.key, testServerUserID(t, state, target))
+	source := Source{key: sourceUserCacheTestKey(302), valid: true}
+	state.cache.recordAuthenticated(source.key, testUserID(t, state, target))
 	encrypted := encryptDiscoveryMetadata(t, credential, "", users, false, newDummyMetadata())
 
-	result, err := discoverServerUser(publisher, mandatory, encrypted, source, false, nil)
+	result, err := discoverUser(publisher, mandatory, encrypted, source, false, nil)
 	if err != nil {
-		t.Fatalf("discoverServerUser() failed: %v", err)
+		t.Fatalf("discoverUser() failed: %v", err)
 	}
-	assertServerUserDiscovery(t, result, target, serverUserMatchCachedFallback, 1)
+	assertDiscovery(t, result, target, matchCachedFallback, 1)
 }
 
-func TestServerUserDiscoveryRegistryHintPrecedesCachedSharedCredential(t *testing.T) {
+func TestDiscoveryRegistryHintPrecedesCachedSharedCredential(t *testing.T) {
 	const (
 		cached = "cached-nonmatching"
 		hinted = "hinted-registry-user"
 	)
 	credential := cipher.HashPassword([]byte(t.Name()), []byte("shared"))
 	users := userMap(makeTestUser(cached, credential), makeTestUser(hinted, credential))
-	publisher, mandatory := testServerUserPublisher(users, false)
+	publisher, mandatory := testPublisher(users, false)
 	state := publisher.Load()
-	source := serverUserDiscoverySource{key: sourceUserCacheTestKey(303), valid: true}
-	state.cache.recordAuthenticated(source.key, testServerUserID(t, state, cached))
+	source := Source{key: sourceUserCacheTestKey(303), valid: true}
+	state.cache.recordAuthenticated(source.key, testUserID(t, state, cached))
 	encrypted := encryptDiscoveryMetadata(t, credential, hinted, users, true, newDummyMetadata())
 
-	result, err := discoverServerUser(publisher, mandatory, encrypted, source, false, nil)
+	result, err := discoverUser(publisher, mandatory, encrypted, source, false, nil)
 	if err != nil {
-		t.Fatalf("discoverServerUser() failed: %v", err)
+		t.Fatalf("discoverUser() failed: %v", err)
 	}
-	assertServerUserDiscovery(t, result, hinted, serverUserMatchRegistryHint, 1)
+	assertDiscovery(t, result, hinted, matchRegistryHint, 1)
 }
 
-func TestServerUserDiscoveryMandatoryHintRejectsCachedFallback(t *testing.T) {
+func TestDiscoveryMandatoryHintRejectsCachedFallback(t *testing.T) {
 	const target = "cached-but-not-hinted"
 	credential := cipher.HashPassword([]byte(t.Name()), []byte(target))
 	users := userMap(makeTestUser(target, credential))
-	publisher, _ := testServerUserPublisher(users, true)
+	publisher, _ := testPublisher(users, true)
 	state := publisher.Load()
-	source := serverUserDiscoverySource{key: sourceUserCacheTestKey(304), valid: true}
-	state.cache.recordAuthenticated(source.key, testServerUserID(t, state, target))
+	source := Source{key: sourceUserCacheTestKey(304), valid: true}
+	state.cache.recordAuthenticated(source.key, testUserID(t, state, target))
 	encrypted := encryptDiscoveryMetadata(t, credential, "unregistered-hint", users, false, newDummyMetadata())
 
-	result := tryServerUserState(state, encrypted, source, true)
+	result := tryState(state, encrypted, source, true)
 	if result.block != nil || result.attempts != 0 {
 		t.Fatalf("mandatory discovery = (block nil=%t, attempts=%d), want rejection without cached fallback", result.block == nil, result.attempts)
 	}
 }
 
-func TestServerUserDiscoveryCacheMissPreservesRegistryFallback(t *testing.T) {
+func TestDiscoveryCacheMissPreservesRegistryFallback(t *testing.T) {
 	const target = "z-registry-fallback"
 	credential := cipher.HashPassword([]byte(t.Name()), []byte(target))
 	users := userMap(
 		makeTestUser("a-wrong-user", cipher.HashPassword([]byte("wrong"), []byte("a-wrong-user"))),
 		makeTestUser(target, credential),
 	)
-	publisher, mandatory := testServerUserPublisher(users, false)
-	source := serverUserDiscoverySource{key: sourceUserCacheTestKey(305), valid: true}
+	publisher, mandatory := testPublisher(users, false)
+	source := Source{key: sourceUserCacheTestKey(305), valid: true}
 	encrypted := encryptDiscoveryMetadata(t, credential, "", users, false, newDummyMetadata())
 
-	result, err := discoverServerUser(publisher, mandatory, encrypted, source, false, nil)
+	result, err := discoverUser(publisher, mandatory, encrypted, source, false, nil)
 	if err != nil {
-		t.Fatalf("discoverServerUser() failed: %v", err)
+		t.Fatalf("discoverUser() failed: %v", err)
 	}
-	assertServerUserDiscovery(t, result, target, serverUserMatchRegistryFallback, 2)
+	assertDiscovery(t, result, target, matchRegistryFallback, 2)
 }
 
-func TestServerUserDiscoveryMultipleCachedUsers(t *testing.T) {
+func TestDiscoveryMultipleCachedUsers(t *testing.T) {
 	const (
 		first  = "first-cached-user"
 		target = "second-cached-user"
@@ -261,39 +261,39 @@ func TestServerUserDiscoveryMultipleCachedUsers(t *testing.T) {
 	firstCredential := cipher.HashPassword([]byte("first"), []byte(first))
 	targetCredential := cipher.HashPassword([]byte(t.Name()), []byte(target))
 	users := userMap(makeTestUser(first, firstCredential), makeTestUser(target, targetCredential))
-	publisher, mandatory := testServerUserPublisher(users, false)
+	publisher, mandatory := testPublisher(users, false)
 	state := publisher.Load()
-	source := serverUserDiscoverySource{key: sourceUserCacheTestKey(306), valid: true}
-	state.cache.recordAuthenticated(source.key, testServerUserID(t, state, first))
-	state.cache.recordAuthenticated(source.key, testServerUserID(t, state, target))
+	source := Source{key: sourceUserCacheTestKey(306), valid: true}
+	state.cache.recordAuthenticated(source.key, testUserID(t, state, first))
+	state.cache.recordAuthenticated(source.key, testUserID(t, state, target))
 	encrypted := encryptDiscoveryMetadata(t, targetCredential, "", users, false, newDummyMetadata())
 
-	result, err := discoverServerUser(publisher, mandatory, encrypted, source, false, nil)
+	result, err := discoverUser(publisher, mandatory, encrypted, source, false, nil)
 	if err != nil {
-		t.Fatalf("discoverServerUser() failed: %v", err)
+		t.Fatalf("discoverUser() failed: %v", err)
 	}
-	assertServerUserDiscovery(t, result, target, serverUserMatchCachedFallback, 2)
+	assertDiscovery(t, result, target, matchCachedFallback, 2)
 }
 
-func TestServerUserDiscoverySkipsInvalidCachedID(t *testing.T) {
+func TestDiscoverySkipsInvalidCachedID(t *testing.T) {
 	const target = "valid-cached-user"
 	credential := cipher.HashPassword([]byte(t.Name()), []byte(target))
 	users := userMap(makeTestUser(target, credential))
-	publisher, mandatory := testServerUserPublisher(users, false)
+	publisher, mandatory := testPublisher(users, false)
 	state := publisher.Load()
-	source := serverUserDiscoverySource{key: sourceUserCacheTestKey(307), valid: true}
+	source := Source{key: sourceUserCacheTestKey(307), valid: true}
 	state.cache.recordAuthenticated(source.key, uint32(len(state.users)+100))
-	state.cache.recordAuthenticated(source.key, testServerUserID(t, state, target))
+	state.cache.recordAuthenticated(source.key, testUserID(t, state, target))
 	encrypted := encryptDiscoveryMetadata(t, credential, "", users, false, newDummyMetadata())
 
-	result, err := discoverServerUser(publisher, mandatory, encrypted, source, false, nil)
+	result, err := discoverUser(publisher, mandatory, encrypted, source, false, nil)
 	if err != nil {
-		t.Fatalf("discoverServerUser() failed: %v", err)
+		t.Fatalf("discoverUser() failed: %v", err)
 	}
-	assertServerUserDiscovery(t, result, target, serverUserMatchCachedFallback, 1)
+	assertDiscovery(t, result, target, matchCachedFallback, 1)
 }
 
-func TestServerUserDiscoveryDoesNotRetryCachedHintFailure(t *testing.T) {
+func TestDiscoveryDoesNotRetryCachedHintFailure(t *testing.T) {
 	const (
 		cachedWrong = "a-cached-wrong"
 		target      = "z-correct-user"
@@ -301,19 +301,19 @@ func TestServerUserDiscoveryDoesNotRetryCachedHintFailure(t *testing.T) {
 	wrongCredential := cipher.HashPassword([]byte("wrong"), []byte(cachedWrong))
 	targetCredential := cipher.HashPassword([]byte(t.Name()), []byte(target))
 	users := userMap(makeTestUser(cachedWrong, wrongCredential), makeTestUser(target, targetCredential))
-	publisher, mandatory := testServerUserPublisher(users, false)
+	publisher, mandatory := testPublisher(users, false)
 	state := publisher.Load()
-	source := serverUserDiscoverySource{key: sourceUserCacheTestKey(308), valid: true}
-	state.cache.recordAuthenticated(source.key, testServerUserID(t, state, cachedWrong))
+	source := Source{key: sourceUserCacheTestKey(308), valid: true}
+	state.cache.recordAuthenticated(source.key, testUserID(t, state, cachedWrong))
 	encrypted := encryptDiscoveryMetadata(t, targetCredential, cachedWrong, users, true, newDummyMetadata())
 	hintBefore := cipher.ServerHintMatchDecrypt.Load()
 	failedHintBefore := cipher.ServerFailedHintMatchDecrypt.Load()
 
-	result, err := discoverServerUser(publisher, mandatory, encrypted, source, false, nil)
+	result, err := discoverUser(publisher, mandatory, encrypted, source, false, nil)
 	if err != nil {
-		t.Fatalf("discoverServerUser() failed: %v", err)
+		t.Fatalf("discoverUser() failed: %v", err)
 	}
-	assertServerUserDiscovery(t, result, target, serverUserMatchRegistryFallback, 2)
+	assertDiscovery(t, result, target, matchRegistryFallback, 2)
 	if got := cipher.ServerHintMatchDecrypt.Load() - hintBefore; got != 1 {
 		t.Fatalf("hint-match metric delta = %d, want 1", got)
 	}
@@ -322,7 +322,7 @@ func TestServerUserDiscoveryDoesNotRetryCachedHintFailure(t *testing.T) {
 	}
 }
 
-func TestServerUserDiscoveryCacheCounterClassification(t *testing.T) {
+func TestDiscoveryCacheCounterClassification(t *testing.T) {
 	const (
 		cachedUser   = "cached-counter-user"
 		registryUser = "registry-counter-user"
@@ -333,36 +333,36 @@ func TestServerUserDiscoveryCacheCounterClassification(t *testing.T) {
 		makeTestUser(cachedUser, cachedCredential),
 		makeTestUser(registryUser, registryCredential),
 	)
-	publisher, mandatory := testServerUserPublisher(users, false)
+	publisher, mandatory := testPublisher(users, false)
 	state := publisher.Load()
-	source := serverUserDiscoverySource{key: sourceUserCacheTestKey(309), valid: true}
+	source := Source{key: sourceUserCacheTestKey(309), valid: true}
 
 	// A cold query is a source miss and enters a full-registry phase.
 	cold := encryptDiscoveryMetadata(t, cachedCredential, cachedUser, users, true, newDummyMetadata())
-	if _, err := discoverServerUser(publisher, mandatory, cold, source, false, nil); err != nil {
-		t.Fatalf("cold discoverServerUser() failed: %v", err)
+	if _, err := discoverUser(publisher, mandatory, cold, source, false, nil); err != nil {
+		t.Fatalf("cold discoverUser() failed: %v", err)
 	}
-	state.cache.recordAuthenticated(source.key, testServerUserID(t, state, cachedUser))
+	state.cache.recordAuthenticated(source.key, testUserID(t, state, cachedUser))
 
 	// A cached hint winner is both a source and authentication hit, and it
 	// returns before entering a full-registry phase.
-	if _, err := discoverServerUser(publisher, mandatory, cold, source, false, nil); err != nil {
-		t.Fatalf("warm hinted discoverServerUser() failed: %v", err)
+	if _, err := discoverUser(publisher, mandatory, cold, source, false, nil); err != nil {
+		t.Fatalf("warm hinted discoverUser() failed: %v", err)
 	}
 
 	// With no hint, discovery scans the registry hint phase before the cached
 	// optional fallback wins. Authentication hit and full fallback therefore
 	// intentionally overlap.
 	noHint := encryptDiscoveryMetadata(t, cachedCredential, "", users, false, newDummyMetadata())
-	if _, err := discoverServerUser(publisher, mandatory, noHint, source, false, nil); err != nil {
-		t.Fatalf("warm no-hint discoverServerUser() failed: %v", err)
+	if _, err := discoverUser(publisher, mandatory, noHint, source, false, nil); err != nil {
+		t.Fatalf("warm no-hint discoverUser() failed: %v", err)
 	}
 
 	// An exact source hit whose cached user does not win is not an
 	// authentication hit.
 	registry := encryptDiscoveryMetadata(t, registryCredential, registryUser, users, true, newDummyMetadata())
-	if _, err := discoverServerUser(publisher, mandatory, registry, source, false, nil); err != nil {
-		t.Fatalf("registry discoverServerUser() failed: %v", err)
+	if _, err := discoverUser(publisher, mandatory, registry, source, false, nil); err != nil {
+		t.Fatalf("registry discoverUser() failed: %v", err)
 	}
 
 	want := sourceUserCacheStatsSnapshot{
@@ -378,14 +378,14 @@ func TestServerUserDiscoveryCacheCounterClassification(t *testing.T) {
 	}
 }
 
-func TestServerUserDiscoverySharedCredentialContextsAreIndependent(t *testing.T) {
+func TestDiscoverySharedCredentialContextsAreIndependent(t *testing.T) {
 	const (
 		userA = "shared-user-a"
 		userB = "shared-user-b"
 	)
 	credential := cipher.HashPassword([]byte(t.Name()), []byte("shared"))
 	users := userMap(makeTestUser(userA, credential), makeTestUser(userB, credential))
-	publisher, mandatory := testServerUserPublisher(users, true)
+	publisher, mandatory := testPublisher(users, true)
 	encrypted := map[string][]byte{
 		userA: encryptDiscoveryMetadata(t, credential, userA, users, true, newDummyMetadata()),
 		userB: encryptDiscoveryMetadata(t, credential, userB, users, true, newDummyMetadata()),
@@ -401,7 +401,7 @@ func TestServerUserDiscoverySharedCredentialContextsAreIndependent(t *testing.T)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			result, err := discoverServerUser(publisher, mandatory, encrypted[want], serverUserDiscoverySource{}, false, nil)
+			result, err := discoverUser(publisher, mandatory, encrypted[want], Source{}, false, nil)
 			if err != nil {
 				errCh <- err
 				return
@@ -419,7 +419,7 @@ func TestServerUserDiscoverySharedCredentialContextsAreIndependent(t *testing.T)
 	}
 }
 
-func assertServerUserDiscovery(t *testing.T, result serverUserDiscoveryResult, wantUser string, wantOrigin serverUserMatchOrigin, wantAttempts int) {
+func assertDiscovery(t *testing.T, result discoveryResult, wantUser string, wantOrigin matchOrigin, wantAttempts int) {
 	t.Helper()
 	if result.block == nil || !bytes.Equal(result.decryptedMetadata, newDummyMetadata()) {
 		t.Fatalf("discovery returned block nil=%t, metadata=%x", result.block == nil, result.decryptedMetadata)
@@ -435,7 +435,7 @@ func assertServerUserDiscovery(t *testing.T, result serverUserDiscoveryResult, w
 	}
 }
 
-func testServerUserID(t *testing.T, state *serverUserState, name string) uint32 {
+func testUserID(t *testing.T, state *state, name string) uint32 {
 	t.Helper()
 	for i := range state.users {
 		if state.users[i].name == name {
