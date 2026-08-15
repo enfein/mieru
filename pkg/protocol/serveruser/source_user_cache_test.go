@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package protocol
+package serveruser
 
 import (
 	"encoding/binary"
@@ -114,6 +114,7 @@ func TestSourceUserCacheMRUDedupExpiryAndUserEviction(t *testing.T) {
 	clock := &sourceUserCacheTestClock{}
 	cache := newSourceUserCacheWithTick(&sourceUserCacheStats{}, clock.now)
 	key := sourceUserCacheTestKey(1)
+	newUserID := uint32(sourceUserCacheUsers + 1)
 	for userID := uint32(1); userID <= sourceUserCacheUsers; userID++ {
 		clock.set(1000 + userID)
 		cache.recordAuthenticated(key, userID)
@@ -122,10 +123,10 @@ func TestSourceUserCacheMRUDedupExpiryAndUserEviction(t *testing.T) {
 	clock.set(1020)
 	cache.recordAuthenticated(key, 3)
 	clock.set(1021)
-	cache.recordAuthenticated(key, 11)
+	cache.recordAuthenticated(key, newUserID)
 	candidates, count := cache.lookup(key)
-	if count != sourceUserCacheUsers || candidates[0] != 11 || candidates[1] != 3 {
-		t.Fatalf("MRU candidates = (%v, %d), want users 11 and 3 first", candidates, count)
+	if count != sourceUserCacheUsers || candidates[0] != newUserID || candidates[1] != 3 {
+		t.Fatalf("MRU candidates = (%v, %d), want users %d and 3 first", candidates, count, newUserID)
 	}
 	if sourceUserCacheContains(candidates, count, 1) {
 		t.Fatalf("oldest user 1 was not evicted: %v", candidates)
@@ -139,8 +140,8 @@ func TestSourceUserCacheMRUDedupExpiryAndUserEviction(t *testing.T) {
 	// once and retain the newer position.
 	entry.users[1].Store(sourceUserCachePackUser(3, 1010))
 	candidates, count = cache.lookup(key)
-	if count != sourceUserCacheUsers-1 || candidates[0] != 11 || candidates[1] != 3 {
-		t.Fatalf("deduplicated candidates = (%v, %d), want 9 users with 11 and 3 first", candidates, count)
+	if count != sourceUserCacheUsers-1 || candidates[0] != newUserID || candidates[1] != 3 {
+		t.Fatalf("deduplicated candidates = (%v, %d), want %d users with %d and 3 first", candidates, count, sourceUserCacheUsers-1, newUserID)
 	}
 
 	clock.set(1621)
@@ -154,18 +155,19 @@ func TestSourceUserCacheReusesExpiredUserBeforeLiveUser(t *testing.T) {
 	clock.set(1000)
 	cache := newSourceUserCacheWithTick(nil, clock.now)
 	key := sourceUserCacheTestKey(2)
+	newUserID := uint32(sourceUserCacheUsers + 1)
 	cache.recordAuthenticated(key, 1)
 	for userID := uint32(2); userID <= sourceUserCacheUsers; userID++ {
-		clock.set(1590 + userID)
+		clock.set(1000 + sourceUserCacheLifeSeconds - sourceUserCacheUsers + userID)
 		cache.recordAuthenticated(key, userID)
 	}
 	clock.set(1601)
-	cache.recordAuthenticated(key, 11)
+	cache.recordAuthenticated(key, newUserID)
 	candidates, count := cache.lookup(key)
 	if count != sourceUserCacheUsers || sourceUserCacheContains(candidates, count, 1) {
 		t.Fatalf("expired user was not reused before a live user: (%v, %d)", candidates, count)
 	}
-	for userID := uint32(2); userID <= 11; userID++ {
+	for userID := uint32(2); userID <= newUserID; userID++ {
 		if !sourceUserCacheContains(candidates, count, userID) {
 			t.Fatalf("live user %d was evicted: %v", userID, candidates)
 		}
@@ -366,9 +368,9 @@ func TestSourceUserCacheConcurrentOperationsAndRetirement(t *testing.T) {
 	stop.Store(true)
 	wg.Wait()
 
-	records := stats.records.Load()
+	insertions := stats.insertions.Load()
 	cache.recordAuthenticated(keys[0], 99)
-	if stats.records.Load() != records {
+	if stats.insertions.Load() != insertions {
 		t.Fatal("record started after retirement modified the detached table")
 	}
 	if candidates, count := cache.lookup(keys[0]); count != 0 {
@@ -410,8 +412,8 @@ func TestSourceUserCacheStatsAndZeroAllocationWarmPath(t *testing.T) {
 	if _, count := cache.lookup(key); count != 1 {
 		t.Fatal("recorded cache lookup missed")
 	}
-	if stats.lookups.Load() != 2 || stats.hits.Load() != 1 || stats.misses.Load() != 1 || stats.records.Load() != 1 {
-		t.Fatalf("unexpected stats: lookups=%d hits=%d misses=%d records=%d", stats.lookups.Load(), stats.hits.Load(), stats.misses.Load(), stats.records.Load())
+	if stats.lookups.Load() != 2 || stats.sourceHits.Load() != 1 || stats.sourceMisses.Load() != 1 || stats.insertions.Load() != 1 {
+		t.Fatalf("unexpected stats: lookups=%d sourceHits=%d sourceMisses=%d insertions=%d", stats.lookups.Load(), stats.sourceHits.Load(), stats.sourceMisses.Load(), stats.insertions.Load())
 	}
 
 	lookupAllocs := testing.AllocsPerRun(1000, func() {
@@ -428,9 +430,72 @@ func TestSourceUserCacheStatsAndZeroAllocationWarmPath(t *testing.T) {
 	}
 }
 
+func TestSourceUserCacheTransitionStats(t *testing.T) {
+	t.Run("user associations", func(t *testing.T) {
+		clock := &sourceUserCacheTestClock{}
+		clock.set(100)
+		stats := &sourceUserCacheStats{}
+		cache := newSourceUserCacheWithTick(stats, clock.now)
+		key := sourceUserCacheTestKey(12)
+
+		cache.lookup(key)
+		cache.recordAuthenticated(key, 1)
+		clock.set(101)
+		cache.recordAuthenticated(key, 1) // A live refresh is not an insertion.
+		cache.lookup(key)
+		for userID := uint32(2); userID <= sourceUserCacheUsers; userID++ {
+			cache.recordAuthenticated(key, userID)
+		}
+		cache.recordAuthenticated(key, sourceUserCacheUsers+1)
+
+		clock.set(101 + sourceUserCacheLifeSeconds)
+		cache.lookup(key) // Observing expiry does not count a transition.
+		cache.recordAuthenticated(key, sourceUserCacheUsers+1)
+
+		want := sourceUserCacheStatsSnapshot{
+			lookups:      3,
+			sourceHits:   1,
+			sourceMisses: 2,
+			insertions:   sourceUserCacheUsers + 2,
+			expiries:     1,
+			evictions:    1,
+		}
+		if got := stats.load(); got != want {
+			t.Fatalf("transition stats = %+v, want %+v", got, want)
+		}
+	})
+
+	t.Run("source ways", func(t *testing.T) {
+		clock := &sourceUserCacheTestClock{}
+		clock.set(200)
+		stats := &sourceUserCacheStats{}
+		cache := newSourceUserCacheWithTick(stats, clock.now)
+		keys := sourceUserCacheCollidingKeys(sourceUserCacheWays + 2)
+		for i := 0; i < sourceUserCacheWays; i++ {
+			cache.recordAuthenticated(keys[i], uint32(i+1))
+		}
+		cache.recordAuthenticated(keys[sourceUserCacheWays], 10)
+		if got := stats.load(); got.insertions != 5 || got.evictions != 1 || got.expiries != 0 {
+			t.Fatalf("live source replacement stats = %+v, want 5 insertions and 1 eviction", got)
+		}
+
+		clock.set(200 + sourceUserCacheLifeSeconds)
+		cache.recordAuthenticated(keys[sourceUserCacheWays+1], 11)
+		if got := stats.load(); got.insertions != 6 || got.evictions != 1 || got.expiries != 1 {
+			t.Fatalf("expired source replacement stats = %+v, want 6 insertions, 1 eviction, and 1 expiry", got)
+		}
+	})
+}
+
 func TestSourceUserCachePhysicalLimitAndUniformOccupancy(t *testing.T) {
-	if slots := sourceUserCacheBucketCount * sourceUserCacheWays; slots != 65536 {
-		t.Fatalf("physical source slots = %d, want 65536", slots)
+	if sourceUserCacheBucketCount&(sourceUserCacheBucketCount-1) != 0 {
+		t.Fatalf("source bucket count %d is not a power of two", sourceUserCacheBucketCount)
+	}
+	if sourceUserCacheLockStripes&(sourceUserCacheLockStripes-1) != 0 {
+		t.Fatalf("source lock stripe count %d is not a power of two", sourceUserCacheLockStripes)
+	}
+	if slots := sourceUserCacheBucketCount * sourceUserCacheWays; slots != 16384 {
+		t.Fatalf("physical source slots = %d, want 16384", slots)
 	}
 	wantTableSize := uintptr(sourceUserCacheBucketCount*sourceUserCacheWays) * unsafe.Sizeof(atomic.Pointer[sourceUserCacheEntry]{})
 	if tableSize := unsafe.Sizeof(sourceUserCacheTable{}); tableSize != wantTableSize {
@@ -459,8 +524,8 @@ func TestSourceUserCachePhysicalLimitAndUniformOccupancy(t *testing.T) {
 	if occupied >= sourceCount {
 		t.Fatalf("uniform occupancy = %d, want lower than physical limit due to bucket collisions", occupied)
 	}
-	if occupied < 48000 {
-		t.Fatalf("uniform occupancy = %d, want at least 48000", occupied)
+	if occupied < sourceCount*3/4 {
+		t.Fatalf("uniform occupancy = %d, want at least %d", occupied, sourceCount*3/4)
 	}
 	t.Logf("uniform occupancy = %d/%d; table = %d bytes; entry = %d bytes", occupied, sourceCount, unsafe.Sizeof(sourceUserCacheTable{}), unsafe.Sizeof(sourceUserCacheEntry{}))
 }

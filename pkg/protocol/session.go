@@ -34,6 +34,7 @@ import (
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/mathext"
 	"github.com/enfein/mieru/v3/pkg/metrics"
+	"github.com/enfein/mieru/v3/pkg/protocol/serveruser"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -41,7 +42,7 @@ import (
 
 const (
 	// Buffer some segments before blocking the underlay input loop.
-	segmentChanCapacity = 1024
+	segmentChanCapacity = 256
 
 	// Maximum number of segments in a queue or buffer.
 	segmentTreeCapacity = 4096
@@ -148,12 +149,12 @@ type Session struct {
 	openSessionRequestSent atomic.Bool // whether open session request has been sent
 
 	// ---- server fields ----
-	userName                  atomic.Pointer[string]           // user that owns this session
-	userPolicy                atomic.Pointer[serverUserPolicy] // matched immutable policy snapshot
-	pendingServerUserPolicies map[string]serverUserPolicy      // policy of all users; released after user identity is known
-	clientUseLowEntropy       atomic.Bool                      // whether the server received low entropy data from client
-	uploadBytes               metrics.Metric                   // number of bytes from client to server
-	downloadBytes             metrics.Metric                   // number of bytes from server to client
+	userName                  atomic.Pointer[string]            // user that owns this session
+	userPolicy                atomic.Pointer[serveruser.Policy] // matched immutable policy snapshot
+	pendingServerUserPolicies map[string]serveruser.Policy      // policy of all users; released after user identity is known
+	clientUseLowEntropy       atomic.Bool                       // whether the server received low entropy data from client
+	uploadBytes               metrics.Metric                    // number of bytes from client to server
+	downloadBytes             metrics.Metric                    // number of bytes from server to client
 }
 
 var (
@@ -166,10 +167,17 @@ var (
 
 // NewSession creates a new session.
 func NewSession(id uint32, isClient bool, mtu int, users map[string]*appctlpb.User, trafficPattern *appctlpb.TrafficPattern) *Session {
-	return newSession(id, isClient, mtu, serverUserPolicy{}, buildServerUserPolicies(users), trafficPattern)
+	return newSessionWithServerUserPolicy(id, isClient, mtu, serveruser.Policy{}, serveruser.BuildPolicies(users), trafficPattern)
 }
 
-func newSession(id uint32, isClient bool, mtu int, policy serverUserPolicy, pendingPolicies map[string]serverUserPolicy, trafficPattern *appctlpb.TrafficPattern) *Session {
+func newSessionWithServerUserPolicy(
+	id uint32,
+	isClient bool,
+	mtu int,
+	policy serveruser.Policy,
+	pendingPolicies map[string]serveruser.Policy,
+	trafficPattern *appctlpb.TrafficPattern,
+) *Session {
 	rttStat := congestion.NewRTTStats()
 	rttStat.SetMaxAckDelay(periodicOutputInterval)
 	rttStat.SetRTOMultiplier(txTimeoutBackOff)
@@ -199,7 +207,7 @@ func newSession(id uint32, isClient bool, mtu int, policy serverUserPolicy, pend
 	s.lastTXTime.Store(now)
 	s.heartbeatJitter = randomHeartbeatJitter()
 	s.remoteWindowSize.Store(minWindowSize)
-	if policy.name != "" {
+	if policy.Name() != "" {
 		s.userPolicy.Store(&policy)
 	}
 	return s
@@ -974,20 +982,20 @@ func (s *Session) input(seg *segment) error {
 		s.block.Store(&seg.block)
 		if !s.isClient {
 			policy := seg.serverUserPolicy
-			if policy.name == "" && s.pendingServerUserPolicies != nil {
+			if policy.Name() == "" && s.pendingServerUserPolicies != nil {
 				policy = s.pendingServerUserPolicies[seg.block.BlockContext().UserName]
 			}
 			s.pendingServerUserPolicies = nil
 			if current := s.userPolicy.Load(); current != nil {
-				if current.name != seg.block.BlockContext().UserName {
-					panic(fmt.Sprintf("%v user policy name %q differs from cipher user name %q", s, current.name, seg.block.BlockContext().UserName))
+				if current.Name() != seg.block.BlockContext().UserName {
+					panic(fmt.Sprintf("%v user policy name %q differs from cipher user name %q", s, current.Name(), seg.block.BlockContext().UserName))
 				}
-				if policy.name != "" && current.name != policy.name {
-					panic(fmt.Sprintf("%v retained user policy name %q differs from segment user policy name %q", s, current.name, policy.name))
+				if policy.Name() != "" && current.Name() != policy.Name() {
+					panic(fmt.Sprintf("%v retained user policy name %q differs from segment user policy name %q", s, current.Name(), policy.Name()))
 				}
-			} else if policy.name != "" {
-				if policy.name != seg.block.BlockContext().UserName {
-					panic(fmt.Sprintf("%v user policy name %q differs from cipher user name %q", s, policy.name, seg.block.BlockContext().UserName))
+			} else if policy.Name() != "" {
+				if policy.Name() != seg.block.BlockContext().UserName {
+					panic(fmt.Sprintf("%v user policy name %q differs from cipher user name %q", s, policy.Name(), seg.block.BlockContext().UserName))
 				}
 				s.userPolicy.Store(&policy)
 			}
@@ -1380,10 +1388,10 @@ func (s *Session) checkQuota(userName string) (ok bool, err error) {
 	if policy == nil {
 		return true, fmt.Errorf("no registered user")
 	}
-	if policy.name != userName {
+	if policy.Name() != userName {
 		return true, fmt.Errorf("user %s is not found", userName)
 	}
-	if len(policy.quotas) == 0 {
+	if len(policy.Quotas()) == 0 {
 		return true, nil
 	}
 
@@ -1400,12 +1408,12 @@ func (s *Session) checkQuota(userName string) (ok bool, err error) {
 	if !found {
 		return true, fmt.Errorf("metric %s in group %s is not found", metrics.UserMetricDownloadBytes, metricGroupName)
 	}
-	for _, quota := range policy.quotas {
+	for _, quota := range policy.Quotas() {
 		now := time.Now()
-		then := now.Add(-time.Duration(quota.days) * 24 * time.Hour)
+		then := now.Add(-time.Duration(quota.Days()) * 24 * time.Hour)
 		totalBytes := uploadBytes.(*metrics.Counter).DeltaBetween(then, now)
 		totalBytes += downloadBytes.(*metrics.Counter).DeltaBetween(then, now)
-		if totalBytes/1048576 > int64(quota.megabytes) {
+		if totalBytes/1048576 > int64(quota.Megabytes()) {
 			return false, nil
 		}
 	}

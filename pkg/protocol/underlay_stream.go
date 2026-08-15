@@ -22,7 +22,6 @@ import (
 	"math"
 	mrand "math/rand"
 	"net"
-	"sync/atomic"
 	"time"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
@@ -32,6 +31,7 @@ import (
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/mathext"
 	"github.com/enfein/mieru/v3/pkg/metrics"
+	"github.com/enfein/mieru/v3/pkg/protocol/serveruser"
 	"github.com/enfein/mieru/v3/pkg/replay"
 	"github.com/enfein/mieru/v3/pkg/rng"
 	"github.com/enfein/mieru/v3/pkg/stderror"
@@ -56,10 +56,9 @@ type StreamUnderlay struct {
 	block cipher.BlockCipher
 
 	// ---- server fields ----
-	serverUsers               *atomic.Pointer[serverUserState]
-	serverUserHintIsMandatory *atomic.Bool
-	serverUserSource          serverUserDiscoverySource
-	serverUserPolicy          serverUserPolicy
+	serverUsers      *serveruser.Registry
+	serverUserSource serveruser.Source
+	serverUserPolicy serveruser.Policy
 }
 
 var _ Underlay = &StreamUnderlay{}
@@ -227,7 +226,7 @@ func (t *StreamUnderlay) RunEventLoop(ctx context.Context) error {
 		if log.IsLevelEnabled(log.TraceLevel) {
 			log.Tracef("%v received %v", t, seg)
 		}
-		if seg.serverUserAuthentication.valid() {
+		if seg.serverUserAuthentication.Valid() {
 			if err := validateNewServerSessionSegment(seg); err != nil {
 				return stderror.WrapErrorWithType(err, stderror.PROTOCOL_ERROR)
 			}
@@ -297,17 +296,21 @@ func (t *StreamUnderlay) onOpenSessionRequest(seg *segment) error {
 		return nil
 	}
 	policy := t.serverUserPolicy
-	if seg.serverUserAuthentication.valid() {
-		policy = seg.serverUserAuthentication.policy
+	if seg.serverUserAuthentication.Valid() {
+		policy = seg.serverUserAuthentication.Policy()
 	}
-	session := newSession(sessionID, false, t.MTU(), policy, nil, t.trafficPattern)
+	session := newSessionWithServerUserPolicy(sessionID, false, t.MTU(), policy, nil, t.trafficPattern)
 	if err := t.AddSession(session, nil); err != nil {
 		return err
 	}
 	if !t.deliverSegmentToSession(session, seg) {
 		return fmt.Errorf("failed to deliver open session request for session %d", sessionID)
 	}
-	t.readySessions <- session
+	select {
+	case t.readySessions <- session:
+	case <-t.done:
+		return io.ErrClosedPipe
+	}
 	return nil
 }
 
@@ -315,11 +318,11 @@ func (t *StreamUnderlay) onOpenSessionRequest(seg *segment) error {
 // caller invokes it only after the first segment has passed authentication,
 // replay, metadata, payload, padding, role, session-ID, and dispatch checks.
 func (t *StreamUnderlay) commitServerUserAuthentication(seg *segment) {
-	if seg == nil || !seg.serverUserAuthentication.valid() {
+	if seg == nil || !seg.serverUserAuthentication.Valid() {
 		return
 	}
-	t.serverUserPolicy = seg.serverUserAuthentication.policy
-	seg.serverUserAuthentication.recordAuthenticated()
+	t.serverUserPolicy = seg.serverUserAuthentication.Policy()
+	seg.serverUserAuthentication.Record()
 }
 
 func (t *StreamUnderlay) onOpenSessionResponse(seg *segment) error {
@@ -396,7 +399,7 @@ func (t *StreamUnderlay) readOneSegment() (*segment, error) {
 
 	// Decrypt metadata.
 	var decryptedMeta []byte
-	var authentication serverUserAuthentication
+	var authentication serveruser.Authentication
 	if t.recv == nil && t.isClient {
 		t.recv = t.block.Clone()
 	}
@@ -463,8 +466,8 @@ func (t *StreamUnderlay) readOneSegment() (*segment, error) {
 	if err != nil {
 		return nil, err
 	}
-	if authentication.valid() {
-		seg.serverUserPolicy = authentication.policy
+	if authentication.Valid() {
+		seg.serverUserPolicy = authentication.Policy()
 		seg.serverUserAuthentication = authentication
 	}
 	return seg, nil
@@ -632,15 +635,17 @@ func (t *StreamUnderlay) writeOneSegment(seg *segment) error {
 		if err != nil {
 			return fmt.Errorf("Encrypt() failed: %w", err)
 		}
-		dataToSend := encryptedMetadata
+		var encryptedPayload []byte
 		if len(seg.payload) > 0 {
-			encryptedPayload, err := t.send.Encrypt(seg.payload)
+			encryptedPayload, err = t.send.Encrypt(seg.payload)
 			if err != nil {
 				return fmt.Errorf("Encrypt() failed: %w", err)
 			}
-			dataToSend = append(dataToSend, encryptedPayload...)
 		}
-		dataToSend = append(dataToSend, padding...)
+		dataToSend := make([]byte, len(encryptedMetadata)+len(encryptedPayload)+len(padding))
+		offset := copy(dataToSend, encryptedMetadata)
+		offset += copy(dataToSend[offset:], encryptedPayload)
+		copy(dataToSend[offset:], padding)
 		if err := t.writeWithPossibleFragment(dataToSend); err != nil {
 			return err
 		}
@@ -680,9 +685,9 @@ func (t *StreamUnderlay) writeOneSegment(seg *segment) error {
 		if err != nil {
 			return fmt.Errorf("Encrypt() failed: %w", err)
 		}
-		dataToSend := append(encryptedMetadata, padding1...)
+		var encryptedPayload []byte
 		if len(seg.payload) > 0 {
-			encryptedPayload, err := t.send.Encrypt(seg.payload)
+			encryptedPayload, err = t.send.Encrypt(seg.payload)
 			if err != nil {
 				return fmt.Errorf("Encrypt() failed: %w", err)
 			}
@@ -692,9 +697,12 @@ func (t *StreamUnderlay) writeOneSegment(seg *segment) error {
 					return fmt.Errorf("encode low entropy payload failed: %w", err)
 				}
 			}
-			dataToSend = append(dataToSend, encryptedPayload...)
 		}
-		dataToSend = append(dataToSend, padding2...)
+		dataToSend := make([]byte, len(encryptedMetadata)+len(padding1)+len(encryptedPayload)+len(padding2))
+		offset := copy(dataToSend, encryptedMetadata)
+		offset += copy(dataToSend[offset:], padding1)
+		offset += copy(dataToSend[offset:], encryptedPayload)
+		copy(dataToSend[offset:], padding2)
 		if _, err := t.conn.Write(dataToSend); err != nil {
 			return fmt.Errorf("Write() failed: %w", err)
 		}
@@ -719,25 +727,20 @@ func (t *StreamUnderlay) writeOneSegment(seg *segment) error {
 // against one current generation and then initializes t.recv from the mutable
 // winning clone. The returned authentication is temporary and must be recorded
 // only after the complete first segment is validated and dispatched.
-func (t *StreamUnderlay) serverInitRecvBlockCipherAndDecryptMetadata(encryptedMeta []byte) ([]byte, serverUserAuthentication, error) {
+func (t *StreamUnderlay) serverInitRecvBlockCipherAndDecryptMetadata(encryptedMeta []byte) ([]byte, serveruser.Authentication, error) {
 	if t.recv != nil {
-		return nil, serverUserAuthentication{}, fmt.Errorf("recv cipher is already set")
+		return nil, serveruser.Authentication{}, fmt.Errorf("recv cipher is already set")
 	}
-	result, err := discoverServerUser(
-		t.serverUsers,
-		t.serverUserHintIsMandatory,
-		encryptedMeta,
-		t.serverUserSource,
-		true,
-		nil,
-	)
+	if t.serverUsers == nil {
+		return nil, serveruser.Authentication{}, fmt.Errorf("server user registry is nil")
+	}
+	block, _, authentication, err := t.serverUsers.Discover(encryptedMeta, t.serverUserSource, true)
 	if err != nil {
-		return nil, serverUserAuthentication{}, err
+		return nil, serveruser.Authentication{}, err
 	}
 
 	// Re-decrypt with implicit nonce mode enabled to capture TCP nonce state.
-	t.recv = result.block
-	t.recv.SetBlockContext(result.userContext)
+	t.recv = block
 	if t.trafficPattern != nil {
 		t.recv.SetNoncePattern(t.trafficPattern.GetNonce())
 	}
@@ -745,9 +748,9 @@ func (t *StreamUnderlay) serverInitRecvBlockCipherAndDecryptMetadata(encryptedMe
 	decryptedMeta, err := t.recv.Decrypt(encryptedMeta)
 	if err != nil {
 		t.recv = nil
-		return nil, serverUserAuthentication{}, fmt.Errorf("stateful Decrypt() failed: %w", err)
+		return nil, serveruser.Authentication{}, fmt.Errorf("stateful Decrypt() failed: %w", err)
 	}
-	return decryptedMeta, result.authentication(t.serverUserSource), nil
+	return decryptedMeta, authentication, nil
 }
 
 func (t *StreamUnderlay) maybeInitSendBlockCipher() error {

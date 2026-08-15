@@ -16,95 +16,18 @@
 package protocol
 
 import (
-	"bytes"
-	"encoding/hex"
 	"fmt"
-	"strings"
+	"net"
 	"sync"
 	"sync/atomic"
 	"testing"
 
-	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
+	"github.com/enfein/mieru/v3/pkg/metrics"
+	"github.com/enfein/mieru/v3/pkg/protocol/serveruser"
 	"google.golang.org/protobuf/proto"
 )
-
-func TestBuildServerUserStateSorted(t *testing.T) {
-	users := map[string]*appctlpb.User{
-		"map-key-z": {Name: proto.String("z-user"), Password: proto.String("z-password")},
-		"map-key-a": {Name: proto.String("a-user"), Password: proto.String("a-password")},
-		"wrong-key": {Name: proto.String("m-user"), Password: proto.String("m-password")},
-	}
-	state := buildServerUserState(users, &sourceUserCacheStats{})
-	if len(state.users) != 3 {
-		t.Fatalf("compiled user count = %d, want 3", len(state.users))
-	}
-
-	// Verify user is sorted.
-	for i, wantName := range []string{"a-user", "m-user", "z-user"} {
-		user := state.users[i]
-		if user.id != uint32(i+1) || user.name != wantName || user.policy.name != wantName {
-			t.Fatalf("compiled user %d = (ID %d, name %q, policy %q), want (ID %d, name %q, policy %q)", i, user.id, user.name, user.policy.name, i+1, wantName, wantName)
-		}
-	}
-}
-
-func TestBuildServerUserStateRawAndHashedCredential(t *testing.T) {
-	const (
-		name     = "equivalent-user"
-		password = "equivalent-password"
-	)
-	prepared := cipher.HashPassword([]byte(password), []byte(name))
-	rawState := buildServerUserState(userMap(&appctlpb.User{
-		Name:     proto.String(name),
-		Password: proto.String(password),
-	}), &sourceUserCacheStats{})
-	hashedState := buildServerUserState(userMap(makeTestUser(name, prepared)), &sourceUserCacheStats{})
-	if len(rawState.users) != 1 || len(hashedState.users) != 1 {
-		t.Fatalf("compiled user counts = (%d, %d), want (1, 1)", len(rawState.users), len(hashedState.users))
-	}
-	if rawState.users[0].credential != hashedState.users[0].credential {
-		t.Fatal("raw and hashed credentials compiled to different prepared values")
-	}
-}
-
-func TestBuildServerUserStateRejectsMalformedCredentials(t *testing.T) {
-	const (
-		malformedSecret = "raw-secret-that-must-not-be-used"
-		malformedHash   = "hashed-secret-that-is-not-hex"
-		wrongLenSecret  = "wrong-length-secret"
-	)
-	state := buildServerUserState(map[string]*appctlpb.User{
-		"malformed": {
-			Name:           proto.String("malformed-user"),
-			Password:       proto.String(malformedSecret),
-			HashedPassword: proto.String(malformedHash),
-		},
-		"wrong-length": {
-			Name:           proto.String("wrong-length-user"),
-			HashedPassword: proto.String(hex.EncodeToString([]byte(wrongLenSecret))),
-		},
-	}, &sourceUserCacheStats{})
-	if len(state.users) != 0 {
-		t.Fatalf("compiled user count = %d, want 0", len(state.users))
-	}
-}
-
-func TestBuildServerUserStateRejectsInvalidNames(t *testing.T) {
-	duplicateA := &appctlpb.User{Name: proto.String("duplicate"), Password: proto.String("password-a")}
-	duplicateB := &appctlpb.User{Name: proto.String("duplicate"), Password: proto.String("password-b")}
-	state := buildServerUserState(map[string]*appctlpb.User{
-		"empty":      {Password: proto.String("password")},
-		"long":       {Name: proto.String(strings.Repeat("x", constant.MaxUserNameLen+1)), Password: proto.String("password")},
-		"duplicate1": duplicateA,
-		"duplicate2": duplicateB,
-		"valid-key":  {Name: proto.String("valid"), Password: proto.String("password")},
-	}, &sourceUserCacheStats{})
-	if len(state.users) != 1 || state.users[0].name != "valid" || state.users[0].id != 1 {
-		t.Fatalf("compiled users = %+v, want only valid user with ID 1", state.users)
-	}
-}
 
 func TestSetServerUsersAndMandatoryHintAtomicUpdates(t *testing.T) {
 	mux := NewMux(false)
@@ -119,23 +42,13 @@ func TestSetServerUsersAndMandatoryHintAtomicUpdates(t *testing.T) {
 		go func() {
 			defer readers.Done()
 			for !stop.Load() {
-				state := mux.serverUsers.Load()
-				if state == nil || len(state.users) != 1 {
+				if !mux.serverUsers.HasUsers() {
 					select {
-					case errCh <- fmt.Errorf("reader observed incomplete state: %+v", state):
+					case errCh <- fmt.Errorf("reader observed no usable server users"):
 					default:
 					}
 					return
 				}
-				user := state.users[0]
-				if user.id != 1 || user.name != user.policy.name {
-					select {
-					case errCh <- fmt.Errorf("reader observed inconsistent user: %+v", user):
-					default:
-					}
-					return
-				}
-				_ = mux.serverUserHintIsMandatory.Load()
 			}
 		}()
 	}
@@ -170,69 +83,104 @@ func TestTCPUnderlayAcceptedBeforeReloadUsesCurrentGeneration(t *testing.T) {
 	if _, authentication, err := underlay.serverInitRecvBlockCipherAndDecryptMetadata(encrypted); err != nil {
 		t.Fatalf("TCP discovery after reload failed: %v", err)
 	} else {
-		underlay.serverUserPolicy = authentication.policy
+		underlay.serverUserPolicy = authentication.Policy()
 	}
 	if got := underlay.recv.BlockContext().UserName; got != newUser {
 		t.Fatalf("TCP discovery user = %q, want %q", got, newUser)
 	}
 	sourceUser.Quotas[0].Days = proto.Int32(1)
 	mux.SetServerUsers(rawUserMap("later-user", "later-password"))
-	session := newSession(1, false, 1400, underlay.serverUserPolicy, nil, nil)
+	session := newSessionWithServerUserPolicy(1, false, 1400, underlay.serverUserPolicy, nil, nil)
 	retained := session.userPolicy.Load()
-	if retained == nil || retained.name != newUser || len(retained.quotas) != 1 || retained.quotas[0] != (serverUserQuota{days: 5, megabytes: 11}) {
+	if retained == nil || retained.Name() != newUser || len(retained.Quotas()) != 1 || retained.Quotas()[0].Days() != 5 || retained.Quotas()[0].Megabytes() != 11 {
 		t.Fatalf("established TCP policy changed after caller mutation or reload: %+v", retained)
 	}
 }
 
-func TestTCPDiscoveryRetriesWhenGenerationChanges(t *testing.T) {
-	mux := NewMux(false).SetServerUsers(rawUserMap("old-user", "old-password"))
-	t.Cleanup(func() { _ = mux.Close() })
-
-	const newUser = "new-user"
-	newCredential := cipher.HashPassword([]byte("new-password"), []byte(newUser))
-	newUsers := userMap(makeTestUser(newUser, newCredential))
-	encrypted := encryptDiscoveryMetadata(t, newCredential, newUser, newUsers, true, newDummyMetadata())
-	var reload sync.Once
-	result, err := discoverServerUser(
-		&mux.serverUsers,
-		&mux.serverUserHintIsMandatory,
-		encrypted,
-		serverUserDiscoverySource{},
-		true,
-		func(*serverUserState) { reload.Do(func() { mux.SetServerUsers(newUsers) }) },
-	)
-	if err != nil {
-		t.Fatalf("TCP discovery with concurrent reload failed: %v", err)
+func TestTCPAcceptedBeforeReloadRejectsStaleCredentials(t *testing.T) {
+	tests := []struct {
+		name        string
+		currentUser string
+		currentPass string
+	}{
+		{
+			name:        "password changed",
+			currentUser: "reload-user",
+			currentPass: "new-password",
+		},
+		{
+			name:        "user removed",
+			currentUser: "replacement-user",
+			currentPass: "replacement-password",
+		},
 	}
-	if result.block == nil || !bytes.Equal(result.decryptedMetadata, newDummyMetadata()) || result.policy.name != newUser {
-		t.Fatalf("TCP discovery = (block nil=%t, plaintext=%x, policy=%q), want authenticated %q", result.block == nil, result.decryptedMetadata, result.policy.name, newUser)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			const (
+				oldUser = "reload-user"
+				oldPass = "old-password"
+			)
+			oldUsers := rawUserMap(oldUser, oldPass)
+			mux := NewMux(false).SetServerUsers(oldUsers)
+			t.Cleanup(func() { _ = mux.Close() })
+			underlay := mux.serverWrapTCPConn(nil, 1400, nil).(*StreamUnderlay)
+			t.Cleanup(func() { underlay.sessionCleanTicker.Stop() })
+
+			currentUsers := rawUserMap(test.currentUser, test.currentPass)
+			mux.SetServerUsers(currentUsers)
+			oldCredential := cipher.HashPassword([]byte(oldPass), []byte(oldUser))
+			oldEncrypted := encryptDiscoveryMetadata(t, oldCredential, oldUser, oldUsers, true, newDummyMetadata())
+			if _, authentication, err := underlay.serverInitRecvBlockCipherAndDecryptMetadata(oldEncrypted); err == nil {
+				t.Fatal("TCP discovery accepted a credential from the retired generation")
+			} else if authentication.Valid() || underlay.recv != nil {
+				t.Fatal("failed stale discovery retained authentication state or a receive cipher")
+			}
+
+			currentCredential := cipher.HashPassword([]byte(test.currentPass), []byte(test.currentUser))
+			currentEncrypted := encryptDiscoveryMetadata(t, currentCredential, test.currentUser, currentUsers, true, newDummyMetadata())
+			if _, authentication, err := underlay.serverInitRecvBlockCipherAndDecryptMetadata(currentEncrypted); err != nil {
+				t.Fatalf("TCP discovery with the current credential failed: %v", err)
+			} else if authentication.Policy().Name() != test.currentUser || underlay.recv.BlockContext().UserName != test.currentUser {
+				t.Fatalf("TCP discovery selected policy %q and cipher user %q, want %q", authentication.Policy().Name(), underlay.recv.BlockContext().UserName, test.currentUser)
+			}
+		})
 	}
 }
 
-func TestServerUserGenerationRetirementDetachesCache(t *testing.T) {
-	mux := NewMux(false).SetServerUsers(rawUserMap("old-user", "old-password"))
+func TestTCPRepeatedReloadsUseFinalGeneration(t *testing.T) {
+	const reloads = 8
+	mux := NewMux(false).SetServerUsers(rawUserMap("reload-user-00", "reload-password-00"))
 	t.Cleanup(func() { _ = mux.Close() })
-	old := mux.serverUsers.Load()
-	inFlightTable := old.cache.loadTable()
-	if inFlightTable == nil {
-		t.Fatal("old generation cache table is nil before retirement")
-	}
-	entry := &sourceUserCacheEntry{key: [16]byte{15: 1}}
-	inFlightTable.buckets[0].ways[0].Store(entry)
 
-	mux.SetServerUsers(rawUserMap("new-user", "new-password"))
-	current := mux.serverUsers.Load()
-	if old.cache.loadTable() != nil {
-		t.Fatal("retired generation still publishes a cache table")
+	// These sockets are deliberately created before any reload and must not
+	// retain the generation that was current when they were accepted.
+	idleUnderlays := make([]*StreamUnderlay, 3)
+	for i := range idleUnderlays {
+		idleUnderlays[i] = mux.serverWrapTCPConn(nil, 1400, nil).(*StreamUnderlay)
+		defer idleUnderlays[i].sessionCleanTicker.Stop()
 	}
-	if got := inFlightTable.buckets[0].ways[0].Load(); got != entry {
-		t.Fatal("in-flight operation lost its already-loaded cache table")
+
+	var finalUsers map[string]*appctlpb.User
+	var finalUser, finalPassword string
+	for i := 1; i <= reloads; i++ {
+		finalUser = fmt.Sprintf("reload-user-%02d", i)
+		finalPassword = fmt.Sprintf("reload-password-%02d", i)
+		finalUsers = rawUserMap(finalUser, finalPassword)
+		mux.SetServerUsers(finalUsers)
 	}
-	if current.cache.loadTable() == nil {
-		t.Fatal("new generation has no cache table")
-	}
-	if old.cache.stats != &mux.serverUserCacheStats || current.cache.stats != &mux.serverUserCacheStats {
-		t.Fatal("cache statistics are not shared across Mux user generations")
+
+	finalCredential := cipher.HashPassword([]byte(finalPassword), []byte(finalUser))
+	finalEncrypted := encryptDiscoveryMetadata(t, finalCredential, finalUser, finalUsers, true, newDummyMetadata())
+	for i, underlay := range idleUnderlays {
+		_, authentication, err := underlay.serverInitRecvBlockCipherAndDecryptMetadata(finalEncrypted)
+		if err != nil {
+			t.Fatalf("idle TCP underlay %d failed final-generation discovery: %v", i, err)
+		}
+		if authentication.Policy().Name() != finalUser || underlay.recv.BlockContext().UserName != finalUser {
+			t.Fatalf("idle TCP underlay %d installed a noncurrent generation or receive cipher", i)
+		}
+		authentication.Record()
 	}
 }
 
@@ -240,8 +188,7 @@ func TestUDPDiscoveryUsesCurrentGenerationAndRetainsPolicySnapshot(t *testing.T)
 	mux := NewMux(false).SetServerUsers(rawUserMap("old-user", "old-password"))
 	t.Cleanup(func() { _ = mux.Close() })
 	underlay := &PacketUnderlay{
-		serverUsers:               &mux.serverUsers,
-		serverUserHintIsMandatory: &mux.serverUserHintIsMandatory,
+		serverUsers: &mux.serverUsers,
 	}
 
 	const newUser = "new-user"
@@ -252,26 +199,60 @@ func TestUDPDiscoveryUsesCurrentGenerationAndRetainsPolicySnapshot(t *testing.T)
 	mux.SetServerUsers(newUsers)
 
 	encrypted := encryptDiscoveryMetadata(t, newCredential, newUser, newUsers, true, newDummyMetadata())
-	block, _, authentication, err := underlay.serverTryDecryptMetadataForNewSession(encrypted, serverUserDiscoverySource{})
+	block, _, authentication, err := underlay.serverTryDecryptMetadataForNewSession(encrypted, serveruser.Source{})
 	if err != nil {
 		t.Fatalf("UDP discovery after reload failed: %v", err)
 	}
-	policy := authentication.policy
-	if block.BlockContext().UserName != newUser || policy.name != newUser {
-		t.Fatalf("UDP discovery selected block user %q and policy %q, want %q", block.BlockContext().UserName, policy.name, newUser)
+	policy := authentication.Policy()
+	if block.BlockContext().UserName != newUser || policy.Name() != newUser {
+		t.Fatalf("UDP discovery selected block user %q and policy %q, want %q", block.BlockContext().UserName, policy.Name(), newUser)
 	}
 
-	session := newSession(1, false, 1400, policy, nil, nil)
+	session := newSessionWithServerUserPolicy(1, false, 1400, policy, nil, nil)
 	sourceUser.Name = proto.String("mutated-user")
 	sourceUser.Quotas[0].Days = proto.Int32(1)
 	sourceUser.Quotas[0].Megabytes = proto.Int32(1)
 	mux.SetServerUsers(rawUserMap("later-user", "later-password"))
 	retained := session.userPolicy.Load()
-	if retained == nil || retained.name != newUser || len(retained.quotas) != 1 || retained.quotas[0] != (serverUserQuota{days: 3, megabytes: 9}) {
+	if retained == nil || retained.Name() != newUser || len(retained.Quotas()) != 1 || retained.Quotas()[0].Days() != 3 || retained.Quotas()[0].Megabytes() != 9 {
 		t.Fatalf("established UDP session policy changed after mutation or reload: %+v", retained)
 	}
 	if session.pendingServerUserPolicies != nil {
 		t.Fatal("established UDP session retained a full user policy registry")
+	}
+}
+
+func TestMuxCloseFlushesServerUserCacheMetrics(t *testing.T) {
+	metricGroup := metrics.GetMetricGroupByName(serveruser.SourceUserCacheMetricGroupName)
+	if metricGroup == nil {
+		t.Fatal("server user cache metric group is not registered")
+	}
+	insertions, found := metricGroup.GetMetric("Insertions")
+	if !found {
+		t.Fatal("server user cache insertion metric is not registered")
+	}
+	before := insertions.Load()
+
+	const userName = "close-flush-user"
+	credential := cipher.HashPassword([]byte(t.Name()), []byte(userName))
+	users := userMap(makeTestUser(userName, credential))
+	mux := NewMux(false).SetServerUsers(users)
+	encrypted := encryptDiscoveryMetadata(t, credential, userName, users, true, newDummyMetadata())
+	_, _, authentication, err := mux.serverUsers.Discover(
+		encrypted,
+		serveruser.SourceFromAddr(&net.TCPAddr{IP: net.ParseIP("192.0.2.80"), Port: 18001}),
+		false,
+	)
+	if err != nil {
+		_ = mux.Close()
+		t.Fatalf("server user discovery failed: %v", err)
+	}
+	authentication.Record()
+	if err := mux.Close(); err != nil {
+		t.Fatalf("Close() failed: %v", err)
+	}
+	if got := insertions.Load(); got != before+1 {
+		t.Fatalf("published cache insertions = %d, want %d", got, before+1)
 	}
 }
 

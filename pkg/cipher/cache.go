@@ -16,6 +16,7 @@
 package cipher
 
 import (
+	"errors"
 	"fmt"
 	mrand "math/rand"
 	"sync"
@@ -28,68 +29,69 @@ const (
 )
 
 type cachedCiphers struct {
-	cipherList []BlockCipher
+	cipherList []*aeadBlockCipher
 	createTime time.Time
+	epoch      int64
 }
 
 var blockCipherCache = sync.Map{}
 
-// getBlockCipherList returns three BlockCipher. Stateless results are
+var errUnableToDecrypt = errors.New("unable to decrypt from supplied cipher blocks")
+
+// getBlockCipherList returns three AEAD block ciphers. Stateless results are
 // immutable cache templates and must never be consumed directly.
 // Stateful results are mutable clones.
-func getBlockCipherList(password []byte, stateless bool) ([]BlockCipher, error) {
-	pw := string(password)
+func getBlockCipherList(password string, stateless bool) ([]*aeadBlockCipher, error) {
+	entry, err := getCachedCiphers(password, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	blocks := make([]*aeadBlockCipher, len(entry.cipherList))
+	for i, block := range entry.cipherList {
+		if stateless {
+			blocks[i] = block
+		} else {
+			blocks[i] = block.cloneStatelessFast()
+			blocks[i].SetImplicitNonceMode(true)
+		}
+	}
+	return blocks, nil
+}
 
+func getCachedCiphers(password string, now time.Time) (*cachedCiphers, error) {
 	// Try to find []BlockCipher from cache.
-	c, ok := blockCipherCache.Load(pw)
+	c, ok := blockCipherCache.Load(password)
 	if ok {
+		entry := c.(*cachedCiphers)
 		// Check if the cached entry is expired.
 		jitter := time.Duration(mrand.Intn(cacheValidMaxJitterMs)) * time.Millisecond
-		if c.(cachedCiphers).createTime.Add(cacheValidInterval - jitter).Before(time.Now()) {
+		if entry.epoch != cipherKeyEpoch(now) || entry.createTime.Add(cacheValidInterval-jitter).Before(now) {
 			ok = false
 		}
 	}
 	if ok {
-		if stateless {
-			return c.(cachedCiphers).cipherList, nil
-		} else {
-			blocks := CloneBlockCiphers(c.(cachedCiphers).cipherList)
-			for i := 0; i < len(blocks); i++ {
-				blocks[i].SetImplicitNonceMode(true)
-			}
-			return blocks, nil
-		}
+		return c.(*cachedCiphers), nil
 	}
 
 	// If not found, generate the stateless []BlockCipher.
-	blockCiphers, t, err := newBlockCipherList(password, true)
+	blockCiphers, err := newBlockCipherList([]byte(password), now)
 	if err != nil {
 		return nil, fmt.Errorf("newBlockCipherList() failed: %v", err)
 	}
 
 	// Insert to cache.
-	entry := cachedCiphers{
+	entry := &cachedCiphers{
 		cipherList: blockCiphers,
-		createTime: t,
+		createTime: now,
+		epoch:      cipherKeyEpoch(now),
 	}
-	blockCipherCache.Store(pw, entry)
-
-	if stateless {
-		return blockCiphers, nil
-	}
-
-	// Set cipher to stateful if needed.
-	blocks := CloneBlockCiphers(blockCiphers)
-	for i := 0; i < len(blocks); i++ {
-		blocks[i].SetImplicitNonceMode(true)
-	}
-	return blocks, nil
+	blockCipherCache.Store(password, entry)
+	return entry, nil
 }
 
-func newBlockCipherList(password []byte, stateless bool) ([]BlockCipher, time.Time, error) {
-	t := time.Now()
-	salts := saltFromTime(t)
-	blockCiphers := make([]BlockCipher, 0, 3)
+func newBlockCipherList(password []byte, now time.Time) ([]*aeadBlockCipher, error) {
+	salts := saltFromTime(now)
+	blockCiphers := make([]*aeadBlockCipher, 0, 3)
 	for i := 0; i < 3; i++ {
 		keygen := pbkdf2Gen{
 			Salt: salts[i],
@@ -97,16 +99,13 @@ func newBlockCipherList(password []byte, stateless bool) ([]BlockCipher, time.Ti
 		}
 		cipherKey, err := keygen.NewKey(password, DefaultKeyLen)
 		if err != nil {
-			return nil, t, fmt.Errorf("NewKey() failed: %w", err)
+			return nil, fmt.Errorf("NewKey() failed: %w", err)
 		}
 		blockCipher, err := newXChaCha20Poly1305BlockCipher(cipherKey)
 		if err != nil {
-			return nil, t, fmt.Errorf("newXChaCha20Poly1305BlockCipher() failed: %w", err)
-		}
-		if !stateless {
-			blockCipher.SetImplicitNonceMode(true)
+			return nil, fmt.Errorf("newXChaCha20Poly1305BlockCipher() failed: %w", err)
 		}
 		blockCiphers = append(blockCiphers, blockCipher)
 	}
-	return blockCiphers, t, nil
+	return blockCiphers, nil
 }

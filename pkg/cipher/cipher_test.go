@@ -116,7 +116,7 @@ func TestAEADBlockCipherEncryptDecryptImplicitMode(t *testing.T) {
 	}
 	sendCipher.SetImplicitNonceMode(true)
 	sendCipher.SetBlockContext(BlockContext{UserName: "test-user"})
-	recvCipher := sendCipher.Clone().(*AEADBlockCipher)
+	recvCipher := sendCipher.Clone().(*aeadBlockCipher)
 	if sendCipher.IsStateless() {
 		t.Fatalf("IsStateless() = %v, want %v", sendCipher.IsStateless(), false)
 	}
@@ -159,7 +159,7 @@ func TestAEADBlockCipherClone(t *testing.T) {
 	}
 	cipher1.implicitNonce = make([]byte, cipher1.NonceSize())
 	copy(cipher1.implicitNonce, nonce)
-	cipher2 := cipher1.Clone().(*AEADBlockCipher)
+	cipher2 := cipher1.Clone().(*aeadBlockCipher)
 
 	data := make([]byte, 4096)
 	if _, err := crand.Read(data); err != nil {
@@ -202,7 +202,7 @@ func TestAEADBlockCipherIncreaseNonce(t *testing.T) {
 		{[]byte{0xff, 0xff, 0xff, 0xff}, []byte{0x00, 0x00, 0x00, 0x00}},
 	}
 
-	cipher := &AEADBlockCipher{enableImplicitNonce: true}
+	cipher := &aeadBlockCipher{enableImplicitNonce: true}
 	for _, tc := range testdata {
 		cipher.implicitNonce = tc.input
 		cipher.increaseNonce()
@@ -412,12 +412,13 @@ func BenchmarkXChaCha20Poly1305Stateful(b *testing.B) {
 		b.Fatalf("newXChaCha20Poly1305BlockCipher() failed: %v", err)
 	}
 	block.SetImplicitNonceMode(true)
-	block2 := block.Clone().(*AEADBlockCipher)
+	block2 := block.Clone().(*aeadBlockCipher)
 	benchmarkEncryptDecryptStateful(b, block, block2, data)
 }
 
 func benchmarkEncryptDecryptStateless(b *testing.B, block BlockCipher, data []byte) {
 	b.Helper()
+	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		ciphertext, err := block.Encrypt(data)
@@ -432,6 +433,7 @@ func benchmarkEncryptDecryptStateless(b *testing.B, block BlockCipher, data []by
 
 func benchmarkEncryptDecryptStateful(b *testing.B, sendBlock, recvBlock BlockCipher, data []byte) {
 	b.Helper()
+	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		ciphertext, err := sendBlock.Encrypt(data)

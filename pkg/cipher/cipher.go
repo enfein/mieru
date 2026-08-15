@@ -16,11 +16,11 @@
 package cipher
 
 import (
-	"crypto/aes"
 	"crypto/cipher"
 	crand "crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	mrand "math/rand"
 	"sync"
@@ -46,15 +46,17 @@ const (
 )
 
 var (
-	_ BlockCipher = &AEADBlockCipher{}
+	_ BlockCipher = &aeadBlockCipher{}
+
+	errCiphertextTooShort = errors.New("ciphertext is smaller than nonce size")
 )
 
-// AEADBlockCipher implements BlockCipher interface with one AEAD algorithm.
-type AEADBlockCipher struct {
+// aeadBlockCipher implements BlockCipher interface with one AEAD algorithm.
+type aeadBlockCipher struct {
 	aead                cipher.AEAD
 	aeadType            AEADType
+	key                 [DefaultKeyLen]byte
 	enableImplicitNonce bool
-	key                 []byte
 	implicitNonce       []byte
 	mu                  sync.Mutex
 	ctx                 BlockContext
@@ -63,41 +65,38 @@ type AEADBlockCipher struct {
 }
 
 // newXChaCha20Poly1305BlockCipher creates a new XChaCha20-Poly1305 cipher with the supplied key.
-func newXChaCha20Poly1305BlockCipher(key []byte) (*AEADBlockCipher, error) {
+func newXChaCha20Poly1305BlockCipher(key []byte) (*aeadBlockCipher, error) {
 	keyLen := len(key)
 	if keyLen != 32 {
 		return nil, fmt.Errorf("XChaCha20-Poly1305 key length is %d bytes, want 32 bytes", keyLen)
 	}
 
-	aead, err := chacha20poly1305.NewX(key)
+	var ownedKey [DefaultKeyLen]byte
+	copy(ownedKey[:], key)
+	aead, err := chacha20poly1305.NewX(ownedKey[:])
 	if err != nil {
 		return nil, fmt.Errorf("chacha20poly1305.NewX() failed: %w", err)
 	}
 
-	return &AEADBlockCipher{
+	return &aeadBlockCipher{
 		aead:                aead,
 		aeadType:            XChaCha20Poly1305,
 		enableImplicitNonce: false,
-		key:                 key,
+		key:                 ownedKey,
 		implicitNonce:       nil,
 	}, nil
 }
 
-// BlockSize returns the block size of cipher.
-func (*AEADBlockCipher) BlockSize() int {
-	return aes.BlockSize
-}
-
 // NonceSize returns the number of bytes used by nonce.
-func (c *AEADBlockCipher) NonceSize() int {
+func (c *aeadBlockCipher) NonceSize() int {
 	return c.aead.NonceSize()
 }
 
-func (c *AEADBlockCipher) Overhead() int {
+func (c *aeadBlockCipher) Overhead() int {
 	return c.aead.Overhead()
 }
 
-func (c *AEADBlockCipher) Encrypt(plaintext []byte) ([]byte, error) {
+func (c *aeadBlockCipher) Encrypt(plaintext []byte) ([]byte, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var nonce []byte
@@ -133,7 +132,7 @@ func (c *AEADBlockCipher) Encrypt(plaintext []byte) ([]byte, error) {
 	return dst, nil
 }
 
-func (c *AEADBlockCipher) EncryptWithNonce(plaintext, nonce []byte) ([]byte, error) {
+func (c *aeadBlockCipher) EncryptWithNonce(plaintext, nonce []byte) ([]byte, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.enableImplicitNonce {
@@ -145,14 +144,14 @@ func (c *AEADBlockCipher) EncryptWithNonce(plaintext, nonce []byte) ([]byte, err
 	return c.aead.Seal(nil, nonce, plaintext, nil), nil
 }
 
-func (c *AEADBlockCipher) Decrypt(ciphertext []byte) ([]byte, error) {
+func (c *aeadBlockCipher) Decrypt(ciphertext []byte) ([]byte, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var nonce []byte
 	if c.enableImplicitNonce {
 		if len(c.implicitNonce) == 0 {
 			if len(ciphertext) < c.NonceSize() {
-				return nil, fmt.Errorf("ciphertext is smaller than nonce size")
+				return nil, errCiphertextTooShort
 			}
 			c.implicitNonce = make([]byte, c.NonceSize())
 			copy(c.implicitNonce, []byte(ciphertext[:c.NonceSize()]))
@@ -163,7 +162,7 @@ func (c *AEADBlockCipher) Decrypt(ciphertext []byte) ([]byte, error) {
 		nonce = c.implicitNonce
 	} else {
 		if len(ciphertext) < c.NonceSize() {
-			return nil, fmt.Errorf("ciphertext is smaller than nonce size")
+			return nil, errCiphertextTooShort
 		}
 		nonce = ciphertext[:c.NonceSize()]
 		ciphertext = ciphertext[c.NonceSize():]
@@ -176,7 +175,7 @@ func (c *AEADBlockCipher) Decrypt(ciphertext []byte) ([]byte, error) {
 	return plaintext, nil
 }
 
-func (c *AEADBlockCipher) DecryptWithNonce(ciphertext, nonce []byte) ([]byte, error) {
+func (c *aeadBlockCipher) DecryptWithNonce(ciphertext, nonce []byte) ([]byte, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.enableImplicitNonce {
@@ -192,14 +191,22 @@ func (c *AEADBlockCipher) DecryptWithNonce(ciphertext, nonce []byte) ([]byte, er
 	return plaintext, nil
 }
 
-func (c *AEADBlockCipher) Clone() BlockCipher {
+func (c *aeadBlockCipher) DecryptStatelessTo(ciphertext, dst []byte) ([]byte, error) {
+	if len(ciphertext) < c.aead.NonceSize() {
+		return nil, errCiphertextTooShort
+	}
+	nonceSize := c.aead.NonceSize()
+	return c.aead.Open(dst, ciphertext[:nonceSize], ciphertext[nonceSize:], nil)
+}
+
+func (c *aeadBlockCipher) Clone() BlockCipher {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	var newCipher *AEADBlockCipher
+	var newCipher *aeadBlockCipher
 	var err error
 	if c.aeadType == XChaCha20Poly1305 {
-		newCipher, err = newXChaCha20Poly1305BlockCipher(c.key)
+		newCipher, err = newXChaCha20Poly1305BlockCipher(c.key[:])
 	} else {
 		panic("invalid AEAD type")
 	}
@@ -217,7 +224,11 @@ func (c *AEADBlockCipher) Clone() BlockCipher {
 	return newCipher
 }
 
-func (c *AEADBlockCipher) SetImplicitNonceMode(enable bool) {
+func (c *aeadBlockCipher) CloneStatelessFast() BlockCipher {
+	return c.cloneStatelessFast()
+}
+
+func (c *aeadBlockCipher) SetImplicitNonceMode(enable bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.enableImplicitNonce = enable
@@ -226,38 +237,38 @@ func (c *AEADBlockCipher) SetImplicitNonceMode(enable bool) {
 	}
 }
 
-func (c *AEADBlockCipher) IsStateless() bool {
+func (c *aeadBlockCipher) IsStateless() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return !c.enableImplicitNonce
 }
 
-func (c *AEADBlockCipher) BlockContext() BlockContext {
+func (c *aeadBlockCipher) BlockContext() BlockContext {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.ctx
 }
 
-func (c *AEADBlockCipher) SetBlockContext(bc BlockContext) {
+func (c *aeadBlockCipher) SetBlockContext(bc BlockContext) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.ctx = bc
 }
 
-func (c *AEADBlockCipher) NoncePattern() *appctlpb.NoncePattern {
+func (c *aeadBlockCipher) NoncePattern() *appctlpb.NoncePattern {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return proto.Clone(c.noncePattern).(*appctlpb.NoncePattern)
 }
 
-func (c *AEADBlockCipher) SetNoncePattern(pattern *appctlpb.NoncePattern) {
+func (c *aeadBlockCipher) SetNoncePattern(pattern *appctlpb.NoncePattern) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.noncePattern = proto.Clone(pattern).(*appctlpb.NoncePattern)
 }
 
 // newNonce generates a new nonce.
-func (c *AEADBlockCipher) newNonce() ([]byte, error) {
+func (c *aeadBlockCipher) newNonce() ([]byte, error) {
 	nonce := make([]byte, c.NonceSize())
 	if _, err := crand.Read(nonce); err != nil {
 		return nil, err
@@ -305,7 +316,7 @@ func (c *AEADBlockCipher) newNonce() ([]byte, error) {
 }
 
 // nonceRewriteLen returns a random length in [minLen, maxLen] clamped to the nonce size.
-func (c *AEADBlockCipher) nonceRewriteLen() int {
+func (c *aeadBlockCipher) nonceRewriteLen() int {
 	minLen := int(c.noncePattern.GetMinLen())
 	maxLen := int(c.noncePattern.GetMaxLen())
 	if maxLen > c.NonceSize() {
@@ -321,7 +332,7 @@ func (c *AEADBlockCipher) nonceRewriteLen() int {
 	return minLen + rangeSize
 }
 
-func (c *AEADBlockCipher) increaseNonce() {
+func (c *aeadBlockCipher) increaseNonce() {
 	if !c.enableImplicitNonce || len(c.implicitNonce) == 0 {
 		panic("implicit nonce mode is not enabled")
 	}
@@ -334,7 +345,15 @@ func (c *AEADBlockCipher) increaseNonce() {
 	}
 }
 
-func (c *AEADBlockCipher) addUserHintToNonce(nonce []byte) []byte {
+func (c *aeadBlockCipher) cloneStatelessFast() *aeadBlockCipher {
+	return &aeadBlockCipher{
+		aead:     c.aead,
+		aeadType: c.aeadType,
+		key:      c.key,
+	}
+}
+
+func (c *aeadBlockCipher) addUserHintToNonce(nonce []byte) []byte {
 	if c.ctx.UserName == "" {
 		return nonce
 	}
@@ -350,4 +369,32 @@ func (c *AEADBlockCipher) addUserHintToNonce(nonce []byte) []byte {
 	output := sha256.Sum256(input[:n])
 	copy(nonce[len(nonce)-NonceSuffixLenForUserHint:], output[:NonceSuffixLenForUserHint])
 	return nonce
+}
+
+// selectDecrypt returns the appropriate cipher block that can decrypt the data,
+// as well as the decrypted result.
+func selectDecrypt(data []byte, blocks []*aeadBlockCipher) (*aeadBlockCipher, []byte, error) {
+	for _, block := range blocks {
+		decrypted, err := block.Decrypt(data)
+		if err != nil {
+			continue
+		}
+		return block, decrypted, nil
+	}
+
+	return nil, nil, fmt.Errorf("unable to decrypt from supplied %d cipher blocks", len(blocks))
+}
+
+func selectDecryptStateless(ciphertext, dst []byte, blocks []*aeadBlockCipher) (*aeadBlockCipher, []byte, error) {
+	if dst == nil && len(ciphertext) >= DefaultNonceSize+DefaultOverhead {
+		dst = make([]byte, 0, len(ciphertext)-DefaultNonceSize-DefaultOverhead)
+	}
+	for _, block := range blocks {
+		decrypted, err := block.DecryptStatelessTo(ciphertext, dst)
+		if err != nil {
+			continue
+		}
+		return block, decrypted, nil
+	}
+	return nil, nil, errUnableToDecrypt
 }
