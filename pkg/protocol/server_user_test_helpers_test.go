@@ -63,8 +63,8 @@ func encryptDiscoveryMetadata(tb testing.TB, credential []byte, hintUser string,
 			tb.Fatalf("BlockCipherFromPassword() failed: %v", err)
 		}
 		block.SetBlockContext(cipher.BlockContext{UserName: hintUser})
-		encryptedMeta, err := block.Encrypt(plaintext)
-		if err != nil {
+		encryptedMeta := make([]byte, block.NonceSize()+len(plaintext)+block.Overhead())
+		if err := block.Encrypt(encryptedMeta[:0], plaintext); err != nil {
 			tb.Fatalf("Encrypt() failed: %v", err)
 		}
 

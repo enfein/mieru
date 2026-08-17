@@ -469,14 +469,14 @@ func buildServerUserStreamWire(t *testing.T, credential []byte, userName string,
 		t.Fatalf("BlockCipherFromPassword() failed: %v", err)
 	}
 	block.SetBlockContext(cipher.BlockContext{UserName: userName})
-	encryptedMetadata, err := block.Encrypt(plaintextMetadata)
-	if err != nil {
+	encryptedMetadata := make([]byte, block.NonceSize()+len(plaintextMetadata)+block.Overhead())
+	if err := block.Encrypt(encryptedMetadata[:0], plaintextMetadata); err != nil {
 		t.Fatalf("Encrypt(metadata) failed: %v", err)
 	}
 	wire := append([]byte(nil), encryptedMetadata...)
 	if len(payload) > 0 {
-		encryptedPayload, err := block.Encrypt(payload)
-		if err != nil {
+		encryptedPayload := make([]byte, len(payload)+block.Overhead())
+		if err := block.Encrypt(encryptedPayload[:0], payload); err != nil {
 			t.Fatalf("Encrypt(payload) failed: %v", err)
 		}
 		wire = append(wire, encryptedPayload...)
@@ -504,15 +504,15 @@ func buildServerUserPacketWire(t *testing.T, credential []byte, userName string,
 		t.Fatalf("BlockCipherFromPassword() failed: %v", err)
 	}
 	block.SetBlockContext(cipher.BlockContext{UserName: userName})
-	encryptedMetadata, err := block.Encrypt(plaintextMetadata)
-	if err != nil {
+	encryptedMetadata := make([]byte, block.NonceSize()+len(plaintextMetadata)+block.Overhead())
+	if err := block.Encrypt(encryptedMetadata[:0], plaintextMetadata); err != nil {
 		t.Fatalf("Encrypt(metadata) failed: %v", err)
 	}
 	nonce := encryptedMetadata[:cipher.DefaultNonceSize]
 	wire := append([]byte(nil), encryptedMetadata...)
 	if len(payload) > 0 {
-		encryptedPayload, err := block.EncryptWithNonce(payload, nonce)
-		if err != nil {
+		encryptedPayload := make([]byte, len(payload)+block.Overhead())
+		if err := block.EncryptWithNonce(encryptedPayload[:0], nonce, payload); err != nil {
 			t.Fatalf("EncryptWithNonce(payload) failed: %v", err)
 		}
 		wire = append(wire, encryptedPayload...)

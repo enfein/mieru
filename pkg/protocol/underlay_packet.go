@@ -677,21 +677,23 @@ func (u *PacketUnderlay) writeOneSegment(seg *segment, addr net.Addr) error {
 		}
 
 		plaintextMetadata := seg.metadata.Marshal()
-		encryptedMetadata, err := blockCipher.Encrypt(plaintextMetadata)
-		if err != nil {
+		encryptedMetadataLen := len(plaintextMetadata) + blockCipher.NonceSize() + blockCipher.Overhead()
+		encryptedPayloadLen := 0
+		if len(seg.payload) > 0 {
+			encryptedPayloadLen = len(seg.payload) + blockCipher.Overhead()
+		}
+		dataToSend := make([]byte, encryptedMetadataLen+encryptedPayloadLen+len(padding))
+		if err := blockCipher.Encrypt(dataToSend[:0], plaintextMetadata); err != nil {
 			return fmt.Errorf("Encrypt() failed: %w", err)
 		}
-		nonce := encryptedMetadata[:cipher.DefaultNonceSize]
-		var encryptedPayload []byte
+		nonce := dataToSend[:blockCipher.NonceSize()]
+		offset := encryptedMetadataLen
 		if len(seg.payload) > 0 {
-			encryptedPayload, err = blockCipher.EncryptWithNonce(seg.payload, nonce)
-			if err != nil {
+			if err := blockCipher.EncryptWithNonce(dataToSend[offset:offset], nonce, seg.payload); err != nil {
 				return fmt.Errorf("EncryptWithNonce() failed: %w", err)
 			}
+			offset += encryptedPayloadLen
 		}
-		dataToSend := make([]byte, len(encryptedMetadata)+len(encryptedPayload)+len(padding))
-		offset := copy(dataToSend, encryptedMetadata)
-		offset += copy(dataToSend[offset:], encryptedPayload)
 		copy(dataToSend[offset:], padding)
 		if _, err := u.conn.WriteTo(dataToSend, addr); err != nil {
 			return fmt.Errorf("WriteTo() failed: %w", err)
@@ -725,28 +727,35 @@ func (u *PacketUnderlay) writeOneSegment(seg *segment, addr net.Addr) error {
 		}
 
 		plaintextMetadata := seg.metadata.Marshal()
-		encryptedMetadata, err := blockCipher.Encrypt(plaintextMetadata)
-		if err != nil {
+		encryptedMetadataLen := len(plaintextMetadata) + blockCipher.NonceSize() + blockCipher.Overhead()
+		wirePayloadLen := 0
+		if len(seg.payload) > 0 {
+			wirePayloadLen = len(seg.payload) + blockCipher.Overhead()
+			if lowEntropy {
+				wirePayloadLen = int(das.payloadLen) + blockCipher.Overhead()
+			}
+		}
+		dataToSend := make([]byte, encryptedMetadataLen+len(padding1)+wirePayloadLen+len(padding2))
+		if err := blockCipher.Encrypt(dataToSend[:0], plaintextMetadata); err != nil {
 			return fmt.Errorf("Encrypt() failed: %w", err)
 		}
-		nonce := encryptedMetadata[:cipher.DefaultNonceSize]
-		var encryptedPayload []byte
+		nonce := dataToSend[:blockCipher.NonceSize()]
+		offset := encryptedMetadataLen
+		offset += copy(dataToSend[offset:], padding1)
 		if len(seg.payload) > 0 {
-			encryptedPayload, err = blockCipher.EncryptWithNonce(seg.payload, nonce)
-			if err != nil {
+			if err := blockCipher.EncryptWithNonce(dataToSend[offset:offset], nonce, seg.payload); err != nil {
 				return fmt.Errorf("EncryptWithNonce() failed: %w", err)
 			}
 			if lowEntropy {
-				encryptedPayload, err = encodeLowEntropyEncryptedPayload(encryptedPayload, das)
+				encryptedPayloadLen := len(seg.payload) + blockCipher.Overhead()
+				encryptedPayload, err := encodeLowEntropyEncryptedPayload(dataToSend[offset:offset+encryptedPayloadLen], das)
 				if err != nil {
 					return fmt.Errorf("encode low entropy payload failed: %w", err)
 				}
+				copy(dataToSend[offset:], encryptedPayload)
 			}
+			offset += wirePayloadLen
 		}
-		dataToSend := make([]byte, len(encryptedMetadata)+len(padding1)+len(encryptedPayload)+len(padding2))
-		offset := copy(dataToSend, encryptedMetadata)
-		offset += copy(dataToSend[offset:], padding1)
-		offset += copy(dataToSend[offset:], encryptedPayload)
 		copy(dataToSend[offset:], padding2)
 		if lowEntropy && len(dataToSend) > u.mtu {
 			return fmt.Errorf("low entropy datagram length %d exceeds MTU %d", len(dataToSend), u.mtu)

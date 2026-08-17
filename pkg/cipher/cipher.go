@@ -48,7 +48,8 @@ const (
 var (
 	_ BlockCipher = &aeadBlockCipher{}
 
-	errCiphertextTooShort = errors.New("ciphertext is smaller than nonce size")
+	errCiphertextTooShort  = errors.New("ciphertext is smaller than nonce size")
+	errDestinationTooSmall = errors.New("destination capacity is too small")
 )
 
 // aeadBlockCipher implements BlockCipher interface with one AEAD algorithm.
@@ -96,52 +97,64 @@ func (c *aeadBlockCipher) Overhead() int {
 	return c.aead.Overhead()
 }
 
-func (c *aeadBlockCipher) Encrypt(plaintext []byte) ([]byte, error) {
+func (c *aeadBlockCipher) Encrypt(dst, plaintext []byte) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var nonce []byte
 	var err error
-	needSendNonce := true
+	needSendNonce := !c.enableImplicitNonce || len(c.implicitNonce) == 0
+	resultLen := len(plaintext) + c.aead.Overhead()
+	if needSendNonce {
+		resultLen += c.aead.NonceSize()
+	}
+	if cap(dst)-len(dst) < resultLen {
+		return errDestinationTooSmall
+	}
 	if c.enableImplicitNonce {
 		if len(c.implicitNonce) == 0 {
 			c.implicitNonce, err = c.newNonce()
 			if err != nil {
-				return nil, fmt.Errorf("newNonce() failed: %w", err)
+				return fmt.Errorf("newNonce() failed: %w", err)
 			}
 			c.implicitNonce = c.addUserHintToNonce(c.implicitNonce)
-			// Must create a copy because nonce will be extended.
-			nonce = make([]byte, len(c.implicitNonce))
-			copy(nonce, c.implicitNonce)
+			nonce = c.implicitNonce
 		} else {
 			c.increaseNonce()
 			nonce = c.implicitNonce
-			needSendNonce = false
 		}
 	} else {
-		nonce, err = c.newNonce()
-		if err != nil {
-			return nil, fmt.Errorf("newNonce() failed: %w", err)
+		start := len(dst)
+		dst = dst[:start+c.aead.NonceSize()]
+		nonce = dst[start:]
+		if err = c.newNonceTo(nonce); err != nil {
+			return fmt.Errorf("newNonceTo() failed: %w", err)
 		}
 		nonce = c.addUserHintToNonce(nonce)
 	}
 
-	dst := c.aead.Seal(nil, nonce, plaintext, nil)
 	if needSendNonce {
-		return append(nonce, dst...), nil
+		if c.enableImplicitNonce {
+			dst = append(dst, nonce...)
+		}
 	}
-	return dst, nil
+	c.aead.Seal(dst, nonce, plaintext, nil)
+	return nil
 }
 
-func (c *aeadBlockCipher) EncryptWithNonce(plaintext, nonce []byte) ([]byte, error) {
+func (c *aeadBlockCipher) EncryptWithNonce(dst, nonce, plaintext []byte) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.enableImplicitNonce {
-		return nil, fmt.Errorf("EncryptWithNonce() is not supported when implicit nonce is enabled")
+		return fmt.Errorf("EncryptWithNonce() is not supported when implicit nonce is enabled")
 	}
 	if len(nonce) != c.NonceSize() {
-		return nil, fmt.Errorf("want nonce size %d, got %d", c.NonceSize(), len(nonce))
+		return fmt.Errorf("want nonce size %d, got %d", c.NonceSize(), len(nonce))
 	}
-	return c.aead.Seal(nil, nonce, plaintext, nil), nil
+	if cap(dst)-len(dst) < len(plaintext)+c.aead.Overhead() {
+		return errDestinationTooSmall
+	}
+	c.aead.Seal(dst, nonce, plaintext, nil)
+	return nil
 }
 
 func (c *aeadBlockCipher) Decrypt(ciphertext []byte) ([]byte, error) {
@@ -270,18 +283,29 @@ func (c *aeadBlockCipher) SetNoncePattern(pattern *appctlpb.NoncePattern) {
 // newNonce generates a new nonce.
 func (c *aeadBlockCipher) newNonce() ([]byte, error) {
 	nonce := make([]byte, c.NonceSize())
-	if _, err := crand.Read(nonce); err != nil {
+	if err := c.newNonceTo(nonce); err != nil {
 		return nil, err
+	}
+	return nonce, nil
+}
+
+func (c *aeadBlockCipher) newNonceTo(nonce []byte) error {
+	if len(nonce) < c.NonceSize() {
+		return errDestinationTooSmall
+	}
+	nonce = nonce[:c.NonceSize()]
+	if _, err := crand.Read(nonce); err != nil {
+		return err
 	}
 
 	if c.noncePattern == nil {
-		return nonce, nil
+		return nil
 	}
 
 	// For UDP (stateless) cipher, if the pattern was already applied
 	// and applyToAllUDPPacket is false, don't change the nonce.
 	if !c.enableImplicitNonce && c.noncePatternApplied && !c.noncePattern.GetApplyToAllUDPPacket() {
-		return nonce, nil
+		return nil
 	}
 
 	switch c.noncePattern.GetType() {
@@ -312,7 +336,7 @@ func (c *aeadBlockCipher) newNonce() ([]byte, error) {
 	}
 
 	c.noncePatternApplied = true
-	return nonce, nil
+	return nil
 }
 
 // nonceRewriteLen returns a random length in [minLen, maxLen] clamped to the nonce size.

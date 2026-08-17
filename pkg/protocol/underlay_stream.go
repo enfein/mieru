@@ -616,6 +616,7 @@ func (t *StreamUnderlay) writeOneSegment(seg *segment) error {
 	t.sendMutex.Lock()
 	defer t.sendMutex.Unlock()
 
+	firstWrite := t.send == nil
 	if err := t.maybeInitSendBlockCipher(); err != nil {
 		return fmt.Errorf("maybeInitSendBlockCipher() failed: %w", err)
 	}
@@ -631,20 +632,25 @@ func (t *StreamUnderlay) writeOneSegment(seg *segment) error {
 		}
 
 		plaintextMetadata := seg.metadata.Marshal()
-		encryptedMetadata, err := t.send.Encrypt(plaintextMetadata)
-		if err != nil {
+		encryptedMetadataLen := len(plaintextMetadata) + t.send.Overhead()
+		if firstWrite {
+			encryptedMetadataLen += t.send.NonceSize()
+		}
+		encryptedPayloadLen := 0
+		if len(seg.payload) > 0 {
+			encryptedPayloadLen = len(seg.payload) + t.send.Overhead()
+		}
+		dataToSend := make([]byte, encryptedMetadataLen+encryptedPayloadLen+len(padding))
+		if err := t.send.Encrypt(dataToSend[:0], plaintextMetadata); err != nil {
 			return fmt.Errorf("Encrypt() failed: %w", err)
 		}
-		var encryptedPayload []byte
+		offset := encryptedMetadataLen
 		if len(seg.payload) > 0 {
-			encryptedPayload, err = t.send.Encrypt(seg.payload)
-			if err != nil {
+			if err := t.send.Encrypt(dataToSend[offset:offset], seg.payload); err != nil {
 				return fmt.Errorf("Encrypt() failed: %w", err)
 			}
+			offset += encryptedPayloadLen
 		}
-		dataToSend := make([]byte, len(encryptedMetadata)+len(encryptedPayload)+len(padding))
-		offset := copy(dataToSend, encryptedMetadata)
-		offset += copy(dataToSend[offset:], encryptedPayload)
 		copy(dataToSend[offset:], padding)
 		if err := t.writeWithPossibleFragment(dataToSend); err != nil {
 			return err
@@ -678,30 +684,37 @@ func (t *StreamUnderlay) writeOneSegment(seg *segment) error {
 		}
 
 		plaintextMetadata := seg.metadata.Marshal()
-		if err := t.maybeInitSendBlockCipher(); err != nil {
-			return fmt.Errorf("maybeInitSendBlockCipher() failed: %w", err)
+		encryptedMetadataLen := len(plaintextMetadata) + t.send.Overhead()
+		if firstWrite {
+			encryptedMetadataLen += t.send.NonceSize()
 		}
-		encryptedMetadata, err := t.send.Encrypt(plaintextMetadata)
-		if err != nil {
+		wirePayloadLen := 0
+		if len(seg.payload) > 0 {
+			wirePayloadLen = len(seg.payload) + t.send.Overhead()
+			if lowEntropy {
+				wirePayloadLen = int(das.payloadLen) + t.send.Overhead()
+			}
+		}
+		dataToSend := make([]byte, encryptedMetadataLen+len(padding1)+wirePayloadLen+len(padding2))
+		if err := t.send.Encrypt(dataToSend[:0], plaintextMetadata); err != nil {
 			return fmt.Errorf("Encrypt() failed: %w", err)
 		}
-		var encryptedPayload []byte
+		offset := encryptedMetadataLen
+		offset += copy(dataToSend[offset:], padding1)
 		if len(seg.payload) > 0 {
-			encryptedPayload, err = t.send.Encrypt(seg.payload)
-			if err != nil {
+			if err := t.send.Encrypt(dataToSend[offset:offset], seg.payload); err != nil {
 				return fmt.Errorf("Encrypt() failed: %w", err)
 			}
 			if lowEntropy {
-				encryptedPayload, err = encodeLowEntropyEncryptedPayload(encryptedPayload, das)
+				encryptedPayloadLen := len(seg.payload) + t.send.Overhead()
+				encryptedPayload, err := encodeLowEntropyEncryptedPayload(dataToSend[offset:offset+encryptedPayloadLen], das)
 				if err != nil {
 					return fmt.Errorf("encode low entropy payload failed: %w", err)
 				}
+				copy(dataToSend[offset:], encryptedPayload)
 			}
+			offset += wirePayloadLen
 		}
-		dataToSend := make([]byte, len(encryptedMetadata)+len(padding1)+len(encryptedPayload)+len(padding2))
-		offset := copy(dataToSend, encryptedMetadata)
-		offset += copy(dataToSend[offset:], padding1)
-		offset += copy(dataToSend[offset:], encryptedPayload)
 		copy(dataToSend[offset:], padding2)
 		if _, err := t.conn.Write(dataToSend); err != nil {
 			return fmt.Errorf("Write() failed: %w", err)

@@ -96,8 +96,8 @@ func TestConcurrentStatelessTrialsReturnIndependentCiphers(t *testing.T) {
 		t.Fatalf("BlockCipherFromPassword() failed: %v", err)
 	}
 	plaintext := []byte("parallel plaintext")
-	ciphertext, err := block.Encrypt(plaintext)
-	if err != nil {
+	ciphertext := make([]byte, block.NonceSize()+len(plaintext)+block.Overhead())
+	if err := block.Encrypt(ciphertext[:0], plaintext); err != nil {
 		t.Fatalf("Encrypt() failed: %v", err)
 	}
 
@@ -126,8 +126,8 @@ func TestConcurrentStatelessTrialsReturnIndependentCiphers(t *testing.T) {
 			}
 			nonce := make([]byte, DefaultNonceSize)
 			nonce[len(nonce)-1] = byte(i)
-			sealed, err := winner.EncryptWithNonce(plaintext, nonce)
-			if err != nil {
+			sealed := make([]byte, len(plaintext)+winner.Overhead())
+			if err := winner.EncryptWithNonce(sealed[:0], nonce, plaintext); err != nil {
 				errCh <- fmt.Errorf("trial %d EncryptWithNonce() failed: %w", i, err)
 				return
 			}
@@ -167,8 +167,8 @@ func TestConcurrentPreparedStatelessTrialsAreRaceFree(t *testing.T) {
 		t.Fatalf("BlockCipherFromPassword() failed: %v", err)
 	}
 	plaintext := []byte("parallel prepared plaintext")
-	ciphertext, err := block.Encrypt(plaintext)
-	if err != nil {
+	ciphertext := make([]byte, block.NonceSize()+len(plaintext)+block.Overhead())
+	if err := block.Encrypt(ciphertext[:0], plaintext); err != nil {
 		t.Fatalf("Encrypt() failed: %v", err)
 	}
 	decryptor, err := NewStatelessDecryptor(password)
@@ -236,8 +236,8 @@ func BenchmarkTryDecrypt(b *testing.B) {
 			if err != nil {
 				b.Fatalf("BlockCipherFromPassword() failed: %v", err)
 			}
-			ciphertext, err := block.Encrypt(data)
-			if err != nil {
+			ciphertext := make([]byte, block.NonceSize()+len(data)+block.Overhead())
+			if err := block.Encrypt(ciphertext[:0], data); err != nil {
 				b.Fatalf("Encrypt() failed: %v", err)
 			}
 

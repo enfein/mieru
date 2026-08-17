@@ -797,12 +797,13 @@ func buildStreamLowEntropyWireWithMetadataMutation(t *testing.T, payload []byte,
 	if mutateMetadata != nil {
 		mutateMetadata(&wireMetadata)
 	}
-	encryptedMetadata, err := sendBlock.Encrypt(wireMetadata.Marshal())
-	if err != nil {
+	plaintextMetadata := wireMetadata.Marshal()
+	encryptedMetadata := make([]byte, sendBlock.NonceSize()+len(plaintextMetadata)+sendBlock.Overhead())
+	if err := sendBlock.Encrypt(encryptedMetadata[:0], plaintextMetadata); err != nil {
 		t.Fatalf("Encrypt(metadata) failed: %v", err)
 	}
-	encryptedPayload, err := sendBlock.Encrypt(payload)
-	if err != nil {
+	encryptedPayload := make([]byte, len(payload)+sendBlock.Overhead())
+	if err := sendBlock.Encrypt(encryptedPayload[:0], payload); err != nil {
 		t.Fatalf("Encrypt(payload) failed: %v", err)
 	}
 	if len(encryptedPayload) != len(payload)+cipher.DefaultOverhead {
@@ -837,13 +838,14 @@ func buildPacketLowEntropyWireWithMetadataMutation(t *testing.T, payload []byte,
 	if mutateMetadata != nil {
 		mutateMetadata(&wireMetadata)
 	}
-	encryptedMetadata, err := block.Encrypt(wireMetadata.Marshal())
-	if err != nil {
+	plaintextMetadata := wireMetadata.Marshal()
+	encryptedMetadata := make([]byte, block.NonceSize()+len(plaintextMetadata)+block.Overhead())
+	if err := block.Encrypt(encryptedMetadata[:0], plaintextMetadata); err != nil {
 		t.Fatalf("Encrypt(metadata) failed: %v", err)
 	}
 	nonce := encryptedMetadata[:cipher.DefaultNonceSize]
-	encryptedPayload, err := block.EncryptWithNonce(payload, nonce)
-	if err != nil {
+	encryptedPayload := make([]byte, len(payload)+block.Overhead())
+	if err := block.EncryptWithNonce(encryptedPayload[:0], nonce, payload); err != nil {
 		t.Fatalf("EncryptWithNonce(payload) failed: %v", err)
 	}
 	encoded, err := encodeLowEntropyPayloadWithPaddingBit(encryptedPayload[:len(payload)], appctlpb.LowEntropyMode(das.lowEntropyMode), das.lowEntropyMask, appctlpb.LowEntropyMaskRotation(das.lowEntropyMaskRotation), 0)

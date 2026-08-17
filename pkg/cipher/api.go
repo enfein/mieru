@@ -67,12 +67,15 @@ var (
 
 // BlockCipher is an interface of block encryption and decryption.
 type BlockCipher interface {
-	// Encrypt method adds the nonce in the dst, then encryptes the src.
-	Encrypt(plaintext []byte) ([]byte, error)
+	// Encrypt appends the nonce when needed, then the encrypted plaintext, to dst.
+	// The caller must provide enough capacity in dst for the complete result.
+	Encrypt(dst, plaintext []byte) error
 
-	// EncryptWithNonce encrypts the src with the given nonce.
+	// EncryptWithNonce encrypts plaintext with the given nonce and appends the
+	// result to dst. The caller must provide enough capacity in dst for the
+	// complete result.
 	// This method is not supported by stateful BlockCipher.
-	EncryptWithNonce(plaintext, nonce []byte) ([]byte, error)
+	EncryptWithNonce(dst, nonce, plaintext []byte) error
 
 	// Decrypt method removes the nonce in the src, then decryptes the src.
 	Decrypt(ciphertext []byte) ([]byte, error)

@@ -19,6 +19,7 @@ import (
 	"bytes"
 	crand "crypto/rand"
 	"encoding/hex"
+	"errors"
 	mrand "math/rand"
 	"testing"
 
@@ -75,8 +76,8 @@ func TestAEADBlockCipherEncryptDecrypt(t *testing.T) {
 		if _, err := crand.Read(data); err != nil {
 			t.Fatalf("fail to generate data: %v", err)
 		}
-		ciphertext, err := cipher.Encrypt(data)
-		if err != nil {
+		ciphertext := make([]byte, cipher.NonceSize()+len(data)+cipher.Overhead())
+		if err := cipher.Encrypt(ciphertext[:0], data); err != nil {
 			t.Fatalf("Encrypt() failed: %v", err)
 		}
 		plaintext, err := cipher.Decrypt(ciphertext)
@@ -91,8 +92,8 @@ func TestAEADBlockCipherEncryptDecrypt(t *testing.T) {
 		if _, err := crand.Read(nonce); err != nil {
 			t.Fatalf("fail to generate nonce: %v", err)
 		}
-		ciphertext, err = cipher.EncryptWithNonce(data, nonce)
-		if err != nil {
+		ciphertext = make([]byte, len(data)+cipher.Overhead())
+		if err := cipher.EncryptWithNonce(ciphertext[:0], nonce, data); err != nil {
 			t.Fatalf("EncryptWithNonce() failed: %v", err)
 		}
 		plaintext, err = cipher.DecryptWithNonce(ciphertext, nonce)
@@ -102,6 +103,83 @@ func TestAEADBlockCipherEncryptDecrypt(t *testing.T) {
 		if !bytes.Equal(data, plaintext) {
 			t.Errorf("data after decryption is different")
 		}
+	}
+}
+
+func TestAEADBlockCipherEncryptAppendsToDestination(t *testing.T) {
+	key := make([]byte, DefaultKeyLen)
+	cipher, err := newXChaCha20Poly1305BlockCipher(key)
+	if err != nil {
+		t.Fatalf("newXChaCha20Poly1305BlockCipher() failed: %v", err)
+	}
+	plaintext := []byte("plaintext")
+	prefix := []byte("prefix")
+	resultLen := cipher.NonceSize() + len(plaintext) + cipher.Overhead()
+	dst := make([]byte, len(prefix), len(prefix)+resultLen)
+	copy(dst, prefix)
+	if err := cipher.Encrypt(dst, plaintext); err != nil {
+		t.Fatalf("Encrypt() failed: %v", err)
+	}
+	dst = dst[:cap(dst)]
+	if !bytes.Equal(dst[:len(prefix)], prefix) {
+		t.Fatalf("destination prefix = %q, want %q", dst[:len(prefix)], prefix)
+	}
+	decrypted, err := cipher.Decrypt(dst[len(prefix):])
+	if err != nil {
+		t.Fatalf("Decrypt() failed: %v", err)
+	}
+	if !bytes.Equal(decrypted, plaintext) {
+		t.Fatalf("decrypted plaintext = %q, want %q", decrypted, plaintext)
+	}
+
+	nonce := dst[len(prefix) : len(prefix)+cipher.NonceSize()]
+	sealedLen := len(plaintext) + cipher.Overhead()
+	sealed := make([]byte, len(prefix), len(prefix)+sealedLen)
+	copy(sealed, prefix)
+	if err := cipher.EncryptWithNonce(sealed, nonce, plaintext); err != nil {
+		t.Fatalf("EncryptWithNonce() failed: %v", err)
+	}
+	sealed = sealed[:cap(sealed)]
+	if !bytes.Equal(sealed[:len(prefix)], prefix) {
+		t.Fatalf("destination prefix = %q, want %q", sealed[:len(prefix)], prefix)
+	}
+	decrypted, err = cipher.DecryptWithNonce(sealed[len(prefix):], nonce)
+	if err != nil {
+		t.Fatalf("DecryptWithNonce() failed: %v", err)
+	}
+	if !bytes.Equal(decrypted, plaintext) {
+		t.Fatalf("decrypted plaintext = %q, want %q", decrypted, plaintext)
+	}
+
+	if err := cipher.Encrypt(make([]byte, 0, resultLen-1), plaintext); !errors.Is(err, errDestinationTooSmall) {
+		t.Fatalf("Encrypt() error = %v, want %v", err, errDestinationTooSmall)
+	}
+}
+
+func TestAEADBlockCipherEncryptAllocatesNoHeap(t *testing.T) {
+	key := make([]byte, DefaultKeyLen)
+	cipher, err := newXChaCha20Poly1305BlockCipher(key)
+	if err != nil {
+		t.Fatalf("newXChaCha20Poly1305BlockCipher() failed: %v", err)
+	}
+	plaintext := make([]byte, 1500)
+	dst := make([]byte, 0, cipher.NonceSize()+len(plaintext)+cipher.Overhead())
+	if allocs := testing.AllocsPerRun(1000, func() {
+		if err := cipher.Encrypt(dst, plaintext); err != nil {
+			panic(err)
+		}
+	}); allocs != 0 {
+		t.Fatalf("Encrypt() allocations = %v, want 0", allocs)
+	}
+
+	nonce := make([]byte, cipher.NonceSize())
+	sealed := make([]byte, 0, len(plaintext)+cipher.Overhead())
+	if allocs := testing.AllocsPerRun(1000, func() {
+		if err := cipher.EncryptWithNonce(sealed, nonce, plaintext); err != nil {
+			panic(err)
+		}
+	}); allocs != 0 {
+		t.Fatalf("EncryptWithNonce() allocations = %v, want 0", allocs)
 	}
 }
 
@@ -129,8 +207,12 @@ func TestAEADBlockCipherEncryptDecryptImplicitMode(t *testing.T) {
 		if _, err := crand.Read(data); err != nil {
 			t.Fatalf("fail to generate data: %v", err)
 		}
-		ciphertext, err := sendCipher.Encrypt(data)
-		if err != nil {
+		ciphertextLen := len(data) + sendCipher.Overhead()
+		if i == 0 {
+			ciphertextLen += sendCipher.NonceSize()
+		}
+		ciphertext := make([]byte, ciphertextLen)
+		if err := sendCipher.Encrypt(ciphertext[:0], data); err != nil {
 			t.Fatalf("Encrypt() failed: %v", err)
 		}
 		plaintext, err := recvCipher.Decrypt(ciphertext)
@@ -165,12 +247,12 @@ func TestAEADBlockCipherClone(t *testing.T) {
 	if _, err := crand.Read(data); err != nil {
 		t.Fatalf("fail to generate data: %v", err)
 	}
-	ciphertext1, err := cipher1.Encrypt(data)
-	if err != nil {
+	ciphertext1 := make([]byte, len(data)+cipher1.Overhead())
+	if err := cipher1.Encrypt(ciphertext1[:0], data); err != nil {
 		t.Fatalf("Encrypt() failed: %v", err)
 	}
-	ciphertext2, err := cipher2.Encrypt(data)
-	if err != nil {
+	ciphertext2 := make([]byte, len(data)+cipher2.Overhead())
+	if err := cipher2.Encrypt(ciphertext2[:0], data); err != nil {
 		t.Fatalf("Encrypt() failed: %v", err)
 	}
 	if !bytes.Equal(ciphertext1, ciphertext2) {
@@ -418,11 +500,11 @@ func BenchmarkXChaCha20Poly1305Stateful(b *testing.B) {
 
 func benchmarkEncryptDecryptStateless(b *testing.B, block BlockCipher, data []byte) {
 	b.Helper()
+	ciphertext := make([]byte, block.NonceSize()+len(data)+block.Overhead())
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ciphertext, err := block.Encrypt(data)
-		if err != nil {
+		if err := block.Encrypt(ciphertext[:0], data); err != nil {
 			b.FailNow()
 		}
 		if _, err := block.Decrypt(ciphertext); err != nil {
@@ -433,14 +515,18 @@ func benchmarkEncryptDecryptStateless(b *testing.B, block BlockCipher, data []by
 
 func benchmarkEncryptDecryptStateful(b *testing.B, sendBlock, recvBlock BlockCipher, data []byte) {
 	b.Helper()
+	ciphertext := make([]byte, sendBlock.NonceSize()+len(data)+sendBlock.Overhead())
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ciphertext, err := sendBlock.Encrypt(data)
-		if err != nil {
+		ciphertextLen := len(data) + sendBlock.Overhead()
+		if i == 0 {
+			ciphertextLen += sendBlock.NonceSize()
+		}
+		if err := sendBlock.Encrypt(ciphertext[:0], data); err != nil {
 			b.FailNow()
 		}
-		if _, err := recvBlock.Decrypt(ciphertext); err != nil {
+		if _, err := recvBlock.Decrypt(ciphertext[:ciphertextLen]); err != nil {
 			b.FailNow()
 		}
 	}
