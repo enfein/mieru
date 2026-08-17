@@ -158,9 +158,7 @@ func TestConcurrentStatelessTrialsReturnIndependentCiphers(t *testing.T) {
 	}
 }
 
-// The cached XChaCha20-Poly1305 templates are immutable. Concurrent Open
-// calls share only their read-only key and create all working state per call.
-func TestConcurrentPreparedStatelessTrialsAreRaceFree(t *testing.T) {
+func TestConcurrentStatelessDecryptor(t *testing.T) {
 	password := HashPassword([]byte(t.Name()), []byte("parallel-prepared-user"))
 	block, err := BlockCipherFromPassword(password, true)
 	if err != nil {

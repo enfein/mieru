@@ -30,6 +30,8 @@ import (
 )
 
 // metadataLength is the fixed plaintext size of mieru protocol metadata.
+// We don't use the definition in protocol package, because protocol depends on
+// this package.
 const metadataLength = 32
 
 // user is the immutable authentication record used by server side user discovery.
@@ -44,7 +46,7 @@ type user struct {
 }
 
 // Policy contains the value-based user settings retained after
-// authentication. It must not contain caller-owned maps or protobuf messages.
+// authentication.
 type Policy struct {
 	name   string
 	quotas []Quota
@@ -455,8 +457,7 @@ func tryState(state *state, encryptedMeta []byte, source Source, hintMandatory b
 
 	// All registry hint matches retain precedence over cached users whose
 	// names do not match the hint, including when credentials are shared.
-	// Reaching this point enters a complete-registry phase, whether or not a
-	// registry user ultimately wins.
+	// Reaching this point enters a complete-registry phase.
 	if state.cache != nil && state.cache.stats != nil {
 		state.cache.stats.fullFallbacks.Add(1)
 	}

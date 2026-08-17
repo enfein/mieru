@@ -14,7 +14,5 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // Package serveruser authenticates server users and caches successful
-// source-to-user associations. Registry is the package boundary; cache
-// generations, prepared decryptors, candidate ordering, and counters remain
-// internal.
+// source-to-user associations.
 package serveruser

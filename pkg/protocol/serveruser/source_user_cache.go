@@ -153,6 +153,7 @@ func (c *sourceUserCache) lookup(key [16]byte) ([sourceUserCacheUsers]uint32, in
 		if entry == nil || entry.key != key {
 			continue
 		}
+		// Entry found but stale; stop searching other ways.
 		if sourceUserCacheExpired(now, entry.lastActive.Load()) {
 			break
 		}
@@ -165,6 +166,9 @@ func (c *sourceUserCache) lookup(key [16]byte) ([sourceUserCacheUsers]uint32, in
 				continue
 			}
 			age := sourceUserCacheAge(now, seen)
+
+			// Deduplicate: a user may occupy multiple slots;
+			// keep the freshest (smallest age) seen so far.
 			duplicate := -1
 			for j := 0; j < count; j++ {
 				if candidates[j].id == userID {
@@ -182,6 +186,8 @@ func (c *sourceUserCache) lookup(key [16]byte) ([sourceUserCacheUsers]uint32, in
 			count++
 		}
 
+		// Insertion-sort candidates by age so the most recently
+		// seen user is tried first by the caller.
 		for i := 1; i < count; i++ {
 			candidate := candidates[i]
 			j := i
@@ -200,7 +206,7 @@ func (c *sourceUserCache) lookup(key [16]byte) ([sourceUserCacheUsers]uint32, in
 			}
 			return result, count
 		}
-		break
+		break // At most one way can match the key; no need to check others.
 	}
 
 	if c.stats != nil {

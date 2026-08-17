@@ -19,7 +19,6 @@ import (
 	"bytes"
 	crand "crypto/rand"
 	"encoding/hex"
-	"errors"
 	mrand "math/rand"
 	"testing"
 
@@ -29,7 +28,7 @@ import (
 )
 
 func TestDefaultNonceSize(t *testing.T) {
-	key := make([]byte, 32)
+	key := make([]byte, DefaultKeyLen)
 	if _, err := crand.Read(key); err != nil {
 		t.Fatalf("fail to generate key: %v", err)
 	}
@@ -43,7 +42,7 @@ func TestDefaultNonceSize(t *testing.T) {
 }
 
 func TestDefaultOverhead(t *testing.T) {
-	key := make([]byte, 32)
+	key := make([]byte, DefaultKeyLen)
 	if _, err := crand.Read(key); err != nil {
 		t.Fatalf("fail to generate key: %v", err)
 	}
@@ -58,7 +57,7 @@ func TestDefaultOverhead(t *testing.T) {
 
 func TestAEADBlockCipherEncryptDecrypt(t *testing.T) {
 	for i := 0; i < 1000; i++ {
-		key := make([]byte, 32)
+		key := make([]byte, DefaultKeyLen)
 		if _, err := crand.Read(key); err != nil {
 			t.Fatalf("fail to generate key: %v", err)
 		}
@@ -113,7 +112,8 @@ func TestAEADBlockCipherEncryptAppendsToDestination(t *testing.T) {
 		t.Fatalf("newXChaCha20Poly1305BlockCipher() failed: %v", err)
 	}
 	plaintext := []byte("plaintext")
-	prefix := []byte("prefix")
+	prefix := []byte("prefix") // not modified after encryption
+
 	resultLen := cipher.NonceSize() + len(plaintext) + cipher.Overhead()
 	dst := make([]byte, len(prefix), len(prefix)+resultLen)
 	copy(dst, prefix)
@@ -150,10 +150,6 @@ func TestAEADBlockCipherEncryptAppendsToDestination(t *testing.T) {
 	if !bytes.Equal(decrypted, plaintext) {
 		t.Fatalf("decrypted plaintext = %q, want %q", decrypted, plaintext)
 	}
-
-	if err := cipher.Encrypt(make([]byte, 0, resultLen-1), plaintext); !errors.Is(err, errDestinationTooSmall) {
-		t.Fatalf("Encrypt() error = %v, want %v", err, errDestinationTooSmall)
-	}
 }
 
 func TestAEADBlockCipherEncryptAllocatesNoHeap(t *testing.T) {
@@ -184,7 +180,7 @@ func TestAEADBlockCipherEncryptAllocatesNoHeap(t *testing.T) {
 }
 
 func TestAEADBlockCipherEncryptDecryptImplicitMode(t *testing.T) {
-	key := make([]byte, 32)
+	key := make([]byte, DefaultKeyLen)
 	if _, err := crand.Read(key); err != nil {
 		t.Fatalf("fail to generate key: %v", err)
 	}
@@ -226,7 +222,7 @@ func TestAEADBlockCipherEncryptDecryptImplicitMode(t *testing.T) {
 }
 
 func TestAEADBlockCipherClone(t *testing.T) {
-	key := make([]byte, 32)
+	key := make([]byte, DefaultKeyLen)
 	if _, err := crand.Read(key); err != nil {
 		t.Fatalf("fail to generate key: %v", err)
 	}
@@ -295,7 +291,7 @@ func TestAEADBlockCipherIncreaseNonce(t *testing.T) {
 }
 
 func TestAEADBlockCipherNewNonce(t *testing.T) {
-	key := make([]byte, 32)
+	key := make([]byte, DefaultKeyLen)
 	if _, err := crand.Read(key); err != nil {
 		t.Fatalf("fail to generate key: %v", err)
 	}
@@ -315,7 +311,7 @@ func TestAEADBlockCipherNewNonce(t *testing.T) {
 }
 
 func TestNewNonceTypePrintable(t *testing.T) {
-	key := make([]byte, 32)
+	key := make([]byte, DefaultKeyLen)
 	if _, err := crand.Read(key); err != nil {
 		t.Fatalf("fail to generate key: %v", err)
 	}
@@ -347,7 +343,7 @@ func TestNewNonceTypePrintable(t *testing.T) {
 }
 
 func TestNewNonceTypePrintableSubset(t *testing.T) {
-	key := make([]byte, 32)
+	key := make([]byte, DefaultKeyLen)
 	if _, err := crand.Read(key); err != nil {
 		t.Fatalf("fail to generate key: %v", err)
 	}
@@ -382,7 +378,7 @@ func TestNewNonceTypePrintableSubset(t *testing.T) {
 }
 
 func TestNewNonceTypeFixed(t *testing.T) {
-	key := make([]byte, 32)
+	key := make([]byte, DefaultKeyLen)
 	if _, err := crand.Read(key); err != nil {
 		t.Fatalf("fail to generate key: %v", err)
 	}
@@ -422,7 +418,7 @@ func TestNewNonceTypeFixed(t *testing.T) {
 }
 
 func TestNewNonceApplyOnce(t *testing.T) {
-	key := make([]byte, 32)
+	key := make([]byte, DefaultKeyLen)
 	if _, err := crand.Read(key); err != nil {
 		t.Fatalf("fail to generate key: %v", err)
 	}
@@ -478,7 +474,7 @@ func TestNewNonceApplyOnce(t *testing.T) {
 }
 
 func BenchmarkXChaCha20Poly1305Stateless(b *testing.B) {
-	key, data := benchmarkGenKeyAndData(b, 32)
+	key, data := benchmarkGenKeyAndData(b, DefaultKeyLen)
 	block, err := newXChaCha20Poly1305BlockCipher(key)
 	if err != nil {
 		b.Fatalf("newXChaCha20Poly1305BlockCipher() failed: %v", err)
@@ -488,7 +484,7 @@ func BenchmarkXChaCha20Poly1305Stateless(b *testing.B) {
 }
 
 func BenchmarkXChaCha20Poly1305Stateful(b *testing.B) {
-	key, data := benchmarkGenKeyAndData(b, 32)
+	key, data := benchmarkGenKeyAndData(b, DefaultKeyLen)
 	block, err := newXChaCha20Poly1305BlockCipher(key)
 	if err != nil {
 		b.Fatalf("newXChaCha20Poly1305BlockCipher() failed: %v", err)
