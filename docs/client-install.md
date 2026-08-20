@@ -109,6 +109,22 @@ mieru stop
 
 Note that every time you change the settings with `mieru apply config <FILE>`, you need to restart the client with `mieru stop` and `mieru start` for the new settings to take effect.
 
+## TUN Mode Requirements
+
+When TUN mode is enabled, the mieru client creates a virtual network interface and routes all network traffic through it. This requires elevated privileges.
+
+- **Linux**: The client needs the `CAP_NET_ADMIN` capability. Installers (`.deb` / `.rpm`) grant it automatically at installation time. If you built the client manually, grant it once with:
+  ```sh
+  make setcap
+  ```
+  (you will be prompted for the sudo password), or manually:
+  ```sh
+  sudo setcap cap_net_admin+ep /path/to/mieru
+  ```
+  Without this capability, `mieru start` fails with a clear error message.
+- **Windows**: The client must run with administrator privileges. Run `mieru.exe` as administrator manually (for example, right-click on it and choose "Run as administrator"). Without elevation, `mieru start` fails with a clear error message.
+- **macOS**: TUN mode is not supported.
+
 ## Test the Connection Between Client and Server
 
 ```sh

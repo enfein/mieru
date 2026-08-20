@@ -109,6 +109,22 @@ mieru stop
 
 注意，每次使用 `mieru apply config <FILE>` 修改设置后，需要用 `mieru stop` 和 `mieru start` 重启客户端，才能使新设置生效。
 
+## TUN 模式所需权限
+
+当启用 TUN 模式时，mieru 客户端会创建一个虚拟网卡，并将所有网络流量路由到该网卡。这需要较高的系统权限。
+
+- **Linux**：客户端需要 `CAP_NET_ADMIN` 权限。安装包（`.deb` / `.rpm`）会在安装时自动授予该权限。如果是手动编译的客户端，需要一次性执行以下命令：
+  ```sh
+  make setcap
+  ```
+  （会提示输入 sudo 密码），或手动执行：
+  ```sh
+  sudo setcap cap_net_admin+ep /path/to/mieru
+  ```
+  如果没有该权限，`mieru start` 会失败并显示明确的错误信息。
+- **Windows**：客户端必须以管理员权限运行。请手动以管理员身份运行 `mieru.exe`（例如右键点击该程序并选择「以管理员身份运行」）。如果没有提升权限，`mieru start` 会报出明确的错误信息。
+- **macOS**：不支持 TUN 模式。
+
 ## 测试客户端与服务器的连接
 
 ```sh

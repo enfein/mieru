@@ -39,7 +39,7 @@ var describeBuildFunc = func(_ []string) error {
 	if !ok {
 		return fmt.Errorf("build info is unavailable")
 	}
-	log.Infof(info.String())
+	log.Infof("%s", info.String())
 	return nil
 }
 

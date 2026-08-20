@@ -132,7 +132,7 @@ func (entry *Entry) WithFields(fields Fields) *Entry {
 		isErrField := false
 		if t := reflect.TypeOf(v); t != nil {
 			switch {
-			case t.Kind() == reflect.Func, t.Kind() == reflect.Ptr && t.Elem().Kind() == reflect.Func:
+			case t.Kind() == reflect.Func, t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Func:
 				isErrField = true
 			}
 		}

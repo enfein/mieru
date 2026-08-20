@@ -6,6 +6,7 @@
 /release
 *.exe
 *.dll
+!pkg/tun/wintun/bin/**/wintun.dll
 *.so
 *.dylib
 __pycache__/

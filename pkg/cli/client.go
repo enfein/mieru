@@ -24,10 +24,12 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"runtime/pprof"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
@@ -45,6 +47,7 @@ import (
 	"github.com/enfein/mieru/v3/pkg/sockopts"
 	"github.com/enfein/mieru/v3/pkg/socks5"
 	"github.com/enfein/mieru/v3/pkg/stderror"
+	"github.com/enfein/mieru/v3/pkg/tun"
 	"github.com/enfein/mieru/v3/pkg/version/updater"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -455,10 +458,18 @@ var clientStartFunc = func(s []string) error {
 	}
 
 	if err = appctl.IsClientDaemonRunning(context.Background()); err == nil {
-		if config.GetSocks5ListenLAN() {
-			log.Infof("mieru client is running, listening to socks5://0.0.0.0:%d", config.GetSocks5Port())
+		if err == nil && config.GetTunEnabled() {
+			if config.GetTunInterfaceName() != "" {
+				log.Infof("mieru client is already running in VPN (TUN) mode via interface: %s", config.GetTunInterfaceName())
+			} else {
+				log.Infof("mieru client is already running in VPN (TUN) mode via default interface: mieru_tun0")
+			}
 		} else {
-			log.Infof("mieru client is running, listening to socks5://127.0.0.1:%d", config.GetSocks5Port())
+			if config.GetSocks5ListenLAN() {
+				log.Infof("mieru client is running, listening to socks5://0.0.0.0:%d", config.GetSocks5Port())
+			} else {
+				log.Infof("mieru client is running, listening to socks5://127.0.0.1:%d", config.GetSocks5Port())
+			}
 		}
 		return nil
 	}
@@ -484,12 +495,19 @@ var clientStartFunc = func(s []string) error {
 			} else {
 				log.Infof("mieru client is started, listening to socks5://127.0.0.1:%d", config.GetSocks5Port())
 			}
+			if config.GetTunEnabled() {
+				if config.GetTunInterfaceName() != "" {
+					log.Infof("TUN mode is enabled, routing traffic via interface: %s", config.GetTunInterfaceName())
+				} else {
+					log.Infof("TUN mode is enabled, routing traffic via default interface: mieru_tun0")
+				}
+			}
 
 			if should, _ := clientShouldCheckUpdate(config); should {
 				msg, _ := clientCheckUpdateAndUpdateHistory(fmt.Sprintf("socks5://127.0.0.1:%d", config.GetSocks5Port()))
 				if msg != updater.UpToDateMessage {
 					log.Infof("")
-					log.Infof(msg)
+					log.Infof("%s", msg)
 				}
 			}
 			return nil
@@ -679,6 +697,33 @@ var clientRunFunc = func(s []string) error {
 	}
 
 	<-appctl.ClientSocks5ServerStarted
+	if config.GetTunEnabled() {
+		wg.Add(1)
+		tunCtx, tunCancel := context.WithCancel(context.Background())
+		appctl.SetClientTunStopFunc(tunCancel)
+		go func(socks5Addr string) {
+			defer wg.Done()
+
+			// Start our engine from the pkg/tun package
+			// Pass the context, config and the address to which computer traffic is forwarded
+			var ipAddress string
+			for _, s := range activeProfile.GetServers() {
+				if len(s.GetIpAddress()) != 0 {
+					ipAddress = s.GetIpAddress()
+					break
+				}
+			}
+			if err := tun.StartEngine(
+				tunCtx,
+				config.GetTunInterfaceName(),
+				socks5Addr,
+				ipAddress,
+				config.GetTunDNS(),
+			); err != nil && !errors.Is(err, context.Canceled) {
+				log.Errorf("TUN engine failed: %v", err)
+			}
+		}(socks5Addr)
+	}
 
 	if config.GetAdvancedSettings().GetMetricsLoggingInterval() != "" {
 		metricsDuration, err := time.ParseDuration(config.GetAdvancedSettings().GetMetricsLoggingInterval())
@@ -691,6 +736,15 @@ var clientRunFunc = func(s []string) error {
 		}
 	}
 	metrics.EnableLogging()
+
+	// Stop the client daemon gracefully when a signal is received.
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigCh
+		log.Infof("received termination signal, stopping mieru client")
+		appctl.StopClientDaemon()
+	}()
 
 	appctl.SetAppStatus(appctlpb.AppStatus_RUNNING)
 	log.Debugf("Started proxy after %v", appctl.Elapsed())

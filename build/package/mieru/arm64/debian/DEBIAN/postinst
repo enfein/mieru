@@ -1,0 +1,20 @@
+#!/bin/sh
+
+# The execution sequence of upgrade debian package:
+# 1. prerm
+# 2. postrm
+# 3. preinst
+# 4. postinst
+
+set -e
+
+# Grant CAP_NET_ADMIN so that the TUN interface can be created without root.
+# This is best-effort: libcap may not be installed on all systems, and file
+# capabilities may not be supported on all filesystems.
+if [ -x /sbin/setcap ] || [ -x /usr/sbin/setcap ]; then
+    setcap cap_net_admin+ep /usr/bin/mieru || true
+fi
+
+################################################################################
+# Developer note: sync this file with build/package/mieru/arm64/rpm/mieru.spec
+################################################################################

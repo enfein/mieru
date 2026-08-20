@@ -173,6 +173,17 @@ client-linux-riscv64:
 	mv mieru_${VERSION}_linux_riscv64.tar.gz ../../
 	mv mieru_${VERSION}_linux_riscv64.tar.gz.sha256.txt ../../
 
+# Grant the CAP_NET_ADMIN capability to the linux client binaries so that the
+# TUN interface can be created without root. You will be prompted for the sudo
+# password:
+#   make setcap
+.PHONY: setcap
+setcap: client-linux
+	sudo setcap cap_net_admin+ep release/linux/amd64/mieru
+	sudo setcap cap_net_admin+ep release/linux/arm64/mieru
+	sudo setcap cap_net_admin+ep release/linux/armv7/mieru
+	sudo setcap cap_net_admin+ep release/linux/riscv64/mieru
+
 # Build MacOS clients.
 .PHONY: client-mac
 client-mac: client-mac-amd64 client-mac-arm64
@@ -209,7 +220,7 @@ client-windows: client-windows-x86 client-windows-amd64 client-windows-arm64
 .PHONY: client-windows-x86
 client-windows-x86:
 	mkdir -p release/windows/386
-	env GOOS=windows GOARCH=386 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/windows/386/mieru.exe cmd/mieru/mieru.go
+	env GOOS=windows GOARCH=386 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/windows/386/mieru.exe ./cmd/mieru
 	cd release/windows/386
 	sha256sum mieru.exe > mieru_${VERSION}_windows_x86.exe.sha256.txt
 	zip -r mieru_${VERSION}_windows_x86.zip mieru.exe
@@ -221,7 +232,7 @@ client-windows-x86:
 .PHONY: client-windows-amd64
 client-windows-amd64:
 	mkdir -p release/windows/amd64
-	env GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/windows/amd64/mieru.exe cmd/mieru/mieru.go
+	env GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/windows/amd64/mieru.exe ./cmd/mieru
 	cd release/windows/amd64
 	sha256sum mieru.exe > mieru_${VERSION}_windows_amd64.exe.sha256.txt
 	zip -r mieru_${VERSION}_windows_amd64.zip mieru.exe
@@ -233,7 +244,7 @@ client-windows-amd64:
 .PHONY: client-windows-arm64
 client-windows-arm64:
 	mkdir -p release/windows/arm64
-	env GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/windows/arm64/mieru.exe cmd/mieru/mieru.go
+	env GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o release/windows/arm64/mieru.exe ./cmd/mieru
 	cd release/windows/arm64
 	sha256sum mieru.exe > mieru_${VERSION}_windows_arm64.exe.sha256.txt
 	zip -r mieru_${VERSION}_windows_arm64.zip mieru.exe
