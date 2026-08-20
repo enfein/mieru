@@ -132,7 +132,7 @@ func (entry *Entry) WithFields(fields Fields) *Entry {
 		isErrField := false
 		if t := reflect.TypeOf(v); t != nil {
 			switch {
-			case t.Kind() == reflect.Func, t.Kind() == reflect.Ptr && t.Elem().Kind() == reflect.Func:
+			case t.Kind() == reflect.Func, t.Kind() == pointerKind && t.Elem().Kind() == reflect.Func:
 				isErrField = true
 			}
 		}
@@ -204,7 +204,8 @@ func getCaller() *runtime.Frame {
 
 		// If the caller isn't part of this package, we're done
 		if pkg != logrusPackage {
-			return &f //nolint:scopelint
+			caller := f
+			return &caller
 		}
 	}
 
