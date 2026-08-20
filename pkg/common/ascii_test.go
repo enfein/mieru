@@ -16,6 +16,7 @@
 package common
 
 import (
+	"bytes"
 	crand "crypto/rand"
 	"testing"
 )
@@ -33,6 +34,45 @@ func TestToPrintableChar(t *testing.T) {
 		if b[i] < PrintableCharSub || b[i] > PrintableCharSup {
 			t.Errorf("Found non printable character")
 		}
+	}
+}
+
+func TestToPrintableCharDistribution(t *testing.T) {
+	// Feed one rejected value followed by one value for each printable
+	// character to verify both rejection sampling and an even distribution.
+	randomData := make([]byte, 0, (printableCharLen+1)*2)
+	randomData = append(randomData, 0xff, 0xff)
+	for i := 0; i < printableCharLen; i++ {
+		randomData = append(randomData, byte(i>>8), byte(i))
+	}
+
+	oldReader := crand.Reader
+	crand.Reader = bytes.NewReader(randomData)
+	t.Cleanup(func() { crand.Reader = oldReader })
+
+	b := make([]byte, printableCharLen)
+	ToPrintableChar(b, 0, len(b))
+	counts := make([]int, printableCharLen)
+	for _, c := range b {
+		counts[int(c)-PrintableCharSub]++
+	}
+	for i, count := range counts {
+		if count != 1 {
+			t.Errorf("character %q occurred %d times, want 1", byte(i+PrintableCharSub), count)
+		}
+	}
+}
+
+func BenchmarkToPrintableChar(b *testing.B) {
+	const size = 1024
+	src := make([]byte, size)
+	dst := make([]byte, size)
+
+	b.SetBytes(size)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		copy(dst, src)
+		ToPrintableChar(dst, 0, len(dst))
 	}
 }
 

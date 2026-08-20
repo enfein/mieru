@@ -19,7 +19,7 @@ PROJECT_NAME=$(shell basename "${ROOT}")
 TEST_BINARY_PREREQ = test-binary
 BENCH_TIME ?= 10s
 FUZZ_TIME ?= 10s
-BENCH_PACKAGES ?= ./pkg/cipher ./pkg/protocol ./pkg/protocol/serveruser
+BENCH_PACKAGES ?= ./pkg/cipher ./pkg/common ./pkg/protocol ./pkg/protocol/serveruser
 FUZZ_PACKAGES ?= ./pkg/protocol
 
 # If this version is changed, also change the version in

@@ -15,22 +15,21 @@
 
 package common
 
-import (
-	crand "crypto/rand"
-	"math/big"
-)
+import crand "crypto/rand"
 
 const (
 	PrintableCharSub = 0x20 // 0x20, i.e. ' ', is the first printable ASCII character
 	PrintableCharSup = 0x7E // 0x7E, i.e. '~', is the last printable ASCII character
+	printableCharLen = PrintableCharSup - PrintableCharSub + 1
 
 	// Common64Set contains 64 selected common characters.
 	// This value can change in different software releases.
 	Common64Set = "A7k9mP2vX5bW1qRtN8zL4fJyHcVsDwQxPlKzMbRtNjFfGyHcVsDwQxPlKzMbRtNj"
-)
 
-var (
-	printableCharRange = big.NewInt(PrintableCharSup - PrintableCharSub + 1)
+	// The largest multiple of printableCharLen that fits in a uint16.
+	// Values below this limit can be reduced without modulo bias.
+	printableUint16Limit = 1<<16 - (1<<16)%printableCharLen
+	printableRandBatch   = 128
 )
 
 // ToPrintableChar rewrites [beginIdx, endIdx) of the byte slice with printable
@@ -42,6 +41,7 @@ func ToPrintableChar(b []byte, beginIdx, endIdx int) {
 	if endIdx > len(b) {
 		panic("index out of range")
 	}
+	randCount := 0
 	for i := beginIdx; i < endIdx; i++ {
 		if b[i] < PrintableCharSub || b[i] > PrintableCharSup {
 			if b[i]&0x80 > 0 {
@@ -51,15 +51,35 @@ func ToPrintableChar(b []byte, beginIdx, endIdx int) {
 					continue
 				}
 			}
-			var randBigInt *big.Int
-			var err error
-			for {
-				randBigInt, err = crand.Int(crand.Reader, printableCharRange)
-				if err == nil {
-					break
-				}
+			randCount++
+		}
+	}
+
+	// Draw random values in batches.
+	var randBuf [printableRandBatch * 2]byte
+	next := beginIdx
+	for randCount > 0 {
+		drawCount := randCount
+		if drawCount > printableRandBatch {
+			drawCount = printableRandBatch
+		}
+		for {
+			if _, err := crand.Read(randBuf[:drawCount*2]); err == nil {
+				break
 			}
-			b[i] = byte(randBigInt.Int64() + PrintableCharSub)
+		}
+
+		for i := 0; i < drawCount; i++ {
+			r := int(randBuf[2*i])<<8 | int(randBuf[2*i+1])
+			if r >= printableUint16Limit {
+				continue
+			}
+			for b[next] >= PrintableCharSub && b[next] <= PrintableCharSup {
+				next++
+			}
+			b[next] = byte(r%printableCharLen + PrintableCharSub)
+			next++
+			randCount--
 		}
 	}
 }
