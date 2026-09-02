@@ -24,7 +24,7 @@ const (
 
 	// Common64Set contains 64 selected common characters.
 	// This value can change in different software releases.
-	Common64Set = "A7k9mP2vX5bW1qRtN8zL4fJyHcVsDwQxPlKzMbRtNjFfGyHcVsDwQxPlKzMbRtNj"
+	Common64Set = "CCOzB3KKr9NDAgVnJcCn9ib37T1JH6vRSVx8YaNnXbfo6yFU1EHPy2r3D5LM1Qi4"
 
 	// The largest multiple of printableCharLen that fits in a uint16.
 	// Values below this limit can be reduced without modulo bias.

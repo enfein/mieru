@@ -31,7 +31,6 @@ import (
 	"time"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
-	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/apis/trafficpattern"
 	"github.com/enfein/mieru/v3/pkg/appctl"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlcommon"
@@ -747,9 +746,10 @@ var clientTestFunc = func(s []string) error {
 		return fmt.Errorf(stderror.GetClientConfigFailedErr, err)
 	}
 
+	dialer := socks5.NewClientDialer(net.JoinHostPort("127.0.0.1", strconv.Itoa(int(config.GetSocks5Port()))), nil, false)
 	httpClient := &http.Client{
 		Transport: &http.Transport{
-			Dial: socks5.Dial(fmt.Sprintf("socks5://127.0.0.1:%d", config.GetSocks5Port()), constant.Socks5ConnectCmd),
+			DialContext: dialer.DialContext,
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return nil

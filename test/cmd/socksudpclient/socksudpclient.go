@@ -81,6 +81,7 @@ func main() {
 func CreateNewConnAndDoRequest(nRequest int, dstAddr *net.UDPAddr) {
 	socksDialer := socks5.DialSocks5Proxy(&socks5.Client{
 		Host:    *localProxyHost + ":" + strconv.Itoa(*localProxyPort),
+		Timeout: 10 * time.Second,
 		CmdType: constant.Socks5UDPAssociateCmd,
 	})
 	ctrlConn, udpConn, proxyAddr, err := socksDialer("tcp", *dstHost+":"+strconv.Itoa(*dstPort))

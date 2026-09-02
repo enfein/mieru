@@ -61,6 +61,7 @@ func TestDatagramModeConnect(t *testing.T) {
 
 	dialer := DialSocks5Proxy(&Client{
 		Host:    proxyAddr,
+		Timeout: 5 * time.Second,
 		CmdType: constant.Socks5ConnectCmd,
 	})
 	conn, _, _, err := dialer("tcp", target.String())
@@ -268,6 +269,7 @@ func dialUDPAssociate(t *testing.T, proxyAddr, targetAddr string) (net.Conn, *ne
 	t.Helper()
 	dialer := DialSocks5Proxy(&Client{
 		Host:    proxyAddr,
+		Timeout: 5 * time.Second,
 		CmdType: constant.Socks5UDPAssociateCmd,
 	})
 	ctrlConn, udpConn, proxyUDPAddr, err := dialer("udp", targetAddr)

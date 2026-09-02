@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/socks5"
 	"github.com/enfein/mieru/v3/pkg/version"
 	"github.com/enfein/mieru/v3/pkg/version/updater/updaterpb"
@@ -83,8 +82,12 @@ func queryLatestVersion(socks5ProxyURI string) (string, error) {
 		Timeout: 10 * time.Second,
 	}
 	if socks5ProxyURI != "" {
+		dialer, err := socks5.NewClientDialerFromURI(socks5ProxyURI, false)
+		if err != nil {
+			return "", fmt.Errorf("create socks5 dialer failed: %v", err)
+		}
 		httpClient.Transport = &http.Transport{
-			Dial: socks5.Dial(socks5ProxyURI, constant.Socks5ConnectCmd),
+			DialContext: dialer.DialContext,
 		}
 	}
 	resp, err := httpClient.Get("https://api.github.com/repos/enfein/mieru/releases/latest")

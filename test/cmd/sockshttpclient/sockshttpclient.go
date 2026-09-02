@@ -134,6 +134,7 @@ func main() {
 			if *proxyMode == Socks5ProxyMode {
 				socksDialer := socks5.DialSocks5Proxy(&socks5.Client{
 					Host:    *localProxyHost + ":" + strconv.Itoa(*localProxyPort),
+					Timeout: 10 * time.Second,
 					CmdType: constant.Socks5ConnectCmd,
 				})
 				conn, _, _, err = socksDialer("tcp", *dstHost+":"+strconv.Itoa(*dstPort))

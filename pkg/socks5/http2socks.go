@@ -24,7 +24,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
 )
@@ -77,7 +76,12 @@ func (p *HTTPProxy) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	}
 
 	// Dialer to socks5 server.
-	dialFunc := Dial(p.ProxyURI, constant.Socks5ConnectCmd)
+	dialer, err := NewClientDialerFromURI(p.ProxyURI, false)
+	if err != nil {
+		HTTPConnErrors.Add(1)
+		log.Debugf("create socks5 dialer failed: %v", err)
+		return
+	}
 
 	if req.Method == http.MethodConnect {
 		// HTTPS
@@ -112,7 +116,7 @@ func (p *HTTPProxy) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		}
 
 		// Dial to socks server.
-		socksConn, err := dialFunc("tcp", common.MaybeDecorateIPv6(req.URL.Hostname())+":"+port)
+		socksConn, err := dialer.DialContext(req.Context(), "tcp", common.MaybeDecorateIPv6(req.URL.Hostname())+":"+port)
 		if err != nil {
 			HTTPConnErrors.Add(1)
 			log.Debugf("HTTP proxy dial to socks5 server failed: %v", err)
@@ -125,7 +129,7 @@ func (p *HTTPProxy) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		p.mu.Lock()
 		if p.client == nil {
 			tr := &http.Transport{
-				Dial: dialFunc,
+				DialContext: dialer.DialContext,
 			}
 			p.client = &http.Client{
 				Transport: tr,
