@@ -29,6 +29,8 @@ import (
 	"github.com/enfein/mieru/v3/pkg/version"
 )
 
+const checkUpdateTimeout = 10 * time.Second
+
 var versionFunc = func(_ []string) error {
 	log.Infof(version.AppVersion)
 	return nil

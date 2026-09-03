@@ -200,17 +200,28 @@ func NewClientManagementRPCClient() (appctlgrpc.ClientManagementServiceClient, e
 	return newClientManagementRPCClient(rpcAddr)
 }
 
-// IsClientDaemonRunning detects if client daemon is running by using
+// GetClientStatusWithRPC gets client application status via
 // ClientManagementService.GetStatus() RPC.
-func IsClientDaemonRunning(ctx context.Context) error {
+func GetClientStatusWithRPC(ctx context.Context) (*pb.AppStatusMsg, error) {
 	client, err := NewClientManagementRPCClient()
 	if err != nil {
-		return fmt.Errorf("NewClientManagementRPCClient() failed: %w", err)
+		return nil, fmt.Errorf("NewClientManagementRPCClient() failed: %w", err)
 	}
 	timedctx, cancelFunc := context.WithTimeout(ctx, RPCTimeout)
 	defer cancelFunc()
-	if _, err = client.GetStatus(timedctx, &emptypb.Empty{}); err != nil {
-		return fmt.Errorf("ClientManagementService.GetStatus() failed: %w", err)
+	status, err := client.GetStatus(timedctx, &emptypb.Empty{})
+	if err != nil {
+		return nil, fmt.Errorf("ClientManagementService.GetStatus() failed: %w", err)
+	}
+	return status, nil
+}
+
+// IsClientDaemonRunning detects if client daemon is running by using
+// ClientManagementService.GetStatus() RPC.
+func IsClientDaemonRunning(ctx context.Context) error {
+	_, err := GetClientStatusWithRPC(ctx)
+	if err != nil {
+		return err
 	}
 	return nil
 }

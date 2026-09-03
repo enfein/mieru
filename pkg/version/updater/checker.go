@@ -16,6 +16,7 @@
 package updater
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -33,17 +34,18 @@ const (
 )
 
 // CheckUpdate fetches the latest mieru / mita version using GitHub API
-// and check if a new release is available.
+// and checks if a new release is available. The request is canceled when ctx
+// is done.
 // If the proxy URI is not empty, that is used by the HTTP client when
 // sending the HTTP request.
-func CheckUpdate(socks5ProxyURI string) (record *updaterpb.UpdateRecord, msg string, err error) {
+func CheckUpdate(ctx context.Context, socks5ProxyURI string) (record *updaterpb.UpdateRecord, msg string, err error) {
 	record = &updaterpb.UpdateRecord{
 		TimeUnix: proto.Int64(time.Now().Unix()),
 		Version:  proto.String(version.AppVersion),
 	}
 
 	var remoteTag string
-	remoteTag, err = queryLatestVersion(socks5ProxyURI)
+	remoteTag, err = queryLatestVersion(ctx, socks5ProxyURI)
 	if err != nil {
 		err = fmt.Errorf("queryLatestVersion() failed: %w", err)
 		record.Error = proto.String(err.Error())
@@ -77,10 +79,8 @@ func CheckUpdate(socks5ProxyURI string) (record *updaterpb.UpdateRecord, msg str
 	}
 }
 
-func queryLatestVersion(socks5ProxyURI string) (string, error) {
-	httpClient := http.Client{
-		Timeout: 10 * time.Second,
-	}
+func queryLatestVersion(ctx context.Context, socks5ProxyURI string) (string, error) {
+	httpClient := http.Client{}
 	if socks5ProxyURI != "" {
 		dialer, err := socks5.NewClientDialerFromURI(socks5ProxyURI, false)
 		if err != nil {
@@ -90,9 +90,13 @@ func queryLatestVersion(socks5ProxyURI string) (string, error) {
 			DialContext: dialer.DialContext,
 		}
 	}
-	resp, err := httpClient.Get("https://api.github.com/repos/enfein/mieru/releases/latest")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/repos/enfein/mieru/releases/latest", nil)
 	if err != nil {
-		return "", fmt.Errorf("http.Get() failed: %v [GitHub may be blocked in your network]", err)
+		return "", fmt.Errorf("create HTTP request failed: %w", err)
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("http.Do() failed: %w [GitHub may be blocked in your network]", err)
 	}
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("HTTP returned expected status code %d", resp.StatusCode)

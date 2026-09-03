@@ -755,7 +755,10 @@ var serverDeleteUserFunc = func(s []string) error {
 }
 
 var serverCheckUpdateFunc = func(s []string) error {
-	_, msg, err := updater.CheckUpdate("")
+	ctx, cancelFunc := context.WithTimeout(context.Background(), checkUpdateTimeout)
+	defer cancelFunc()
+
+	_, msg, err := updater.CheckUpdate(ctx, "")
 	if err != nil {
 		return fmt.Errorf("check update failed: %w", err)
 	}
