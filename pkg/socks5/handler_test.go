@@ -586,6 +586,14 @@ func TestHandleForwardingUDP(t *testing.T) {
 			t.Errorf("expected UDP associate command, got %v", reqHeader[1])
 			return
 		}
+		wantReqHeader := []byte{
+			constant.Socks5Version, constant.Socks5UDPAssociateCmd, 0, constant.Socks5IPv4Address,
+			0, 0, 0, 0, 0, 0,
+		}
+		if !bytes.Equal(reqHeader, wantReqHeader) {
+			t.Errorf("downstream got UDP associate request %v, want %v", reqHeader, wantReqHeader)
+			return
+		}
 
 		// Create a UDP listener for the socks5 UDP relay.
 		downstreamUDP, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})

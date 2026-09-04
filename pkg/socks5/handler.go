@@ -235,8 +235,15 @@ func (s *Server) handleForwarding(req *model.Request, proxyConn net.Conn, proxy 
 }
 
 func (s *Server) handleForwardingUDP(req *model.Request, proxyConn, egressConn net.Conn) error {
-	// Write UDP associate request to downstream server.
-	if _, err := egressConn.Write(req.Raw); err != nil {
+	// Mita creates a new UDP socket for the downstream proxy, so the client's
+	// requested endpoint does not describe the source of those datagrams. Ask
+	// the downstream proxy to learn Mita's UDP endpoint from the association
+	// instead. Each UDP datagram still carries its actual destination address.
+	downstreamReq := &model.Request{
+		Command: constant.Socks5UDPAssociateCmd,
+		DstAddr: model.AddrSpec{IP: net.IPv4zero, Port: 0},
+	}
+	if err := downstreamReq.WriteToSocks5(egressConn); err != nil {
 		HandshakeErrors.Add(1)
 		egressConn.Close()
 		return fmt.Errorf("failed to write socks5 request to egress proxy: %w", err)
