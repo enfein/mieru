@@ -30,5 +30,8 @@
         }
     ],
     "loggingLevel": "INFO",
-    "mtu": 1400
+    "mtu": 1400,
+    "dns": {
+        "dualStack": "PREFER_IPv4"
+    }
 }

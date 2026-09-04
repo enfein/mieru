@@ -42,5 +42,8 @@
                 "proxyNames": ["cloudflare"]
             }
         ]
+    },
+    "dns": {
+        "dualStack": "PREFER_IPv4"
     }
 }

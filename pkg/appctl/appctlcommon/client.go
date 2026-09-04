@@ -108,10 +108,10 @@ func NewClientMuxFromProfile(activeProfile *pb.ClientProfile, dialer apicommon.D
 	// Construct dialer and packet dialer, which are used to connect to proxy server.
 	if profileDialer := activeProfile.GetDialer(); profileDialer != nil {
 		if dialer == nil && packetDialer == nil {
-			profileSocks5Dialer := newProfileSocks5Dialer(profileDialer)
-			dialer = profileSocks5Dialer
+			socks5Dialer := newSocks5Dialer(profileDialer)
+			dialer = socks5Dialer
 			if profileDialer.GetSocks5UDPAssociate() {
-				packetDialer = profileSocks5Dialer
+				packetDialer = socks5Dialer
 			}
 		}
 	}
@@ -205,7 +205,7 @@ func validateClientProfileDialer(profile *pb.ClientProfile) error {
 	return nil
 }
 
-func newProfileSocks5Dialer(dialer *pb.ClientDialer) *socks5.ClientDialer {
+func newSocks5Dialer(dialer *pb.ClientDialer) *socks5.ClientDialer {
 	var credential *socks5.Credential
 	if auth := dialer.GetSocks5Authentication(); auth != nil {
 		credential = &socks5.Credential{
@@ -213,7 +213,11 @@ func newProfileSocks5Dialer(dialer *pb.ClientDialer) *socks5.ClientDialer {
 			Password: auth.GetPassword(),
 		}
 	}
-	return socks5.NewClientDialer(net.JoinHostPort(dialer.GetHost(), strconv.Itoa(int(dialer.GetPort()))), credential, dialer.GetSocks5UDPAssociate())
+	return socks5.NewClientDialer(
+		net.JoinHostPort(dialer.GetHost(), strconv.Itoa(int(dialer.GetPort()))),
+		credential,
+		dialer.GetSocks5UDPAssociate(),
+	)
 }
 
 func clientEndpointsFromProfile(activeProfile *pb.ClientProfile) ([]protocol.UnderlayProperties, error) {

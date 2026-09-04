@@ -24,24 +24,6 @@ type Client struct {
 	Timeout time.Duration
 }
 
-// Dial returns the dial function to be used in http.Transport object.
-// Argument proxyURI should be in the format: "socks5://user:password@127.0.0.1:1080?timeout=5s".
-// Only socks5 protocol is supported.
-//
-// Deprecated: Use ClientDialer.DialContext with http.Transport.DialContext.
-func Dial(proxyURI string, cmdType byte) func(string, string) (net.Conn, error) {
-	if cmdType != constant.Socks5ConnectCmd {
-		return dialError(fmt.Errorf("command type %d is not supported by Dial", cmdType))
-	}
-	dialer, err := NewClientDialerFromURI(proxyURI, false)
-	if err != nil {
-		return dialError(err)
-	}
-	return func(network, targetAddr string) (net.Conn, error) {
-		return dialer.DialContext(context.Background(), network, targetAddr)
-	}
-}
-
 // DialSocks5Proxy returns two connections that can be used to send TCP and UDP traffic.
 //
 // Deprecated: Use ClientDialer.DialContext or ClientDialer.ListenPacket.
@@ -152,12 +134,6 @@ func parseProxyURI(proxyURI string) (*Client, error) {
 		}
 	}
 	return c, nil
-}
-
-func dialError(err error) func(string, string) (net.Conn, error) {
-	return func(_, _ string) (net.Conn, error) {
-		return nil, err
-	}
 }
 
 func dialErrorLong(err error) func(string, string) (net.Conn, *net.UDPConn, *net.UDPAddr, error) {

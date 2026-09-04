@@ -428,6 +428,9 @@ class ServerConfig:
             'users': [],
             'loggingLevel': 'INFO',
             'mtu': 1400,
+            'dns': {
+                'dualStack': 'PREFER_IPv4',
+            },
         }
 
 

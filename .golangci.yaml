@@ -16,6 +16,14 @@ linters:
             - $gostd
             - github.com/enfein/mieru/v3/apis/constant
             - github.com/enfein/mieru/v3/apis/model
+        apis-client:
+          files:
+            - "**/apis/client/**"
+          deny:
+            - pkg: github.com/enfein/mieru/v3/pkg/appctl$
+              desc: "apis/client should not depend on pkg/appctl"
+            - pkg: github.com/enfein/mieru/v3/pkg/cli$
+              desc: "apis/client should not depend on pkg/cli"
         apis-constant:
           files:
             - "**/apis/constant/**"
@@ -28,6 +36,14 @@ linters:
           allow:
             - $gostd
             - github.com/enfein/mieru/v3/apis/constant
+        apis-server:
+          files:
+            - "**/apis/server/**"
+          deny:
+            - pkg: github.com/enfein/mieru/v3/pkg/appctl$
+              desc: "apis/server should not depend on pkg/appctl"
+            - pkg: github.com/enfein/mieru/v3/pkg/cli$
+              desc: "apis/server should not depend on pkg/cli"
         pkg-appctl-appctlcommon:
           files:
             - "**/pkg/appctl/appctlcommon/**"

@@ -110,7 +110,10 @@ Below is an example of the server configuration file.
         }
     ],
     "loggingLevel": "INFO",
-    "mtu": 1400
+    "mtu": 1400,
+    "dns": {
+        "dualStack": "PREFER_IPv4"
+    }
 }
 ```
 
@@ -119,6 +122,7 @@ Below is an example of the server configuration file.
 3. Fill in the `users` -> `name` property with the user name.
 4. Fill in the `users` -> `password` property with the user's password.
 5. [Optional] The `mtu` property is the maximum transport layer payload size when using the UDP proxy protocol. The default value is 1400. The minimum value is 1280.
+6. We recommend setting `dns` -> `dualStack` to `PREFER_IPv4`, especially if the server does not support IPv6. See [DNS Policy](#dns-policy) for other options and static host mappings.
 
 In addition to this, mita can listen to several different ports. We recommend using multiple ports in both server and client configurations.
 
@@ -244,12 +248,12 @@ For information on how to configure nested proxy on a Tor browser, please refer 
 
 ### DNS Policy
 
-When a proxy client requests a target website using a domain name instead of an IP address, the proxy server needs to resolve the domain name before connecting to the target website. You can adjust the proxy server DNS policy using the following configuration:
+When a proxy client requests a domain name, the proxy server resolves it before connecting. You can configure the DNS policy and static host mappings as follows:
 
 ```js
 {
     "dns": {
-        "dualStack": "USE_FIRST_IP",
+        "dualStack": "PREFER_IPv4",
         "hosts": {
             "example.com": "93.184.216.34",
             "ipv6.example.com": "2606:2800:220:1:248:1893:25c8:1946"
@@ -258,17 +262,15 @@ When a proxy client requests a target website using a domain name instead of an 
 }
 ```
 
-The `dns` -> `dualStack` attribute supports the following values:
+The `dns` -> `dualStack` property supports the following values:
 
-1. `USE_FIRST_IP`: Always use the first IP address returned by the DNS server. This is the default policy.
-2. `PREFER_IPv4`: Prefer to use the first IPv4 address returned by the DNS server. If there is no IPv4 address, use the first IPv6 address.
-3. `PREFER_IPv6`: Prefer to use the first IPv6 address returned by the DNS server. If there is no IPv6 address, use the first IPv4 address.
-4. `ONLY_IPv4`: Force to use the first IPv4 address returned by the DNS server. If there is no IPv4 address, the connection fails.
-5. `ONLY_IPv6`: Force to use the first IPv6 address returned by the DNS server. If there is no IPv6 address, the connection fails.
+1. `USE_FIRST_IP`: Use the first IP address returned by the DNS server. This is the default policy.
+2. `PREFER_IPv4`: Prefer IPv4, then fall back to IPv6.
+3. `PREFER_IPv6`: Prefer IPv6, then fall back to IPv4.
+4. `ONLY_IPv4`: Use only IPv4. The connection fails if no IPv4 address is available.
+5. `ONLY_IPv6`: Use only IPv6. The connection fails if no IPv6 address is available.
 
-The `dns` -> `hosts` attribute defines static domain name to IP address mappings, similar to `/etc/hosts`. When the proxy server receives a request for a domain name listed in `hosts`, it uses the configured IP address directly instead of querying DNS resolver.
-
-Each key in `hosts` must be a domain name, and each value must be a valid IPv4 or IPv6 address. Domain name matching is exact and case-insensitive. Wildcards and DNS suffix matching are not supported. Domain names must not begin or end with a dot.
+The optional `dns` -> `hosts` property defines static domain name to IP address mappings. Each key must be a domain name, and each value must be a valid IPv4 or IPv6 address. Matching is exact and case-insensitive; wildcards and DNS suffix matching are not supported. Domain names must not begin or end with a dot.
 
 ### Allow Users to Access Internal Network
 

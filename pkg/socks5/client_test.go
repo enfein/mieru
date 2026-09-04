@@ -92,15 +92,6 @@ func TestNewClientDialerFromURI(t *testing.T) {
 	}
 }
 
-func TestDialRejectsUnsupportedCommands(t *testing.T) {
-	for _, cmd := range []byte{constant.Socks5BindCmd, constant.Socks5UDPAssociateCmd} {
-		dial := Dial("socks5://127.0.0.1:1080", cmd)
-		if _, err := dial("tcp", "example.com:80"); err == nil {
-			t.Errorf("Dial() command %d error = nil, want unsupported command error", cmd)
-		}
-	}
-}
-
 func TestDialSocks5ProxyRejectsBind(t *testing.T) {
 	dial := DialSocks5Proxy(&Client{
 		Host:    "127.0.0.1:1080",
@@ -108,25 +99,6 @@ func TestDialSocks5ProxyRejectsBind(t *testing.T) {
 	})
 	if _, _, _, err := dial("tcp", "example.com:80"); err == nil {
 		t.Error("DialSocks5Proxy() BIND error = nil, want unsupported command error")
-	}
-}
-
-func TestDialPreservesURIHandshakeTimeout(t *testing.T) {
-	proxyAddr := startUnresponsiveSocks5Proxy(t)
-	dial := Dial(fmt.Sprintf("socks5://%s?timeout=100ms", proxyAddr), constant.Socks5ConnectCmd)
-
-	done := make(chan error, 1)
-	go func() {
-		_, err := dial("tcp", "example.com:80")
-		done <- err
-	}()
-	select {
-	case err := <-done:
-		if err == nil {
-			t.Fatal("Dial() error = nil, want timeout error")
-		}
-	case <-time.After(1 * time.Second):
-		t.Fatal("Dial() did not honor the URI handshake timeout")
 	}
 }
 
@@ -238,8 +210,11 @@ func TestSocks5Anonymous(t *testing.T) {
 	}
 	newTestSocksServer(port)
 
-	dialSocksProxy := Dial(fmt.Sprintf("socks5://127.0.0.1:%d?timeout=5s", port), constant.Socks5ConnectCmd)
-	tr := &http.Transport{Dial: dialSocksProxy}
+	dialer, err := NewClientDialerFromURI(fmt.Sprintf("socks5://127.0.0.1:%d?timeout=5s", port), false)
+	if err != nil {
+		t.Fatalf("NewClientDialerFromURI() failed: %v", err)
+	}
+	tr := &http.Transport{DialContext: dialer.DialContext}
 	httpClient := &http.Client{Transport: tr}
 	resp, err := httpClient.Get(fmt.Sprintf("http://localhost" + httpTestServer.Addr))
 	if err != nil {
