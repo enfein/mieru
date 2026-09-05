@@ -37,7 +37,7 @@ FUZZ_PACKAGES ?= ./pkg/protocol
 # - pkg/version/current.go
 #
 # Use `tools/bump_version.sh` script to change all those files at one shot.
-VERSION="3.36.0"
+VERSION="3.36.1"
 
 # With .ONESHELL, each recipe is executed in a single shell instance.
 # This allows `cd` to affect subsequent commands in the same recipe.
