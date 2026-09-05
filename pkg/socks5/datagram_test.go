@@ -59,12 +59,9 @@ func TestDatagramModeConnect(t *testing.T) {
 	target := startTCPEchoServer(t)
 	proxyAddr := startDatagramModeServer(t, nil)
 
-	dialer := DialSocks5Proxy(&Client{
-		Host:    proxyAddr,
-		Timeout: 5 * time.Second,
-		CmdType: constant.Socks5ConnectCmd,
-	})
-	conn, _, _, err := dialer("tcp", target.String())
+	dialer := NewClientDialer(proxyAddr, nil, false)
+	dialer.Timeout = 5 * time.Second
+	conn, err := dialer.DialContext(context.Background(), "tcp", target.String())
 	if err != nil {
 		t.Fatalf("dial to socks5 proxy failed: %v", err)
 	}
@@ -267,12 +264,10 @@ func startUDPRecordingServer(t *testing.T) (*net.UDPAddr, <-chan []byte) {
 
 func dialUDPAssociate(t *testing.T, proxyAddr, targetAddr string) (net.Conn, *net.UDPConn, *net.UDPAddr) {
 	t.Helper()
-	dialer := DialSocks5Proxy(&Client{
-		Host:    proxyAddr,
-		Timeout: 5 * time.Second,
-		CmdType: constant.Socks5UDPAssociateCmd,
-	})
-	ctrlConn, udpConn, proxyUDPAddr, err := dialer("udp", targetAddr)
+	dialer := NewClientDialer(proxyAddr, nil, true)
+	dialer.Timeout = 5 * time.Second
+	// Use the raw connection to test SOCKS5 UDP packet headers and fragmentation.
+	ctrlConn, udpConn, proxyUDPAddr, err := dialer.dial(context.Background(), constant.Socks5UDPAssociateCmd, "udp", "", targetAddr)
 	if err != nil {
 		t.Fatalf("dial to socks5 proxy failed: %v", err)
 	}

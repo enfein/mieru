@@ -19,6 +19,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
@@ -31,7 +32,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/socks5"
 )
@@ -132,12 +132,9 @@ func main() {
 		var err error
 		for {
 			if *proxyMode == Socks5ProxyMode {
-				socksDialer := socks5.DialSocks5Proxy(&socks5.Client{
-					Host:    *localProxyHost + ":" + strconv.Itoa(*localProxyPort),
-					Timeout: 10 * time.Second,
-					CmdType: constant.Socks5ConnectCmd,
-				})
-				conn, _, _, err = socksDialer("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
+				socksDialer := socks5.NewClientDialer(*localProxyHost+":"+strconv.Itoa(*localProxyPort), nil, false)
+				socksDialer.Timeout = 10 * time.Second
+				conn, err = socksDialer.DialContext(context.Background(), "tcp", *dstHost+":"+strconv.Itoa(*dstPort))
 			} else if *proxyMode == HTTPProxyMode {
 				tr := &http.Transport{
 					Proxy: socks5.HTTPTransportProxyFunc("http://" + *localHTTPHost + ":" + strconv.Itoa(*localHTTPPort)),
@@ -211,12 +208,9 @@ func CreateNewConnAndDoRequest(seq int, proxyMode string) {
 	for {
 		switch proxyMode {
 		case Socks5ProxyMode:
-			socksDialer := socks5.DialSocks5Proxy(&socks5.Client{
-				Host:    *localProxyHost + ":" + strconv.Itoa(*localProxyPort),
-				Timeout: 10 * time.Second,
-				CmdType: constant.Socks5ConnectCmd,
-			})
-			conn, _, _, err = socksDialer("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
+			socksDialer := socks5.NewClientDialer(*localProxyHost+":"+strconv.Itoa(*localProxyPort), nil, false)
+			socksDialer.Timeout = 10 * time.Second
+			conn, err = socksDialer.DialContext(context.Background(), "tcp", *dstHost+":"+strconv.Itoa(*dstPort))
 		case HTTPProxyMode:
 			tr := &http.Transport{
 				Proxy: socks5.HTTPTransportProxyFunc("http://" + *localHTTPHost + ":" + strconv.Itoa(*localHTTPPort)),

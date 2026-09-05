@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"time"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
@@ -53,12 +54,11 @@ func NewClientDialer(proxyAddress string, credential *Credential, socks5UDPAssoc
 // NewClientDialerFromURI creates a socks5 client dialer from a URI in the
 // format "socks5://user:password@127.0.0.1:1080?timeout=5s".
 func NewClientDialerFromURI(proxyURI string, socks5UDPAssociate bool) (*ClientDialer, error) {
-	c, err := parseProxyURI(proxyURI)
+	dialer, err := parseProxyURI(proxyURI)
 	if err != nil {
 		return nil, err
 	}
-	dialer := NewClientDialer(c.Host, c.Credential, socks5UDPAssociate)
-	dialer.Timeout = c.Timeout
+	dialer.Socks5UDPAssociate = socks5UDPAssociate
 	return dialer, nil
 }
 
@@ -250,6 +250,41 @@ func (c *clientPacketConn) SetReadDeadline(t time.Time) error {
 
 func (c *clientPacketConn) SetWriteDeadline(t time.Time) error {
 	return c.udpConn.SetWriteDeadline(t)
+}
+
+// parseProxyURI parses a socks5 URI and creates a client dialer.
+func parseProxyURI(proxyURI string) (*ClientDialer, error) {
+	uri, err := url.Parse(proxyURI)
+	if err != nil {
+		return nil, err
+	}
+
+	c := &ClientDialer{}
+	if uri.Scheme != "socks5" {
+		return nil, fmt.Errorf("unsupported protocol %s", uri.Scheme)
+	}
+	c.ProxyAddress = uri.Host
+	user := uri.User.Username()
+	password, _ := uri.User.Password()
+	if user != "" || password != "" {
+		if user == "" || password == "" || len(user) > 255 || len(password) > 255 {
+			return nil, fmt.Errorf("invalid user name or password")
+		}
+		c.Credential = &Credential{
+			User:     user,
+			Password: password,
+		}
+	}
+	query := uri.Query()
+	timeout := query.Get("timeout")
+	if timeout != "" {
+		var err error
+		c.Timeout, err = time.ParseDuration(timeout)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return c, nil
 }
 
 func setConnDeadlineOnContextDone(ctx context.Context, conn net.Conn) func() {

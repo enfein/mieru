@@ -20,6 +20,7 @@ import (
 	"context"
 	"io"
 	"net"
+	"reflect"
 	"strconv"
 	"testing"
 	"time"
@@ -27,6 +28,25 @@ import (
 	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/model"
 )
+
+func TestNewClientDialerFromURI(t *testing.T) {
+	dialer, err := NewClientDialerFromURI("socks5://u1:p1@127.0.0.1:8080?timeout=2s", true)
+	if err != nil {
+		t.Fatalf("NewClientDialerFromURI() failed: %v", err)
+	}
+	if dialer.ProxyAddress != "127.0.0.1:8080" {
+		t.Errorf("ProxyAddress = %q, want %q", dialer.ProxyAddress, "127.0.0.1:8080")
+	}
+	if dialer.Credential == nil || dialer.Credential.User != "u1" || dialer.Credential.Password != "p1" {
+		t.Errorf("Credential = %v, want user u1 and password p1", dialer.Credential)
+	}
+	if dialer.Timeout != 2*time.Second {
+		t.Errorf("Timeout = %v, want %v", dialer.Timeout, 2*time.Second)
+	}
+	if !dialer.Socks5UDPAssociate {
+		t.Error("Socks5UDPAssociate = false, want true")
+	}
+}
 
 func TestClientDialerConnect(t *testing.T) {
 	target := startTCPEchoServer(t)
@@ -155,6 +175,48 @@ func TestClientDialerUDPAssociateFQDN(t *testing.T) {
 	}
 	if !bytes.Equal(out[:n], []byte("pong")) {
 		t.Fatalf("got %v, want %v", out[:n], []byte("pong"))
+	}
+}
+
+func TestParseProxyURI(t *testing.T) {
+	t.Parallel()
+	testcases := []struct {
+		name string
+		uri  string
+		c    ClientDialer
+	}{
+		{
+			name: "full config",
+			uri:  "socks5://u1:p1@127.0.0.1:8080?timeout=1s",
+			c: ClientDialer{
+				Credential: &Credential{
+					User:     "u1",
+					Password: "p1",
+				},
+				ProxyAddress: "127.0.0.1:8080",
+				Timeout:      1 * time.Second,
+			},
+		},
+		{
+			name: "simple socks5",
+			uri:  "socks5://127.0.0.1:8080",
+			c: ClientDialer{
+				ProxyAddress: "127.0.0.1:8080",
+			},
+		},
+	}
+	for _, tc := range testcases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c, err := parseProxyURI(tc.uri)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(c, &tc.c) {
+				t.Fatalf("expect %v got %v", tc.c, c)
+			}
+		})
 	}
 }
 

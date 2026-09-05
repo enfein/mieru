@@ -26,6 +26,7 @@ import (
 	"sync/atomic"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
+	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
@@ -206,6 +207,63 @@ func RunUDPForwardingLoop(udpConn *net.UDPConn, conn *apicommon.PacketOverStream
 		return err.(error)
 	}
 	return nil
+}
+
+// TransceiveUDPPacket sends a single UDP associate message and returns the response.
+func TransceiveUDPPacket(conn *net.UDPConn, proxyAddr, dstAddr *net.UDPAddr, payload []byte) ([]byte, error) {
+	header := []byte{0, 0, 0}
+	if dstAddr.IP.To4() != nil {
+		header = append(header, constant.Socks5IPv4Address)
+		header = append(header, dstAddr.IP.To4()...)
+		header = append(header, byte(dstAddr.Port>>8))
+		header = append(header, byte(dstAddr.Port))
+	} else {
+		header = append(header, constant.Socks5IPv6Address)
+		header = append(header, dstAddr.IP.To16()...)
+		header = append(header, byte(dstAddr.Port>>8))
+		header = append(header, byte(dstAddr.Port))
+	}
+	if _, err := conn.WriteToUDP(append(header, payload...), proxyAddr); err != nil {
+		return nil, fmt.Errorf("WriteToUDP() failed: %v", err)
+	}
+	buf := make([]byte, 65536)
+	n, readAddr, err := conn.ReadFromUDP(buf)
+	if err != nil {
+		return nil, fmt.Errorf("ReadFromUDP() failed: %v", err)
+	}
+	if readAddr.Port != proxyAddr.Port {
+		// We don't compare the IP address because a wildcard address like 0.0.0.0 can be used.
+		return nil, fmt.Errorf("unexpected read from a different address")
+	}
+	if n < 4 {
+		return nil, fmt.Errorf("UDP associate response is too short")
+	}
+	switch buf[3] {
+	case constant.Socks5IPv4Address:
+		if n <= 10 {
+			return nil, fmt.Errorf("UDP associate response is too short for IPv4 address")
+		}
+		// Header length is 10 bytes.
+		return buf[10:n], nil
+	case constant.Socks5IPv6Address:
+		if n <= 22 {
+			return nil, fmt.Errorf("UDP associate response is too short for IPv6 address")
+		}
+		// Header length is 22 bytes.
+		return buf[22:n], nil
+	case constant.Socks5FQDNAddress:
+		if n < 5 {
+			return nil, fmt.Errorf("UDP associate response is too short for FQDN address")
+		}
+		domainLen := int(buf[4])
+		headerLen := 7 + domainLen
+		if n <= headerLen {
+			return nil, fmt.Errorf("UDP associate response is too short for FQDN address")
+		}
+		return buf[headerLen:n], nil
+	default:
+		return nil, fmt.Errorf("UDP associate unsupported address type: %d", buf[3])
+	}
 }
 
 // runUDPAssociateDatagramLoop exchanges RFC 1928 SOCKS5 UDP datagrams between

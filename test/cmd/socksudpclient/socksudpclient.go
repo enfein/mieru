@@ -18,13 +18,13 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	mrand "math/rand"
 	"net"
 	"strconv"
 	"time"
 
-	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/socks5"
 	"github.com/enfein/mieru/v3/pkg/testtool"
@@ -79,34 +79,35 @@ func main() {
 }
 
 func CreateNewConnAndDoRequest(nRequest int, dstAddr *net.UDPAddr) {
-	socksDialer := socks5.DialSocks5Proxy(&socks5.Client{
-		Host:    *localProxyHost + ":" + strconv.Itoa(*localProxyPort),
-		Timeout: 10 * time.Second,
-		CmdType: constant.Socks5UDPAssociateCmd,
-	})
-	ctrlConn, udpConn, proxyAddr, err := socksDialer("tcp", *dstHost+":"+strconv.Itoa(*dstPort))
+	socksDialer := socks5.NewClientDialer(*localProxyHost+":"+strconv.Itoa(*localProxyPort), nil, true)
+	socksDialer.Timeout = 10 * time.Second
+	conn, err := socksDialer.ListenPacket(context.Background(), "udp", "", dstAddr.String())
 	if err != nil {
 		log.Fatalf("dial to socks: %v", err)
 	}
-	defer ctrlConn.Close()
-	defer udpConn.Close()
+	defer conn.Close()
 
 	for i := 0; i < nRequest; i++ {
-		DoRequestWithExistingConn(udpConn, proxyAddr, dstAddr)
+		DoRequestWithExistingConn(conn, dstAddr)
 		time.Sleep(time.Millisecond * time.Duration(*intervalMs))
 	}
 }
 
-func DoRequestWithExistingConn(conn *net.UDPConn, proxyAddr, dstAddr *net.UDPAddr) {
+func DoRequestWithExistingConn(conn net.PacketConn, dstAddr *net.UDPAddr) {
 	payloadSize := mrand.Intn(*maxPayload) + 1
 	payload := testtool.TestHelperGenRot13Input(payloadSize)
 
 	conn.SetReadDeadline(time.Now().Add(1 * time.Second))
 	defer conn.SetReadDeadline(time.Time{})
-	resp, err := socks5.TransceiveUDPPacket(conn, proxyAddr, dstAddr, payload)
-	if err != nil {
-		log.Fatalf("socks5.TransceiveUDPPacket() failed: %v", err)
+	if _, err := conn.WriteTo(payload, dstAddr); err != nil {
+		log.Fatalf("WriteTo() failed: %v", err)
 	}
+	buf := make([]byte, 65536)
+	n, _, err := conn.ReadFrom(buf)
+	if err != nil {
+		log.Fatalf("ReadFrom() failed: %v", err)
+	}
+	resp := buf[:n]
 
 	rot13, err := testtool.TestHelperRot13(resp)
 	if err != nil {
