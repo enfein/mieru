@@ -35,6 +35,10 @@ var metricsDumpFilePath string
 var stopLogging chan struct{}
 var logMutex sync.Mutex
 
+// Serialize collection through publication, not just filesystem writes. An
+// older concurrent snapshot must never replace a newer checkpoint.
+var dumpMutex sync.Mutex
+
 func init() {
 	logDuration = 10 * time.Minute
 	stopLogging = make(chan struct{}, 1) // doesn't block
@@ -104,6 +108,8 @@ func SetMetricsDumpFilePath(path string) {
 }
 
 func LoadMetricsFromDump() error {
+	dumpMutex.Lock()
+	defer dumpMutex.Unlock()
 	logMutex.Lock()
 	defer logMutex.Unlock()
 	if metricsDumpFilePath == "" {
@@ -157,13 +163,16 @@ func LoadMetricsFromDump() error {
 
 // DumpMetricsNow writes the current metrics to the dump file.
 // This function can be called when metrics dump is disabled.
+// It does not stop metric producers or the periodic logging worker.
 func DumpMetricsNow() error {
+	dumpMutex.Lock()
+	defer dumpMutex.Unlock()
 	logMutex.Lock()
-	if metricsDumpFilePath == "" {
-		logMutex.Unlock()
+	path := metricsDumpFilePath
+	logMutex.Unlock()
+	if path == "" {
 		return fmt.Errorf("can't dump metrics: file path is not set")
 	}
-	logMutex.Unlock()
 
 	m := &pb.AllMetrics{}
 	pbGroups := make([]*pb.MetricGroup, 0)
@@ -187,10 +196,11 @@ func DumpMetricsNow() error {
 	if err != nil {
 		return fmt.Errorf("proto.Marshal() failed: %w", err)
 	}
-	if err := os.WriteFile(metricsDumpFilePath, b, 0660); err != nil {
-		return fmt.Errorf("os.WriteFile(%q) failed: %w", metricsDumpFilePath, err)
-	}
-	return nil
+	return writeCheckpointFile(path, b, checkpointFileOps{
+		createTemp: func(dir, pattern string) (checkpointFile, error) { return os.CreateTemp(dir, pattern) },
+		rename:     os.Rename,
+		openDir:    func(dir string) (checkpointFile, error) { return os.Open(dir) },
+	})
 }
 
 // ToMetricPB creates a protobuf representation of a metric.
