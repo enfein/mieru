@@ -5,6 +5,7 @@ package protocol
 
 import (
 	"net"
+	"os"
 	"syscall"
 	"testing"
 	"time"
@@ -66,12 +67,18 @@ func TestServerMuxRetainsPacketBurstDuringReaderPause(t *testing.T) {
 		t.Fatal("server did not attempt to enlarge the receive buffer")
 	}
 	const (
-		packets     = 160
-		packetBytes = 1000
-		// Linux reports SO_RCVBUF as twice the requested capacity to account
-		// for socket bookkeeping. Require that same conservative margin.
-		requiredBuffer = 2 * packets * packetBytes
+		packets               = 160
+		packetBytes           = 1000
+		minPacketMemoryBudget = 8 << 10
 	)
+	// Linux charges queued datagrams by skb->truesize, not wire payload bytes.
+	// Budget two OS pages per packet, with an 8 KiB floor, before running the
+	// fixture against the effective SO_RCVBUF capacity.
+	packetMemoryBudget := 2 * os.Getpagesize()
+	if packetMemoryBudget < minPacketMemoryBudget {
+		packetMemoryBudget = minPacketMemoryBudget
+	}
+	requiredBuffer := packets * packetMemoryBudget
 	effectiveBuffer, err := udpReadBufferSize(raw)
 	if err != nil {
 		t.Fatalf("read effective UDP receive buffer: %v", err)
