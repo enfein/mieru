@@ -18,6 +18,7 @@ package metrics
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"sort"
 	"sync"
 	"time"
@@ -34,9 +35,6 @@ var metricsDump bool
 var metricsDumpFilePath string
 var stopLogging chan struct{}
 var logMutex sync.Mutex
-
-// Serialize collection through publication, not just filesystem writes. An
-// older concurrent snapshot must never replace a newer checkpoint.
 var dumpMutex sync.Mutex
 
 func init() {
@@ -162,9 +160,14 @@ func LoadMetricsFromDump() error {
 }
 
 // DumpMetricsNow writes the current metrics to the dump file.
+// It is not supported on Windows.
 // This function can be called when metrics dump is disabled.
 // It does not stop metric producers or the periodic logging worker.
 func DumpMetricsNow() error {
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+
 	dumpMutex.Lock()
 	defer dumpMutex.Unlock()
 	logMutex.Lock()

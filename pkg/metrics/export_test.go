@@ -20,6 +20,7 @@ import (
 	mrand "math/rand"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -46,6 +47,10 @@ func TestEnableAndDisableLogging(t *testing.T) {
 }
 
 func TestMetricsDump(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("metrics dumping is not supported on Windows")
+	}
+
 	dumpPath := filepath.Join(t.TempDir(), "metrics.pb")
 	SetMetricsDumpFilePath(dumpPath)
 	if err := EnableMetricsDump(); err != nil {
