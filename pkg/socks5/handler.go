@@ -129,15 +129,10 @@ func (s *Server) handleAssociate(ctx context.Context, req *model.Request, proxyC
 	return s.handleAssociatePacketOverStream(ctx, req, proxyConn)
 }
 
-func (s *Server) handleAssociatePacketOverStream(ctx context.Context, _ *model.Request, proxyConn net.Conn) error {
+func (s *Server) handleAssociatePacketOverStream(_ context.Context, _ *model.Request, proxyConn net.Conn) error {
 	// Create a UDP listener on a random port.
 	// All the requests associated to this connection will go through this port.
-	udpListenerAddr, err := apicommon.ResolveUDPAddr(ctx, s.config.Resolver, "udp", common.MaybeDecorateIPv6(common.AllIPAddr())+":0")
-	if err != nil {
-		UDPAssociateErrors.Add(1)
-		return fmt.Errorf("failed to resolve UDP address: %w", err)
-	}
-	udpConn, err := net.ListenUDP("udp", udpListenerAddr)
+	udpConn, err := net.ListenUDP("udp", nil)
 	if err != nil {
 		UDPAssociateErrors.Add(1)
 		return fmt.Errorf("failed to listen UDP: %w", err)
@@ -161,15 +156,10 @@ func (s *Server) handleAssociatePacketOverStream(ctx context.Context, _ *model.R
 	return RunUDPAssociateLoop(udpConn, apicommon.NewPacketOverStreamTunnel(proxyConn), s.config.Resolver)
 }
 
-func (s *Server) handleAssociateDatagram(ctx context.Context, _ *model.Request, proxyConn net.Conn) error {
+func (s *Server) handleAssociateDatagram(_ context.Context, _ *model.Request, proxyConn net.Conn) error {
 	// Create a UDP listener on a random port.
 	// All the requests associated to this connection will go through this port.
-	udpListenerAddr, err := apicommon.ResolveUDPAddr(ctx, s.config.Resolver, "udp", common.MaybeDecorateIPv6(common.AllIPAddr())+":0")
-	if err != nil {
-		UDPAssociateErrors.Add(1)
-		return fmt.Errorf("failed to resolve UDP address: %w", err)
-	}
-	udpConn, err := net.ListenUDP("udp", udpListenerAddr)
+	udpConn, err := net.ListenUDP("udp", nil)
 	if err != nil {
 		UDPAssociateErrors.Add(1)
 		return fmt.Errorf("failed to listen UDP: %w", err)

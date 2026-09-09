@@ -122,7 +122,7 @@ Below is an example of the server configuration file.
 3. Fill in the `users` -> `name` property with the user name.
 4. Fill in the `users` -> `password` property with the user's password.
 5. [Optional] The `mtu` property is the maximum transport layer payload size when using the UDP proxy protocol. The default value is 1400. The minimum value is 1280.
-6. We recommend setting `dns` -> `dualStack` to `PREFER_IPv4`, especially if the server does not support IPv6. See [DNS Policy](#dns-policy) for other options and static host mappings.
+6. [Optional] We recommend setting `dns` -> `dualStack` to `PREFER_IPv4`, especially if the server does not support IPv6. See [DNS Policy](#dns-policy) for other options and static host mappings.
 
 In addition to this, mita can listen to several different ports. We recommend using multiple ports in both server and client configurations.
 

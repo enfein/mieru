@@ -308,3 +308,16 @@ func TestResolveUDPAddr(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveLiteralAddr(t *testing.T) {
+	for _, address := range []string{":80", "[fe80::1%eth0]:80"} {
+		tcp, err := ResolveTCPAddr(context.Background(), NilDNSResolver{}, "tcp", address)
+		if err != nil || tcp.String() != address {
+			t.Fatalf("ResolveTCPAddr(%q) = %v, %v", address, tcp, err)
+		}
+		udp, err := ResolveUDPAddr(context.Background(), NilDNSResolver{}, "udp", address)
+		if err != nil || udp.String() != address {
+			t.Fatalf("ResolveUDPAddr(%q) = %v, %v", address, udp, err)
+		}
+	}
+}

@@ -17,10 +17,7 @@ package common
 
 import (
 	"net"
-	"os"
-	"runtime"
-	"strconv"
-	"strings"
+	"net/netip"
 )
 
 // DualStackPreference controls the strategy to pick one IP address
@@ -36,39 +33,6 @@ const (
 	ONLY_IPv6    DualStackPreference = 4
 )
 
-// IsIPDualStack returns true if an IPv6 socket is able to send and receive
-// both IPv4 and IPv6 packets.
-//
-// This function only supports Linux. It always returns false if running other
-// operating systems.
-func IsIPDualStack() bool {
-	if runtime.GOOS == "linux" {
-		v, err := os.ReadFile("/proc/sys/net/ipv6/bindv6only")
-		if err != nil {
-			return false
-		}
-		s := string(v)
-		s = strings.TrimSpace(s)
-		i, err := strconv.Atoi(s)
-		if err != nil {
-			return false
-		}
-		if i == 0 {
-			return true
-		}
-	}
-	return false
-}
-
-// AllIPAddr returns a catch-all IP address to bind. If the machine supports
-// IP dual stack, "::" is returned. Otherwise "0.0.0.0" is returned.
-func AllIPAddr() string {
-	if IsIPDualStack() {
-		return "::"
-	}
-	return "0.0.0.0"
-}
-
 // LocalIPAddr returns the localhost IP address.
 func LocalIPAddr() string {
 	// If IP dual stack is supported, bind to "::1" will also bind to
@@ -82,7 +46,7 @@ func LocalIPAddr() string {
 // input string is a IPv4 address or not a valid IP address (e.g. is a domain name),
 // the same string is returned.
 func MaybeDecorateIPv6(addr string) string {
-	if isIPv6(addr) {
+	if ip, err := netip.ParseAddr(addr); err == nil && ip.Is6() {
 		return "[" + addr + "]"
 	}
 	return addr
@@ -126,18 +90,4 @@ func SelectIPFromList(ips []net.IP, strategy DualStackPreference) net.IP {
 	default:
 		return ips[0]
 	}
-}
-
-// isIPv6 returns true if the given network address is IPv6.
-func isIPv6(addr string) bool {
-	host, _, err := net.SplitHostPort(addr)
-	if err != nil {
-		// Assume there is no port.
-		host = addr
-	}
-	ip := net.ParseIP(host)
-	if ip == nil {
-		return false
-	}
-	return ip.To4() == nil
 }

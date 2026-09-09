@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"strconv"
 	"strings"
 )
@@ -114,8 +115,11 @@ func ResolveTCPAddr(ctx context.Context, r DNSResolver, network, address string)
 	if err != nil {
 		return nil, err
 	}
-	if ip := net.ParseIP(host); ip != nil {
-		return &net.TCPAddr{IP: ip, Port: port}, nil
+	if host == "" {
+		return &net.TCPAddr{Port: port}, nil
+	}
+	if ip, err := netip.ParseAddr(host); err == nil {
+		return &net.TCPAddr{IP: net.IP(ip.AsSlice()), Port: port, Zone: ip.Zone()}, nil
 	}
 
 	ips, err := r.LookupIP(ctx, dnsQueryNetwork, host)
@@ -152,8 +156,11 @@ func ResolveUDPAddr(ctx context.Context, r DNSResolver, network, address string)
 	if err != nil {
 		return nil, err
 	}
-	if ip := net.ParseIP(host); ip != nil {
-		return &net.UDPAddr{IP: ip, Port: port}, nil
+	if host == "" {
+		return &net.UDPAddr{Port: port}, nil
+	}
+	if ip, err := netip.ParseAddr(host); err == nil {
+		return &net.UDPAddr{IP: net.IP(ip.AsSlice()), Port: port, Zone: ip.Zone()}, nil
 	}
 
 	ips, err := r.LookupIP(ctx, dnsQueryNetwork, host)

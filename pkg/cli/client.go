@@ -654,7 +654,7 @@ var clientRunFunc = func(s []string) error {
 	// Run the local socks5 server in the background.
 	var socks5Addr string
 	if config.GetSocks5ListenLAN() {
-		socks5Addr = common.MaybeDecorateIPv6(common.AllIPAddr()) + ":" + strconv.Itoa(int(config.GetSocks5Port()))
+		socks5Addr = net.JoinHostPort("", strconv.Itoa(int(config.GetSocks5Port())))
 	} else {
 		socks5Addr = common.MaybeDecorateIPv6(common.LocalIPAddr()) + ":" + strconv.Itoa(int(config.GetSocks5Port()))
 	}
@@ -687,22 +687,23 @@ var clientRunFunc = func(s []string) error {
 			log.Fatalf(`HTTP(S) proxy is not compatible with socks5 user password authentication. Please run "mieru delete socks5 authentication" to stop using user password authentication, or run "mieru delete http proxy" command to stop using HTTP(S) proxy.`)
 		}
 		wg.Add(1)
-		go func(socks5Addr string) {
+		go func() {
 			var httpServerAddr string
 			if config.GetHttpProxyListenLAN() {
-				httpServerAddr = common.MaybeDecorateIPv6(common.AllIPAddr()) + ":" + strconv.Itoa(int(config.GetHttpProxyPort()))
+				httpServerAddr = net.JoinHostPort("", strconv.Itoa(int(config.GetHttpProxyPort())))
 			} else {
 				httpServerAddr = common.MaybeDecorateIPv6(common.LocalIPAddr()) + ":" + strconv.Itoa(int(config.GetHttpProxyPort()))
 			}
+			socks5DialAddr := net.JoinHostPort(common.LocalIPAddr(), strconv.Itoa(int(config.GetSocks5Port())))
 			httpServer := socks5.NewHTTPProxyServer(httpServerAddr, &socks5.HTTPProxy{
-				ProxyURI: "socks5://" + socks5Addr + "?timeout=10s",
+				ProxyURI: "socks5://" + socks5DialAddr + "?timeout=10s",
 			})
 			log.Infof("mieru client HTTP proxy server is running")
 			wg.Done()
 			if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				log.Fatalf("run HTTP proxy server failed: %v", err)
 			}
-		}(socks5Addr)
+		}()
 	}
 
 	<-appctl.ClientSocks5ServerStarted

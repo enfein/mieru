@@ -21,7 +21,12 @@ import "appctl/proto/base.proto";
 
 option go_package = "github.com/enfein/mieru/v3/pkg/appctl/appctlpb";
 
+// Proxy server configuration. The next field number is 10.
 message ServerConfig {
+    // The IP address the server listens on.
+    // If not set, the server listens on all interfaces.
+    optional string listenIPAddress = 9;
+
     // Server's port-protocol bindings.
     repeated PortBinding portBindings = 1;
 
