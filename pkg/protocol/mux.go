@@ -556,6 +556,10 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 			wg.Done()
 			return
 		}
+		if err := configureServerPacketBuffers(conn); err != nil {
+			// Buffer tuning is best-effort; a usable listener must remain available.
+			log.Warnf("Server UDP endpoint %s buffer tuning: %v", laddr, err)
+		}
 		wg.Done()
 		log.Infof("Mux is listening to endpoint %s %s", network, laddr)
 
