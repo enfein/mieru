@@ -17,10 +17,24 @@ package appctlcommon
 
 import (
 	"fmt"
+	"net/netip"
 
 	"github.com/enfein/mieru/v3/apis/constant"
 	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 )
+
+// ValidateServerListenIPAddress validates the optional server listen IP address.
+// An empty address means listening on all interfaces.
+func ValidateServerListenIPAddress(address string) error {
+	if address == "" {
+		return nil
+	}
+	ip, err := netip.ParseAddr(address)
+	if err != nil || ip.Zone() != "" {
+		return fmt.Errorf("server listen IP address %q is invalid", address)
+	}
+	return nil
+}
 
 // ValidateServerConfigSingleUser validates a single server config user.
 //

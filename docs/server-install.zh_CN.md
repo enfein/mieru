@@ -166,6 +166,8 @@ mita stop
 
 注意，每次使用 `mita apply config <FILE>` 修改设置后，需要用 `mita stop` 和 `mita start` 重启代理服务，才能使新设置生效。一个例外是，如果只修改了 `users` 或者 `loggingLevel` 设置，你可以使用 `mita reload` 加载新的设置，此时不会影响服务器与客户端的活跃连接。
 
+修改 `listenIPAddress` 后，必须依次运行 `mita stop` 和 `mita start`。`mita reload` 不会替换或关闭现有监听器。如果新监听器无法绑定地址（例如，旧监听器已占用该端口），重新加载会返回错误。
+
 启动代理服务后，请继续进行[客户端安装与配置](./client-install.zh_CN.md)。
 
 ## 高级设置

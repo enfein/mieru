@@ -17,6 +17,7 @@ package protocol
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	mrand "math/rand"
@@ -136,30 +137,49 @@ func (m *Mux) flushServerUserCacheMetrics() {
 // If mux is started and new endpoints are added, mux also starts
 // to listen to those new endpoints. In that case, old endpoints
 // are not impacted.
+// Listener failures are logged. Use UpdateEndpoints to receive the errors.
 func (m *Mux) SetEndpoints(endpoints []UnderlayProperties) *Mux {
+	if err := m.UpdateEndpoints(endpoints); err != nil {
+		log.Errorf("Update mux endpoints failed: %v", err)
+	}
+	return m
+}
+
+// UpdateEndpoints updates the configured endpoints before startup or on a client.
+// On a running server, it adds listeners while retaining all existing endpoints.
+// It returns listener errors without stopping the mux. Successful additions remain
+// active even if another endpoint fails; failed endpoints can be retried.
+func (m *Mux) UpdateEndpoints(endpoints []UnderlayProperties) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	select {
+	case <-m.done:
+		return io.ErrClosedPipe
+	default:
+	}
+	if m.isClient || !m.used {
+		m.endpoints = endpoints
+		return nil
+	}
 	new := m.newEndpoints(m.endpoints, endpoints)
-	if len(new) > 0 {
-		if m.used {
-			select {
-			case <-m.done:
-				log.Infof("Unable to add new endpoint after multiplexer is closed")
-			default:
-				var wg sync.WaitGroup
-				for _, p := range new {
-					wg.Add(1)
-					go m.acceptUnderlayLoop(m.ctx, p, &wg)
-				}
-				wg.Wait()
-				m.endpoints = endpoints
-			}
+	var wg sync.WaitGroup
+	results := make([]*muxAcceptErr, len(new))
+	for i, p := range new {
+		results[i] = newMuxAcceptErr()
+		wg.Add(1)
+		go m.acceptUnderlayLoop(m.ctx, p, &wg, results[i])
+	}
+	wg.Wait()
+	var errs []error
+	for i, result := range results {
+		if err := result.get(); err != nil {
+			errs = append(errs, err)
 		} else {
-			m.endpoints = new
+			m.endpoints = append(m.endpoints, new[i])
 		}
 	}
 	log.Infof("Mux now has %d endpoints", len(m.endpoints))
-	return m
+	return errors.Join(errs...)
 }
 
 // SetDialer updates the dialer used by the mux.
@@ -354,7 +374,7 @@ func (m *Mux) Start() error {
 	var wg sync.WaitGroup
 	for _, p := range m.endpoints {
 		wg.Add(1)
-		go m.acceptUnderlayLoop(m.ctx, p, &wg)
+		go m.acceptUnderlayLoop(m.ctx, p, &wg, m.acceptErr)
 	}
 	wg.Wait()
 	acceptErr := m.acceptErr.get()
@@ -454,12 +474,12 @@ func (m *Mux) newEndpoints(old, new []UnderlayProperties) []UnderlayProperties {
 	return newEndpoints
 }
 
-func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayProperties, wg *sync.WaitGroup) {
+func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayProperties, wg *sync.WaitGroup, acceptErr *muxAcceptErr) {
 	laddr := properties.LocalAddr().String()
 	if laddr == "" {
 		err := fmt.Errorf("underlay local address is empty")
 		log.Errorf("%v", err)
-		m.acceptErr.set(err)
+		acceptErr.set(err)
 		wg.Done()
 		return
 	}
@@ -471,7 +491,7 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 		if err != nil {
 			err = fmt.Errorf("resolve TCP address %q failed: %w", laddr, err)
 			log.Errorf("%v", err)
-			m.acceptErr.set(err)
+			acceptErr.set(err)
 			wg.Done()
 			return
 		}
@@ -479,7 +499,7 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 		if err != nil {
 			err = fmt.Errorf("listen %s %s failed: %w", tcpAddr.Network(), tcpAddr.String(), err)
 			log.Errorf("%v", err)
-			m.acceptErr.set(err)
+			acceptErr.set(err)
 			wg.Done()
 			return
 		}
@@ -544,7 +564,7 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 		if err != nil {
 			err = fmt.Errorf("resolve UDP address %q failed: %w", laddr, err)
 			log.Errorf("%v", err)
-			m.acceptErr.set(err)
+			acceptErr.set(err)
 			wg.Done()
 			return
 		}
@@ -552,7 +572,7 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 		if err != nil {
 			err = fmt.Errorf("listen %s %s failed: %w", udpAddr.Network(), udpAddr.String(), err)
 			log.Errorf("%v", err)
-			m.acceptErr.set(err)
+			acceptErr.set(err)
 			wg.Done()
 			return
 		}
@@ -609,7 +629,7 @@ func (m *Mux) acceptUnderlayLoop(ctx context.Context, properties UnderlayPropert
 	default:
 		err := fmt.Errorf("unsupported underlay network type %q", network)
 		log.Errorf("%v", err)
-		m.acceptErr.set(err)
+		acceptErr.set(err)
 		wg.Done()
 	}
 }

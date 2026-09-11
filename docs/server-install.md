@@ -166,6 +166,8 @@ mita stop
 
 Note that each time you change the settings with `mita apply config <FILE>`, you need to restart the service with `mita stop` and `mita start` for the new settings to take effect. An exception is, if you only change `users` or `loggingLevel` settings, you may run `mita reload` to load the new settings, which will not disturb active connections between server and client.
 
+Changes to `listenIPAddress` require `mita stop` followed by `mita start`. `mita reload` does not replace or close existing listeners. If a new listener cannot bind (for example, because the old listener already uses the port), reload returns an error.
+
 After starting the proxy service, proceed to [Client Installation & Configuration](./client-install.md).
 
 ## Advanced Settings

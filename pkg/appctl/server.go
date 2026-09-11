@@ -97,7 +97,7 @@ func newServerProxy(config *pb.ServerConfig) (*serverProxy, error) {
 	if config.GetMtu() != 0 {
 		mtu = int(config.GetMtu())
 	}
-	endpoints, err := appctlcommon.PortBindingsToUnderlayProperties(config.GetPortBindings(), mtu)
+	endpoints, err := appctlcommon.AddrPortToUnderlayProperties(config.GetListenIPAddress(), config.GetPortBindings(), mtu)
 	if err != nil {
 		mux.Close()
 		return nil, err
@@ -300,16 +300,18 @@ func (s *serverManagementService) Reload(ctx context.Context, req *emptypb.Empty
 
 	mux := serverMuxRef.Load()
 	if mux != nil {
-		// Adjust portBindings.
+		// Adjust portBindings and listenIPAddress.
 		mtu := common.DefaultMTU
 		if config.GetMtu() != 0 {
 			mtu = int(config.GetMtu())
 		}
-		endpoints, err := appctlcommon.PortBindingsToUnderlayProperties(config.GetPortBindings(), mtu)
+		endpoints, err := appctlcommon.AddrPortToUnderlayProperties(config.GetListenIPAddress(), config.GetPortBindings(), mtu)
 		if err != nil {
 			return &emptypb.Empty{}, err
 		}
-		mux.SetEndpoints(endpoints)
+		if err := mux.UpdateEndpoints(endpoints); err != nil {
+			return &emptypb.Empty{}, fmt.Errorf("reload server listeners failed (use mita stop and mita start to change existing listeners): %w", err)
+		}
 
 		// Adjust users.
 		mux.SetServerUsers(appctlcommon.UserListToMap(config.GetUsers()))
@@ -628,24 +630,28 @@ func DeleteServerUsers(names []string) error {
 // ValidateServerConfigPatch validates a patch of server config.
 //
 // A server config patch must satisfy:
-// 1. port bindings are valid
-// 2. users are valid
-// 3. if set, MTU is valid
-// 4. for each egress proxy
-// 4.1. name is not empty
-// 4.2. name is unique
-// 4.3. protocol is valid
-// 4.4. host is not empty
-// 4.5. port is valid
-// 4.6. if socks5 authentication is used, the user and password are not empty
-// 5. for each egress rule
-// 5.1. each IP range is either "*" or a valid IP CIDR
-// 5.2. each domain name is not empty, and does not begin or end with a dot
-// 5.3. if the action is "PROXY", the proxy is defined
-// 6. DNS host mapping is valid
-// 7. if set, metrics logging interval is valid, and it is not less than 1 second
-// 8. if set, traffic pattern is valid
+// 1. listen IP address is valid
+// 2. port bindings are valid
+// 3. users are valid
+// 4. if set, MTU is valid
+// 5. for each egress proxy
+// 5.1. name is not empty
+// 5.2. name is unique
+// 5.3. protocol is valid
+// 5.4. host is not empty
+// 5.5. port is valid
+// 5.6. if socks5 authentication is used, the user and password are not empty
+// 6. for each egress rule
+// 6.1. each IP range is either "*" or a valid IP CIDR
+// 6.2. each domain name is not empty, and does not begin or end with a dot
+// 6.3. if the action is "PROXY", the proxy is defined
+// 7. DNS host mapping is valid
+// 8. if set, metrics logging interval is valid, and it is not less than 1 second
+// 9. if set, traffic pattern is valid
 func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
+	if err := appctlcommon.ValidateServerListenIPAddress(patch.GetListenIPAddress()); err != nil {
+		return err
+	}
 	if _, err := appctlcommon.FlatPortBindings(patch.GetPortBindings()); err != nil {
 		return err
 	}
@@ -785,6 +791,11 @@ func serverConfigFilePath() (string, ConfigFileType, error) {
 // mergeServerConfig merges the source client config into destination.
 // If a user is specified in source, it is added to destination, or replacing existing user in destination.
 func mergeServerConfig(dst, src *pb.ServerConfig) error {
+	listenIPAddress := dst.ListenIPAddress
+	if src.ListenIPAddress != nil {
+		listenIPAddress = src.ListenIPAddress
+	}
+
 	// Port bindings: if src is set, replace dst with src.
 	var portBindings []*pb.PortBinding
 	if src.PortBindings != nil {
@@ -849,6 +860,7 @@ func mergeServerConfig(dst, src *pb.ServerConfig) error {
 	}
 
 	proto.Reset(dst)
+	dst.ListenIPAddress = listenIPAddress
 	dst.PortBindings = portBindings
 	dst.Users = mergedUsers
 	dst.AdvancedSettings = advancedSettings

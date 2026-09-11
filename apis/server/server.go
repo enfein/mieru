@@ -102,7 +102,7 @@ func (ms *mieruServer) Start() error {
 	if ms.config.Config.GetMtu() != 0 {
 		mtu = int(ms.config.Config.GetMtu())
 	}
-	endpoints, err := appctlcommon.PortBindingsToUnderlayProperties(ms.config.Config.GetPortBindings(), mtu)
+	endpoints, err := appctlcommon.AddrPortToUnderlayProperties(ms.config.Config.GetListenIPAddress(), ms.config.Config.GetPortBindings(), mtu)
 	if err != nil {
 		return err
 	}
@@ -152,6 +152,9 @@ func (ms *mieruServer) Accept() (net.Conn, *model.Request, error) {
 func validateServerConfig(config *appctlpb.ServerConfig) error {
 	if config == nil {
 		return fmt.Errorf("server config is nil")
+	}
+	if err := appctlcommon.ValidateServerListenIPAddress(config.GetListenIPAddress()); err != nil {
+		return err
 	}
 	if len(config.GetPortBindings()) == 0 {
 		return fmt.Errorf("server port bindings are not set")

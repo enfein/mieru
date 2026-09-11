@@ -118,9 +118,14 @@ func FlatPortBindings(bindings []*pb.PortBinding) ([]*pb.PortBinding, error) {
 	return res, nil
 }
 
-// PortBindingsToUnderlayProperties converts port bindings to underlay properties.
-func PortBindingsToUnderlayProperties(portBindings []*pb.PortBinding, mtu int) ([]protocol.UnderlayProperties, error) {
+// AddrPortToUnderlayProperties converts a listen IP address and port bindings to underlay properties.
+// An empty listenIPAddress means listening on all interfaces.
+func AddrPortToUnderlayProperties(listenIPAddress string, portBindings []*pb.PortBinding, mtu int) ([]protocol.UnderlayProperties, error) {
 	endpoints := make([]protocol.UnderlayProperties, 0)
+	if err := ValidateServerListenIPAddress(listenIPAddress); err != nil {
+		return endpoints, err
+	}
+	ip := net.ParseIP(listenIPAddress)
 	portBindings, err := FlatPortBindings(portBindings)
 	if err != nil {
 		return endpoints, fmt.Errorf(stderror.InvalidPortBindingsErr, err)
@@ -131,10 +136,10 @@ func PortBindingsToUnderlayProperties(portBindings []*pb.PortBinding, mtu int) (
 		port := portBindings[i].GetPort()
 		switch proto {
 		case pb.TransportProtocol_TCP:
-			endpoint := protocol.NewUnderlayProperties(mtu, common.StreamTransport, &net.TCPAddr{Port: int(port)}, nil)
+			endpoint := protocol.NewUnderlayProperties(mtu, common.StreamTransport, &net.TCPAddr{IP: ip, Port: int(port)}, nil)
 			endpoints = append(endpoints, endpoint)
 		case pb.TransportProtocol_UDP:
-			endpoint := protocol.NewUnderlayProperties(mtu, common.PacketTransport, &net.UDPAddr{Port: int(port)}, nil)
+			endpoint := protocol.NewUnderlayProperties(mtu, common.PacketTransport, &net.UDPAddr{IP: ip, Port: int(port)}, nil)
 			endpoints = append(endpoints, endpoint)
 		default:
 			return []protocol.UnderlayProperties{}, fmt.Errorf(stderror.InvalidTransportProtocol)

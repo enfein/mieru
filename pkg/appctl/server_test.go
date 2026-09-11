@@ -17,6 +17,7 @@ package appctl
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"strings"
@@ -464,4 +465,193 @@ func afterServerTest(t *testing.T) {
 	if err := deleteServerConfigFile(); err != nil {
 		t.Fatalf("failed to clean server config file after the test")
 	}
+}
+
+func TestApplyServerListenIPAddress(t *testing.T) {
+	beforeServerTest(t)
+	defer afterServerTest(t)
+	if err := ApplyJSONServerConfig("testdata/server_apply_config_1.json"); err != nil {
+		t.Fatal(err)
+	}
+	patchPath := t.TempDir() + "/patch.json"
+	cases := []struct {
+		name    string
+		patch   string
+		want    *string
+		wantErr bool
+	}{
+		{"unset", `{}`, nil, false},
+		{"set IPv4", `{"listenIPAddress":"127.0.0.1"}`, proto.String("127.0.0.1"), false},
+		{"preserve", `{"loggingLevel":"INFO"}`, proto.String("127.0.0.1"), false},
+		{"replace IPv6", `{"listenIPAddress":"::1"}`, proto.String("::1"), false},
+		{"invalid hostname", `{"listenIPAddress":"localhost"}`, proto.String("::1"), true},
+		{"invalid IP", `{"listenIPAddress":"300.1.2.3"}`, proto.String("::1"), true},
+		{"invalid port", `{"listenIPAddress":"127.0.0.1:80"}`, proto.String("::1"), true},
+		{"invalid brackets", `{"listenIPAddress":"[::1]"}`, proto.String("::1"), true},
+		{"reset", `{"listenIPAddress":""}`, proto.String(""), false},
+		{"preserve reset", `{}`, proto.String(""), false},
+		{"IPv4 wildcard", `{"listenIPAddress":"0.0.0.0"}`, proto.String("0.0.0.0"), false},
+		{"IPv6 wildcard", `{"listenIPAddress":"::"}`, proto.String("::"), false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			patch := &pb.ServerConfig{}
+			if err := common.UnmarshalJSON([]byte(c.patch), patch); err != nil {
+				t.Fatal(err)
+			}
+			full := proto.Clone(patch).(*pb.ServerConfig)
+			full.PortBindings = []*pb.PortBinding{{Port: proto.Int32(8000), Protocol: pb.TransportProtocol_TCP.Enum()}}
+			for _, err := range []error{ValidateServerConfigPatch(patch), ValidateFullServerConfig(full)} {
+				if (err != nil) != c.wantErr {
+					t.Fatalf("validation error = %v, want error %v", err, c.wantErr)
+				}
+			}
+			if err := os.WriteFile(patchPath, []byte(c.patch), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := ApplyJSONServerConfig(patchPath); (err != nil) != c.wantErr {
+				t.Fatalf("apply error = %v, want error %v", err, c.wantErr)
+			}
+			config, err := LoadServerConfig()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c.want == nil {
+				if config.ListenIPAddress != nil {
+					t.Fatalf("address = %q, want absent", config.GetListenIPAddress())
+				}
+			} else if config.ListenIPAddress == nil || config.GetListenIPAddress() != *c.want {
+				t.Fatalf("address = %v (%q), want %q", config.ListenIPAddress, config.GetListenIPAddress(), *c.want)
+			}
+		})
+	}
+}
+
+func TestServerReloadListenIPAddressConflict(t *testing.T) {
+	beforeServerTest(t)
+	defer afterServerTest(t)
+	for _, transport := range []pb.TransportProtocol{pb.TransportProtocol_TCP, pb.TransportProtocol_UDP} {
+		for _, address := range []string{"", "127.0.0.1"} {
+			t.Run(fmt.Sprintf("%s/address=%s", transport, address), func(t *testing.T) {
+				var port int
+				var err error
+				if transport == pb.TransportProtocol_TCP {
+					port, err = common.UnusedTCPPort()
+				} else {
+					port, err = common.UnusedUDPPort()
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				config := &pb.ServerConfig{
+					ListenIPAddress: proto.String(address),
+					Users:           []*pb.User{{Name: proto.String("user"), Password: proto.String("password")}},
+					PortBindings:    []*pb.PortBinding{{Port: proto.Int32(int32(port)), Protocol: transport.Enum()}},
+				}
+				proxy, err := newServerProxy(config)
+				if err != nil {
+					t.Fatal(err)
+				}
+				// Disable port reuse so overlapping addresses reliably fail to bind.
+				factory := &net.ListenConfig{}
+				proxy.mux.SetStreamListenerFactory(factory).SetPacketListenerFactory(factory)
+				t.Cleanup(func() {
+					SetServerMuxRef(nil)
+					proxy.mux.Close()
+				})
+				if err := proxy.mux.Start(); err != nil {
+					t.Fatal(err)
+				}
+				SetServerMuxRef(proxy.mux)
+				if address == "" {
+					config.ListenIPAddress = proto.String("127.0.0.1")
+				} else {
+					config.ListenIPAddress = proto.String("")
+				}
+				if err := StoreServerConfig(config); err != nil {
+					t.Fatal(err)
+				}
+				service := NewServerManagementService()
+				for i := 0; i < 2; i++ {
+					if _, err := service.Reload(context.Background(), &emptypb.Empty{}); err == nil {
+						t.Fatal("Reload() succeeded with a conflicting listenIPAddress")
+					} else if !strings.Contains(err.Error(), "mita stop and mita start") {
+						t.Fatalf("Reload() error lacks restart instructions: %v", err)
+					}
+				}
+				config.ListenIPAddress = proto.String(address)
+				if err := StoreServerConfig(config); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := service.Reload(context.Background(), &emptypb.Empty{}); err != nil {
+					t.Fatalf("Reload() failed after restoring the original address: %v", err)
+				}
+			})
+		}
+	}
+}
+
+func TestServerProxyListenIPAddress(t *testing.T) {
+	beforeServerTest(t)
+	defer afterServerTest(t)
+	for _, reload := range []bool{false, true} {
+		for _, address := range []string{"", "127.0.0.1", "::1"} {
+			t.Run(fmt.Sprintf("reload=%v/address=%s", reload, address), func(t *testing.T) {
+				config := &pb.ServerConfig{
+					ListenIPAddress: proto.String(address),
+					Users:           []*pb.User{{Name: proto.String("user"), Password: proto.String("password")}},
+					PortBindings: []*pb.PortBinding{
+						{Port: proto.Int32(8000), Protocol: pb.TransportProtocol_TCP.Enum()},
+						{Port: proto.Int32(8000), Protocol: pb.TransportProtocol_UDP.Enum()},
+					},
+				}
+				var mux *protocol.Mux
+				if reload {
+					mux = protocol.NewMux(false)
+					SetServerMuxRef(mux)
+					t.Cleanup(func() { SetServerMuxRef(nil) })
+					if err := StoreServerConfig(config); err != nil {
+						t.Fatal(err)
+					}
+					if _, err := NewServerManagementService().Reload(context.Background(), &emptypb.Empty{}); err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					proxy, err := newServerProxy(config)
+					if err != nil {
+						t.Fatal(err)
+					}
+					mux = proxy.mux
+				}
+				t.Cleanup(func() { mux.Close() })
+				factory := &recordingListenerFactory{addresses: make(chan string, 2)}
+				mux.SetStreamListenerFactory(factory).SetPacketListenerFactory(factory)
+				if err := mux.Start(); err == nil {
+					t.Fatal("Start() succeeded with failing listener factory")
+				}
+				for i := 0; i < 2; i++ {
+					select {
+					case got := <-factory.addresses:
+						if want := net.JoinHostPort(address, "8000"); got != want {
+							t.Errorf("listener address = %q, want %q", got, want)
+						}
+					default:
+						t.Fatal("listener factory was not called")
+					}
+				}
+			})
+		}
+	}
+}
+
+type recordingListenerFactory struct{ addresses chan string }
+
+func (f *recordingListenerFactory) Listen(_ context.Context, _, address string) (net.Listener, error) {
+	f.addresses <- address
+	return nil, fmt.Errorf("test listener failure")
+}
+
+func (f *recordingListenerFactory) ListenPacket(_ context.Context, _, address string) (net.PacketConn, error) {
+	f.addresses <- address
+	return nil, fmt.Errorf("test listener failure")
 }
