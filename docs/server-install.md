@@ -18,32 +18,32 @@ Or you can manually install and configure proxy server using the steps below.
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.36.1/mita_3.36.1_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.37.0/mita_3.37.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.36.1/mita_3.36.1_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.37.0/mita_3.37.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.36.1/mita-3.36.1-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.37.0/mita-3.37.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.36.1/mita-3.36.1-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.37.0/mita-3.37.0-1.aarch64.rpm
 ```
 
 ## Install mita package
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_3.36.1_amd64.deb
+sudo dpkg -i mita_3.37.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_3.36.1_arm64.deb
+sudo dpkg -i mita_3.37.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-3.36.1-1.x86_64.rpm
+sudo rpm -Uvh --force mita-3.37.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-3.36.1-1.aarch64.rpm
+sudo rpm -Uvh --force mita-3.37.0-1.aarch64.rpm
 ```
 
 Those instructions can also be used to upgrade the version of mita software package.
@@ -166,17 +166,27 @@ mita stop
 
 Note that each time you change the settings with `mita apply config <FILE>`, you need to restart the service with `mita stop` and `mita start` for the new settings to take effect. An exception is, if you only change `users` or `loggingLevel` settings, you may run `mita reload` to load the new settings, which will not disturb active connections between server and client.
 
-Changes to `listenIPAddress` require `mita stop` followed by `mita start`. `mita reload` does not replace or close existing listeners. If a new listener cannot bind (for example, because the old listener already uses the port), reload returns an error.
-
 After starting the proxy service, proceed to [Client Installation & Configuration](./client-install.md).
 
 ## Advanced Settings
 
+### Listening IP Address
+
+By default, mita listens on all network interfaces. Set the `listenIPAddress` property to an IPv4 or IPv6 address to listen only on that address. For example, to listen on `1.2.3.4`:
+
+```js
+{
+    "listenIPAddress": "1.2.3.4"
+}
+```
+
+Set `listenIPAddress` to an empty string `""` to listen on all network interfaces again.
+
+Changes to `listenIPAddress` require `mita stop` followed by `mita start`. `mita reload` does not replace or close existing listeners. If a new listener cannot bind (for example, because the old listener already uses the port), reload returns an error.
+
 ### BBR Congestion Control Algorithm
 
 [BBR](https://en.wikipedia.org/wiki/TCP_congestion_control#TCP_BBR) is a congestion control algorithm that does not rely on packet loss. Under poor network conditions, network transmission using BBR is faster than traditional algorithms.
-
-mieru's UDP transmission protocol already uses the BBR algorithm.
 
 Run the following script to use BBR algorithm on TCP transmission protocol on Linux.
 

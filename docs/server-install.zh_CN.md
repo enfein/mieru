@@ -18,32 +18,32 @@ sudo python3 setup.py --lang=zh
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.36.1/mita_3.36.1_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.37.0/mita_3.37.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.36.1/mita_3.36.1_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.37.0/mita_3.37.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.36.1/mita-3.36.1-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.37.0/mita-3.37.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.36.1/mita-3.36.1-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.37.0/mita-3.37.0-1.aarch64.rpm
 ```
 
 ## 安装 mita 软件包
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_3.36.1_amd64.deb
+sudo dpkg -i mita_3.37.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_3.36.1_arm64.deb
+sudo dpkg -i mita_3.37.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-3.36.1-1.x86_64.rpm
+sudo rpm -Uvh --force mita-3.37.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-3.36.1-1.aarch64.rpm
+sudo rpm -Uvh --force mita-3.37.0-1.aarch64.rpm
 ```
 
 上述指令也可以用来升级 mita 软件包的版本。
@@ -166,17 +166,27 @@ mita stop
 
 注意，每次使用 `mita apply config <FILE>` 修改设置后，需要用 `mita stop` 和 `mita start` 重启代理服务，才能使新设置生效。一个例外是，如果只修改了 `users` 或者 `loggingLevel` 设置，你可以使用 `mita reload` 加载新的设置，此时不会影响服务器与客户端的活跃连接。
 
-修改 `listenIPAddress` 后，必须依次运行 `mita stop` 和 `mita start`。`mita reload` 不会替换或关闭现有监听器。如果新监听器无法绑定地址（例如，旧监听器已占用该端口），重新加载会返回错误。
-
 启动代理服务后，请继续进行[客户端安装与配置](./client-install.zh_CN.md)。
 
 ## 高级设置
 
+### 监听 IP 地址
+
+默认情况下，mita 监听所有网络接口。将 `listenIPAddress` 属性设置为一个 IPv4 或 IPv6 地址，即可只监听该地址上的端口。例如，监听 `1.2.3.4`：
+
+```js
+{
+    "listenIPAddress": "1.2.3.4"
+}
+```
+
+将 `listenIPAddress` 设置为空字符串 `""`，即可重新监听所有网络接口。
+
+修改 `listenIPAddress` 后，必须依次运行 `mita stop` 和 `mita start`。`mita reload` 不会替换或关闭现有监听器。如果新监听器无法绑定地址（例如，旧监听器已占用该端口），重新加载会返回错误。
+
 ### BBR 拥塞控制算法
 
 [BBR](https://en.wikipedia.org/wiki/TCP_congestion_control#TCP_BBR) 是一种不依赖于丢包的拥塞控制算法。在恶劣的网络情况下，使用 BBR 的网络传输速度比传统算法更快。
-
-mieru 的 UDP 传输协议已经使用了 BBR 算法。
 
 运行以下脚本在 Linux 系统中让 TCP 传输协议使用 BBR 算法。
 
