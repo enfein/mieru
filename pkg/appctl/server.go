@@ -585,8 +585,8 @@ func ApplyJSONServerConfig(path string) error {
 	if err != nil {
 		return fmt.Errorf("LoadServerConfig() failed: %w", err)
 	}
-	if err = mergeServerConfig(config, s); err != nil {
-		return fmt.Errorf("mergeServerConfig() failed: %w", err)
+	if err = MergeServerConfig(config, s); err != nil {
+		return fmt.Errorf("MergeServerConfig() failed: %w", err)
 	}
 	if err = ValidateFullServerConfig(config); err != nil {
 		return fmt.Errorf("ValidateFullServerConfig() failed: %w", err)
@@ -788,9 +788,11 @@ func serverConfigFilePath() (string, ConfigFileType, error) {
 	return "", INVALID_CONFIG_FILE_TYPE, fmt.Errorf("server config file path is empty")
 }
 
-// mergeServerConfig merges the source client config into destination.
-// If a user is specified in source, it is added to destination, or replacing existing user in destination.
-func mergeServerConfig(dst, src *pb.ServerConfig) error {
+// MergeServerConfig merges the source server config into destination.
+// Source users are added or replace destination users with the same name.
+// Users omitted from source are preserved. Other supplied fields replace their
+// destination values. The caller must validate the patch and merged config.
+func MergeServerConfig(dst, src *pb.ServerConfig) error {
 	listenIPAddress := dst.ListenIPAddress
 	if src.ListenIPAddress != nil {
 		listenIPAddress = src.ListenIPAddress

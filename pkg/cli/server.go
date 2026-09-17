@@ -613,7 +613,17 @@ var serverApplyConfigFunc = func(s []string) error {
 	}
 	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
 	defer cancelFunc()
-	_, err = client.SetConfig(timedctx, patch)
+	config, err := client.GetConfig(timedctx, &emptypb.Empty{})
+	if err != nil {
+		return fmt.Errorf(stderror.GetServerConfigFailedErr, err)
+	}
+	if err = appctl.MergeServerConfig(config, patch); err != nil {
+		return fmt.Errorf("MergeServerConfig() failed: %w", err)
+	}
+	if err = appctl.ValidateFullServerConfig(config); err != nil {
+		return fmt.Errorf("ValidateFullServerConfig() failed: %w", err)
+	}
+	_, err = client.SetConfig(timedctx, config)
 	if err != nil {
 		return fmt.Errorf(stderror.SetServerConfigFailedErr, err)
 	}
