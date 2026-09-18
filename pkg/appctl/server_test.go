@@ -30,45 +30,82 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-func TestApply2ServerConfig(t *testing.T) {
-
-	beforeServerTest(t)
-
-	// Apply config1, and then apply config2.
-	configFile1 := "testdata/server_apply_config_1.json"
-	if err := ApplyJSONServerConfig(configFile1); err != nil {
-		t.Errorf("ApplyJSONServerConfig() failed: %v", err)
+func TestMergeServerConfig(t *testing.T) {
+	initial := &pb.ServerConfig{
+		PortBindings: []*pb.PortBinding{{Port: proto.Int32(8000), Protocol: pb.TransportProtocol_TCP.Enum()}},
+		Users: []*pb.User{{
+			Name:           proto.String("user1"),
+			Password:       proto.String("old-password"),
+			Quotas:         []*pb.Quota{{Days: proto.Int32(7), Megabytes: proto.Int32(1000)}},
+			AllowPrivateIP: proto.Bool(true),
+		}},
+		LoggingLevel:   pb.LoggingLevel_DEBUG.Enum(),
+		Mtu:            proto.Int32(1300),
+		TrafficPattern: &pb.TrafficPattern{Seed: proto.Int32(1)},
 	}
-	configFile2 := "testdata/server_apply_config_2.json"
-	if err := ApplyJSONServerConfig(configFile2); err != nil {
-		t.Errorf("ApplyJSONServerConfig() failed: %v", err)
+	replacement := &pb.ServerConfig{
+		PortBindings: []*pb.PortBinding{
+			{Port: proto.Int32(9000), Protocol: pb.TransportProtocol_TCP.Enum()},
+			{PortRange: proto.String("10000-11000"), Protocol: pb.TransportProtocol_UDP.Enum()},
+			{PortRange: proto.String("12000-13000"), Protocol: pb.TransportProtocol_TCP.Enum()},
+		},
+		Users: []*pb.User{
+			{Name: proto.String("user1"), Password: proto.String("new-password")},
+			{
+				Name:     proto.String("user2"),
+				Password: proto.String("password2"),
+				Quotas: []*pb.Quota{
+					{Days: proto.Int32(7), Megabytes: proto.Int32(1000)},
+					{Days: proto.Int32(30), Megabytes: proto.Int32(2000)},
+				},
+				AllowLoopbackIP: proto.Bool(true),
+			},
+		},
+		LoggingLevel: pb.LoggingLevel_INFO.Enum(),
+		Mtu:          proto.Int32(1400),
+		Egress: &pb.Egress{
+			Proxies: []*pb.EgressProxy{{
+				Name: proto.String("proxy1"), Protocol: pb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL.Enum(),
+				Host: proto.String("localhost"), Port: proto.Int32(1081),
+			}},
+			Rules: []*pb.EgressRule{
+				{IpRanges: []string{"8.8.8.8/32"}, Action: pb.EgressAction_REJECT.Enum()},
+				{DomainNames: []string{"example.com"}, Action: pb.EgressAction_PROXY.Enum(), ProxyNames: []string{"proxy1"}},
+				{IpRanges: []string{"*"}, DomainNames: []string{"*"}, Action: pb.EgressAction_DIRECT.Enum()},
+			},
+		},
+		Dns:            &pb.DNS{DualStack: pb.DualStack_PREFER_IPv4.Enum()},
+		TrafficPattern: &pb.TrafficPattern{Seed: proto.Int32(2)},
 	}
-	merged, err := LoadServerConfig()
-	if err != nil {
-		t.Errorf("LoadServerConfig() failed: %v", err)
+	cases := []struct {
+		name  string
+		dst   *pb.ServerConfig
+		patch *pb.ServerConfig
+		want  *pb.ServerConfig
+	}{
+		{"initialize", &pb.ServerConfig{}, replacement, replacement},
+		{"replace fields and users", initial, replacement, replacement},
+		{"preserve omitted fields", replacement, &pb.ServerConfig{}, replacement},
+		{"preserve omitted users", replacement, &pb.ServerConfig{Users: replacement.Users[:1]}, replacement},
 	}
-
-	// Apply only config2. The server config should be the same.
-	if err := deleteServerConfigFile(); err != nil {
-		t.Fatalf("failed to delete server config file")
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			config := proto.Clone(c.dst).(*pb.ServerConfig)
+			patch := proto.Clone(c.patch).(*pb.ServerConfig)
+			if err := ValidateServerConfigPatch(patch); err != nil {
+				t.Fatal(err)
+			}
+			if err := MergeServerConfig(config, patch); err != nil {
+				t.Fatal(err)
+			}
+			if err := ValidateFullServerConfig(config); err != nil {
+				t.Fatal(err)
+			}
+			if !proto.Equal(config, c.want) {
+				t.Errorf("merged config = %v, want %v", config, c.want)
+			}
+		})
 	}
-	if err := StoreServerConfig(&pb.ServerConfig{}); err != nil {
-		t.Fatalf("failed to create empty server config file")
-	}
-	if err := ApplyJSONServerConfig(configFile2); err != nil {
-		t.Errorf("ApplyJSONServerConfig() failed: %v", err)
-	}
-	want, err := LoadServerConfig()
-	if err != nil {
-		t.Errorf("LoadServerConfig() failed: %v", err)
-	}
-	if !proto.Equal(merged, want) {
-		mergedJSON, _ := common.MarshalJSON(merged)
-		wantJSON, _ := common.MarshalJSON(want)
-		t.Errorf("server config doesn't equal:\ngot = %v\nwant = %v", string(mergedJSON), string(wantJSON))
-	}
-
-	afterServerTest(t)
 }
 
 func TestServerApplyReject(t *testing.T) {
@@ -278,12 +315,14 @@ func TestServerApplyReject(t *testing.T) {
 }
 
 func TestServerDeleteUser(t *testing.T) {
-
 	beforeServerTest(t)
+	defer afterServerTest(t)
 
-	configFile := "testdata/server_apply_config_2.json"
-	if err := ApplyJSONServerConfig(configFile); err != nil {
-		t.Fatalf("ApplyJSONServerConfig() failed: %v", err)
+	if err := StoreServerConfig(&pb.ServerConfig{Users: []*pb.User{
+		{Name: proto.String("user1"), Password: proto.String("password1")},
+		{Name: proto.String("user2"), Password: proto.String("password2")},
+	}}); err != nil {
+		t.Fatalf("StoreServerConfig() failed: %v", err)
 	}
 
 	names := []string{"user2", "user3", "user4"}
@@ -295,30 +334,29 @@ func TestServerDeleteUser(t *testing.T) {
 		t.Fatalf("LoadServerConfig() failed: %v", err)
 	}
 	if len(config.GetUsers()) != 1 {
-		t.Errorf("want 1 user, got %d user(s)", len(config.GetUsers()))
+		t.Fatalf("want 1 user, got %d user(s)", len(config.GetUsers()))
 	}
 	if config.GetUsers()[0].GetName() != "user1" {
 		t.Errorf("want user name %q, got %q", "user1", config.GetUsers()[0].GetName())
 	}
-
-	afterServerTest(t)
 }
 
-func TestServerHashUserPassword(t *testing.T) {
-
+func TestStoreServerConfigHashesPasswords(t *testing.T) {
 	beforeServerTest(t)
+	defer afterServerTest(t)
 
-	configFile := "testdata/server_apply_config_1.json"
-	if err := ApplyJSONServerConfig(configFile); err != nil {
-		t.Errorf("ApplyJSONServerConfig() failed: %v", err)
+	if err := StoreServerConfig(&pb.ServerConfig{Users: []*pb.User{
+		{Name: proto.String("user1"), Password: proto.String("password1")},
+	}}); err != nil {
+		t.Fatalf("StoreServerConfig() failed: %v", err)
 	}
 	config, err := LoadServerConfig()
 	if err != nil {
-		t.Errorf("LoadServerConfig() failed: %v", err)
+		t.Fatalf("LoadServerConfig() failed: %v", err)
 	}
 	users := config.GetUsers()
-	if len(users) == 0 {
-		t.Errorf("no user found in server config")
+	if len(users) != 1 {
+		t.Fatalf("want 1 user, got %d user(s)", len(users))
 	}
 	for _, user := range users {
 		if user.GetPassword() != "" {
@@ -328,8 +366,6 @@ func TestServerHashUserPassword(t *testing.T) {
 			t.Errorf("user %q has no hashed password", user.GetName())
 		}
 	}
-
-	afterServerTest(t)
 }
 
 func TestServerStopClearsMuxRef(t *testing.T) {
@@ -467,13 +503,10 @@ func afterServerTest(t *testing.T) {
 	}
 }
 
-func TestApplyServerListenIPAddress(t *testing.T) {
-	beforeServerTest(t)
-	defer afterServerTest(t)
-	if err := ApplyJSONServerConfig("testdata/server_apply_config_1.json"); err != nil {
-		t.Fatal(err)
+func TestServerListenIPAddressConfig(t *testing.T) {
+	config := &pb.ServerConfig{
+		PortBindings: []*pb.PortBinding{{Port: proto.Int32(8000), Protocol: pb.TransportProtocol_TCP.Enum()}},
 	}
-	patchPath := t.TempDir() + "/patch.json"
 	cases := []struct {
 		name    string
 		patch   string
@@ -506,14 +539,13 @@ func TestApplyServerListenIPAddress(t *testing.T) {
 					t.Fatalf("validation error = %v, want error %v", err, c.wantErr)
 				}
 			}
-			if err := os.WriteFile(patchPath, []byte(c.patch), 0600); err != nil {
+			if c.wantErr {
+				return
+			}
+			if err := MergeServerConfig(config, patch); err != nil {
 				t.Fatal(err)
 			}
-			if err := ApplyJSONServerConfig(patchPath); (err != nil) != c.wantErr {
-				t.Fatalf("apply error = %v, want error %v", err, c.wantErr)
-			}
-			config, err := LoadServerConfig()
-			if err != nil {
+			if err := ValidateFullServerConfig(config); err != nil {
 				t.Fatal(err)
 			}
 			if c.want == nil {

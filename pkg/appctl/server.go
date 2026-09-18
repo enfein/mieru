@@ -568,32 +568,89 @@ func StoreServerConfig(config *pb.ServerConfig) error {
 	return nil
 }
 
-// ApplyJSONServerConfig applies user provided JSON server config from path.
-func ApplyJSONServerConfig(path string) error {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("os.ReadFile(%q) failed: %w", path, err)
+// MergeServerConfig merges the source server config into destination.
+// Source users are added or replace destination users with the same name.
+// Users omitted from source are preserved. Other supplied fields replace their
+// destination values. The caller must validate the patch and merged config.
+func MergeServerConfig(dst, src *pb.ServerConfig) error {
+	listenIPAddress := dst.ListenIPAddress
+	if src.ListenIPAddress != nil {
+		listenIPAddress = src.ListenIPAddress
 	}
-	s := &pb.ServerConfig{}
-	if err = common.UnmarshalJSON(b, s); err != nil {
-		return fmt.Errorf("common.UnmarshalJSON() failed: %w", err)
+
+	// Port bindings: if src is set, replace dst with src.
+	var portBindings []*pb.PortBinding
+	if src.PortBindings != nil {
+		portBindings = src.GetPortBindings()
+	} else {
+		portBindings = dst.GetPortBindings()
 	}
-	if err := ValidateServerConfigPatch(s); err != nil {
-		return fmt.Errorf("ValidateServerConfigPatch() failed: %w", err)
+
+	// Users: merge src into dst.
+	mergedUserMapping := map[string]*pb.User{}
+	for _, user := range dst.GetUsers() {
+		mergedUserMapping[user.GetName()] = user
 	}
-	config, err := LoadServerConfig()
-	if err != nil {
-		return fmt.Errorf("LoadServerConfig() failed: %w", err)
+	for _, user := range src.GetUsers() {
+		mergedUserMapping[user.GetName()] = user
 	}
-	if err = MergeServerConfig(config, s); err != nil {
-		return fmt.Errorf("MergeServerConfig() failed: %w", err)
+	names := make([]string, 0, len(mergedUserMapping))
+	for name := range mergedUserMapping {
+		names = append(names, name)
 	}
-	if err = ValidateFullServerConfig(config); err != nil {
-		return fmt.Errorf("ValidateFullServerConfig() failed: %w", err)
+	sort.Strings(names)
+	mergedUsers := make([]*pb.User, 0, len(mergedUserMapping))
+	for _, name := range names {
+		mergedUsers = append(mergedUsers, mergedUserMapping[name])
 	}
-	if err = StoreServerConfig(config); err != nil {
-		return fmt.Errorf("StoreServerConfig() failed: %w", err)
+
+	var advancedSettings *pb.ServerAdvancedSettings
+	if src.AdvancedSettings != nil {
+		advancedSettings = src.GetAdvancedSettings()
+	} else {
+		advancedSettings = dst.GetAdvancedSettings()
 	}
+	var loggingLevel pb.LoggingLevel
+	if src.LoggingLevel != nil {
+		loggingLevel = src.GetLoggingLevel()
+	} else {
+		loggingLevel = dst.GetLoggingLevel()
+	}
+	var mtu int32
+	if src.Mtu != nil {
+		mtu = src.GetMtu()
+	} else {
+		mtu = dst.GetMtu()
+	}
+	var egress *pb.Egress
+	if src.Egress != nil {
+		egress = src.GetEgress()
+	} else {
+		egress = dst.GetEgress()
+	}
+	var dns *pb.DNS
+	if src.Dns != nil {
+		dns = src.GetDns()
+	} else {
+		dns = dst.GetDns()
+	}
+	var trafficPattern *pb.TrafficPattern
+	if src.TrafficPattern != nil {
+		trafficPattern = src.GetTrafficPattern()
+	} else {
+		trafficPattern = dst.GetTrafficPattern()
+	}
+
+	proto.Reset(dst)
+	dst.ListenIPAddress = listenIPAddress
+	dst.PortBindings = portBindings
+	dst.Users = mergedUsers
+	dst.AdvancedSettings = advancedSettings
+	dst.LoggingLevel = &loggingLevel
+	dst.Mtu = proto.Int32(mtu)
+	dst.Egress = egress
+	dst.Dns = dns
+	dst.TrafficPattern = trafficPattern
 	return nil
 }
 
@@ -786,92 +843,6 @@ func serverConfigFilePath() (string, ConfigFileType, error) {
 		return cachedServerConfigFilePath, FindConfigFileType(cachedServerConfigFilePath), nil
 	}
 	return "", INVALID_CONFIG_FILE_TYPE, fmt.Errorf("server config file path is empty")
-}
-
-// MergeServerConfig merges the source server config into destination.
-// Source users are added or replace destination users with the same name.
-// Users omitted from source are preserved. Other supplied fields replace their
-// destination values. The caller must validate the patch and merged config.
-func MergeServerConfig(dst, src *pb.ServerConfig) error {
-	listenIPAddress := dst.ListenIPAddress
-	if src.ListenIPAddress != nil {
-		listenIPAddress = src.ListenIPAddress
-	}
-
-	// Port bindings: if src is set, replace dst with src.
-	var portBindings []*pb.PortBinding
-	if src.PortBindings != nil {
-		portBindings = src.GetPortBindings()
-	} else {
-		portBindings = dst.GetPortBindings()
-	}
-
-	// Users: merge src into dst.
-	mergedUserMapping := map[string]*pb.User{}
-	for _, user := range dst.GetUsers() {
-		mergedUserMapping[user.GetName()] = user
-	}
-	for _, user := range src.GetUsers() {
-		mergedUserMapping[user.GetName()] = user
-	}
-	names := make([]string, 0, len(mergedUserMapping))
-	for name := range mergedUserMapping {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	mergedUsers := make([]*pb.User, 0, len(mergedUserMapping))
-	for _, name := range names {
-		mergedUsers = append(mergedUsers, mergedUserMapping[name])
-	}
-
-	var advancedSettings *pb.ServerAdvancedSettings
-	if src.AdvancedSettings != nil {
-		advancedSettings = src.GetAdvancedSettings()
-	} else {
-		advancedSettings = dst.GetAdvancedSettings()
-	}
-	var loggingLevel pb.LoggingLevel
-	if src.LoggingLevel != nil {
-		loggingLevel = src.GetLoggingLevel()
-	} else {
-		loggingLevel = dst.GetLoggingLevel()
-	}
-	var mtu int32
-	if src.Mtu != nil {
-		mtu = src.GetMtu()
-	} else {
-		mtu = dst.GetMtu()
-	}
-	var egress *pb.Egress
-	if src.Egress != nil {
-		egress = src.GetEgress()
-	} else {
-		egress = dst.GetEgress()
-	}
-	var dns *pb.DNS
-	if src.Dns != nil {
-		dns = src.GetDns()
-	} else {
-		dns = dst.GetDns()
-	}
-	var trafficPattern *pb.TrafficPattern
-	if src.TrafficPattern != nil {
-		trafficPattern = src.GetTrafficPattern()
-	} else {
-		trafficPattern = dst.GetTrafficPattern()
-	}
-
-	proto.Reset(dst)
-	dst.ListenIPAddress = listenIPAddress
-	dst.PortBindings = portBindings
-	dst.Users = mergedUsers
-	dst.AdvancedSettings = advancedSettings
-	dst.LoggingLevel = &loggingLevel
-	dst.Mtu = proto.Int32(mtu)
-	dst.Egress = egress
-	dst.Dns = dns
-	dst.TrafficPattern = trafficPattern
-	return nil
 }
 
 // deleteServerConfigFile deletes the server config file.
