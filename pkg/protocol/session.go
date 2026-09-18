@@ -47,6 +47,9 @@ const (
 	// Maximum number of segments in a queue or buffer.
 	segmentTreeCapacity = 4096
 
+	// Use a smaller number in sendQueue to produce earlier write backpressure.
+	segmentSendQueueTreeCapacity = 1024
+
 	minWindowSize = 16
 	maxWindowSize = segmentTreeCapacity
 
@@ -54,13 +57,22 @@ const (
 	sessionHeartbeatInterval = 5 * time.Second
 	sessionHeartbeatJitterMs = 1000
 
-	// periodicOutputInterval triggers periodic output of packet transport,
-	// even if there is no new data to send.
-	periodicOutputInterval = 1 * time.Millisecond
+	// minOutputInterval is the minimum interval between two output loops.
+	minOutputInterval = 1 * time.Millisecond
 
 	// backPressureDelay is a short sleep to add back pressure
 	// to the writer.
 	backPressureDelay = 100 * time.Microsecond
+
+	// packetAckDelay is the maximum time the packet transport waits before it
+	// acknowledges received data. Segments received within this window
+	// share a single ACK, which bounds the ACK rate.
+	packetAckDelay = 1 * time.Millisecond
+
+	// retransmissionCheckDelay is the time to wait before the first
+	// retransmission check after new segments are sent into an empty
+	// send buffer.
+	retransmissionCheckDelay = 10 * time.Millisecond
 
 	// Number of ack to trigger early retransmission.
 	earlyRetransmission = 3
@@ -126,6 +138,8 @@ type Session struct {
 	recvQueue *segmentTree  // segments waiting to be read by application
 	recvChan  chan *segment // channel to receive segments from underlay
 
+	packetOutputWakeup chan struct{} // channel to wake up the packet output loop
+
 	nextSend               atomic.Uint32 // next sequence number to send a segment
 	nextRecv               atomic.Uint32 // next sequence number to receive
 	lastSend               atomic.Uint32 // last segment sequence number sent
@@ -134,6 +148,7 @@ type Session struct {
 	heartbeatJitter        time.Duration // random jitter added to heartbeat interval to break periodic pattern
 	nextRetransmissionTime atomic.Int64  // time that need to retransmit a segment in sendBuf, in microseconds since Unix epoch
 	ackOnDataRecv          atomic.Bool   // whether ack should be sent due to receive of new data
+	ackDeadline            atomic.Int64  // time to send the pending ack requested by ackOnDataRecv, in microseconds since Unix epoch
 	unreadBuf              []byte        // payload removed from the recvQueue that haven't been read by application
 
 	rttStat            *congestion.RTTStats
@@ -179,7 +194,7 @@ func newSessionWithServerUserPolicy(
 	trafficPattern *appctlpb.TrafficPattern,
 ) *Session {
 	rttStat := congestion.NewRTTStats()
-	rttStat.SetMaxAckDelay(periodicOutputInterval)
+	rttStat.SetMaxAckDelay(packetAckDelay)
 	rttStat.SetRTOMultiplier(txTimeoutBackOff)
 	s := &Session{
 		conn:                      nil,
@@ -194,11 +209,12 @@ func newSessionWithServerUserPolicy(
 		closedChan:                make(chan struct{}),
 		inputErr:                  make(chan error),
 		outputErr:                 make(chan error),
-		sendQueue:                 newSegmentTree(segmentTreeCapacity),
+		sendQueue:                 newSegmentTree(segmentSendQueueTreeCapacity),
 		sendBuf:                   newSegmentTree(segmentTreeCapacity),
 		recvBuf:                   newSegmentTree(segmentTreeCapacity),
 		recvQueue:                 newSegmentTree(segmentTreeCapacity),
 		recvChan:                  make(chan *segment, segmentChanCapacity),
+		packetOutputWakeup:        make(chan struct{}, 1),
 		rttStat:                   rttStat,
 		cubicSendAlgorithm:        congestion.NewCubicSendAlgorithm(minWindowSize, maxWindowSize),
 	}
@@ -727,18 +743,23 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 			}
 		}
 	case common.PacketTransport:
-		ticker := time.NewTicker(periodicOutputInterval)
-		defer ticker.Stop()
+		// The packet output loop is driven by events and a timer.
+		// The timer is armed for the earliest of the retransmission,
+		// delayed ACK and heartbeat deadlines.
+		timer := time.NewTimer(s.nextPacketOutputDelay())
+		defer timer.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return nil
 			case <-s.closedChan:
 				return nil
-			case <-ticker.C:
+			case <-timer.C:
 			case <-s.sendQueue.chanNotEmptyEvent:
+			case <-s.packetOutputWakeup:
 			}
 			s.runOutputOncePacket()
+			resetTimer(timer, s.nextPacketOutputDelay())
 		}
 	default:
 		err := fmt.Errorf("unsupported transport protocol %v", s.transportProtocol)
@@ -753,7 +774,7 @@ func (s *Session) runOutputLoop(ctx context.Context) error {
 func (s *Session) runOutputOnceStream() {
 	if s.outputHasErr.Load() {
 		// Can't run output.
-		time.Sleep(periodicOutputInterval)
+		time.Sleep(minOutputInterval)
 		return
 	}
 
@@ -780,7 +801,7 @@ func (s *Session) runOutputOnceStream() {
 func (s *Session) runOutputOncePacket() {
 	if s.outputHasErr.Load() {
 		// Can't run output.
-		time.Sleep(periodicOutputInterval)
+		time.Sleep(minOutputInterval)
 		return
 	}
 
@@ -789,7 +810,7 @@ func (s *Session) runOutputOncePacket() {
 	hasTimeout := false
 	totalTransmissionCount := 0
 
-	if time.Now().UnixMicro() >= s.nextRetransmissionTime.Load() {
+	if s.sendBuf.Len() > 0 && time.Now().UnixMicro() >= s.nextRetransmissionTime.Load() {
 		// Resend segments in sendBuf.
 		//
 		// Iterate all the segments in sendBuf to update nextRetransmissionTime,
@@ -801,8 +822,6 @@ func (s *Session) runOutputOncePacket() {
 		s.oLock.Lock()
 		var nextTX int64 = math.MaxInt64
 		s.sendBuf.Ascend(func(iter *segment) bool {
-			nextTX = mathext.Min(nextTX, iter.txTime+iter.txTimeout.Microseconds())
-
 			if iter.txCount >= txCountLimit {
 				err := fmt.Errorf("too many retransmission of %v", iter)
 				log.Debugf("%v is unhealthy: %v", s, err)
@@ -814,7 +833,7 @@ func (s *Session) runOutputOncePacket() {
 			}
 
 			satisfyEarlyRetransmission := iter.ackCount >= earlyRetransmission && iter.txCount <= earlyRetransmissionLimit
-			if satisfyEarlyRetransmission || time.Now().UnixMicro()-iter.txTime > iter.txTimeout.Microseconds() {
+			if satisfyEarlyRetransmission || time.Now().UnixMicro()-iter.txTime >= iter.txTimeout.Microseconds() {
 				if satisfyEarlyRetransmission {
 					hasLoss = true
 				} else {
@@ -838,15 +857,14 @@ func (s *Session) runOutputOncePacket() {
 					return false
 				}
 				totalTransmissionCount++
-				return true
 			}
+			// Use the deadline after a possible retransmission, so the
+			// next check is not scheduled in the past.
+			nextTX = mathext.Min(nextTX, iter.txTime+iter.txTimeout.Microseconds())
 			return true
 		})
 		if nextTX != math.MaxInt64 {
 			s.nextRetransmissionTime.Store(nextTX)
-		} else {
-			// Account for new segments to be sent below.
-			s.nextRetransmissionTime.Store(time.Now().UnixMicro() + 10000)
 		}
 		s.oLock.Unlock()
 		if closeSessionReason != nil {
@@ -888,6 +906,15 @@ func (s *Session) runOutputOncePacket() {
 				das, _ := toDataAckStruct(seg.metadata)
 				das.unAckSeq = s.nextRecv.Load()
 			}
+			// Make sure the segment is checked for retransmission no later
+			// than its own deadline. When sendBuf is empty the stored
+			// deadline is stale and the first check is scheduled early.
+			deadline := seg.txTime + seg.txTimeout.Microseconds()
+			if s.sendBuf.Len() == 0 {
+				s.nextRetransmissionTime.Store(mathext.Min(deadline, seg.txTime+retransmissionCheckDelay.Microseconds()))
+			} else if s.nextRetransmissionTime.Load() > deadline {
+				s.nextRetransmissionTime.Store(deadline)
+			}
 			if !s.sendBuf.Insert(seg) {
 				s.oLock.Unlock()
 				err := fmt.Errorf("output() failed: insert %v to send buffer failed", seg)
@@ -915,9 +942,15 @@ func (s *Session) runOutputOncePacket() {
 
 	// Send ACK or heartbeat if needed.
 	// ACK is not limited by window.
+	now := time.Now().UnixMicro()
+	ackDue := s.ackOnDataRecv.Load() && now >= s.ackDeadline.Load()
 	jitteredInterval := sessionHeartbeatInterval + s.heartbeatJitter
-	exceedHeartbeatInterval := time.Now().UnixMicro()-s.lastTXTime.Load() > jitteredInterval.Microseconds()
-	if !s.isClientPacketSessionOpening() && (s.ackOnDataRecv.Load() || exceedHeartbeatInterval) {
+	exceedHeartbeatInterval := now-s.lastTXTime.Load() > jitteredInterval.Microseconds()
+	if !s.isClientPacketSessionOpening() && (ackDue || exceedHeartbeatInterval) {
+		// Clear the request before reading nextRecv, so that a segment
+		// received concurrently either is covered by this ACK or
+		// requests a new one.
+		s.ackOnDataRecv.Store(false)
 		baseStruct := baseStruct{}
 		if s.isClient {
 			baseStruct.protocol = uint8(ackClientToServer)
@@ -944,9 +977,67 @@ func (s *Session) runOutputOncePacket() {
 			}
 			s.closeWithError(err)
 		}
-		s.ackOnDataRecv.Store(false)
 		s.heartbeatJitter = randomHeartbeatJitter()
 	}
+}
+
+// nextPacketOutputDelay returns how long the packet output loop can sleep
+// before it must run again.
+func (s *Session) nextPacketOutputDelay() time.Duration {
+	now := time.Now().UnixMicro()
+	var next int64 = math.MaxInt64
+	if s.sendBuf.Len() > 0 {
+		next = mathext.Min(next, s.nextRetransmissionTime.Load())
+	}
+	if !s.isClientPacketSessionOpening() {
+		if s.ackOnDataRecv.Load() {
+			next = mathext.Min(next, s.ackDeadline.Load())
+		}
+		jitteredInterval := sessionHeartbeatInterval + s.heartbeatJitter
+		next = mathext.Min(next, s.lastTXTime.Load()+jitteredInterval.Microseconds())
+	}
+	if next == math.MaxInt64 {
+		// Nothing is scheduled. Keep the session alive.
+		return sessionHeartbeatInterval
+	}
+
+	delay := time.Duration(next-now) * time.Microsecond
+	if delay <= 0 {
+		return minOutputInterval
+	}
+	return delay
+}
+
+// wakePacketOutput wakes up the packet output loop without blocking.
+func (s *Session) wakePacketOutput() {
+	select {
+	case s.packetOutputWakeup <- struct{}{}:
+	default:
+	}
+}
+
+// requestPacketAck asks the packet output loop to acknowledge received data.
+// The ACK is delayed by up to packetAckDelay to combine multiple requests.
+func (s *Session) requestPacketAck() {
+	if s.ackOnDataRecv.Load() {
+		// An ACK is already pending.
+		return
+	}
+	s.ackDeadline.Store(time.Now().UnixMicro() + packetAckDelay.Microseconds())
+	s.ackOnDataRecv.Store(true)
+	s.wakePacketOutput()
+}
+
+// resetTimer stops, drains and re-arms the timer. The caller must be the
+// only receiver of the timer channel.
+func resetTimer(timer *time.Timer, d time.Duration) {
+	if !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
+		}
+	}
+	timer.Reset(d)
 }
 
 // input reads incoming packets from network and assemble
@@ -1026,9 +1117,7 @@ func (s *Session) input(seg *segment) error {
 		}
 		if s.isClientPacketSessionOpenResponse(seg) {
 			s.forwardStateTo(sessionEstablished)
-			if s.sendQueue.Len() > 0 {
-				s.sendQueue.notifyNotEmpty()
-			}
+			s.wakePacketOutput()
 		}
 		return nil
 	} else if isAckProtocol(protocol) {
@@ -1050,11 +1139,6 @@ func (s *Session) inputData(seg *segment) error {
 		}
 	case common.PacketTransport:
 		// Delete all previous acknowledged segments from sendBuf.
-		var priorInFlight int64
-		s.sendBuf.Ascend(func(iter *segment) bool {
-			priorInFlight += int64(packetOverhead + len(iter.payload))
-			return true
-		})
 		das, ok := seg.metadata.(*dataAckStruct)
 		if ok {
 			unAckSeq := das.unAckSeq
@@ -1071,9 +1155,12 @@ func (s *Session) inputData(seg *segment) error {
 			}
 			s.remoteWindowSize.Store(uint32(das.windowSize))
 		}
+		if s.sendQueue.Len() > 0 {
+			s.wakePacketOutput()
+		}
 
 		// Deliver the segment to recvBuf.
-		s.ackOnDataRecv.Store(true)
+		s.requestPacketAck()
 		if s.receiveWindowSize() <= 0 {
 			if log.IsLevelEnabled(log.TraceLevel) {
 				log.Tracef("%v dropped %v because the receive window size is 0", s, seg)
@@ -1093,6 +1180,9 @@ func (s *Session) inputData(seg *segment) error {
 				return fmt.Errorf("inputData() failed: %w", err)
 			}
 		}
+		// Make sure the segments moved to recvQueue are acknowledged,
+		// even if an ACK was sent while they were being processed.
+		s.requestPacketAck()
 	default:
 		return fmt.Errorf("unsupported transport protocol %v", s.transportProtocol)
 	}
@@ -1148,11 +1238,6 @@ func (s *Session) inputAck(seg *segment) error {
 		return nil
 	case common.PacketTransport:
 		// Delete all previous acknowledged segments from sendBuf.
-		var priorInFlight int64
-		s.sendBuf.Ascend(func(iter *segment) bool {
-			priorInFlight += int64(packetOverhead + len(iter.payload))
-			return true
-		})
 		das := seg.metadata.(*dataAckStruct)
 		unAckSeq := das.unAckSeq
 		for {
@@ -1179,6 +1264,9 @@ func (s *Session) inputAck(seg *segment) error {
 			}
 			return true
 		})
+		if s.sendQueue.Len() > 0 {
+			s.wakePacketOutput()
+		}
 		return nil
 	default:
 		return fmt.Errorf("unsupported transport protocol %v", s.transportProtocol)
