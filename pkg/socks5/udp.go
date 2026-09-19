@@ -130,7 +130,16 @@ func RunUDPAssociateLoop(udpConn *net.UDPConn, conn *apicommon.PacketOverStreamT
 // RunUDPForwardingLoop exchanges socks5 UDP packets between a mieru proxy client and a socks5 proxy server,
 // the proxy client is connected via the PacketOverStreamTunnel.
 func RunUDPForwardingLoop(udpConn *net.UDPConn, conn *apicommon.PacketOverStreamTunnel, downstreamAddr *net.UDPAddr, ctrlConn net.Conn) error {
-	var udpErr atomic.Value
+	var udpErr error
+	var closeOnce sync.Once
+	closeAll := func(err error) {
+		closeOnce.Do(func() {
+			udpErr = err
+			ctrlConn.Close()
+			udpConn.Close()
+			conn.Close()
+		})
+	}
 
 	var wg sync.WaitGroup
 	wg.Add(3)
@@ -140,13 +149,7 @@ func RunUDPForwardingLoop(udpConn *net.UDPConn, conn *apicommon.PacketOverStream
 		defer wg.Done()
 		buf := make([]byte, 1)
 		_, err := ctrlConn.Read(buf)
-		if err != nil {
-			if udpErr.Load() == nil {
-				udpErr.Store(err)
-			}
-		}
-		udpConn.Close()
-		conn.Close()
+		closeAll(err)
 	}()
 
 	// Packets from mieru proxy client -> socks5 proxy server.
@@ -157,9 +160,7 @@ func RunUDPForwardingLoop(udpConn *net.UDPConn, conn *apicommon.PacketOverStream
 		for {
 			n, err := conn.Read(buf)
 			if err != nil {
-				if udpErr.Load() == nil {
-					udpErr.Store(err)
-				}
+				closeAll(err)
 				return
 			}
 			ws, err := udpConn.WriteToUDP(buf[:n], downstreamAddr)
@@ -183,17 +184,13 @@ func RunUDPForwardingLoop(udpConn *net.UDPConn, conn *apicommon.PacketOverStream
 				if !stderror.IsEOF(err) && !stderror.IsClosed(err) {
 					log.Debugf("UDP forwarding %v ReadFromUDP() failed: %v", udpConn.LocalAddr(), err)
 				}
-				if udpErr.Load() == nil {
-					udpErr.Store(err)
-				}
+				closeAll(err)
 				return
 			}
 			_, err = conn.Write(buf[:n])
 			if err != nil {
 				log.Debugf("UDP forwarding %v Write() to client failed: %v", udpConn.LocalAddr(), err)
-				if udpErr.Load() == nil {
-					udpErr.Store(err)
-				}
+				closeAll(err)
 				return
 			}
 			UDPAssociateDownloadPackets.Add(1)
@@ -202,11 +199,7 @@ func RunUDPForwardingLoop(udpConn *net.UDPConn, conn *apicommon.PacketOverStream
 	}()
 
 	wg.Wait()
-	ctrlConn.Close()
-	if err := udpErr.Load(); err != nil {
-		return err.(error)
-	}
-	return nil
+	return udpErr
 }
 
 // TransceiveUDPPacket sends a single UDP associate message and returns the response.

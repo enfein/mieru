@@ -18,9 +18,12 @@ package socks5
 import (
 	"bytes"
 	"errors"
+	"io"
 	"net"
 	"testing"
+	"time"
 
+	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/stderror"
@@ -106,5 +109,43 @@ func TestSocks5UDPDatagramRejectsTruncatedHeader(t *testing.T) {
 	_, err := parseSocks5UDPDatagram(pkt)
 	if !errors.Is(err, stderror.ErrNoEnoughData) {
 		t.Fatalf("parseSocks5UDPDatagram() error = %v, want %v", err, stderror.ErrNoEnoughData)
+	}
+}
+
+func TestRunUDPForwardingLoopStopsWhenClientTunnelCloses(t *testing.T) {
+	udpConn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatalf("net.ListenUDP() failed: %v", err)
+	}
+
+	tunnelConn, tunnelPeer := net.Pipe()
+	ctrlConn, ctrlPeer := net.Pipe()
+	defer tunnelPeer.Close()
+	defer ctrlPeer.Close()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- RunUDPForwardingLoop(
+			udpConn,
+			apicommon.NewPacketOverStreamTunnel(tunnelConn),
+			udpConn.LocalAddr().(*net.UDPAddr),
+			ctrlConn,
+		)
+	}()
+
+	// Closing the Mieru tunnel is a terminal event for this UDP association.
+	// The forwarding loop must also close the SOCKS control connection so its
+	// monitor goroutine can exit instead of keeping the association forever.
+	if err := tunnelPeer.Close(); err != nil {
+		t.Fatalf("tunnelPeer.Close() failed: %v", err)
+	}
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, io.EOF) {
+			t.Fatalf("RunUDPForwardingLoop() error = %v, want EOF", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("RunUDPForwardingLoop() did not stop after the client tunnel closed")
 	}
 }
