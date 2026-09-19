@@ -216,7 +216,7 @@ func (s *Server) handleForwarding(req *model.Request, proxyConn net.Conn, proxy 
 			egressConn.Close()
 			return fmt.Errorf("failed to write socks5 request to egress proxy: %w", err)
 		}
-		return common.BidiCopy(proxyConn, egressConn)
+		return common.BidiCopy(proxyConn, newWriteTimeoutConn(egressConn, forwardingWriteTimeout))
 	case constant.Socks5UDPAssociateCmd:
 		return s.handleForwardingUDP(req, proxyConn, egressConn)
 	default:

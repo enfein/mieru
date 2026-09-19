@@ -20,12 +20,35 @@ import (
 	"io"
 	"net"
 	"sync/atomic"
+	"time"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
+
+const forwardingWriteTimeout = 30 * time.Second
+
+// writeTimeoutConn limits a single blocked write without imposing an idle or
+// lifetime limit on the connection. A quiet download therefore remains valid,
+// while a downstream proxy that stops accepting data cannot retain the Mieru
+// session and its buffers indefinitely.
+type writeTimeoutConn struct {
+	net.Conn
+	timeout time.Duration
+}
+
+func (c *writeTimeoutConn) Write(p []byte) (int, error) {
+	if err := c.SetWriteDeadline(time.Now().Add(c.timeout)); err != nil {
+		return 0, err
+	}
+	return c.Conn.Write(p)
+}
+
+func newWriteTimeoutConn(conn net.Conn, timeout time.Duration) net.Conn {
+	return &writeTimeoutConn{Conn: conn, timeout: timeout}
+}
 
 // BidiCopyUDP does bi-directional data copy between a proxy client UDP endpoint
 // and the proxy tunnel.
