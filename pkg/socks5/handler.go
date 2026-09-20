@@ -8,6 +8,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/constant"
@@ -17,6 +18,8 @@ import (
 	"github.com/enfein/mieru/v3/pkg/log"
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
+
+const forwardingWriteTimeout = time.Minute
 
 // handleRequest is used to process socks5 request after authentication.
 func (s *Server) handleRequest(ctx context.Context, req *model.Request, proxyConn net.Conn) error {
@@ -216,7 +219,7 @@ func (s *Server) handleForwarding(req *model.Request, proxyConn net.Conn, proxy 
 			egressConn.Close()
 			return fmt.Errorf("failed to write socks5 request to egress proxy: %w", err)
 		}
-		return common.BidiCopy(proxyConn, newWriteTimeoutConn(egressConn, forwardingWriteTimeout))
+		return common.BidiCopy(proxyConn, common.NewWriteTimeoutConn(egressConn, forwardingWriteTimeout))
 	case constant.Socks5UDPAssociateCmd:
 		return s.handleForwardingUDP(req, proxyConn, egressConn)
 	default:

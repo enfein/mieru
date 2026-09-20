@@ -18,10 +18,34 @@ package common
 import (
 	"bytes"
 	crand "crypto/rand"
+	"errors"
 	"io"
 	mrand "math/rand"
+	"net"
 	"testing"
+	"time"
 )
+
+func TestWriteTimeoutConnStopsBlockedWrite(t *testing.T) {
+	conn, peer := net.Pipe()
+	defer conn.Close()
+	defer peer.Close()
+
+	timeout := 10 * time.Millisecond
+	wrapped := NewWriteTimeoutConn(conn, timeout)
+	started := time.Now()
+	_, err := wrapped.Write([]byte("blocked"))
+	if err == nil {
+		t.Fatal("Write() succeeded while the peer was not reading")
+	}
+	var netErr net.Error
+	if !errors.As(err, &netErr) || !netErr.Timeout() {
+		t.Fatalf("Write() error = %v, want a timeout", err)
+	}
+	if elapsed := time.Since(started); elapsed < timeout {
+		t.Fatalf("Write() returned after %v, before timeout %v", elapsed, timeout)
+	}
+}
 
 func TestReadAllAndDiscard(t *testing.T) {
 	n := mrand.Int63n(1024*1024) + 1

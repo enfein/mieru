@@ -18,8 +18,28 @@ package common
 import (
 	"context"
 	"io"
+	"net"
 	"time"
 )
+
+type writeTimeoutConn struct {
+	net.Conn
+	timeout time.Duration
+}
+
+func (c *writeTimeoutConn) Write(p []byte) (int, error) {
+	if err := c.SetWriteDeadline(time.Now().Add(c.timeout)); err != nil {
+		return 0, err
+	}
+	return c.Conn.Write(p)
+}
+
+// NewWriteTimeoutConn wraps conn to limit each write to timeout without imposing
+// an idle or lifetime limit on the connection. Each write resets the underlying
+// connection's write deadline.
+func NewWriteTimeoutConn(conn net.Conn, timeout time.Duration) net.Conn {
+	return &writeTimeoutConn{Conn: conn, timeout: timeout}
+}
 
 type SetReadDeadlineInterface interface {
 	SetReadDeadline(t time.Time) error
