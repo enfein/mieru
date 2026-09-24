@@ -24,6 +24,8 @@ import os
 import subprocess
 import sys
 
+from typing import List
+
 
 def enable_tcp_bbr() -> None:
     if sys.version_info < (3, 8, 0):
@@ -63,7 +65,7 @@ def is_bbr_enabled() -> bool:
         print_exit(e)
 
 
-def must_write_sysctl_file(content: list[str]) -> None:
+def must_write_sysctl_file(content: List[str]) -> None:
     try:
         with open('/etc/sysctl.d/mieru_tcp_bbr.conf', 'w') as f:
             for line in content:
@@ -73,7 +75,7 @@ def must_write_sysctl_file(content: list[str]) -> None:
         print_exit(e)
 
 
-def must_run_command(command: list[str]) -> str:
+def must_run_command(command: List[str]) -> str:
     try:
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True, text=True)
         return result.stdout

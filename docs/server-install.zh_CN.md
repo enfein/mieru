@@ -18,32 +18,32 @@ sudo python3 setup.py --lang=zh
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.37.0/mita_3.37.0_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.38.0/mita_3.38.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.37.0/mita_3.37.0_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.38.0/mita_3.38.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.37.0/mita-3.37.0-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.38.0/mita-3.38.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.37.0/mita-3.37.0-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.38.0/mita-3.38.0-1.aarch64.rpm
 ```
 
 ## 安装 mita 软件包
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_3.37.0_amd64.deb
+sudo dpkg -i mita_3.38.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_3.37.0_arm64.deb
+sudo dpkg -i mita_3.38.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-3.37.0-1.x86_64.rpm
+sudo rpm -Uvh --force mita-3.38.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-3.37.0-1.aarch64.rpm
+sudo rpm -Uvh --force mita-3.38.0-1.aarch64.rpm
 ```
 
 上述指令也可以用来升级 mita 软件包的版本。
@@ -84,6 +84,12 @@ mita apply config <FILE>
 ```
 
 指令来修改代理服务器的设置，这里的 `<FILE>` 是一个 JSON 格式的配置文件。该配置文件不需要指定完整的代理服务器设置。运行指令 `mita apply config <FILE>` 时，文件内容会合并到任何已有的代理服务器设置。
+
+要替换整个已保存的配置，请提供含有完整代理服务器设置的 JSON 文件：
+
+```sh
+mita replace config <FILE>
+```
 
 下面是服务器配置文件的一个例子。
 
@@ -164,7 +170,7 @@ mita status
 mita stop
 ```
 
-注意，每次使用 `mita apply config <FILE>` 修改设置后，需要用 `mita stop` 和 `mita start` 重启代理服务，才能使新设置生效。一个例外是，如果只修改了 `users` 或者 `loggingLevel` 设置，你可以使用 `mita reload` 加载新的设置，此时不会影响服务器与客户端的活跃连接。
+注意，每次使用 `mita apply config <FILE>` 或 `mita replace config <FILE>` 修改设置后，需要用 `mita stop` 和 `mita start` 重启代理服务，才能使新设置生效。一个例外是，如果只修改了 `users` 或者 `loggingLevel` 设置，你可以使用 `mita reload` 加载新的设置，此时不会影响服务器与客户端的活跃连接。
 
 启动代理服务后，请继续进行[客户端安装与配置](./client-install.zh_CN.md)。
 

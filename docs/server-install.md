@@ -18,32 +18,32 @@ Or you can manually install and configure proxy server using the steps below.
 
 ```sh
 # Debian / Ubuntu - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.37.0/mita_3.37.0_amd64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.38.0/mita_3.38.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.37.0/mita_3.37.0_arm64.deb
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.38.0/mita_3.38.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.37.0/mita-3.37.0-1.x86_64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.38.0/mita-3.38.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-curl -LSO https://github.com/enfein/mieru/releases/download/v3.37.0/mita-3.37.0-1.aarch64.rpm
+curl -LSO https://github.com/enfein/mieru/releases/download/v3.38.0/mita-3.38.0-1.aarch64.rpm
 ```
 
 ## Install mita package
 
 ```sh
 # Debian / Ubuntu - X86_64
-sudo dpkg -i mita_3.37.0_amd64.deb
+sudo dpkg -i mita_3.38.0_amd64.deb
 
 # Debian / Ubuntu - ARM 64
-sudo dpkg -i mita_3.37.0_arm64.deb
+sudo dpkg -i mita_3.38.0_arm64.deb
 
 # RedHat / CentOS / Rocky Linux - X86_64
-sudo rpm -Uvh --force mita-3.37.0-1.x86_64.rpm
+sudo rpm -Uvh --force mita-3.38.0-1.x86_64.rpm
 
 # RedHat / CentOS / Rocky Linux - ARM 64
-sudo rpm -Uvh --force mita-3.37.0-1.aarch64.rpm
+sudo rpm -Uvh --force mita-3.38.0-1.aarch64.rpm
 ```
 
 Those instructions can also be used to upgrade the version of mita software package.
@@ -84,6 +84,12 @@ mita apply config <FILE>
 ```
 
 to modify the proxy server settings. `<FILE>` is a JSON formatted configuration file. This configuration file does not need to specify the full proxy server settings. When you run command `mita apply config <FILE>`, the contents of the file will be merged into any existing proxy server settings.
+
+To replace the entire saved configuration, provide a JSON file with full server settings:
+
+```sh
+mita replace config <FILE>
+```
 
 Below is an example of the server configuration file.
 
@@ -164,7 +170,7 @@ If you want to stop the proxy service, use command
 mita stop
 ```
 
-Note that each time you change the settings with `mita apply config <FILE>`, you need to restart the service with `mita stop` and `mita start` for the new settings to take effect. An exception is, if you only change `users` or `loggingLevel` settings, you may run `mita reload` to load the new settings, which will not disturb active connections between server and client.
+Note that each time you change the settings with `mita apply config <FILE>` or `mita replace config <FILE>`, you need to restart the service with `mita stop` and `mita start` for the new settings to take effect. An exception is, if you only change `users` or `loggingLevel` settings, you may run `mita reload` to load the new settings, which will not disturb active connections between server and client.
 
 After starting the proxy service, proceed to [Client Installation & Configuration](./client-install.md).
 

@@ -121,6 +121,18 @@ func RegisterClientCommands() {
 		clientApplyConfigFunc,
 	)
 	RegisterCallback(
+		[]string{"", "replace", "config"},
+		func(s []string) error {
+			if len(s) < 4 {
+				return fmt.Errorf("usage: mieru replace config <FILE>. No config file is provided")
+			} else if len(s) > 4 {
+				return fmt.Errorf("usage: mieru replace config <FILE>. More than 1 config file is provided")
+			}
+			return nil
+		},
+		clientReplaceConfigFunc,
+	)
+	RegisterCallback(
 		[]string{"", "describe", "config"},
 		func(s []string) error {
 			return unexpectedArgsError(s, 3)
@@ -328,6 +340,13 @@ var clientHelpFunc = func(s []string) error {
 				help: []string{
 					"Apply client configuration patch from a file.",
 					"It merges the patch with existing client configuration.",
+				},
+			},
+			{
+				cmd: "replace config <JSON_FILE>",
+				help: []string{
+					"Replace saved client configuration with a complete JSON file.",
+					"Omitted settings and profiles are removed.",
 				},
 			},
 			{
@@ -814,6 +833,10 @@ var clientApplyConfigFunc = func(s []string) error {
 		}
 	}
 	return appctl.ApplyJSONClientConfig(s[3])
+}
+
+var clientReplaceConfigFunc = func(s []string) error {
+	return appctl.ReplaceJSONClientConfig(s[3])
 }
 
 var clientDescribeConfigFunc = func(s []string) error {

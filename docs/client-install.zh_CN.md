@@ -16,6 +16,12 @@ mieru apply config <FILE>
 
 指令来修改客户端的设置，这里的 `<FILE>` 是一个 JSON 格式的配置文件。该配置文件不需要指定完整的客户端设置。运行指令 `mieru apply config <FILE>` 时，文件内容会合并到任何已有的客户端设置。
 
+要替换整个已保存的配置，请提供含有完整客户端设置的 JSON 文件：
+
+```sh
+mieru replace config <FILE>
+```
+
 客户端配置的一个示例如下。
 
 ```js
@@ -107,7 +113,7 @@ mieru 客户端不会与系统一同启动。在重新启动计算机后，需�
 mieru stop
 ```
 
-注意，每次使用 `mieru apply config <FILE>` 修改设置后，需要用 `mieru stop` 和 `mieru start` 重启客户端，才能使新设置生效。
+注意，每次使用 `mieru apply config <FILE>` 或 `mieru replace config <FILE>` 修改设置后，需要用 `mieru stop` 和 `mieru start` 重启客户端，才能使新设置生效。
 
 ## 测试客户端与服务器的连接
 

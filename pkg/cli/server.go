@@ -103,6 +103,18 @@ func RegisterServerCommands() {
 		serverApplyConfigFunc,
 	)
 	RegisterCallback(
+		[]string{"", "replace", "config"},
+		func(s []string) error {
+			if len(s) < 4 {
+				return fmt.Errorf("usage: mita replace config <FILE>. no config file is provided")
+			} else if len(s) > 4 {
+				return fmt.Errorf("usage: mita replace config <FILE>. more than 1 config file is provided")
+			}
+			return nil
+		},
+		serverReplaceConfigFunc,
+	)
+	RegisterCallback(
 		[]string{"", "describe", "config"},
 		func(s []string) error {
 			return unexpectedArgsError(s, 3)
@@ -270,6 +282,13 @@ var serverHelpFunc = func(s []string) error {
 				help: []string{
 					"Apply server configuration patch from a file.",
 					"It merges the patch with existing server configuration.",
+				},
+			},
+			{
+				cmd: "replace config <JSON_FILE>",
+				help: []string{
+					"Replace saved server configuration with a complete JSON file.",
+					"Omitted settings and users are removed.",
 				},
 			},
 			{
@@ -623,6 +642,44 @@ var serverApplyConfigFunc = func(s []string) error {
 	if err = appctl.ValidateFullServerConfig(config); err != nil {
 		return fmt.Errorf("ValidateFullServerConfig() failed: %w", err)
 	}
+	_, err = client.SetConfig(timedctx, config)
+	if err != nil {
+		return fmt.Errorf(stderror.SetServerConfigFailedErr, err)
+	}
+	return nil
+}
+
+var serverReplaceConfigFunc = func(s []string) error {
+	appStatus, err := appctl.GetServerStatusWithRPC(context.Background())
+	if err != nil {
+		if stderror.IsConnRefused(err) {
+			return fmt.Errorf(stderror.ServerNotRunningWithCommand)
+		}
+		return fmt.Errorf(stderror.GetServerStatusFailedErr, err)
+	}
+	if err := appctl.IsServerDaemonRunning(appStatus); err != nil {
+		return fmt.Errorf(stderror.ServerNotRunningErr, err)
+	}
+
+	path := s[3]
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("os.ReadFile(%q) failed: %w", path, err)
+	}
+	config := &appctlpb.ServerConfig{}
+	if err = common.UnmarshalJSON(b, config); err != nil {
+		return fmt.Errorf("common.UnmarshalJSON() failed: %w", err)
+	}
+	if err = appctl.ValidateFullServerConfig(config); err != nil {
+		return fmt.Errorf("ValidateFullServerConfig() failed: %w", err)
+	}
+
+	client, err := appctl.NewServerManagementRPCClient()
+	if err != nil {
+		return fmt.Errorf(stderror.CreateServerManagementRPCClientFailedErr, err)
+	}
+	timedctx, cancelFunc := context.WithTimeout(context.Background(), appctl.RPCTimeout)
+	defer cancelFunc()
 	_, err = client.SetConfig(timedctx, config)
 	if err != nil {
 		return fmt.Errorf(stderror.SetServerConfigFailedErr, err)

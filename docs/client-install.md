@@ -16,6 +16,12 @@ mieru apply config <FILE>
 
 to modify the proxy client settings. `<FILE>` is a JSON formatted configuration file. This configuration file does not need to specify the full proxy client settings. When you run command `mieru apply config <FILE>`, the contents of the file will be merged into any existing proxy client settings.
 
+To replace the entire saved configuration, provide a JSON file with full client settings:
+
+```sh
+mieru replace config <FILE>
+```
+
 An example of client configuration is as follows.
 
 ```js
@@ -107,7 +113,7 @@ If you need to stop the mieru client, enter the following command
 mieru stop
 ```
 
-Note that every time you change the settings with `mieru apply config <FILE>`, you need to restart the client with `mieru stop` and `mieru start` for the new settings to take effect.
+Note that every time you change the settings with `mieru apply config <FILE>` or `mieru replace config <FILE>`, you need to restart the client with `mieru stop` and `mieru start` for the new settings to take effect.
 
 ## Test the Connection Between Client and Server
 

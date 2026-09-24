@@ -28,10 +28,15 @@ echo "mieru build info:"
 ./mieru describe build
 sleep 1
 
-# Update mieru server with mixed config.
-./mita apply config server_mix.json
+# Replace mieru server with mixed config.
+# The destination of server configuration should not use env var of invoking command.
+MITA_CONFIG_FILE=/test/unused.pb MITA_CONFIG_JSON_FILE=/test/unused.json ./mita replace config server_mix.json
 if [[ "$?" -ne 0 ]]; then
-    echo "command 'mita apply config server_mix.json' failed"
+    echo "command 'mita replace config server_mix.json' failed"
+    exit 1
+fi
+if [[ -e /test/unused.pb || -e /test/unused.json ]]; then
+    echo "mita replacement used the invoking command's destination"
     exit 1
 fi
 echo "mieru server config:"
@@ -51,10 +56,10 @@ if [[ "$?" -ne 0 ]]; then
     exit 1
 fi
 
-# Update mieru client with mix config.
-./mieru apply config client_mix.json
+# Replace mieru client with mixed config.
+./mieru replace config client_mix.json
 if [[ "$?" -ne 0 ]]; then
-    echo "command 'mieru apply config client_mix.json' failed"
+    echo "command 'mieru replace config client_mix.json' failed"
     exit 1
 fi
 sleep 1

@@ -348,6 +348,25 @@ func ApplyJSONClientConfig(path string) error {
 	return applyClientConfig(c)
 }
 
+// ReplaceJSONClientConfig replaces the saved client config with a complete JSON config.
+func ReplaceJSONClientConfig(path string) error {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("os.ReadFile(%q) failed: %w", path, err)
+	}
+	config := &pb.ClientConfig{}
+	if err = common.UnmarshalJSON(b, config); err != nil {
+		return fmt.Errorf("common.UnmarshalJSON() failed: %w", err)
+	}
+	if err = ValidateFullClientConfig(config); err != nil {
+		return fmt.Errorf("ValidateFullClientConfig() failed: %w", err)
+	}
+	if err = StoreClientConfig(config); err != nil {
+		return fmt.Errorf("StoreClientConfig() failed: %w", err)
+	}
+	return nil
+}
+
 // ParseURLClientConfig parses a client config URL and returns the config
 // without applying it.
 func ParseURLClientConfig(u string) (*pb.ClientConfig, error) {
