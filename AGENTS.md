@@ -1,76 +1,40 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
+Go module for the `mieru` proxy client and `mita` proxy server. Entrypoints are `cmd/mieru` and `cmd/mita`, the public API is `apis/`, implementation is `pkg/`, and integration-test helpers and Dockerfiles are in `test/`.
 
-This is a Go module for the `mieru` proxy client and `mita` proxy server.
+## Dependency Layers
 
-Entrypoints live in `cmd/mieru` and `cmd/mita`.
+Dependencies flow downward only. Lower layers must not import `cmd/` or `pkg/cli`.
 
-Public API packages are under `apis/`, while most implementation code is in `pkg/`.
+1. CLI: `cmd/mieru`, `cmd/mita`, `pkg/cli`.
+2. Public API: `apis/client`, `apis/server`, plus shared `apis/common`, `apis/model`, `apis/constant`, `apis/log`, `apis/trafficpattern`. `apis/internal` is API-private.
+3. Control and config: `pkg/appctl` (app status, config files, URL import/export, gRPC management). `pkg/appctl/appctlcommon` holds helpers that `apis/` can use without importing the gRPC-dependent `pkg/appctl`.
+4. Runtime: `pkg/protocol` (mux/session transport; `serveruser` handles server-user auth), `pkg/socks5`, `pkg/cipher`, `pkg/replay`, `pkg/congestion`, `pkg/sockopts`, `pkg/egress`.
+5. Support utilities: `pkg/common`, `pkg/log`, `pkg/stderror`, `pkg/metrics`, `pkg/version`, and other small helper packages.
 
-Example and template configs are in `configs/`.
+## Compatibility Requirements
 
-Installation, protocol, security, and operation docs are in `docs/`.
+- Existing protocol and wire format must not change.
+- Exported elements in `apis/` must not change unless absolutely necessary.
+- Exported elements in `pkg/` may change, provided protocol and wire format remain unchanged.
 
-Integration-test helpers, Dockerfiles, and test commands are under `test/`.
+## Generated Code
 
-Build and packaging metadata lives in `build/`, `deployments/`, and the root `Makefile`.
+`pkg/appctl/appctlpb`, `pkg/appctl/appctlgrpc`, `pkg/metrics/metricspb`, and `pkg/version/updater/updaterpb` are generated. Never edit them by hand: change the `.proto` under `pkg/**/proto/` and run `make protobuf`.
 
-## Package Overview & Dependency Layers
+## Build and Test
 
-Keep executable and CLI dependencies at the top of the graph. Shared API packages may be imported by both external users and internal `pkg/` code, but lower-level packages should not import `cmd/` or `pkg/cli`.
+- `make lib`: fmt, vet, build, and race-enabled unit tests with coverage. Run before larger submissions.
+- `make lint`: `golangci-lint` using `.golangci.yaml`. Not included in `make lib`.
+- `make bench`: run when changing `pkg/cipher` or `pkg/protocol`.
+- `make run-container-test`: Docker integration tests. Run when changes affect networking, client/server behavior, API clients/servers, or deployment configs. Takes a few minutes.
+- Run tests outside the sandbox; most need network setup.
+- Do not run `make clean` unless explicitly requested.
+- Check `go.mod` before writing code. It pins the Go language version and dependency versions; do not use newer stdlib APIs or libraries that are not already present.
 
-- Entrypoints and CLI: `cmd/mieru`, `cmd/mita`, and `pkg/cli` register and parse commands, load configuration, run daemons, and call management APIs.
-- API surface: `apis/client` and `apis/server` expose embeddable client/server APIs. `apis/common`, `apis/model`, `apis/constant`, `apis/log`, and `apis/trafficpattern` provide shared interfaces, SOCKS/address models, protocol constants, logging hooks, and traffic-pattern helpers used by both API consumers and internal packages. `apis/internal` is for API-private helpers only.
-- Control and configuration: `pkg/appctl` owns app status, profile/config file handling, URL import/export, and gRPC management services. `pkg/appctl/appctlcommon` contains helpers that API packages can use without importing the full gRPC-dependent `pkg/appctl`.
-- Runtime implementation: `pkg/protocol` implements the mux/session transport, while `pkg/protocol/serveruser` handles server-user authentication and source-to-user caching. `pkg/socks5`, `pkg/cipher`, `pkg/replay`, `pkg/congestion`, `pkg/sockopts`, and `pkg/egress` implement SOCKS5 handling, encryption, replay protection, congestion state, socket options, and egress action policy.
-- Support packages: `pkg/common`, `pkg/log`, `pkg/stderror`, `pkg/metrics`, `pkg/version`, `pkg/version/updater`, `pkg/rng`, `pkg/mathext`, `pkg/deque`, and `pkg/testtool` provide reusable utilities, logging, errors, telemetry, version/update support, random/math helpers, data structures, and test support.
-- Generated protobuf packages: `pkg/appctl/appctlpb`, `pkg/appctl/appctlgrpc`, `pkg/metrics/metricspb`, and `pkg/version/updater/updaterpb` are generated from `.proto` definitions and should not be edited by hand.
+## Conventions
 
-## Build, Test, and Development Commands
-
-- `make fmt`: runs `go fmt ./...`.
-- `make vet`: runs `go vet ./...`.
-- `make lint`: runs `golangci-lint run ./...` using `.golangci.yaml`.
-- `make lib`: formats, vets, builds all Go packages, runs race-enabled unit tests, and writes `coverage.out` / `coverage.html`.
-- `make test-binary`: builds local binaries used by integration tests into `bin/`.
-- `make run-container-test`: builds Docker test images and runs the integration tests.
-- `make protobuf`: regenerates Go code after editing files in `pkg/**/proto/`.
-
-## Coding Style & Naming Conventions
-
-Use idiomatic Go formatted by `go fmt`; keep tabs for Go indentation.
-
-Package names are short, lowercase, and domain-oriented.
-
-Avoid very long names for functions, structs, and variables. If a concise name does not make the meaning obvious, add a brief Godoc comment explaining it.
-
-Test files use the standard `*_test.go` pattern beside the package they cover.
-
-Keep generated protobuf output in sync with `.proto` changes.
-
-## Testing Guidelines
-
-Add unit tests near changed code and prefer table-driven tests for protocol, parsing, and config behavior.
-
-Run `make lib` before larger submissions.
-
-Run `make bench` when changing `pkg/cipher`.
-
-Use Docker integration tests when changes affect runtime networking, client/server behavior, API clients, or deployment configs. It can take a few minutes to run the Docker integration tests.
-
-Run tests outside sandbox because most tests require network setup.
-
-## Commit & Pull Request Guidelines
-
-Use concise Conventional Commit-style prefixes.
-
-## Agent-Specific Instructions
-
-Do not run destructive cleanup such as `make clean` unless explicitly requested.
-
-Before writing go code, check go.mod file to confirm the compatibility of libraries.
-
-Avoid editing generated protobuf files by hand; update the source `.proto` and run `make protobuf` instead.
-
-When modifying documentation, also provide a precise Chinese translation of the modified content in related `zh_CN.md` file.
+- Prefer table-driven tests for protocol, parsing, and config behavior.
+- Avoid very long identifiers. If a concise name is not self-explanatory, add a brief Godoc comment.
+- Use concise Conventional Commit prefixes.
+- When modifying a doc that has a `*.zh_CN.md` counterpart, update the Chinese file with a precise translation of the changed content.
