@@ -100,8 +100,7 @@ func (s *Server) handleAuthentication(conn net.Conn) error {
 		return fmt.Errorf("socks5 client provided authentication is not supported by socks5 server")
 	}
 	if requestNoAuth && len(s.config.AuthOpts.IngressCredentials) == 0 {
-		// Handle no authentication. It is only allowed when the socks5 server
-		// does not require user and password credentials.
+		// Allow no authentication when the socks5 server does not configure credentials.
 		if _, err := conn.Write([]byte{constant.Socks5Version, constant.Socks5NoAuth}); err != nil {
 			HandshakeErrors.Add(1)
 			return fmt.Errorf("write authentication response (no authentication required) failed: %w", err)
@@ -164,8 +163,7 @@ func (s *Server) handleAuthentication(conn net.Conn) error {
 		}
 		return fmt.Errorf("user password authentication failed: invalid user or password")
 	} else {
-		// The client only offers no authentication, but the server requires
-		// user and password credentials.
+		// The client only offers no authentication, but the server requires credentials.
 		HandshakeErrors.Add(1)
 		return fmt.Errorf("socks5 client requested no authentication, but user and password are required by socks5 server")
 	}

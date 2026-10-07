@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"io"
 	"net"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -27,6 +28,7 @@ import (
 )
 
 // BufPipe is like net.Pipe() but with an internal buffer.
+// Write never blocks, and Read can drain buffered data after the peer is closed.
 func BufPipe() (net.Conn, net.Conn) {
 	var buf1, buf2 bytes.Buffer
 	var lock1, lock2 sync.Mutex
@@ -64,79 +66,57 @@ const (
 )
 
 type ioEndpoint struct {
-	direction ioDirection
-	buf1      *bytes.Buffer // forward writes to here
-	buf2      *bytes.Buffer // backward writes to here
-	lock1     *sync.Mutex   // lock of buf1
-	lock2     *sync.Mutex   // lock of buf2
-	cond1     *sync.Cond
-	cond2     *sync.Cond
-	closed    atomic.Bool
-	peer      *ioEndpoint
+	direction     ioDirection
+	buf1          *bytes.Buffer // forward writes to here
+	buf2          *bytes.Buffer // backward writes to here
+	lock1         *sync.Mutex   // lock of buf1
+	lock2         *sync.Mutex   // lock of buf2
+	cond1         *sync.Cond
+	cond2         *sync.Cond
+	closed        atomic.Bool
+	peer          *ioEndpoint
+	readDeadline  deadline
+	writeDeadline time.Time
 }
 
 var _ net.Conn = &ioEndpoint{}
 
 func (e *ioEndpoint) Read(b []byte) (n int, err error) {
-	if e.closed.Load() {
-		return 0, io.EOF
-	}
-
-	var buffer *bytes.Buffer
-	var lock *sync.Mutex
-	var cond *sync.Cond
-
-	if e.direction == forward {
-		buffer = e.buf2
-		lock = e.lock2
-		cond = e.cond2
-	} else {
-		buffer = e.buf1
-		lock = e.lock1
-		cond = e.cond1
-	}
-
+	buffer, lock, cond := e.readSide()
 	lock.Lock()
 	defer lock.Unlock()
 
-	for buffer.Len() == 0 {
-		if e.closed.Load() || e.peer.closed.Load() {
+	for {
+		if e.closed.Load() {
+			return 0, io.ErrClosedPipe
+		}
+		if e.readDeadline.exceeded {
+			return 0, os.ErrDeadlineExceeded
+		}
+		if buffer.Len() > 0 {
+			return buffer.Read(b)
+		}
+		if e.peer.closed.Load() {
 			return 0, io.EOF
 		}
 		cond.Wait()
 	}
-
-	return buffer.Read(b)
 }
 
 func (e *ioEndpoint) Write(b []byte) (n int, err error) {
-	if e.closed.Load() {
-		return 0, io.ErrClosedPipe
-	}
-
-	var buffer *bytes.Buffer
-	var lock *sync.Mutex
-	var cond *sync.Cond
-
-	if e.direction == forward {
-		buffer = e.buf1
-		lock = e.lock1
-		cond = e.cond1
-	} else {
-		buffer = e.buf2
-		lock = e.lock2
-		cond = e.cond2
-	}
-
+	buffer, lock, cond := e.writeSide()
 	lock.Lock()
 	defer lock.Unlock()
 
-	if e.peer.closed.Load() {
+	if e.closed.Load() || e.peer.closed.Load() {
 		return 0, io.ErrClosedPipe
+	}
+	if !e.writeDeadline.IsZero() && !time.Now().Before(e.writeDeadline) {
+		return 0, os.ErrDeadlineExceeded
 	}
 
 	n, err = buffer.Write(b)
-	cond.Signal()
+	cond.Broadcast()
 	return
 }
 
@@ -144,8 +124,11 @@ func (e *ioEndpoint) Close() error {
 	if e.closed.Swap(true) {
 		return nil
 	}
-	e.cond1.Broadcast()
-	e.cond2.Broadcast()
+	for _, cond := range []*sync.Cond{e.cond1, e.cond2} {
+		cond.L.Lock()
+		cond.Broadcast()
+		cond.L.Unlock()
+	}
 	return nil
 }
 
@@ -158,13 +141,86 @@ func (e *ioEndpoint) RemoteAddr() net.Addr {
 }
 
 func (e *ioEndpoint) SetDeadline(t time.Time) error {
-	return nil
+	if err := e.SetReadDeadline(t); err != nil {
+		return err
+	}
+	return e.SetWriteDeadline(t)
 }
 
 func (e *ioEndpoint) SetReadDeadline(t time.Time) error {
+	_, lock, cond := e.readSide()
+	lock.Lock()
+	defer lock.Unlock()
+
+	if e.closed.Load() {
+		return io.ErrClosedPipe
+	}
+	e.readDeadline.set(t, cond)
 	return nil
 }
 
 func (e *ioEndpoint) SetWriteDeadline(t time.Time) error {
+	_, lock, _ := e.writeSide()
+	lock.Lock()
+	defer lock.Unlock()
+
+	if e.closed.Load() {
+		return io.ErrClosedPipe
+	}
+	e.writeDeadline = t
 	return nil
+}
+
+// readSide returns the buffer to read from, with its lock and condition.
+func (e *ioEndpoint) readSide() (*bytes.Buffer, *sync.Mutex, *sync.Cond) {
+	if e.direction == forward {
+		return e.buf2, e.lock2, e.cond2
+	}
+	return e.buf1, e.lock1, e.cond1
+}
+
+// writeSide returns the buffer to write to, with its lock and condition.
+func (e *ioEndpoint) writeSide() (*bytes.Buffer, *sync.Mutex, *sync.Cond) {
+	if e.direction == forward {
+		return e.buf1, e.lock1, e.cond1
+	}
+	return e.buf2, e.lock2, e.cond2
+}
+
+// deadline becomes exceeded when the timer fires, and wakes up
+// the waiters of the condition. It is protected by the lock of the condition.
+type deadline struct {
+	timer    *time.Timer
+	seq      uint64 // identifies the current timer
+	exceeded bool
+}
+
+// set changes the deadline to t. A zero value of t means no deadline.
+func (d *deadline) set(t time.Time, cond *sync.Cond) {
+	if d.timer != nil {
+		d.timer.Stop()
+		d.timer = nil
+	}
+	// A previous timer may have fired and be waiting for the lock.
+	// Changing seq prevents it from affecting the new deadline.
+	d.seq++
+	d.exceeded = false
+	if t.IsZero() {
+		return
+	}
+
+	if dur := time.Until(t); dur > 0 {
+		seq := d.seq
+		d.timer = time.AfterFunc(dur, func() {
+			cond.L.Lock()
+			defer cond.L.Unlock()
+			if d.seq == seq {
+				d.exceeded = true
+				cond.Broadcast()
+			}
+		})
+		return
+	}
+	d.exceeded = true
+	cond.Broadcast()
 }

@@ -11,7 +11,8 @@ import (
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/constant"
-	"github.com/enfein/mieru/v3/pkg/common"
+	"github.com/enfein/mieru/v3/pkg/stderror"
+	"github.com/enfein/mieru/v3/pkg/testtool"
 )
 
 func TestNewRejectsUnsupportedUDPAssociateMode(t *testing.T) {
@@ -27,6 +28,7 @@ func TestSocks5Connect(t *testing.T) {
 	if err != nil {
 		t.Fatalf("net.Listen() failed: %v", err)
 	}
+	defer l.Close()
 	go func() {
 		conn, err := l.Accept()
 		if err != nil {
@@ -61,24 +63,7 @@ func TestSocks5Connect(t *testing.T) {
 		t.Fatalf("New() failed: %v", err)
 	}
 
-	// Socks server start listening.
-	serverPort, err := common.UnusedTCPPort()
-	if err != nil {
-		t.Fatalf("common.UnusedTCPPort() failed: %v", err)
-	}
-	go func() {
-		if err := serv.ListenAndServe("tcp", "127.0.0.1:"+strconv.Itoa(serverPort)); err != nil {
-			t.Errorf("ListenAndServe() failed: %v", err)
-			return
-		}
-	}()
-	time.Sleep(200 * time.Millisecond)
-
-	// Dial to socks server.
-	conn, err := net.Dial("tcp", "127.0.0.1:"+strconv.Itoa(serverPort))
-	if err != nil {
-		t.Fatalf("net.Dial() failed: %v", err)
-	}
+	conn := servePipe(t, serv)
 
 	req := bytes.NewBuffer(nil)
 	req.Write([]byte{constant.Socks5Version, 1, constant.Socks5NoAuth})
@@ -170,24 +155,7 @@ func TestSocks5UDPAssociation(t *testing.T) {
 		t.Fatalf("New() failed: %v", err)
 	}
 
-	// Socks server start listening.
-	serverPort, err := common.UnusedTCPPort()
-	if err != nil {
-		t.Fatalf("common.UnusedTCPPort() failed: %v", err)
-	}
-	go func() {
-		if err := serv.ListenAndServe("tcp", "127.0.0.1:"+strconv.Itoa(serverPort)); err != nil {
-			t.Errorf("ListenAndServe() failed: %v", err)
-			return
-		}
-	}()
-	time.Sleep(200 * time.Millisecond)
-
-	// Dial to socks server.
-	conn, err := net.Dial("tcp", "127.0.0.1:"+strconv.Itoa(serverPort))
-	if err != nil {
-		t.Fatalf("net.Dial() failed: %v", err)
-	}
+	conn := servePipe(t, serv)
 
 	req := bytes.NewBuffer(nil)
 	req.Write([]byte{constant.Socks5Version, 1, constant.Socks5NoAuth})
@@ -249,4 +217,31 @@ func TestSocks5UDPAssociation(t *testing.T) {
 	if UDPAssociateDownloadPackets.Load() <= udpDownloadPktsCnt {
 		t.Errorf("UDPAssociateDownloadPackets value %d is not increased", UDPAssociateDownloadPackets.Load())
 	}
+}
+
+// servePipe buffers pipelined authentication, requests, and payloads while the
+// server writes its replies before reading the next part of the request.
+func servePipe(t *testing.T, serv *Server) net.Conn {
+	t.Helper()
+	clientConn, serverConn := testtool.BufPipe()
+	done := make(chan error, 1)
+	go func() {
+		done <- serv.ServeConn(serverConn)
+	}()
+	t.Cleanup(func() {
+		clientConn.Close()
+		serverConn.Close()
+		select {
+		case err := <-done:
+			if err != nil && !stderror.IsEOF(err) && !stderror.IsClosed(err) {
+				t.Errorf("ServeConn() failed: %v", err)
+			}
+		case <-time.After(time.Second):
+			t.Error("socks5 server did not stop")
+		}
+	})
+	if err := clientConn.SetDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		t.Fatalf("SetDeadline() failed: %v", err)
+	}
+	return clientConn
 }

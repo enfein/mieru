@@ -35,12 +35,11 @@ func (r datagramFailResolver) LookupIP(_ context.Context, _ string, host string)
 }
 
 func TestDatagramModeNoAuthNegotiation(t *testing.T) {
-	proxyAddr := startDatagramModeServer(t, nil)
-	conn, err := net.Dial("tcp", proxyAddr)
+	serv, err := New(&Config{UDPAssociateMode: UDPAssociateModeDatagram})
 	if err != nil {
-		t.Fatalf("net.Dial() failed: %v", err)
+		t.Fatalf("New() failed: %v", err)
 	}
-	defer conn.Close()
+	conn := servePipe(t, serv)
 
 	if _, err := conn.Write([]byte{constant.Socks5Version, 1, constant.Socks5NoAuth}); err != nil {
 		t.Fatalf("Write() failed: %v", err)
