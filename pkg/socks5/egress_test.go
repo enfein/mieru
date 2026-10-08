@@ -155,6 +155,47 @@ func TestEgressRule(t *testing.T) {
 	}
 }
 
+// makeSocks5ConnectDomainInput builds an egress.Input for a SOCKS5 CONNECT
+// request to the given domain name.
+func makeSocks5ConnectDomainInput(domain, user string) egress.Input {
+	data := []byte{constant.Socks5Version, constant.Socks5ConnectCmd, 0, constant.Socks5FQDNAddress, byte(len(domain))}
+	data = append(data, []byte(domain)...)
+	data = append(data, 0, 80)
+	in := egress.Input{
+		Protocol: appctlpb.ProxyProtocol_SOCKS5_PROXY_PROTOCOL,
+		Data:     data,
+	}
+	if user != "" {
+		in.Env = map[string]string{"user": user}
+	}
+	return in
+}
+
+// TestRejectPrivateAndLoopbackDomainName checks that the well-known local
+// domain names are recognized regardless of the DNS-equivalent spelling used
+// by the client. DNS names are case-insensitive and a trailing dot denotes the
+// same absolute name, so all of these spellings address the loopback interface
+// and must be rejected when the user did not enable allowLoopbackIP.
+func TestRejectPrivateAndLoopbackDomainName(t *testing.T) {
+	controller := &Server{
+		config: &Config{
+			Egress:   &appctlpb.Egress{},
+			Resolver: apicommon.NilDNSResolver{},
+			Users: map[string]*appctlpb.User{
+				"xijinping": {Name: proto.String("xijinping")},
+			},
+		},
+	}
+	for _, domain := range []string{"localhost", "LOCALHOST", "LocalHost", "localhost.", "LOCALHOST.", "IP6-LOCALHOST"} {
+		t.Run(domain, func(t *testing.T) {
+			action := controller.FindAction(context.Background(), makeSocks5ConnectDomainInput(domain, "xijinping"))
+			if action.Action != appctlpb.EgressAction_REJECT {
+				t.Errorf("FindAction(%q) = %v, want %v", domain, action.Action, appctlpb.EgressAction_REJECT)
+			}
+		})
+	}
+}
+
 func TestMatchEgressRule(t *testing.T) {
 	controller := &Server{
 		config: &Config{
