@@ -104,7 +104,11 @@ func (s *Server) rejectPrivateAndLoopbackIPAction(_ context.Context, in egress.I
 	if len(ip) == 0 && req.DstAddr.FQDN != "" {
 		// If we do a DNS lookup, we leak the destination domain name to the DNS server.
 		// For user privacy, we only check some well-known local domain names.
-		domainName := req.DstAddr.FQDN
+		// DNS names are case-insensitive and a trailing dot denotes the same
+		// absolute name, so normalize the name before matching. Otherwise a
+		// client could bypass the loopback / private address guard by sending
+		// "LOCALHOST" or "localhost." instead of "localhost".
+		domainName := strings.ToLower(strings.TrimSuffix(req.DstAddr.FQDN, "."))
 		isWellKnownIPv4LocalDomainName := false
 		isWellKnownIPv6LocalDomainName := false
 		for _, d := range wellKnownIPv4LocalDomainNames {
