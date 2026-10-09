@@ -75,6 +75,11 @@ type Mux struct {
 
 	// ---- server only fields ----
 	serverUsers serveruser.Registry
+
+	// serverUnderlayIdleTimeout is the duration after which the server closes
+	// a underlay that has no session and no network activity. Zero disables
+	// the reclamation, which is the default.
+	serverUnderlayIdleTimeout time.Duration
 }
 
 var _ net.Listener = &Mux{}
@@ -292,6 +297,21 @@ func (m *Mux) SetServerUserHintIsMandatory(userHintIsMandatory bool) *Mux {
 	}
 	m.serverUsers.SetHintMandatory(userHintIsMandatory)
 	log.Infof("Mux user hint is mandatory is set to %v", userHintIsMandatory)
+	return m
+}
+
+// SetServerUnderlayIdleTimeout sets how long the server keeps a underlay
+// network connection that has no session and no network activity.
+// Zero or a negative duration disables the reclamation, so the underlay is
+// only closed when the client closes it. This is the default behavior.
+func (m *Mux) SetServerUnderlayIdleTimeout(d time.Duration) *Mux {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if d < 0 {
+		d = 0
+	}
+	m.serverUnderlayIdleTimeout = d
+	log.Infof("Mux server underlay idle timeout is set to %v", d)
 	return m
 }
 
@@ -770,6 +790,25 @@ func (m *Mux) maybePickExistingUnderlay() Underlay {
 	return nil
 }
 
+// shouldCloseIdleServerUnderlay returns true if the server should close the
+// underlay because it carries no active session and no recent network
+// activity. A session that is already closed may stay in the session map until
+// the underlay event loop processes it, so SessionCount() is not used here.
+// The caller must hold m.mu.
+func (m *Mux) shouldCloseIdleServerUnderlay(underlay Underlay) bool {
+	if m.isClient || m.serverUnderlayIdleTimeout <= 0 {
+		return false
+	}
+	if underlay.ActiveSessionCount() != 0 {
+		return false
+	}
+	lastActive := underlay.LastActivity()
+	if lastActive.IsZero() {
+		return false
+	}
+	return time.Since(lastActive) > m.serverUnderlayIdleTimeout
+}
+
 // cleanUnderlay removes closed underlays.
 // This method MUST be called only when holding the mu lock.
 func (m *Mux) cleanUnderlay(alsoDisableIdleOrOverloadUnderlay bool) {
@@ -780,6 +819,16 @@ func (m *Mux) cleanUnderlay(alsoDisableIdleOrOverloadUnderlay bool) {
 		select {
 		case <-underlay.Done():
 		default:
+			// On the server the scheduler is never disabled, so a underlay
+			// without session and without network activity would stay open
+			// until the client closes it. Reclaim it here instead.
+			if m.shouldCloseIdleServerUnderlay(underlay) {
+				log.Debugf("Closing idle server underlay %v, no activity for %v", underlay, time.Since(underlay.LastActivity()))
+				underlay.Close()
+				close++
+				continue
+			}
+
 			// Close idle underlay.
 			if underlay.SessionCount() == 0 && underlay.Scheduler().Idle() {
 				underlay.Close()

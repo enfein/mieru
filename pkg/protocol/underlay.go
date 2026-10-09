@@ -18,6 +18,7 @@ package protocol
 import (
 	"context"
 	"net"
+	"time"
 
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/common"
@@ -69,6 +70,9 @@ type Underlay interface {
 	// Returns the number of sessions.
 	SessionCount() int
 
+	// Returns the number of sessions that are not closed yet.
+	ActiveSessionCount() int
+
 	// Returns detailed information of all the sessions.
 	SessionInfos() []*appctlpb.SessionInfo
 
@@ -77,6 +81,9 @@ type Underlay interface {
 
 	// Number of bytes sent to the network.
 	OutBytes() int64
+
+	// Return the time of the last observed network activity.
+	LastActivity() time.Time
 
 	// Run event loop.
 	// The underlay needs to be closed when this returns.

@@ -66,6 +66,13 @@ message ServerAdvancedSettings {
     // If true, proxy clients must provide user hint,
     // otherwise proxy server will refuse to decrypt the network packets.
     optional bool userHintIsMandatory = 3;
+
+    // If set, the server closes a underlay network connection that has no
+    // session and no network activity for this duration.
+    // Examples: 30s, 2m, 5m.
+    // If empty, idle underlay connections are never reclaimed by the server,
+    // which is the same behavior as before this setting was introduced.
+    optional string underlayIdleTimeout = 4;
 }
 
 message Egress {

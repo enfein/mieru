@@ -59,6 +59,10 @@ type baseUnderlay struct {
 	inBytes  atomic.Int64
 	outBytes atomic.Int64
 
+	// lastActive is the unix nano timestamp of the last observed network
+	// activity. It is only used by the server to reclaim idle underlays.
+	lastActive atomic.Int64
+
 	// ---- client fields ----
 	scheduler *ScheduleController
 }
@@ -68,7 +72,7 @@ var (
 )
 
 func newBaseUnderlay(isClient bool, mtu int, trafficPattern *appctlpb.TrafficPattern) *baseUnderlay {
-	return &baseUnderlay{
+	b := &baseUnderlay{
 		isClient:       isClient,
 		mtu:            mtu,
 		done:           make(chan struct{}),
@@ -76,6 +80,8 @@ func newBaseUnderlay(isClient bool, mtu int, trafficPattern *appctlpb.TrafficPat
 		trafficPattern: trafficPattern,
 		scheduler:      &ScheduleController{},
 	}
+	b.touch()
+	return b
 }
 
 // Accept implements net.Listener interface.
@@ -186,6 +192,23 @@ func (b *baseUnderlay) SessionCount() int {
 	return n
 }
 
+// ActiveSessionCount returns the number of sessions that are not closed yet.
+// A session may stay in the session map for a while after it is closed, so
+// this is the value to use when deciding whether a underlay is still in use.
+func (b *baseUnderlay) ActiveSessionCount() int {
+	n := 0
+	b.sessionMap.Range(func(k, v any) bool {
+		s := v.(*Session)
+		select {
+		case <-s.closedChan:
+		default:
+			n++
+		}
+		return true
+	})
+	return n
+}
+
 func (b *baseUnderlay) SessionInfos() []*appctlpb.SessionInfo {
 	res := make([]*appctlpb.SessionInfo, 0)
 	b.sessionMap.Range(func(k, v any) bool {
@@ -202,6 +225,17 @@ func (b *baseUnderlay) InBytes() int64 {
 
 func (b *baseUnderlay) OutBytes() int64 {
 	return b.outBytes.Load()
+}
+
+// touch records network activity on the underlay connection.
+func (b *baseUnderlay) touch() {
+	b.lastActive.Store(time.Now().UnixNano())
+}
+
+// LastActivity returns the time of the last observed network activity.
+// It returns the zero time if the underlay was never touched.
+func (b *baseUnderlay) LastActivity() time.Time {
+	return time.Unix(0, b.lastActive.Load())
 }
 
 func (b *baseUnderlay) RunEventLoop(ctx context.Context) error {

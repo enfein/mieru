@@ -84,6 +84,25 @@ type serverProxy struct {
 	socks5Server *socks5.Server
 }
 
+// serverUnderlayIdleTimeout returns the configured duration after which the
+// server closes a underlay that has no session and no network activity.
+// An empty, invalid, or negative value disables the reclamation.
+func serverUnderlayIdleTimeout(config *pb.ServerConfig) time.Duration {
+	value := config.GetAdvancedSettings().GetUnderlayIdleTimeout()
+	if value == "" {
+		return 0
+	}
+	d, err := time.ParseDuration(value)
+	if err != nil {
+		log.Warnf("Failed to parse underlay idle timeout %q from server configuration: %v", value, err)
+		return 0
+	}
+	if d < 0 {
+		return 0
+	}
+	return d
+}
+
 func newServerProxy(config *pb.ServerConfig) (*serverProxy, error) {
 	trafficPattern, err := trafficpattern.NewConfig(config.TrafficPattern)
 	if err != nil {
@@ -92,7 +111,8 @@ func newServerProxy(config *pb.ServerConfig) (*serverProxy, error) {
 	mux := protocol.NewMux(false).
 		SetTrafficPattern(trafficPattern).
 		SetServerUsers(appctlcommon.UserListToMap(config.GetUsers())).
-		SetServerUserHintIsMandatory(config.GetAdvancedSettings().GetUserHintIsMandatory())
+		SetServerUserHintIsMandatory(config.GetAdvancedSettings().GetUserHintIsMandatory()).
+		SetServerUnderlayIdleTimeout(serverUnderlayIdleTimeout(config))
 	mtu := common.DefaultMTU
 	if config.GetMtu() != 0 {
 		mtu = int(config.GetMtu())
@@ -318,6 +338,9 @@ func (s *serverManagementService) Reload(ctx context.Context, req *emptypb.Empty
 
 		// Adjust advanced settings: user hint is mandatory.
 		mux.SetServerUserHintIsMandatory(config.GetAdvancedSettings().GetUserHintIsMandatory())
+
+		// Adjust advanced settings: underlay idle timeout.
+		mux.SetServerUnderlayIdleTimeout(serverUnderlayIdleTimeout(config))
 	}
 	log.Infof("completed Reload request from RPC caller")
 	return &emptypb.Empty{}, nil
@@ -705,6 +728,7 @@ func DeleteServerUsers(names []string) error {
 // 7. DNS host mapping is valid
 // 8. if set, metrics logging interval is valid, and it is not less than 1 second
 // 9. if set, traffic pattern is valid
+// 10. if set, underlay idle timeout is valid, and it is not negative
 func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 	if err := appctlcommon.ValidateServerListenIPAddress(patch.GetListenIPAddress()); err != nil {
 		return err
@@ -791,6 +815,15 @@ func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 		}
 		if d < time.Second {
 			return fmt.Errorf("metrics logging interval %q is less than 1 second", patch.GetAdvancedSettings().GetMetricsLoggingInterval())
+		}
+	}
+	if patch.GetAdvancedSettings().GetUnderlayIdleTimeout() != "" {
+		d, err := time.ParseDuration(patch.GetAdvancedSettings().GetUnderlayIdleTimeout())
+		if err != nil {
+			return fmt.Errorf("underlay idle timeout %q is invalid: %w", patch.GetAdvancedSettings().GetUnderlayIdleTimeout(), err)
+		}
+		if d < 0 {
+			return fmt.Errorf("underlay idle timeout %q is negative", patch.GetAdvancedSettings().GetUnderlayIdleTimeout())
 		}
 	}
 	if err := trafficpattern.Validate(patch.GetTrafficPattern()); err != nil {
