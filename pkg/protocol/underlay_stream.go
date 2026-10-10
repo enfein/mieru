@@ -17,6 +17,7 @@ package protocol
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -374,8 +375,8 @@ func (t *StreamUnderlay) readOneSegment() (*segment, error) {
 	}
 	encryptedMeta := make([]byte, readLen)
 	if n, err := io.ReadFull(t.conn, encryptedMeta); err != nil {
-		if stderror.IsTimeout(err) && n == 0 {
-			// No TCP data received. Caller will retry.
+		if stderror.IsTimeout(err) && n == 0 && !errors.Is(err, net.ErrClosed) {
+			// Retry read deadlines, but never a timeout that closed the underlay.
 			return nil, nil
 		}
 		err = fmt.Errorf("metadata: read %d bytes from StreamUnderlay failed: %w", readLen, err)
