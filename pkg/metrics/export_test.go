@@ -136,6 +136,7 @@ func TestMetricPBConvertion(t *testing.T) {
 					{
 						TimeUnixMilli: proto.Int64(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC).UnixMilli()),
 						Delta:         proto.Int64(100),
+						RollUp:        pb.RollUpLabel_ROLL_UP_TO_DAY.Enum(),
 					},
 				},
 			},
@@ -170,5 +171,47 @@ func TestMetricPBConvertion(t *testing.T) {
 				t.Errorf("metric protobuf doesn't match.\nwant: %v\ngot: %v", tc.metricPB, p2)
 			}
 		})
+	}
+}
+
+func TestLoadLegacyHistory(t *testing.T) {
+	base := time.Date(2024, time.March, 1, 0, 0, 0, 0, time.UTC)
+	ms := func(d time.Duration) *int64 { return proto.Int64(base.Add(d).UnixMilli()) }
+	src := &pb.Metric{
+		Name:  proto.String("counter_ts"),
+		Type:  pb.MetricType_COUNTER_TIME_SERIES.Enum(),
+		Value: proto.Int64(31),
+		History: []*pb.History{
+			{TimeUnixMilli: ms(-10 * 24 * time.Hour), Delta: proto.Int64(1), RollUp: pb.RollUpLabel_ROLL_UP_TO_DAY.Enum()},
+			{TimeUnixMilli: ms(-3 * time.Hour), Delta: proto.Int64(2), RollUp: pb.RollUpLabel_ROLL_UP_TO_HOUR.Enum()},
+			{TimeUnixMilli: ms(-10 * time.Minute), Delta: proto.Int64(4), RollUp: pb.RollUpLabel_ROLL_UP_TO_MINUTE.Enum()},
+			{TimeUnixMilli: ms(-10 * time.Second), Delta: proto.Int64(8), RollUp: pb.RollUpLabel_ROLL_UP_TO_SECOND.Enum()},
+			{TimeUnixMilli: ms(-1500 * time.Millisecond), Delta: proto.Int64(16), RollUp: pb.RollUpLabel_NO_ROLL_UP.Enum()},
+		},
+	}
+	m, err := FromMetricPB(src)
+	if err != nil {
+		t.Fatalf("FromMetricPB() failed: %v", err)
+	}
+	c := m.(*Counter)
+	if got := c.DeltaBetween(base.Add(-time.Hour), base); got != 4+8+16 {
+		t.Errorf("DeltaBetween() = %d, want %d", got, 4+8+16)
+	}
+	if got, want := c.LastUpdateTime(), base.Add(-1500*time.Millisecond); !got.Equal(want) {
+		t.Errorf("LastUpdateTime() = %v, want %v", got, want)
+	}
+	p := ToMetricPB(c)
+	var sum int64
+	for i, h := range p.GetHistory() {
+		sum += h.GetDelta()
+		if h.GetRollUp() == pb.RollUpLabel_NO_ROLL_UP {
+			t.Errorf("history %d is not rolled up", i)
+		}
+		if i > 0 && h.GetTimeUnixMilli() < p.GetHistory()[i-1].GetTimeUnixMilli() {
+			t.Errorf("history %d is not ordered by time", i)
+		}
+	}
+	if sum != p.GetValue() || sum != 31 {
+		t.Errorf("history sum = %d, value = %d, want 31", sum, p.GetValue())
 	}
 }

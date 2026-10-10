@@ -222,12 +222,9 @@ func ToMetricPB(src Metric) *pb.Metric {
 	}
 	dst.Value = proto.Int64(src.Load())
 	if src.Type() == COUNTER_TIME_SERIES {
-		counter := src.(*Counter)
-		counter.mu.Lock()
-		dst.Value = proto.Int64(counter.value) // Make sure value matches history.
-		dst.History = make([]*pb.History, len(counter.history))
-		copy(dst.History, counter.history)
-		counter.mu.Unlock()
+		value, history := src.(*Counter).historyPB() // Make sure value matches history.
+		dst.Value = proto.Int64(value)
+		dst.History = history
 	}
 	return dst
 }
@@ -306,7 +303,9 @@ func loadCounterFromMetricPB(dst *Counter, src *pb.Metric) {
 	if (src.GetType() == pb.MetricType_COUNTER && dst.Type() == COUNTER) || (src.GetType() == pb.MetricType_COUNTER_TIME_SERIES && dst.Type() == COUNTER_TIME_SERIES) {
 		delta := mathext.Max(0, src.GetValue()-dst.Load())
 		dst.Add(delta)
-		dst.history = src.GetHistory()
+		if dst.timeSeries {
+			dst.loadHistory(src.GetHistory())
+		}
 	}
 }
 

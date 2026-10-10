@@ -89,15 +89,111 @@ func TestRollUp(t *testing.T) {
 		c.addWithTime(v, time.UnixMilli(timestamps[i]))
 		total += v
 	}
-	t.Logf("Length of history is %d", len(c.history))
-	if c.value != total {
-		t.Fatalf("Got counter value %d, want %d", c.value, total)
+	if c.Load() != total {
+		t.Fatalf("Got counter value %d, want %d", c.Load(), total)
 	}
 	var sum int64
-	for _, r := range c.history {
-		sum += r.GetDelta()
+	for i, h := range c.history {
+		t.Logf("Length of history tier %d is %d", i, len(h))
+		for _, b := range h {
+			sum += b.delta
+		}
 	}
 	if sum != total {
 		t.Errorf("History sum up to %d, want %d", sum, total)
 	}
+}
+
+func TestCompact(t *testing.T) {
+	base := time.Date(2024, time.January, 10, 0, 0, 0, 0, time.UTC)
+	testcases := []struct {
+		name string
+		at   time.Duration // add time relative to base
+		now  time.Duration // compaction time relative to base
+		tier int
+		want time.Duration // bucket start relative to base
+	}{
+		{"second", 1500 * time.Millisecond, 2 * time.Second, 0, time.Second},
+		{"second retained", 1500 * time.Millisecond, 121 * time.Second, 0, time.Second},
+		{"to minute", 61500 * time.Millisecond, 182 * time.Second, 1, time.Minute},
+		{"to hour", 61 * time.Minute, 182 * time.Minute, 2, time.Hour},
+		{"to day", 25 * time.Hour, 10 * 24 * time.Hour, 3, 24 * time.Hour},
+		{"previous day", -1500 * time.Millisecond, 0, 0, -2 * time.Second},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &Counter{name: "counter", timeSeries: true}
+			c.addWithTime(7, base.Add(tc.at))
+			c.compact(base.Add(tc.now).UnixMilli())
+			for i, h := range c.history {
+				if i != tc.tier && len(h) != 0 {
+					t.Fatalf("tier %d has %d buckets, want 0", i, len(h))
+				}
+			}
+			h := c.history[tc.tier]
+			want := bucket{start: base.Add(tc.want).UnixMilli(), delta: 7}
+			if len(h) != 1 || h[0] != want {
+				t.Errorf("tier %d = %v, want [%v]", tc.tier, h, want)
+			}
+		})
+	}
+}
+
+func TestHistoryIsBounded(t *testing.T) {
+	c := &Counter{name: "counter", timeSeries: true}
+	start := time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)
+	const days = 10
+	for ts := start; ts.Before(start.Add(days * 24 * time.Hour)); ts = ts.Add(5 * time.Second) {
+		c.addWithTime(1, ts)
+	}
+	end := start.Add(days * 24 * time.Hour)
+	limits := []int{121 + 1, 121 + 1, 8*24 + 1, days + 1}
+	var sum int64
+	for i, h := range c.history {
+		if len(h) > limits[i] {
+			t.Errorf("tier %d has %d buckets, want <= %d", i, len(h), limits[i])
+		}
+		for j := 1; j < len(h); j++ {
+			if h[j].start <= h[j-1].start {
+				t.Fatalf("tier %d is not ordered at %d", i, j)
+			}
+		}
+		for _, b := range h {
+			sum += b.delta
+		}
+	}
+	if sum != c.Load() {
+		t.Errorf("History sum up to %d, want %d", sum, c.Load())
+	}
+	// 1 update per 5 seconds. The window can miss at most one hour bucket.
+	got := c.DeltaBetween(end.Add(-24*time.Hour), end)
+	if want := int64(24 * 720); got > want || got < want-720 {
+		t.Errorf("DeltaBetween() = %d, want within [%d, %d]", got, want-720, want)
+	}
+}
+
+func BenchmarkCounterAdd(b *testing.B) {
+	c := &Counter{name: "counter"}
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		c.Add(100)
+	}
+}
+
+func BenchmarkCounterAddTimeSeries(b *testing.B) {
+	c := &Counter{name: "counter", timeSeries: true}
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		c.Add(100)
+	}
+}
+
+func BenchmarkCounterAddTimeSeriesParallel(b *testing.B) {
+	c := &Counter{name: "counter", timeSeries: true}
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			c.Add(100)
+		}
+	})
 }
