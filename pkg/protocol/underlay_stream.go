@@ -383,6 +383,7 @@ func (t *StreamUnderlay) readOneSegment() (*segment, error) {
 		return nil, stderror.WrapErrorWithType(err, stderror.NETWORK_ERROR)
 	}
 	t.inBytes.Add(int64(len(encryptedMeta)))
+	t.touch()
 	if t.isClient {
 		metrics.DownloadBytes.Add(int64(len(encryptedMeta)))
 	} else {
@@ -613,6 +614,7 @@ func (t *StreamUnderlay) writeOneSegment(seg *segment) error {
 	if seg == nil {
 		return stderror.ErrNullPointer
 	}
+	t.touch()
 
 	t.sendMutex.Lock()
 	defer t.sendMutex.Unlock()
