@@ -1,0 +1,80 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to release (v{major}.{minor}.{patch})'
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - name: Validate tag and check for an existing release
+        run: |
+          if [[ ! "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo '[error] Tag must have the format v{major}.{minor}.{patch}.'
+            exit 1
+          fi
+          gh api "repos/$GH_REPO/git/ref/tags/$TAG" --silent
+          # Listing releases includes drafts and checks every page.
+          release_id=$(gh api --paginate "repos/$GH_REPO/releases" \
+            --jq ".[] | select(.tag_name == \"$TAG\") | .id")
+          if [[ -n "$release_id" ]]; then
+            echo "[error] A release already exists for $TAG."
+            exit 1
+          fi
+      - name: Check out tagged repository code
+        uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.25'
+      - name: Create vendor directory
+        run: make vendor
+      - name: Build binaries
+        run: make build
+      - name: Create draft release with artifacts and checksums
+        run: |
+          # Fail if any expected artifact type or checksum files are missing.
+          shopt -s failglob
+          assets=(release/*.deb release/*.rpm release/*.tar.gz release/*.zip)
+          for asset in "${assets[@]}"; do
+            if [[ ! -f "$asset.sha256.txt" ]]; then
+              echo "[error] Missing checksum for $asset."
+              exit 1
+            fi
+          done
+          (cd release && sha256sum --check -- *.sha256.txt)
+          # Recheck after the build in case a release was created meanwhile.
+          release_id=$(gh api --paginate "repos/$GH_REPO/releases" \
+            --jq ".[] | select(.tag_name == \"$TAG\") | .id")
+          if [[ -n "$release_id" ]]; then
+            echo "[error] A release already exists for $TAG."
+            exit 1
+          fi
+          gh release create "$TAG" "${assets[@]}" release/*.sha256.txt \
+            --verify-tag --draft --title "$TAG" --notes ''
