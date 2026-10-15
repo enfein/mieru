@@ -12,10 +12,10 @@ import (
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/constant"
+	"github.com/enfein/mieru/v3/internal/testtool"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/egress"
 	"github.com/enfein/mieru/v3/pkg/stderror"
-	"github.com/enfein/mieru/v3/pkg/testtool"
 )
 
 type failResolver struct{}

@@ -16,6 +16,7 @@ linters:
             - $gostd
             - github.com/enfein/mieru/v3/apis/constant
             - github.com/enfein/mieru/v3/apis/model
+            - github.com/enfein/mieru/v3/internal/bufpool
         apis-client:
           files:
             - "**/apis/client/**"
@@ -44,17 +45,22 @@ linters:
               desc: "apis/server should not depend on pkg/appctl"
             - pkg: github.com/enfein/mieru/v3/pkg/cli$
               desc: "apis/server should not depend on pkg/cli"
+        internal-bufpool:
+          files:
+            - "**/internal/bufpool/**"
+          allow:
+            - $gostd
+        internal-deque:
+          files:
+            - "**/internal/deque/**"
+          allow:
+            - $gostd
         pkg-appctl-appctlcommon:
           files:
             - "**/pkg/appctl/appctlcommon/**"
           deny:
             - pkg: google.golang.org/grpc
               desc: "pkg/appctl/appctlcommon should not depend on grpc"
-        pkg-deque:
-          files:
-            - "**/pkg/deque/**"
-          allow:
-            - $gostd
         pkg-log:
           files:
             - "**/pkg/log/**"

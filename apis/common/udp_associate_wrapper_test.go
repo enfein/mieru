@@ -21,7 +21,7 @@ import (
 
 	"github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/model"
-	"github.com/enfein/mieru/v3/pkg/testtool"
+	"github.com/enfein/mieru/v3/internal/testtool"
 )
 
 func TestUDPAssociateWrapper(t *testing.T) {

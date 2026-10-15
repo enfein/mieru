@@ -27,11 +27,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/enfein/mieru/v3/internal/testtool"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
 	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
-	"github.com/enfein/mieru/v3/pkg/testtool"
 	"google.golang.org/protobuf/proto"
 )
 

@@ -23,7 +23,7 @@ import (
 	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/apis/internal"
 	"github.com/enfein/mieru/v3/apis/model"
-	"github.com/enfein/mieru/v3/pkg/testtool"
+	"github.com/enfein/mieru/v3/internal/testtool"
 )
 
 func TestEarlyConnRequest(t *testing.T) {

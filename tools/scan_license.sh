@@ -34,10 +34,10 @@ EXCLUDE_DIRS=(
 )
 EXCEPTION_PATHS=(
     "./deployments"
+    "./internal/deque"
     "./pkg/appctl/proto/google/protobuf"
     "./pkg/congestion/rtt.go"
     "./pkg/log"
-    "./pkg/deque"
     "./pkg/socks5"
 )
 

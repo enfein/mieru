@@ -11,8 +11,8 @@ import (
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
 	"github.com/enfein/mieru/v3/apis/constant"
+	"github.com/enfein/mieru/v3/internal/testtool"
 	"github.com/enfein/mieru/v3/pkg/stderror"
-	"github.com/enfein/mieru/v3/pkg/testtool"
 )
 
 func TestNewRejectsUnsupportedUDPAssociateMode(t *testing.T) {
