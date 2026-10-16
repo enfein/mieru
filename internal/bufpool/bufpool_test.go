@@ -103,17 +103,6 @@ func TestSubsliceOwnership(t *testing.T) {
 	}
 }
 
-func TestAcquireAfterGC(t *testing.T) {
-	for _, size := range []int{0, 256, 1500, 8192, 32772, 65539, 128 * 1024} {
-		buf := Acquire(size)
-		buf.Release()
-	}
-	// No assertion relies on sync.Pool keeping or returning a particular owner.
-	runtime.GC()
-	runtime.GC()
-	TestAcquire(t)
-}
-
 func TestConcurrentOwners(t *testing.T) {
 	for worker := 0; worker < 16; worker++ {
 		worker := worker

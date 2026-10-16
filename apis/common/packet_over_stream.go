@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+
+	"github.com/enfein/mieru/v3/internal/bufpool"
 )
 
 // PacketOverStreamTunnel keeps the boundary of packets when transmitted
@@ -73,7 +75,9 @@ func (c *PacketOverStreamTunnel) Write(p []byte) (int, error) {
 	if len(p) > 65535 {
 		return 0, fmt.Errorf("packet length %d is larger than maximum length 65535", len(p))
 	}
-	data := make([]byte, 4+len(p))
+	buf := bufpool.Acquire(4 + len(p))
+	defer buf.Release()
+	data := buf.Bytes()
 	data[0] = 0x00
 	binary.BigEndian.PutUint16(data[1:], uint16(len(p)))
 	copy(data[3:], p)

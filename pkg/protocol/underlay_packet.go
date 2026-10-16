@@ -23,6 +23,7 @@ import (
 	"time"
 
 	apicommon "github.com/enfein/mieru/v3/apis/common"
+	"github.com/enfein/mieru/v3/internal/bufpool"
 	"github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
 	"github.com/enfein/mieru/v3/pkg/cipher"
 	"github.com/enfein/mieru/v3/pkg/common"
@@ -682,7 +683,9 @@ func (u *PacketUnderlay) writeOneSegment(seg *segment, addr net.Addr) error {
 		if len(seg.payload) > 0 {
 			encryptedPayloadLen = len(seg.payload) + blockCipher.Overhead()
 		}
-		dataToSend := make([]byte, encryptedMetadataLen+encryptedPayloadLen+len(padding))
+		buf := bufpool.Acquire(encryptedMetadataLen + encryptedPayloadLen + len(padding))
+		defer buf.Release()
+		dataToSend := buf.Bytes()
 		if err := blockCipher.Encrypt(dataToSend[:0], plaintextMetadata); err != nil {
 			return fmt.Errorf("Encrypt() failed: %w", err)
 		}
@@ -735,7 +738,9 @@ func (u *PacketUnderlay) writeOneSegment(seg *segment, addr net.Addr) error {
 				wirePayloadLen = int(das.payloadLen) + blockCipher.Overhead()
 			}
 		}
-		dataToSend := make([]byte, encryptedMetadataLen+len(padding1)+wirePayloadLen+len(padding2))
+		buf := bufpool.Acquire(encryptedMetadataLen + len(padding1) + wirePayloadLen + len(padding2))
+		defer buf.Release()
+		dataToSend := buf.Bytes()
 		if err := blockCipher.Encrypt(dataToSend[:0], plaintextMetadata); err != nil {
 			return fmt.Errorf("Encrypt() failed: %w", err)
 		}

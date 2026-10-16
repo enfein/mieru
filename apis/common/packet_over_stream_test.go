@@ -16,6 +16,9 @@
 package common_test
 
 import (
+	"bytes"
+	"net"
+	"sync"
 	"testing"
 
 	"github.com/enfein/mieru/v3/apis/common"
@@ -51,4 +54,49 @@ func TestUDPAssociateTunnelConn(t *testing.T) {
 	if err = outConn.Close(); err != nil {
 		t.Errorf("Close() failed: %v", err)
 	}
+}
+
+// writeFuncConn uses a custom Write function in net.Conn.
+type writeFuncConn struct {
+	net.Conn
+	write func([]byte) (int, error)
+}
+
+func (c writeFuncConn) Write(p []byte) (int, error) {
+	return c.write(p)
+}
+
+func TestPacketTunnelConcurrentWrites(t *testing.T) {
+	const writers = 16
+	entered := make(chan struct{}, writers)
+	release := make(chan struct{})
+	conn := writeFuncConn{write: func(p []byte) (int, error) {
+		want := append([]byte(nil), p...)
+		entered <- struct{}{}
+		<-release
+		if !bytes.Equal(p, want) {
+			t.Error("frame changed before underlying Write returned")
+		}
+		return len(p), nil
+	}}
+	tunnel := common.PacketOverStreamTunnel{Conn: conn}
+	var wg sync.WaitGroup
+	for i := 0; i < writers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			payload := bytes.Repeat([]byte{byte(i)}, 1400)
+			if _, err := tunnel.Write(payload); err != nil {
+				t.Error(err)
+			}
+			for j := range payload {
+				payload[j] = 0
+			}
+		}(i)
+	}
+	for i := 0; i < writers; i++ {
+		<-entered
+	}
+	close(release)
+	wg.Wait()
 }
