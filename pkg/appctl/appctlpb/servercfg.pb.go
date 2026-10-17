@@ -213,13 +213,20 @@ type ServerAdvancedSettings struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The interval to log metrics.
 	// Examples: 30s, 5m, 2h.
+	// Minimum value: 1s.
 	// If empty, the default interval is used.
 	MetricsLoggingInterval *string `protobuf:"bytes,2,opt,name=metricsLoggingInterval,proto3,oneof" json:"metricsLoggingInterval,omitempty"`
 	// If true, proxy clients must provide user hint,
 	// otherwise proxy server will refuse to decrypt the network packets.
 	UserHintIsMandatory *bool `protobuf:"varint,3,opt,name=userHintIsMandatory,proto3,oneof" json:"userHintIsMandatory,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// Server closes TCP underlay if it is idle in both directions
+	// after this amount of time.
+	// Examples: 5m, 2h.
+	// Minimum value: 1m.
+	// If empty, there is no idle timeout.
+	MaxTCPIdleTimeout *string `protobuf:"bytes,4,opt,name=maxTCPIdleTimeout,proto3,oneof" json:"maxTCPIdleTimeout,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *ServerAdvancedSettings) Reset() {
@@ -264,6 +271,13 @@ func (x *ServerAdvancedSettings) GetUserHintIsMandatory() bool {
 		return *x.UserHintIsMandatory
 	}
 	return false
+}
+
+func (x *ServerAdvancedSettings) GetMaxTCPIdleTimeout() string {
+	if x != nil && x.MaxTCPIdleTimeout != nil {
+		return *x.MaxTCPIdleTimeout
+	}
+	return ""
 }
 
 type Egress struct {
@@ -553,12 +567,14 @@ const file_appctl_proto_servercfg_proto_rawDesc = "" +
 	"\x04_mtuB\t\n" +
 	"\a_egressB\x06\n" +
 	"\x04_dnsB\x11\n" +
-	"\x0f_trafficPattern\"\xc5\x01\n" +
+	"\x0f_trafficPattern\"\x8e\x02\n" +
 	"\x16ServerAdvancedSettings\x12;\n" +
 	"\x16metricsLoggingInterval\x18\x02 \x01(\tH\x00R\x16metricsLoggingInterval\x88\x01\x01\x125\n" +
-	"\x13userHintIsMandatory\x18\x03 \x01(\bH\x01R\x13userHintIsMandatory\x88\x01\x01B\x19\n" +
+	"\x13userHintIsMandatory\x18\x03 \x01(\bH\x01R\x13userHintIsMandatory\x88\x01\x01\x121\n" +
+	"\x11maxTCPIdleTimeout\x18\x04 \x01(\tH\x02R\x11maxTCPIdleTimeout\x88\x01\x01B\x19\n" +
 	"\x17_metricsLoggingIntervalB\x16\n" +
-	"\x14_userHintIsMandatoryJ\x04\b\x01\x10\x02\"m\n" +
+	"\x14_userHintIsMandatoryB\x14\n" +
+	"\x12_maxTCPIdleTimeoutJ\x04\b\x01\x10\x02\"m\n" +
 	"\x06Egress\x123\n" +
 	"\aproxies\x18\x01 \x03(\v2\x19.mieru.appctl.EgressProxyR\aproxies\x12.\n" +
 	"\x05rules\x18\x02 \x03(\v2\x18.mieru.appctl.EgressRuleR\x05rules\"\xa4\x02\n" +

@@ -578,6 +578,7 @@ type ClientAdvancedSettings struct {
 	NoCheckUpdate *bool `protobuf:"varint,1,opt,name=noCheckUpdate,proto3,oneof" json:"noCheckUpdate,omitempty"`
 	// The interval to log metrics.
 	// Examples: 30s, 5m, 2h.
+	// Minimum value: 1s.
 	// If empty, the default interval is used.
 	MetricsLoggingInterval *string `protobuf:"bytes,2,opt,name=metricsLoggingInterval,proto3,oneof" json:"metricsLoggingInterval,omitempty"`
 	unknownFields          protoimpl.UnknownFields

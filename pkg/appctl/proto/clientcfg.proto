@@ -143,6 +143,7 @@ message ClientAdvancedSettings {
 
     // The interval to log metrics.
     // Examples: 30s, 5m, 2h.
+    // Minimum value: 1s.
     // If empty, the default interval is used.
     optional string metricsLoggingInterval = 2;
 }
