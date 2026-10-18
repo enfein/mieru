@@ -704,7 +704,8 @@ func DeleteServerUsers(names []string) error {
 // 6.3. if the action is "PROXY", the proxy is defined
 // 7. DNS host mapping is valid
 // 8. if set, metrics logging interval is valid, and it is not less than 1 second
-// 9. if set, traffic pattern is valid
+// 9. if set, TCP idle timeout is valid, and it is not less than 1 minute
+// 10. if set, traffic pattern is valid
 func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 	if err := appctlcommon.ValidateServerListenIPAddress(patch.GetListenIPAddress()); err != nil {
 		return err
@@ -792,6 +793,9 @@ func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 		if d < time.Second {
 			return fmt.Errorf("metrics logging interval %q is less than 1 second", patch.GetAdvancedSettings().GetMetricsLoggingInterval())
 		}
+	}
+	if _, err := appctlcommon.ParseServerTCPIdleTimeout(patch.GetAdvancedSettings().GetTcpIdleTimeout()); err != nil {
+		return err
 	}
 	if err := trafficpattern.Validate(patch.GetTrafficPattern()); err != nil {
 		return fmt.Errorf("invalid traffic pattern: %w", err)

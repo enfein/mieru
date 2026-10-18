@@ -39,6 +39,9 @@ func TestMergeServerConfig(t *testing.T) {
 			Quotas:         []*pb.Quota{{Days: proto.Int32(7), Megabytes: proto.Int32(1000)}},
 			AllowPrivateIP: proto.Bool(true),
 		}},
+		AdvancedSettings: &pb.ServerAdvancedSettings{
+			MetricsLoggingInterval: proto.String("30m"),
+		},
 		LoggingLevel:   pb.LoggingLevel_DEBUG.Enum(),
 		Mtu:            proto.Int32(1300),
 		TrafficPattern: &pb.TrafficPattern{Seed: proto.Int32(1)},
@@ -60,6 +63,10 @@ func TestMergeServerConfig(t *testing.T) {
 				},
 				AllowLoopbackIP: proto.Bool(true),
 			},
+		},
+		AdvancedSettings: &pb.ServerAdvancedSettings{
+			UserHintIsMandatory: proto.Bool(true),
+			TcpIdleTimeout:      proto.String("600s"),
 		},
 		LoggingLevel: pb.LoggingLevel_INFO.Enum(),
 		Mtu:          proto.Int32(1400),

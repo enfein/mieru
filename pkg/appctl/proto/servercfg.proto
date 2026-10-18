@@ -70,10 +70,10 @@ message ServerAdvancedSettings {
 
     // Server closes TCP underlay if it is idle in both directions
     // after this amount of time.
-    // Examples: 5m, 2h.
-    // Minimum value: 1m.
+    // Examples: 600s, 15m, 1h.
+    // Minimum value: 1m / 60s.
     // If empty, there is no idle timeout.
-    optional string maxTCPIdleTimeout = 4;
+    optional string tcpIdleTimeout = 4;
 }
 
 message Egress {

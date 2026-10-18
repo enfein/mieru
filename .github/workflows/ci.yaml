@@ -20,7 +20,7 @@ jobs:
       - name: Build binaries
         run: make build
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mieru
           path: |
@@ -30,7 +30,7 @@ jobs:
             release/*.zip
           if-no-files-found: error
       - name: Upload code coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: |

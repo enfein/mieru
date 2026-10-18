@@ -18,6 +18,7 @@ package appctlcommon
 import (
 	"fmt"
 	"net/netip"
+	"time"
 
 	"github.com/enfein/mieru/v3/apis/constant"
 	pb "github.com/enfein/mieru/v3/pkg/appctl/appctlpb"
@@ -34,6 +35,22 @@ func ValidateServerListenIPAddress(address string) error {
 		return fmt.Errorf("server listen IP address %q is invalid", address)
 	}
 	return nil
+}
+
+// ParseServerTCPIdleTimeout parses the optional server TCP idle timeout.
+// An empty value disables the timeout; other values must be at least one minute.
+func ParseServerTCPIdleTimeout(value string) (time.Duration, error) {
+	if value == "" {
+		return 0, nil
+	}
+	d, err := time.ParseDuration(value)
+	if err != nil {
+		return 0, fmt.Errorf("TCP idle timeout %q is invalid: %w", value, err)
+	}
+	if d < time.Minute {
+		return 0, fmt.Errorf("TCP idle timeout %q is less than 1 minute", value)
+	}
+	return d, nil
 }
 
 // ValidateServerConfigSingleUser validates a single server config user.

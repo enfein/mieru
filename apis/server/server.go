@@ -173,6 +173,9 @@ func validateServerConfig(config *appctlpb.ServerConfig) error {
 	if config.Egress != nil {
 		return fmt.Errorf("egress is not allowed")
 	}
+	if _, err := appctlcommon.ParseServerTCPIdleTimeout(config.GetAdvancedSettings().GetTcpIdleTimeout()); err != nil {
+		return err
+	}
 	if err := trafficpattern.Validate(config.TrafficPattern); err != nil {
 		return fmt.Errorf("invalid traffic pattern: %w", err)
 	}
