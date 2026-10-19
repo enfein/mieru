@@ -53,7 +53,6 @@ const (
 	minWindowSize = 16
 	maxWindowSize = segmentTreeCapacity
 
-	serverRespTimeout        = 10 * time.Second
 	sessionHeartbeatInterval = 5 * time.Second
 	sessionHeartbeatJitterMs = 1000
 
@@ -702,9 +701,6 @@ func (s *Session) writeChunk(b []byte) (n int, err error) {
 		}
 	}
 
-	if s.isClient {
-		s.readDeadline.Store(time.Now().Add(serverRespTimeout).UnixMicro())
-	}
 	return len(b), nil
 }
 
