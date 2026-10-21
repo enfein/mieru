@@ -29,8 +29,9 @@ type UDPAssociateWrapper struct {
 }
 
 // ReadFrom receives a packet and strips the socks5 UDP associate header.
+// It returns *net.UDPAddr for IP addresses and model.NetAddrSpec for FQDNs.
 func (w *UDPAssociateWrapper) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
-	b := make([]byte, len(p)+256) // add some space to parse the header
+	b := make([]byte, len(p)+262) // maximum UDP associate header with a 255-byte FQDN
 	n, addr, err = w.PacketConn.ReadFrom(b)
 	if err != nil {
 		return
@@ -56,12 +57,12 @@ func (w *UDPAssociateWrapper) ReadFrom(p []byte) (n int, addr net.Addr, err erro
 	if err = destination.ReadFromSocks5(r); err != nil {
 		return
 	}
+	n, err = r.Read(p)
 	if destination.FQDN != "" {
-		err = fmt.Errorf("peer used FQDN in UDP associate header, which is unsupported")
+		destination.Net = "udp"
+		addr = destination
 		return
 	}
-
-	n, err = r.Read(p)
 	// Caller may expect the returned address to be *net.UDPAddr.
 	addr = &net.UDPAddr{
 		IP:   destination.IP,
