@@ -74,7 +74,8 @@ type Mux struct {
 	multiplexFactor int
 
 	// ---- server only fields ----
-	serverUsers serveruser.Registry
+	serverUsers          serveruser.Registry
+	serverTCPIdleTimeout time.Duration // protected by mu
 }
 
 var _ net.Listener = &Mux{}
@@ -292,6 +293,23 @@ func (m *Mux) SetServerUserHintIsMandatory(userHintIsMandatory bool) *Mux {
 	}
 	m.serverUsers.SetHintMandatory(userHintIsMandatory)
 	log.Infof("Mux user hint is mandatory is set to %v", userHintIsMandatory)
+	return m
+}
+
+// SetServerTCPIdleTimeout sets how long a server TCP underlay can be idle in
+// both directions before it is closed. Zero disables the timeout. Changes apply
+// to existing and new underlays at the next maintenance cycle.
+func (m *Mux) SetServerTCPIdleTimeout(timeout time.Duration) *Mux {
+	if m.isClient {
+		panic("Can't set server TCP idle timeout in client mux")
+	}
+	if timeout < 0 {
+		panic("Server TCP idle timeout can't be negative")
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.serverTCPIdleTimeout = timeout
+	log.Infof("Mux server TCP idle timeout is set to %v", timeout)
 	return m
 }
 
@@ -650,6 +668,7 @@ func (m *Mux) serverWrapTCPConn(rawConn net.Conn, mtu int, trafficPattern *appct
 	var source serveruser.Source
 	if rawConn != nil {
 		source = serveruser.SourceFromAddr(rawConn.RemoteAddr())
+		rawConn = common.NewIdleTrackingConn(rawConn)
 	}
 	return &StreamUnderlay{
 		baseUnderlay:       *newBaseUnderlay(false, mtu, trafficPattern),
@@ -780,7 +799,12 @@ func (m *Mux) cleanUnderlay(alsoDisableIdleOrOverloadUnderlay bool) {
 		select {
 		case <-underlay.Done():
 		default:
-			// Close idle underlay.
+			if !m.isClient && m.serverTCPIdleTimeout > 0 {
+				if stream, ok := underlay.(*StreamUnderlay); ok && stream.closeIfIdle(m.serverTCPIdleTimeout) {
+					close++
+					continue
+				}
+			}
 			if underlay.SessionCount() == 0 && underlay.Scheduler().Idle() {
 				underlay.Close()
 				close++

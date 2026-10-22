@@ -220,7 +220,8 @@ type ServerAdvancedSettings struct {
 	// otherwise proxy server will refuse to decrypt the network packets.
 	UserHintIsMandatory *bool `protobuf:"varint,3,opt,name=userHintIsMandatory,proto3,oneof" json:"userHintIsMandatory,omitempty"`
 	// Server closes TCP underlay if it is idle in both directions
-	// after this amount of time.
+	// after this amount of time. The TCP underlay is closed even if
+	// there are active sessions attached to the underlay.
 	// Examples: 600s, 15m, 1h.
 	// Minimum value: 1m / 60s.
 	// If empty, there is no idle timeout.

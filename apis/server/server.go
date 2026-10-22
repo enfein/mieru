@@ -84,6 +84,10 @@ func (ms *mieruServer) Start() error {
 		return ErrNoServerConfig
 	}
 
+	tcpIdleTimeout, err := appctlcommon.ParseServerTCPIdleTimeout(ms.config.Config.GetAdvancedSettings().GetTcpIdleTimeout())
+	if err != nil {
+		return err
+	}
 	ms.mux = protocol.NewMux(false)
 	if ms.config.StreamListenerFactory != nil {
 		ms.mux.SetStreamListenerFactory(ms.config.StreamListenerFactory)
@@ -97,7 +101,8 @@ func (ms *mieruServer) Start() error {
 	}
 	ms.mux.SetTrafficPattern(trafficPattern).
 		SetServerUsers(appctlcommon.UserListToMap(ms.config.Config.GetUsers())).
-		SetServerUserHintIsMandatory(ms.config.Config.GetAdvancedSettings().GetUserHintIsMandatory())
+		SetServerUserHintIsMandatory(ms.config.Config.GetAdvancedSettings().GetUserHintIsMandatory()).
+		SetServerTCPIdleTimeout(tcpIdleTimeout)
 	mtu := common.DefaultMTU
 	if ms.config.Config.GetMtu() != 0 {
 		mtu = int(ms.config.Config.GetMtu())

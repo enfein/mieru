@@ -883,3 +883,28 @@ func (t *StreamUnderlay) cleanSessions() {
 		return true
 	})
 }
+
+// closeIfIdle closes the transport to interrupt blocked reads, writes, or
+// session delivery, if the transport is idle.
+func (t *StreamUnderlay) closeIfIdle(timeout time.Duration) bool {
+	t.closeMutex.Lock()
+	defer t.closeMutex.Unlock()
+	select {
+	case <-t.done:
+		return false
+	default:
+	}
+	conn, ok := t.conn.(*common.IdleTrackingConn)
+	if !ok || !conn.CloseIfIdle(timeout) {
+		return false
+	}
+	log.Debugf("Closing %v after TCP idle timeout %v", t, timeout)
+	t.sessionCleanTicker.Stop()
+	// The transport is already closed, so skip graceful session close requests.
+	t.sessionMap.Range(func(k, v any) bool {
+		v.(*Session).closeWithError(stderror.ErrTimeout)
+		return true
+	})
+	t.baseUnderlay.Close()
+	return true
+}

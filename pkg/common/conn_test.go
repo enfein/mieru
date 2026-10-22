@@ -22,6 +22,7 @@ import (
 	"io"
 	mrand "math/rand"
 	"net"
+	"os"
 	"testing"
 	"time"
 )
@@ -47,6 +48,43 @@ func TestWriteTimeoutConnStopsBlockedWrite(t *testing.T) {
 	}
 }
 
+func TestIdleTrackingConnActivity(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		write bool
+		n     int
+		err   error
+	}{
+		{name: "read", n: 1},
+		{name: "write", write: true, n: 1},
+		{name: "partial read with error", n: 1, err: io.EOF},
+		{name: "partial write with error", write: true, n: 1, err: io.ErrClosedPipe},
+		{name: "empty read"},
+		{name: "empty write", write: true},
+		{name: "read deadline", err: os.ErrDeadlineExceeded},
+		{name: "write deadline", write: true, err: os.ErrDeadlineExceeded},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			raw := &idleResultConn{n: test.n, err: test.err}
+			conn := &IdleTrackingConn{Conn: raw, lastActivity: time.Now().Add(-10 * time.Minute)}
+			var n int
+			var err error
+			if test.write {
+				n, err = conn.Write([]byte{1})
+			} else {
+				n, err = conn.Read(make([]byte, 1))
+			}
+			if n != test.n || !errors.Is(err, test.err) {
+				t.Fatalf("I/O = (%d, %v), want (%d, %v)", n, err, test.n, test.err)
+			}
+			wantClosed := test.n == 0
+			if got := conn.CloseIfIdle(5 * time.Minute); got != wantClosed || raw.closed != wantClosed {
+				t.Fatalf("CloseIfIdle() = %v, closed = %v, want %v", got, raw.closed, wantClosed)
+			}
+		})
+	}
+}
+
 func TestReadAllAndDiscard(t *testing.T) {
 	n := mrand.Int63n(1024*1024) + 1
 	buf := bytes.NewBuffer(make([]byte, n))
@@ -59,4 +97,18 @@ func TestReadAllAndDiscard(t *testing.T) {
 	if buf.Len() != 0 {
 		t.Errorf("buf.Len() = %d, want 0", buf.Len())
 	}
+}
+
+type idleResultConn struct {
+	net.Conn
+	n      int
+	err    error
+	closed bool
+}
+
+func (c *idleResultConn) Read([]byte) (int, error)  { return c.n, c.err }
+func (c *idleResultConn) Write([]byte) (int, error) { return c.n, c.err }
+func (c *idleResultConn) Close() error {
+	c.closed = true
+	return nil
 }

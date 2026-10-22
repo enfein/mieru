@@ -89,10 +89,15 @@ func newServerProxy(config *pb.ServerConfig) (*serverProxy, error) {
 	if err != nil {
 		return nil, err
 	}
+	tcpIdleTimeout, err := appctlcommon.ParseServerTCPIdleTimeout(config.GetAdvancedSettings().GetTcpIdleTimeout())
+	if err != nil {
+		return nil, err
+	}
 	mux := protocol.NewMux(false).
 		SetTrafficPattern(trafficPattern).
 		SetServerUsers(appctlcommon.UserListToMap(config.GetUsers())).
-		SetServerUserHintIsMandatory(config.GetAdvancedSettings().GetUserHintIsMandatory())
+		SetServerUserHintIsMandatory(config.GetAdvancedSettings().GetUserHintIsMandatory()).
+		SetServerTCPIdleTimeout(tcpIdleTimeout)
 	mtu := common.DefaultMTU
 	if config.GetMtu() != 0 {
 		mtu = int(config.GetMtu())
@@ -318,6 +323,13 @@ func (s *serverManagementService) Reload(ctx context.Context, req *emptypb.Empty
 
 		// Adjust advanced settings: user hint is mandatory.
 		mux.SetServerUserHintIsMandatory(config.GetAdvancedSettings().GetUserHintIsMandatory())
+
+		// Adjust advanced settings: TCP idle timeout.
+		tcpIdleTimeout, err := appctlcommon.ParseServerTCPIdleTimeout(config.GetAdvancedSettings().GetTcpIdleTimeout())
+		if err != nil {
+			return &emptypb.Empty{}, err
+		}
+		mux.SetServerTCPIdleTimeout(tcpIdleTimeout)
 	}
 	log.Infof("completed Reload request from RPC caller")
 	return &emptypb.Empty{}, nil
@@ -687,25 +699,26 @@ func DeleteServerUsers(names []string) error {
 // ValidateServerConfigPatch validates a patch of server config.
 //
 // A server config patch must satisfy:
-// 1. listen IP address is valid
-// 2. port bindings are valid
-// 3. users are valid
-// 4. if set, MTU is valid
-// 5. for each egress proxy
-// 5.1. name is not empty
-// 5.2. name is unique
-// 5.3. protocol is valid
-// 5.4. host is not empty
-// 5.5. port is valid
-// 5.6. if socks5 authentication is used, the user and password are not empty
-// 6. for each egress rule
-// 6.1. each IP range is either "*" or a valid IP CIDR
-// 6.2. each domain name is not empty, and does not begin or end with a dot
-// 6.3. if the action is "PROXY", the proxy is defined
-// 7. DNS host mapping is valid
-// 8. if set, metrics logging interval is valid, and it is not less than 1 second
-// 9. if set, TCP idle timeout is valid, and it is not less than 1 minute
-// 10. if set, traffic pattern is valid
+//   - if set, listen IP address is valid and has no zone identifier
+//   - port bindings are valid
+//   - users are valid
+//   - if set, MTU is valid
+//   - for each egress proxy:
+//     1. name is not empty
+//     2. name is unique
+//     3. protocol is not UNKNOWN_PROXY_PROTOCOL
+//     4. host is not empty
+//     5. port is valid
+//     6. socks5 authentication user and password are either both empty or both non-empty
+//   - for each egress rule:
+//     1. each IP range is either "*" or a valid IP CIDR
+//     2. each domain name is not empty, and does not begin or end with a dot
+//     3. if the action is "PROXY", the proxy name list is not empty and every named proxy is defined
+//     4. if the action is not "PROXY", the proxy name list is empty
+//   - DNS host mapping is valid
+//   - if set, metrics logging interval is valid, and it is not less than 1 second
+//   - if set, TCP idle timeout is valid, and it is not less than 1 minute
+//   - if set, traffic pattern is valid
 func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 	if err := appctlcommon.ValidateServerListenIPAddress(patch.GetListenIPAddress()); err != nil {
 		return err
@@ -806,7 +819,8 @@ func ValidateServerConfigPatch(patch *pb.ServerConfig) error {
 // ValidateFullServerConfig validates the full server config.
 //
 // In addition to ValidateServerConfigPatch, it also validates:
-// 1. there is at least 1 port binding
+//   - the config is not empty
+//   - there is at least 1 port binding
 //
 // It is not an error if no user is configured. However mita won't be functional.
 func ValidateFullServerConfig(config *pb.ServerConfig) error {

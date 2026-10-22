@@ -19,8 +19,16 @@ import (
 	"context"
 	"io"
 	"net"
+	"sync"
 	"time"
 )
+
+// NewWriteTimeoutConn wraps conn to limit each write to timeout without imposing
+// an idle or lifetime limit on the connection. Each write resets the underlying
+// connection's write deadline.
+func NewWriteTimeoutConn(conn net.Conn, timeout time.Duration) net.Conn {
+	return &writeTimeoutConn{Conn: conn, timeout: timeout}
+}
 
 type writeTimeoutConn struct {
 	net.Conn
@@ -34,16 +42,59 @@ func (c *writeTimeoutConn) Write(p []byte) (int, error) {
 	return c.Conn.Write(p)
 }
 
-// NewWriteTimeoutConn wraps conn to limit each write to timeout without imposing
-// an idle or lifetime limit on the connection. Each write resets the underlying
-// connection's write deadline.
-func NewWriteTimeoutConn(conn net.Conn, timeout time.Duration) net.Conn {
-	return &writeTimeoutConn{Conn: conn, timeout: timeout}
+func NewIdleTrackingConn(conn net.Conn) *IdleTrackingConn {
+	return &IdleTrackingConn{
+		Conn:         conn,
+		lastActivity: time.Now(),
+	}
+}
+
+// IdleTrackingConn records transport activity and can close the connection
+// when it is idle.
+type IdleTrackingConn struct {
+	net.Conn
+	mu           sync.Mutex
+	lastActivity time.Time
+}
+
+func (c *IdleTrackingConn) Read(b []byte) (int, error) {
+	n, err := c.Conn.Read(b)
+	c.recordActivity(n)
+	return n, err
+}
+
+func (c *IdleTrackingConn) Write(b []byte) (int, error) {
+	n, err := c.Conn.Write(b)
+	c.recordActivity(n)
+	return n, err
+}
+
+// CloseIfIdle closes the connection if there is no read or write within
+// the timeout period. Returns true if the connection is closed by this call.
+func (c *IdleTrackingConn) CloseIfIdle(timeout time.Duration) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if timeout <= 0 || time.Since(c.lastActivity) < timeout {
+		return false
+	}
+	c.Conn.Close()
+	return true
+}
+
+func (c *IdleTrackingConn) recordActivity(n int) {
+	if n > 0 {
+		c.mu.Lock()
+		c.lastActivity = time.Now()
+		c.mu.Unlock()
+	}
 }
 
 type SetReadDeadlineInterface interface {
 	SetReadDeadline(t time.Time) error
 }
+
+// net.Conn implements SetReadDeadlineInterface.
+var _ SetReadDeadlineInterface = net.Conn(nil)
 
 // SetReadTimeout set read deadline.
 // It cancels the deadline if the timeout is 0 or negative.
