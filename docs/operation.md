@@ -291,6 +291,8 @@ sudo systemctl start mita
 
 ## Other Settings
 
+Notice: all settings in `advancedSettings` are applied together. Please specify all the settings you want to keep.
+
 ### Metrics logging interval
 
 By default, metrics are printed in logs every 10 minutes. To change the interval:
@@ -304,6 +306,22 @@ By default, metrics are printed in logs every 10 minutes. To change the interval
 ```
 
 Valid units: `s` (seconds), `m` (minutes), `h` (hours), and combinations.
+
+### Server TCP idle timeout
+
+Use the following configuration to close idle TCP connections between clients and the **mita** server:
+
+```json
+{
+    "advancedSettings": {
+        "tcpIdleTimeout": "15m"
+    }
+}
+```
+
+The server closes a connection if no bytes are read or written in either direction for the configured duration. All sessions sharing that connection are closed. UDP transport is unaffected.
+
+Use duration strings such as `600s`, `15m`, or `1h30m`. The minimum is `1m` (`60s`). The timeout is disabled when it is not set.
 
 ### Disable client auto-update check
 
