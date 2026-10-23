@@ -16,7 +16,9 @@
 package common_test
 
 import (
+	"bytes"
 	"net"
+	"strings"
 	"testing"
 
 	"github.com/enfein/mieru/v3/apis/common"
@@ -25,41 +27,59 @@ import (
 )
 
 func TestUDPAssociateWrapper(t *testing.T) {
-	in, out := testtool.BufPipe()
-	inConn := common.NewUDPAssociateWrapper(common.NewPacketOverStreamTunnel(in))
-	outConn := common.NewUDPAssociateWrapper(common.NewPacketOverStreamTunnel(out))
+	tests := []struct {
+		name string
+		addr model.AddrSpec
+	}{
+		{"IPv4", model.AddrSpec{IP: net.IPv4(1, 1, 1, 1), Port: 8964}},
+		{"IPv6", model.AddrSpec{IP: net.ParseIP("2001:db8::1"), Port: 8964}},
+		{"FQDN", model.AddrSpec{FQDN: "example.com", Port: 8964}},
+		{"FQDN255", model.AddrSpec{FQDN: strings.Repeat("a", 255), Port: 8964}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			in, out := testtool.BufPipe()
+			inConn := common.NewUDPAssociateWrapper(common.NewPacketOverStreamTunnel(in))
+			outConn := common.NewUDPAssociateWrapper(common.NewPacketOverStreamTunnel(out))
 
-	addr := model.NetAddrSpec{Net: "udp", AddrSpec: model.AddrSpec{IP: net.IPv4(1, 1, 1, 1), Port: 8964}}
-	data := []byte{8, 9, 6, 4}
-	n, err := inConn.WriteTo(data, addr)
-	if err != nil {
-		t.Fatalf("Write() failed: %v", err)
-	}
-	if n != 4 {
-		t.Fatalf("Write() returns %d, want %d", n, 4)
-	}
+			addr := model.NetAddrSpec{Net: "udp", AddrSpec: test.addr}
+			data := []byte{8, 9, 6, 4}
+			n, err := inConn.WriteTo(data, addr)
+			if err != nil {
+				t.Fatalf("WriteTo() failed: %v", err)
+			}
+			if n != len(data) {
+				t.Fatalf("WriteTo() returns %d, want %d", n, len(data))
+			}
 
-	buf := make([]byte, 16)
-	var addr2 net.Addr
-	n, addr2, err = outConn.ReadFrom(buf)
-	if err != nil {
-		t.Fatalf("Read() failed: %v", err)
-	}
-	if n != 4 {
-		t.Fatalf("Read() returns %d, want %d", n, 4)
-	}
-	destination := addr2.(*net.UDPAddr)
-	if destination.Network() != "udp" {
-		t.Errorf("got destination network %s, want %s", destination.Network(), "udp")
-	}
-	if destination.String() != "1.1.1.1:8964" {
-		t.Errorf("got destination %s, want %s", destination.String(), "1.1.1.1:8964")
-	}
+			buf := make([]byte, len(data))
+			n, destination, err := outConn.ReadFrom(buf)
+			if err != nil {
+				t.Fatalf("ReadFrom() failed: %v", err)
+			}
+			if n != len(data) || !bytes.Equal(buf[:n], data) {
+				t.Fatalf("ReadFrom() returns %v, want %v", buf[:n], data)
+			}
+			if test.addr.FQDN == "" {
+				if _, ok := destination.(*net.UDPAddr); !ok {
+					t.Errorf("got destination type %T, want *net.UDPAddr", destination)
+				}
+			} else if _, ok := destination.(model.NetAddrSpec); !ok {
+				t.Errorf("got destination type %T, want model.NetAddrSpec", destination)
+			}
+			if destination.Network() != "udp" {
+				t.Errorf("got destination network %s, want %s", destination.Network(), "udp")
+			}
+			if destination.String() != addr.String() {
+				t.Errorf("got destination %s, want %s", destination.String(), addr.String())
+			}
 
-	if err = inConn.Close(); err != nil {
-		t.Errorf("Close() failed: %v", err)
-	}
-	if err = outConn.Close(); err != nil {
-		t.Errorf("Close() failed: %v", err)
+			if err = inConn.Close(); err != nil {
+				t.Errorf("Close() failed: %v", err)
+			}
+			if err = outConn.Close(); err != nil {
+				t.Errorf("Close() failed: %v", err)
+			}
+		})
 	}
 }
