@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"runtime"
 	"runtime/pprof"
 	"strconv"
 	"strings"
@@ -1169,6 +1170,13 @@ func newClientManagementRPCClient(ctx context.Context) (client appctlgrpc.Client
 }
 
 func clientShouldCheckUpdate(config *appctlpb.ClientConfig) (bool, error) {
+	// There is no point to check update on mobile platforms like Android.
+	switch runtime.GOOS {
+	case "windows", "darwin", "linux":
+	default:
+		return false, nil
+	}
+
 	if config.GetAdvancedSettings().GetNoCheckUpdate() {
 		return false, nil
 	}
