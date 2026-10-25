@@ -21,6 +21,7 @@ import (
 	"net"
 
 	"github.com/enfein/mieru/v3/apis/model"
+	"github.com/enfein/mieru/v3/internal/bufpool"
 )
 
 // UDPAssociateWrapper wraps a raw UDP packet with socks5 UDP association header.
@@ -30,7 +31,9 @@ type UDPAssociateWrapper struct {
 
 // ReadFrom receives a packet and strips the socks5 UDP associate header.
 func (w *UDPAssociateWrapper) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
-	b := make([]byte, len(p)+256) // add some space to parse the header
+	buf := bufpool.Acquire(len(p) + 256) // add some space to parse the header
+	defer buf.Release()
+	b := buf.Bytes()
 	n, addr, err = w.PacketConn.ReadFrom(b)
 	if err != nil {
 		return
@@ -61,8 +64,12 @@ func (w *UDPAssociateWrapper) ReadFrom(p []byte) (n int, addr net.Addr, err erro
 		return
 	}
 
-	n, err = r.Read(p)
-	// Caller may expect the returned address to be *net.UDPAddr.
+	// An empty UDP payload is valid and must not return io.EOF.
+	// RFC 8085: A UDP receiver can receive a valid UDP datagram with a zero-length payload.
+	n = copy(p, b[len(b)-r.Len():])
+
+	// Caller may expect the returned address to be *net.UDPAddr
+	// in order to process this packet.
 	addr = &net.UDPAddr{
 		IP:   destination.IP,
 		Port: destination.Port,

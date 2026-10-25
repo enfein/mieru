@@ -16,6 +16,7 @@
 package common_test
 
 import (
+	"bytes"
 	"net"
 	"testing"
 
@@ -61,5 +62,43 @@ func TestUDPAssociateWrapper(t *testing.T) {
 	}
 	if err = outConn.Close(); err != nil {
 		t.Errorf("Close() failed: %v", err)
+	}
+}
+
+func TestUDPAssociateWrapperEmptyPayload(t *testing.T) {
+	for _, host := range []string{"1.1.1.1", "::1"} {
+		t.Run(host, func(t *testing.T) {
+			in, out := testtool.BufPipe()
+			inConn := common.NewUDPAssociateWrapper(common.NewPacketOverStreamTunnel(in))
+			outConn := common.NewUDPAssociateWrapper(common.NewPacketOverStreamTunnel(out))
+			defer inConn.Close()
+			defer outConn.Close()
+
+			addr := &net.UDPAddr{IP: net.ParseIP(host), Port: 8964}
+
+			// A nonempty packet must still be readable after empty packets.
+			for _, payload := range [][]byte{nil, {}, []byte("ping")} {
+				n, err := inConn.WriteTo(payload, addr)
+				if err != nil {
+					t.Fatalf("WriteTo() failed: %v", err)
+				}
+				if n != len(payload) {
+					t.Fatalf("WriteTo() returned %d, want %d", n, len(payload))
+				}
+
+				buf := make([]byte, 16)
+				n, gotAddr, err := outConn.ReadFrom(buf)
+				if err != nil {
+					t.Fatalf("ReadFrom() failed for payload %v: %v", payload, err)
+				}
+				if n != len(payload) || !bytes.Equal(buf[:n], payload) {
+					t.Fatalf("ReadFrom() payload = %v, want %v", buf[:n], payload)
+				}
+				gotUDPAddr, ok := gotAddr.(*net.UDPAddr)
+				if !ok || !gotUDPAddr.IP.Equal(addr.IP) || gotUDPAddr.Port != addr.Port {
+					t.Fatalf("ReadFrom() address = %v, want %v", gotAddr, addr)
+				}
+			}
+		})
 	}
 }
