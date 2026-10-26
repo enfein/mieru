@@ -124,6 +124,69 @@ func TestClientDialerUDPAssociate(t *testing.T) {
 	}
 }
 
+func TestClientPacketConnReadFromBufferSize(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		size int
+		want string
+	}{
+		{name: "empty", size: 0, want: ""},
+		{name: "short", size: 2, want: "fi"},
+		{name: "exact", size: 5, want: "first"},
+		{name: "large", size: 16, want: "first"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			proxy, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer proxy.Close()
+			udpConn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer udpConn.Close()
+			remote := &net.UDPAddr{IP: net.IPv4(1, 1, 1, 1), Port: 1234}
+			conn := &clientPacketConn{
+				udpConn:          udpConn,
+				serverListenAddr: proxy.LocalAddr().(*net.UDPAddr),
+				remoteAddr:       remote,
+			}
+			if err := conn.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+				t.Fatal(err)
+			}
+			for _, payload := range []string{"first", "next"} {
+				pkt, err := wrapSocks5UDPPacket(remote, []byte(payload))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := proxy.WriteToUDP(pkt, udpConn.LocalAddr().(*net.UDPAddr)); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			out := make([]byte, tc.size)
+			n, addr, err := conn.ReadFrom(out)
+			if err != nil {
+				t.Fatalf("ReadFrom() failed: %v", err)
+			}
+			if string(out[:n]) != tc.want || addr != remote {
+				t.Fatalf("ReadFrom() = (%q, %v), want (%q, %v)", out[:n], addr, tc.want, remote)
+			}
+
+			// The unread tail must be discarded with the first datagram.
+			out = make([]byte, 16)
+			n, _, err = conn.ReadFrom(out)
+			if err != nil {
+				t.Fatalf("second ReadFrom() failed: %v", err)
+			}
+			if string(out[:n]) != "next" {
+				t.Fatalf("second ReadFrom() = %q, want %q", out[:n], "next")
+			}
+		})
+	}
+}
+
 func TestClientDialerUDPAssociateDisabled(t *testing.T) {
 	target := startUDPEchoServer(t)
 	proxyAddr := startDatagramModeServer(t, nil)

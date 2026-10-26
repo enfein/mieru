@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/enfein/mieru/v3/apis/constant"
 	"github.com/enfein/mieru/v3/apis/model"
 	"github.com/enfein/mieru/v3/internal/bufpool"
 )
@@ -31,7 +32,7 @@ type UDPAssociateWrapper struct {
 
 // ReadFrom receives a packet and strips the socks5 UDP associate header.
 func (w *UDPAssociateWrapper) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
-	buf := bufpool.Acquire(len(p) + 256) // add some space to parse the header
+	buf := bufpool.Acquire(len(p) + constant.Socks5MaxUDPHeaderLen)
 	defer buf.Release()
 	b := buf.Bytes()
 	n, addr, err = w.PacketConn.ReadFrom(b)

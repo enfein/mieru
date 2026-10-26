@@ -58,3 +58,8 @@ const (
 	Socks5ReplyCommandNotSupported  byte = 7
 	Socks5ReplyAddrTypeNotSupported byte = 8
 )
+
+// socks5 limits.
+const (
+	Socks5MaxUDPHeaderLen = 262
+)

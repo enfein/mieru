@@ -229,6 +229,41 @@ func (b *baseUnderlay) deliverSegmentToSession(s *Session, seg *segment) bool {
 	}
 }
 
+// validateNewServerSessionSegment enforces the only protocol that may create a
+// server session.
+func validateNewServerSessionSegment(seg *segment) error {
+	if seg == nil || seg.metadata == nil {
+		return fmt.Errorf("new server session segment is nil")
+	}
+	ss, ok := seg.metadata.(*sessionStruct)
+	if !ok || ss.Protocol() != openSessionRequest {
+		return fmt.Errorf("protocol %v can't create a server session", seg.metadata.Protocol())
+	}
+	if ss.sessionID == 0 {
+		return fmt.Errorf("reserved session ID %d is used", ss.sessionID)
+	}
+	return nil
+}
+
+// validateServerSegmentDirection rejects protocols that can only be sent by a
+// server.
+func validateServerSegmentDirection(seg *segment) error {
+	if seg == nil || seg.metadata == nil {
+		return fmt.Errorf("server segment is nil")
+	}
+	switch seg.metadata.Protocol() {
+	case openSessionRequest,
+		closeSessionRequest,
+		closeSessionResponse,
+		dataClientToServer,
+		dataClientToServerLowEntropy,
+		ackClientToServer:
+		return nil
+	default:
+		return fmt.Errorf("protocol %v has the wrong direction for a server", seg.metadata.Protocol())
+	}
+}
+
 // encodeLowEntropyEncryptedPayload encodes the ciphertext body with
 // low entropy padding. The trailing AEAD tag is not changed.
 func encodeLowEntropyEncryptedPayload(encryptedPayload []byte, das *dataAckStruct) ([]byte, error) {

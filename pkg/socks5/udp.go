@@ -33,9 +33,6 @@ import (
 	"github.com/enfein/mieru/v3/pkg/stderror"
 )
 
-// maxUDPHeaderLen includes RSV, FRAG, ATYP, a length byte, a 255-byte domain, and port.
-const maxUDPHeaderLen = 262
-
 // RunUDPAssociateLoop exchanges socks5 UDP packets between a socks5 proxy client and a mieru proxy server,
 // the proxy server is connected via the PacketOverStreamTunnel.
 func RunUDPAssociateLoop(udpConn *net.UDPConn, conn *apicommon.PacketOverStreamTunnel, resolver apicommon.DNSResolver) error {
@@ -88,8 +85,8 @@ func RunUDPAssociateLoop(udpConn *net.UDPConn, conn *apicommon.PacketOverStreamT
 	// Packets from mieru proxy server -> socks5 proxy client.
 	go func() {
 		defer wg.Done()
-		buf := make([]byte, maxUDPHeaderLen+(1<<16))
-		payload := buf[maxUDPHeaderLen:]
+		buf := make([]byte, constant.Socks5MaxUDPHeaderLen+(1<<16))
+		payload := buf[constant.Socks5MaxUDPHeaderLen:]
 		var n int
 		var addr *net.UDPAddr
 		var err error
@@ -115,9 +112,9 @@ func RunUDPAssociateLoop(udpConn *net.UDPConn, conn *apicommon.PacketOverStreamT
 				addrMap.Store(addr.String(), header)
 			}
 			// Cached headers remain independently owned and immutable.
-			start := maxUDPHeaderLen - len(header)
-			copy(buf[start:maxUDPHeaderLen], header)
-			_, err = conn.Write(buf[start : maxUDPHeaderLen+n])
+			start := constant.Socks5MaxUDPHeaderLen - len(header)
+			copy(buf[start:constant.Socks5MaxUDPHeaderLen], header)
+			_, err = conn.Write(buf[start : constant.Socks5MaxUDPHeaderLen+n])
 			if err != nil {
 				log.Debugf("UDP associate %v Write() to proxy client failed: %v", udpConn.LocalAddr(), err)
 				if udpErr.Load() == nil {

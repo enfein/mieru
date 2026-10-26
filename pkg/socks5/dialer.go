@@ -18,7 +18,6 @@ package socks5
 import (
 	"context"
 	"fmt"
-	"io"
 	"net"
 	"net/url"
 	"time"
@@ -205,11 +204,8 @@ func (c *clientPacketConn) ReadFrom(p []byte) (int, net.Addr, error) {
 		if err != nil {
 			return 0, nil, err
 		}
-		if len(payload) > len(p) {
-			return 0, nil, io.ErrShortBuffer
-		}
-		copy(p, payload)
-		return len(payload), c.remoteAddr, nil
+		n = copy(p, payload)
+		return n, c.remoteAddr, nil
 	}
 }
 
@@ -229,6 +225,7 @@ func (c *clientPacketConn) WriteTo(p []byte, addr net.Addr) (int, error) {
 
 func (c *clientPacketConn) Close() error {
 	udpErr := c.udpConn.Close()
+	// Closing the TCP control connection also releases the server's UDP association.
 	ctrlErr := c.ctrlConn.Close()
 	if udpErr != nil {
 		return udpErr
