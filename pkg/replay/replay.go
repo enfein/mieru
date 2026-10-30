@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/metrics"
 )
 
@@ -44,6 +45,9 @@ type ReplayCache struct {
 	// mu is required to access the replay cache.
 	mu sync.Mutex
 
+	// clock is nil in production. It is used in test.
+	clock *common.Clock
+
 	// capacity is the maximum number of entries in one replay cache.
 	// If the size of `current` map is bigger than capacity, `current` map
 	// will replace `previous` map.
@@ -65,6 +69,10 @@ type ReplayCache struct {
 
 // NewCache creates a new replay cache.
 func NewCache(capacity int, expireInterval time.Duration) *ReplayCache {
+	return newCache(capacity, expireInterval, nil)
+}
+
+func newCache(capacity int, expireInterval time.Duration, clock *common.Clock) *ReplayCache {
 	if capacity < 0 {
 		panic("replay cache capacity can't be negative")
 	}
@@ -72,8 +80,9 @@ func NewCache(capacity int, expireInterval time.Duration) *ReplayCache {
 		panic("replay cache expire interval must be a positive time range")
 	}
 	return &ReplayCache{
+		clock:          clock,
 		capacity:       capacity,
-		expireTime:     time.Now().Add(expireInterval),
+		expireTime:     clock.Now().Add(expireInterval),
 		expireInterval: expireInterval,
 		current:        make(map[uint64]string),
 		previous:       make(map[uint64]string),
@@ -93,17 +102,18 @@ func (c *ReplayCache) IsDuplicate(data []byte, tag string) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if time.Since(c.expireTime) > c.expireInterval {
+	now := c.clock.Now()
+	if now.Sub(c.expireTime) > c.expireInterval {
 		// Both current and previous are expired.
 		c.current = make(map[uint64]string)
 		c.previous = make(map[uint64]string)
-		c.expireTime = time.Now().Add(c.expireInterval)
+		c.expireTime = now.Add(c.expireInterval)
 	}
-	if len(c.current) >= c.capacity || time.Now().After(c.expireTime) {
+	if len(c.current) >= c.capacity || now.After(c.expireTime) {
 		// Move current to previous.
 		c.previous = c.current
 		c.current = make(map[uint64]string)
-		c.expireTime = time.Now().Add(c.expireInterval)
+		c.expireTime = now.Add(c.expireInterval)
 	}
 
 	if existingTag, ok := c.current[signature]; ok {

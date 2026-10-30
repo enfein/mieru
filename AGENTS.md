@@ -10,7 +10,7 @@ Dependencies flow downward only. Lower layers must not import `cmd/` or `pkg/cli
 2. Public API: `apis/client`, `apis/server`, plus shared `apis/common`, `apis/model`, `apis/constant`, `apis/log`, `apis/trafficpattern`. `apis/internal` is API-private.
 3. Control and config: `pkg/appctl` (app status, config files, URL import/export, gRPC management). `pkg/appctl/appctlcommon` holds helpers that `apis/` can use without importing the gRPC-dependent `pkg/appctl`.
 4. Runtime: `pkg/protocol` (mux/session transport; `serveruser` handles server-user auth), `pkg/socks5`, `pkg/cipher`, `pkg/replay`, `pkg/congestion`, `pkg/sockopts`, `pkg/egress`.
-5. Support utilities: `pkg/common`, `pkg/log`, `pkg/stderror`, `pkg/metrics`, `pkg/version`, and other small helper packages.
+5. Support utilities: `pkg/common`, `pkg/log`, `pkg/stderror`, `pkg/metrics`, `internal/bufpool`, and other small helper packages.
 
 ## Compatibility Requirements
 
