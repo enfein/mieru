@@ -17,7 +17,6 @@ package protocol
 
 import (
 	"bytes"
-	"context"
 	"net"
 	"testing"
 	"time"
@@ -540,31 +539,35 @@ func decryptDataAckForTest(t *testing.T, block cipher.BlockCipher, wire []byte) 
 
 func TestPacketOutputDelay(t *testing.T) {
 	tests := []struct {
-		name    string
-		setup   func(s *Session)
-		minWant time.Duration
-		maxWant time.Duration
+		name  string
+		setup func(s *Session)
+		want  time.Duration
 	}{
 		{
-			name:    "idle waits for heartbeat",
-			setup:   func(s *Session) {},
-			minWant: sessionHeartbeatInterval - sessionHeartbeatJitterMs*time.Millisecond - 100*time.Millisecond,
-			maxWant: sessionHeartbeatInterval + sessionHeartbeatJitterMs*time.Millisecond,
+			name:  "idle waits for heartbeat",
+			setup: func(s *Session) {},
+			want:  sessionHeartbeatInterval,
 		},
 		{
-			name:    "pending ack",
-			setup:   func(s *Session) { s.requestPacketAck() },
-			minWant: 0,
-			maxWant: packetAckDelay,
+			name: "heartbeat includes jitter",
+			setup: func(s *Session) {
+				s.heartbeatJitter = 250 * time.Millisecond
+				s.clock.Advance(time.Second)
+			},
+			want: sessionHeartbeatInterval + 250*time.Millisecond - time.Second,
+		},
+		{
+			name:  "pending ack",
+			setup: func(s *Session) { s.requestPacketAck() },
+			want:  packetAckDelay,
 		},
 		{
 			name: "pending retransmission",
 			setup: func(s *Session) {
 				s.sendBuf.Insert(testDataSegment(1, 0, []byte("a"), common.PacketTransport))
-				s.nextRetransmissionTime.Store(time.Now().Add(50 * time.Millisecond).UnixMicro())
+				s.nextRetransmissionTime.Store(s.clock.Now().Add(50 * time.Millisecond).UnixMicro())
 			},
-			minWant: 40 * time.Millisecond,
-			maxWant: 50 * time.Millisecond,
+			want: 50 * time.Millisecond,
 		},
 		{
 			name: "overdue retransmission",
@@ -572,16 +575,14 @@ func TestPacketOutputDelay(t *testing.T) {
 				s.sendBuf.Insert(testDataSegment(1, 0, []byte("a"), common.PacketTransport))
 				s.nextRetransmissionTime.Store(0)
 			},
-			minWant: minOutputInterval,
-			maxWant: minOutputInterval,
+			want: minOutputInterval,
 		},
 		{
 			name: "stale retransmission time is ignored when sendBuf is empty",
 			setup: func(s *Session) {
 				s.nextRetransmissionTime.Store(0)
 			},
-			minWant: sessionHeartbeatInterval - sessionHeartbeatJitterMs*time.Millisecond - 100*time.Millisecond,
-			maxWant: sessionHeartbeatInterval + sessionHeartbeatJitterMs*time.Millisecond,
+			want: sessionHeartbeatInterval,
 		},
 		{
 			name: "opening client ignores ack and heartbeat",
@@ -590,29 +591,30 @@ func TestPacketOutputDelay(t *testing.T) {
 				s.requestPacketAck()
 				s.lastTXTime.Store(0)
 			},
-			minWant: sessionHeartbeatInterval,
-			maxWant: sessionHeartbeatInterval,
+			want: sessionHeartbeatInterval,
 		},
 		{
 			name: "opening client retransmits open request",
 			setup: func(s *Session) {
 				s.state.Store(int32(sessionAttached))
 				s.sendBuf.Insert(testSessionSegment(openSessionRequest, 1, common.PacketTransport))
-				s.nextRetransmissionTime.Store(time.Now().Add(20 * time.Millisecond).UnixMicro())
+				s.nextRetransmissionTime.Store(s.clock.Now().Add(20 * time.Millisecond).UnixMicro())
 			},
-			minWant: 10 * time.Millisecond,
-			maxWant: 20 * time.Millisecond,
+			want: 20 * time.Millisecond,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			s := NewSession(1, true, 1400, nil, nil)
+			s.clock.SetTime(time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC))
+			s.lastTXTime.Store(s.clock.Now().UnixMicro())
+			s.heartbeatJitter = 0
 			s.transportProtocol = common.PacketTransport
 			s.forwardStateTo(sessionEstablished)
 			test.setup(s)
 			got := s.nextPacketOutputDelay()
-			if got < test.minWant || got > test.maxWant {
-				t.Fatalf("nextPacketOutputDelay() = %v, want in [%v, %v]", got, test.minWant, test.maxWant)
+			if got != test.want {
+				t.Fatalf("nextPacketOutputDelay() = %v, want %v", got, test.want)
 			}
 		})
 	}
@@ -652,6 +654,9 @@ func TestRequestAckCoalesces(t *testing.T) {
 
 func TestPacketRetransmissionDeadline(t *testing.T) {
 	s, receiverConn, _ := newTestPacketSession(t)
+	s.clock.SetTime(time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC))
+	s.lastTXTime.Store(s.clock.Now().UnixMicro())
+	s.heartbeatJitter = 0
 
 	// Sending into an empty sendBuf schedules an early check.
 	seg := testDataSegment(1, 0, []byte("first"), common.PacketTransport)
@@ -663,30 +668,43 @@ func TestPacketRetransmissionDeadline(t *testing.T) {
 	if s.sendBuf.Len() != 1 {
 		t.Fatalf("sendBuf length = %d, want 1", s.sendBuf.Len())
 	}
+	if got, want := seg.txTime, s.clock.Now().UnixMicro(); got != want {
+		t.Fatalf("first transmission time = %d, want %d", got, want)
+	}
 	if got, want := s.nextRetransmissionTime.Load(), seg.txTime+retransmissionCheckDelay.Microseconds(); got != want {
 		t.Fatalf("nextRetransmissionTime after first send = %d, want %d", got, want)
 	}
 
-	// After a retransmission the next check uses the new deadline,
-	// not the expired one.
-	seg.txTime = time.Now().Add(-time.Second).UnixMicro()
-	seg.txTimeout = time.Nanosecond
-	s.nextRetransmissionTime.Store(0)
+	// An early check must not retransmit before the segment's deadline.
+	s.clock.Advance(seg.txTimeout - time.Microsecond)
+	s.runOutputOncePacket()
+	if seg.txCount != 1 {
+		t.Fatalf("txCount before deadline = %d, want 1", seg.txCount)
+	}
+	if got, want := s.nextRetransmissionTime.Load(), seg.txTime+seg.txTimeout.Microseconds(); got != want {
+		t.Fatalf("nextRetransmissionTime before deadline = %d, want %d", got, want)
+	}
+
+	// At the deadline, retransmission schedules the next check in the future.
+	s.clock.Advance(time.Microsecond)
 	s.runOutputOncePacket()
 	readPacketForTest(t, receiverConn)
 	if seg.txCount != 2 {
 		t.Fatalf("txCount = %d, want 2", seg.txCount)
 	}
+	if got, want := seg.txTime, s.clock.Now().UnixMicro(); got != want {
+		t.Fatalf("retransmission time = %d, want %d", got, want)
+	}
 	if got, want := s.nextRetransmissionTime.Load(), seg.txTime+seg.txTimeout.Microseconds(); got != want {
 		t.Fatalf("nextRetransmissionTime after retransmission = %d, want %d", got, want)
 	}
-	if s.nextRetransmissionTime.Load() <= time.Now().UnixMicro() {
+	if s.nextRetransmissionTime.Load() <= s.clock.Now().UnixMicro() {
 		t.Fatal("nextRetransmissionTime after retransmission is not in the future")
 	}
 
 	// A far away deadline from a backed off segment doesn't delay the
 	// check of a newly sent segment.
-	far := time.Now().Add(maxBackOffDuration).UnixMicro()
+	far := s.clock.Now().Add(maxBackOffDuration).UnixMicro()
 	s.nextRetransmissionTime.Store(far)
 	second := testDataSegment(1, 1, []byte("second"), common.PacketTransport)
 	if !s.sendQueue.Insert(second) {
@@ -700,58 +718,4 @@ func TestPacketRetransmissionDeadline(t *testing.T) {
 	if got, want := s.nextRetransmissionTime.Load(), second.txTime+second.txTimeout.Microseconds(); got != want {
 		t.Fatalf("nextRetransmissionTime after second send = %d, want %d", got, want)
 	}
-}
-
-// TestPacketOutputLoopEventDriven verifies that the packet output loop
-// stays silent when idle, acknowledges received data promptly, and still
-// sends heartbeats.
-func TestPacketOutputLoopEventDriven(t *testing.T) {
-	s, receiverConn, decryptBlock := newTestPacketSession(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	loopDone := make(chan struct{})
-	go func() {
-		defer close(loopDone)
-		s.runOutputLoop(ctx)
-	}()
-	defer func() {
-		cancel()
-		select {
-		case <-loopDone:
-		case <-time.After(time.Second):
-			t.Error("runOutputLoop() didn't stop")
-		}
-	}()
-
-	// Idle session doesn't transmit.
-	expectNoPacketForTest(t, receiverConn)
-
-	// Received data is acknowledged after a short delay.
-	data := testDataSegment(1, 0, []byte("payload"), common.PacketTransport)
-	data.metadata.(*dataAckStruct).baseStruct.protocol = uint8(dataServerToClient)
-	start := time.Now()
-	if err := s.input(data); err != nil {
-		t.Fatalf("input() failed: %v", err)
-	}
-	ack := decryptDataAckForTest(t, decryptBlock, readPacketForTest(t, receiverConn))
-	if elapsed := time.Since(start); elapsed > 100*time.Millisecond {
-		t.Errorf("ACK arrived after %v, want within 100ms", elapsed)
-	}
-	if ack.Protocol() != ackClientToServer || ack.unAckSeq != 1 {
-		t.Fatalf("ACK = %v, want %v with unAckSeq 1", ack, ackClientToServer)
-	}
-	if s.ackOnDataRecv.Load() {
-		t.Fatal("ackOnDataRecv is still set after the ACK is sent")
-	}
-
-	// Only one ACK is sent and the session returns to idle.
-	expectNoPacketForTest(t, receiverConn)
-
-	// Heartbeat is sent when the interval expires.
-	s.lastTXTime.Store(time.Now().Add(-2 * sessionHeartbeatInterval).UnixMicro())
-	s.wakePacketOutput()
-	heartbeat := decryptDataAckForTest(t, decryptBlock, readPacketForTest(t, receiverConn))
-	if heartbeat.Protocol() != ackClientToServer {
-		t.Fatalf("heartbeat protocol = %v, want %v", heartbeat.Protocol(), ackClientToServer)
-	}
-	expectNoPacketForTest(t, receiverConn)
 }

@@ -27,12 +27,10 @@ type Clock struct {
 	now atomic.Pointer[time.Time]
 }
 
-// Now returns the current time. A nil Clock also returns real time.
+// Now returns the current time.
 func (c *Clock) Now() time.Time {
-	if c != nil {
-		if now := c.now.Load(); now != nil {
-			return *now
-		}
+	if now := c.now.Load(); now != nil {
+		return *now
 	}
 	return time.Now()
 }

@@ -834,7 +834,7 @@ func (u *PacketUnderlay) cleanSessions() {
 			}
 		default:
 		}
-		if time.Now().UnixMicro()-session.lastRXTime.Load() > idleSessionTimeout.Microseconds() {
+		if session.clock.Now().UnixMicro()-session.lastRXTime.Load() > idleSessionTimeout.Microseconds() {
 			log.Debugf("Found idle %v", session)
 			if err := u.RemoveSession(session); err != nil {
 				log.Debugf("%v RemoveSession() failed: %v", u, err)

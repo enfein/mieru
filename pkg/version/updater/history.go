@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/version/updater/updaterpb"
 	"google.golang.org/protobuf/proto"
 )
@@ -30,6 +31,7 @@ import (
 type History struct {
 	history *updaterpb.UpdateHistory
 	mu      sync.Mutex
+	clock   common.Clock
 }
 
 // NewHistory returns a new History object.
@@ -101,19 +103,20 @@ func (h *History) ShouldCheckUpdate() bool {
 
 	h.sort()
 	lastCheck := h.history.Records[0]
+	now := h.clock.Now()
 
 	// Last check failed for more than 7 days ago.
 	if lastCheck.GetError() != "" {
-		if time.Unix(lastCheck.GetTimeUnix(), 0).AddDate(0, 0, 7).Before(time.Now()) {
+		if time.Unix(lastCheck.GetTimeUnix(), 0).AddDate(0, 0, 7).Before(now) {
 			return true
 		}
 	} else {
 		// Last check found a new version more than 7 days ago.
-		if lastCheck.GetNewReleaseFound() && time.Unix(lastCheck.GetTimeUnix(), 0).AddDate(0, 0, 7).Before(time.Now()) {
+		if lastCheck.GetNewReleaseFound() && time.Unix(lastCheck.GetTimeUnix(), 0).AddDate(0, 0, 7).Before(now) {
 			return true
 		}
 		// Last check didn't find a new version more than 30 days ago.
-		if !lastCheck.GetNewReleaseFound() && time.Unix(lastCheck.GetTimeUnix(), 0).AddDate(0, 0, 30).Before(time.Now()) {
+		if !lastCheck.GetNewReleaseFound() && time.Unix(lastCheck.GetTimeUnix(), 0).AddDate(0, 0, 30).Before(now) {
 			return true
 		}
 	}

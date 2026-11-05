@@ -43,10 +43,9 @@ func (c *writeTimeoutConn) Write(p []byte) (int, error) {
 }
 
 func NewIdleTrackingConn(conn net.Conn) *IdleTrackingConn {
-	return &IdleTrackingConn{
-		Conn:         conn,
-		lastActivity: time.Now(),
-	}
+	c := &IdleTrackingConn{Conn: conn}
+	c.lastActivity = c.clock.Now()
+	return c
 }
 
 // IdleTrackingConn records transport activity and can close the connection
@@ -54,6 +53,7 @@ func NewIdleTrackingConn(conn net.Conn) *IdleTrackingConn {
 type IdleTrackingConn struct {
 	net.Conn
 	mu           sync.Mutex
+	clock        Clock
 	lastActivity time.Time
 }
 
@@ -74,7 +74,7 @@ func (c *IdleTrackingConn) Write(b []byte) (int, error) {
 func (c *IdleTrackingConn) CloseIfIdle(timeout time.Duration) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if timeout <= 0 || time.Since(c.lastActivity) < timeout {
+	if timeout <= 0 || c.clock.Now().Sub(c.lastActivity) < timeout {
 		return false
 	}
 	c.Conn.Close()
@@ -84,7 +84,7 @@ func (c *IdleTrackingConn) CloseIfIdle(timeout time.Duration) bool {
 func (c *IdleTrackingConn) recordActivity(n int) {
 	if n > 0 {
 		c.mu.Lock()
-		c.lastActivity = time.Now()
+		c.lastActivity = c.clock.Now()
 		c.mu.Unlock()
 	}
 }

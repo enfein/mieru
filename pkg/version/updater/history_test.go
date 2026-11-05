@@ -73,6 +73,7 @@ func TestHistoryLoadStore(t *testing.T) {
 }
 
 func TestShouldCheckUpdate(t *testing.T) {
+	now := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 	tests := []struct {
 		name     string
 		records  []*updaterpb.UpdateRecord
@@ -87,7 +88,7 @@ func TestShouldCheckUpdate(t *testing.T) {
 			name: "last check failed more than 7 days ago",
 			records: []*updaterpb.UpdateRecord{
 				{
-					TimeUnix: proto.Int64(time.Now().AddDate(0, 0, -8).Unix()),
+					TimeUnix: proto.Int64(now.AddDate(0, 0, -8).Unix()),
 					Error:    proto.String("failed to check update"),
 				},
 			},
@@ -97,7 +98,7 @@ func TestShouldCheckUpdate(t *testing.T) {
 			name: "last check failed less than 7 days ago",
 			records: []*updaterpb.UpdateRecord{
 				{
-					TimeUnix: proto.Int64(time.Now().AddDate(0, 0, -6).Unix()),
+					TimeUnix: proto.Int64(now.AddDate(0, 0, -6).Unix()),
 					Error:    proto.String("failed to check update"),
 				},
 			},
@@ -107,7 +108,7 @@ func TestShouldCheckUpdate(t *testing.T) {
 			name: "last check found a new version more than 7 days ago",
 			records: []*updaterpb.UpdateRecord{
 				{
-					TimeUnix:        proto.Int64(time.Now().AddDate(0, 0, -8).Unix()),
+					TimeUnix:        proto.Int64(now.AddDate(0, 0, -8).Unix()),
 					NewReleaseFound: proto.Bool(true),
 				},
 			},
@@ -117,7 +118,7 @@ func TestShouldCheckUpdate(t *testing.T) {
 			name: "last check found a new version less than 7 days ago",
 			records: []*updaterpb.UpdateRecord{
 				{
-					TimeUnix:        proto.Int64(time.Now().AddDate(0, 0, -6).Unix()),
+					TimeUnix:        proto.Int64(now.AddDate(0, 0, -6).Unix()),
 					NewReleaseFound: proto.Bool(true),
 				},
 			},
@@ -127,7 +128,7 @@ func TestShouldCheckUpdate(t *testing.T) {
 			name: "last check didn't find a new version more than 30 days ago",
 			records: []*updaterpb.UpdateRecord{
 				{
-					TimeUnix:        proto.Int64(time.Now().AddDate(0, 0, -31).Unix()),
+					TimeUnix:        proto.Int64(now.AddDate(0, 0, -31).Unix()),
 					NewReleaseFound: proto.Bool(false),
 				},
 			},
@@ -137,7 +138,7 @@ func TestShouldCheckUpdate(t *testing.T) {
 			name: "last check didn't find a new version less than 30 days ago",
 			records: []*updaterpb.UpdateRecord{
 				{
-					TimeUnix:        proto.Int64(time.Now().AddDate(0, 0, -29).Unix()),
+					TimeUnix:        proto.Int64(now.AddDate(0, 0, -29).Unix()),
 					NewReleaseFound: proto.Bool(false),
 				},
 			},
@@ -148,10 +149,50 @@ func TestShouldCheckUpdate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := NewHistory()
+			h.clock.SetTime(now)
 			h.history.Records = tt.records
 			got := h.ShouldCheckUpdate()
 			if got != tt.expected {
 				t.Errorf("ShouldCheckUpdate() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestShouldCheckUpdateDeadline(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		days       int
+		err        string
+		newRelease bool
+	}{
+		{name: "failed check", days: 7, err: "failed to check update"},
+		{name: "new release", days: 7, newRelease: true},
+		{name: "no new release", days: 30},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			h := NewHistory()
+			lastCheck := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+			h.Insert(&updaterpb.UpdateRecord{
+				TimeUnix:        proto.Int64(lastCheck.Unix()),
+				Error:           proto.String(test.err),
+				NewReleaseFound: proto.Bool(test.newRelease),
+			})
+			h.clock.SetTime(lastCheck)
+			h.clock.Advance(lastCheck.AddDate(0, 0, test.days).Sub(lastCheck) - time.Nanosecond)
+			for _, step := range []struct {
+				name    string
+				advance time.Duration
+				want    bool
+			}{
+				{name: "before deadline"},
+				{name: "at deadline", advance: time.Nanosecond},
+				{name: "after deadline", advance: time.Nanosecond, want: true},
+			} {
+				h.clock.Advance(step.advance)
+				if got := h.ShouldCheckUpdate(); got != step.want {
+					t.Fatalf("%s: ShouldCheckUpdate() = %v, want %v", step.name, got, step.want)
+				}
 			}
 		})
 	}

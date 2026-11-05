@@ -26,7 +26,6 @@ func TestClockRealTime(t *testing.T) {
 		name  string
 		clock *Clock
 	}{
-		{"nil", nil},
 		{"zero value", &clock},
 		{"reset", &clock},
 	}

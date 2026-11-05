@@ -66,7 +66,10 @@ func TestIdleTrackingConnActivity(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			raw := &idleResultConn{n: test.n, err: test.err}
-			conn := &IdleTrackingConn{Conn: raw, lastActivity: time.Now().Add(-10 * time.Minute)}
+			conn := NewIdleTrackingConn(raw)
+			created := conn.lastActivity
+			conn.clock.SetTime(created)
+			conn.clock.Advance(10 * time.Minute)
 			var n int
 			var err error
 			if test.write {
@@ -76,6 +79,13 @@ func TestIdleTrackingConnActivity(t *testing.T) {
 			}
 			if n != test.n || !errors.Is(err, test.err) {
 				t.Fatalf("I/O = (%d, %v), want (%d, %v)", n, err, test.n, test.err)
+			}
+			wantActivity := created
+			if test.n > 0 {
+				wantActivity = conn.clock.Now()
+			}
+			if !conn.lastActivity.Equal(wantActivity) {
+				t.Fatalf("lastActivity = %v, want %v", conn.lastActivity, wantActivity)
 			}
 			wantClosed := test.n == 0
 			if got := conn.CloseIfIdle(5 * time.Minute); got != wantClosed || raw.closed != wantClosed {

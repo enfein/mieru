@@ -45,8 +45,8 @@ type ReplayCache struct {
 	// mu is required to access the replay cache.
 	mu sync.Mutex
 
-	// clock is nil in production. It is used in test.
-	clock *common.Clock
+	// clock returns real time in production and can be controlled in tests.
+	clock common.Clock
 
 	// capacity is the maximum number of entries in one replay cache.
 	// If the size of `current` map is bigger than capacity, `current` map
@@ -69,24 +69,20 @@ type ReplayCache struct {
 
 // NewCache creates a new replay cache.
 func NewCache(capacity int, expireInterval time.Duration) *ReplayCache {
-	return newCache(capacity, expireInterval, nil)
-}
-
-func newCache(capacity int, expireInterval time.Duration, clock *common.Clock) *ReplayCache {
 	if capacity < 0 {
 		panic("replay cache capacity can't be negative")
 	}
 	if expireInterval.Nanoseconds() <= 0 {
 		panic("replay cache expire interval must be a positive time range")
 	}
-	return &ReplayCache{
-		clock:          clock,
+	c := &ReplayCache{
 		capacity:       capacity,
-		expireTime:     clock.Now().Add(expireInterval),
 		expireInterval: expireInterval,
 		current:        make(map[uint64]string),
 		previous:       make(map[uint64]string),
 	}
+	c.expireTime = c.clock.Now().Add(expireInterval)
+	return c
 }
 
 // IsDuplicate checks if the given data is present in the replay cache.

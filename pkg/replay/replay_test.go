@@ -19,14 +19,12 @@ import (
 	crand "crypto/rand"
 	"testing"
 	"time"
-
-	"github.com/enfein/mieru/v3/pkg/common"
 )
 
 func newTestCache(capacity int, expireInterval time.Duration) *ReplayCache {
-	clock := &common.Clock{}
-	clock.SetTime(time.Now())
-	return newCache(capacity, expireInterval, clock)
+	cache := NewCache(capacity, expireInterval)
+	cache.clock.SetTime(cache.expireTime.Add(-expireInterval))
+	return cache
 }
 
 func TestDuplicate(t *testing.T) {
