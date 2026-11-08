@@ -20,6 +20,7 @@ import (
 	"context"
 	mrand "math/rand"
 	"net"
+	"net/netip"
 	"strings"
 
 	"github.com/enfein/mieru/v3/apis/constant"
@@ -121,7 +122,11 @@ func (s *Server) rejectPrivateAndLoopbackIPAction(_ context.Context, in egress.I
 				break
 			}
 		}
-		if isWellKnownIPv4LocalDomainName {
+		if literal, err := netip.ParseAddr(domainName); err == nil {
+			// net.Resolver returns an IP literal sent as a domain name as is
+			// (IPv6 zone included), without a DNS lookup, so check it as an IP.
+			ip = net.IP(literal.WithZone("").AsSlice())
+		} else if isWellKnownIPv4LocalDomainName {
 			ip = net.ParseIP("127.0.0.1")
 		} else if isWellKnownIPv6LocalDomainName {
 			ip = net.ParseIP("::1")
