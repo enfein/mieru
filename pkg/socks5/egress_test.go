@@ -175,7 +175,8 @@ func makeSocks5ConnectDomainInput(domain, user string) egress.Input {
 // domain names are recognized regardless of the DNS-equivalent spelling used
 // by the client. DNS names are case-insensitive and a trailing dot denotes the
 // same absolute name, so all of these spellings address the loopback interface
-// and must be rejected when the user did not enable allowLoopbackIP.
+// and must be rejected when the user did not enable allowLoopbackIP. An IP
+// literal sent as a domain name is checked like the IP address itself.
 func TestRejectPrivateAndLoopbackDomainName(t *testing.T) {
 	controller := &Server{
 		config: &Config{
@@ -186,7 +187,7 @@ func TestRejectPrivateAndLoopbackDomainName(t *testing.T) {
 			},
 		},
 	}
-	for _, domain := range []string{"localhost", "LOCALHOST", "LocalHost", "localhost.", "LOCALHOST.", "IP6-LOCALHOST"} {
+	for _, domain := range []string{"localhost", "LOCALHOST", "LocalHost", "localhost.", "LOCALHOST.", "IP6-LOCALHOST", "127.0.0.1", "::1", "::ffff:127.0.0.1", "::1%lo", "192.168.0.1"} {
 		t.Run(domain, func(t *testing.T) {
 			action := controller.FindAction(context.Background(), makeSocks5ConnectDomainInput(domain, "xijinping"))
 			if action.Action != appctlpb.EgressAction_REJECT {
