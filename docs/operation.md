@@ -237,6 +237,7 @@ The server does **not** store plaintext passwords; only a checksum is kept.
 | `MIERU_CONFIG_JSON_FILE` | Load JSON client config from this path. |
 | `MIERU_CONFIG_FILE` | Load protobuf client config from this path. |
 | `MITA_LOG_NO_TIMESTAMP` | If non-empty, server log omits timestamps (useful with journald). |
+| `MITA_AUTH_AUDIT` | Set to `1` to log TCP authentication results at `INFO` level. Disabled by default. |
 | `MITA_UDS_PATH` | UNIX domain socket path. Default: `/var/run/mita/mita.sock`. |
 | `MITA_INSECURE_UDS` | If non-empty, skip permission enforcement on the UDS file. For restricted systems. |
 
@@ -247,6 +248,27 @@ MIERU_CONFIG_JSON_FILE=/etc/mieru_client_config.json mieru run
 ```
 
 Logs go to the terminal. Press `Ctrl+C` to exit.
+
+### TCP authentication audit
+
+When several users share a listening port, enable `MITA_AUTH_AUDIT=1` in the server process environment and set `loggingLevel` to `INFO`, `DEBUG`, or `TRACE`. For a systemd installation, run `sudo systemctl edit mita` and add:
+
+```ini
+[Service]
+Environment=MITA_AUTH_AUDIT=1
+```
+
+Then restart the service with `sudo systemctl restart mita`. Audit records appear in the normal server log with an `AUTH_AUDIT ` prefix followed by JSON:
+
+```sh
+sudo journalctl -u mita -f -o cat --grep AUTH_AUDIT
+```
+
+`auth_success` records contain the authenticated `username`, `source_ip`, `source_port`, `local_ip`, `local_port`, `protocol` (`TCP`), UTC `time_utc`, and the initial `session_id`. A success is emitted only after the first complete session segment passes validation and dispatch. Authentication happens once per TCP transport; multiplexed requests do not each produce a new record.
+
+`auth_failure` records contain endpoints, time, and a `reason`, but no username or session ID. A rejected encrypted handshake cannot establish a trusted user identity. Reasons include `invalid_credentials_or_corrupt_data`, `replay_rejected`, `invalid_handshake`, and `incomplete_handshake`; a failure does not necessarily mean an incorrect password.
+
+Passwords and proxied request contents are not included. Audit records expose usernames and public source addresses, so restrict access to the logs and configure retention to suit your deployment. A source address may be shared by several devices behind NAT. This option covers TCP transports only and does not split per-user traffic counters by source IP.
 
 ---
 

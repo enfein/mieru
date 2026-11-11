@@ -217,6 +217,18 @@ func (t *StreamUnderlay) RunEventLoop(ctx context.Context) error {
 			if errType == stderror.UNKNOWN_ERROR {
 				panic(fmt.Sprintf("%v got unexpected error type UNKNOWN_ERROR", t))
 			}
+			if !t.isClient && t.serverUserPolicy.Name() == "" {
+				reason := "incomplete_handshake"
+				switch errType {
+				case stderror.CRYPTO_ERROR:
+					reason = "invalid_credentials_or_corrupt_data"
+				case stderror.REPLAY_ERROR:
+					reason = "replay_rejected"
+				case stderror.PROTOCOL_ERROR:
+					reason = "invalid_handshake"
+				}
+				auditServerAuth("auth_failure", "", reason, t.LocalAddr(), t.RemoteAddr(), 0)
+			}
 			if errType == stderror.CRYPTO_ERROR || errType == stderror.REPLAY_ERROR {
 				t.drainAfterError()
 			}
@@ -230,6 +242,7 @@ func (t *StreamUnderlay) RunEventLoop(ctx context.Context) error {
 		}
 		if seg.serverUserAuthentication.Valid() {
 			if err := validateNewServerSessionSegment(seg); err != nil {
+				auditServerAuth("auth_failure", "", "invalid_handshake", t.LocalAddr(), t.RemoteAddr(), 0)
 				return stderror.WrapErrorWithType(err, stderror.PROTOCOL_ERROR)
 			}
 		}
@@ -325,6 +338,8 @@ func (t *StreamUnderlay) commitServerUserAuthentication(seg *segment) {
 	}
 	t.serverUserPolicy = seg.serverUserAuthentication.Policy()
 	seg.serverUserAuthentication.Record()
+	sessionID, _ := seg.SessionID()
+	auditServerAuth("auth_success", t.serverUserPolicy.Name(), "", t.LocalAddr(), t.RemoteAddr(), sessionID)
 }
 
 func (t *StreamUnderlay) onOpenSessionResponse(seg *segment) error {
