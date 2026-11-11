@@ -237,6 +237,7 @@ mieru apply config <client_config.json>
 | `MIERU_CONFIG_JSON_FILE` | 从该路径加载 JSON 格式客户端配置文件。 |
 | `MIERU_CONFIG_FILE` | 从该路径加载 protobuf 格式客户端配置文件。 |
 | `MITA_LOG_NO_TIMESTAMP` | 非空时，服务器日志不打印时间戳（配合 journald 使用）。 |
+| `MITA_AUTH_AUDIT` | 设为 `1` 时，以 `INFO` 级别记录 TCP 认证结果。默认关闭。 |
 | `MITA_UDS_PATH` | UNIX domain socket 路径。默认值：`/var/run/mita/mita.sock`。 |
 | `MITA_INSECURE_UDS` | 非空时，跳过 UDS 文件权限强制检查。适用于受限系统。 |
 
@@ -247,6 +248,27 @@ MIERU_CONFIG_JSON_FILE=/etc/mieru_client_config.json mieru run
 ```
 
 日志直接输出到终端。按 `Ctrl+C` 退出。
+
+### TCP 认证审计
+
+多个用户共用监听端口时，在服务器进程环境中启用 `MITA_AUTH_AUDIT=1`，并将 `loggingLevel` 设为 `INFO`、`DEBUG` 或 `TRACE`。通过 systemd 安装时，运行 `sudo systemctl edit mita` 并添加：
+
+```ini
+[Service]
+Environment=MITA_AUTH_AUDIT=1
+```
+
+然后执行 `sudo systemctl restart mita` 重启服务。审计记录写入普通服务器日志，以 `AUTH_AUDIT ` 开头，后接 JSON：
+
+```sh
+sudo journalctl -u mita -f -o cat --grep AUTH_AUDIT
+```
+
+`auth_success` 记录包含通过认证的 `username`、`source_ip`、`source_port`、`local_ip`、`local_port`、`protocol`（`TCP`）、UTC 时间 `time_utc` 和初始 `session_id`。只有首个完整会话段通过验证并完成分发后，才会记录成功事件。每条 TCP 传输连接认证一次，多路复用的各个请求不会分别生成新记录。
+
+`auth_failure` 记录包含端点、时间和 `reason`，不包含用户名或会话 ID。被拒绝的加密握手无法确认可信的用户身份。原因包括 `invalid_credentials_or_corrupt_data`、`replay_rejected`、`invalid_handshake` 和 `incomplete_handshake`；失败不一定意味着密码错误。
+
+日志不包含密码或代理请求内容。审计记录会暴露用户名和来源公网地址，请限制日志访问权限，并根据部署需要配置保留时间。多个 NAT 后的设备可能共享同一个来源地址。此选项仅覆盖 TCP 传输，不会将各用户的流量计数按来源 IP 拆分。
 
 ---
 
