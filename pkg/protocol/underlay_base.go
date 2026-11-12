@@ -129,6 +129,21 @@ func (b *baseUnderlay) RemoteAddr() net.Addr {
 }
 
 func (b *baseUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
+	b.closeMutex.Lock()
+	defer b.closeMutex.Unlock()
+	return b.addSessionLocked(s, remoteAddr)
+}
+
+// addSessionLocked attaches a session while the caller holds closeMutex.
+//
+// The lock is what makes the closed check and the attachment one decision. A teardown can run
+// between Mux.DialContext picking an existing underlay and this attach - the pick returns a
+// reference, and Close does not revoke it - so without the lock a new session lands on an object
+// whose transport is already closed and the flow fails later, typically as a SOCKS EOF, instead of
+// being refused at the hand-out. The wrapper underlays hold the same mutex across their own
+// post-attach setup, which is the other half: a session whose attach won the race must be fully
+// started before Close can observe it in the map and wait for it.
+func (b *baseUnderlay) addSessionLocked(s *Session, remoteAddr net.Addr) error {
 	if s == nil {
 		return stderror.ErrNullPointer
 	}
@@ -143,6 +158,11 @@ func (b *baseUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
 	}
 	if !b.isClient && s.isClient {
 		return fmt.Errorf("can't add a client session to a server underlay")
+	}
+	select {
+	case <-b.done:
+		return io.ErrClosedPipe
+	default:
 	}
 	if _, loaded := b.sessionMap.LoadOrStore(s.id, s); loaded {
 		return stderror.ErrAlreadyExist

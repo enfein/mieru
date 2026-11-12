@@ -158,7 +158,14 @@ func (t *StreamUnderlay) RemoteAddr() net.Addr {
 }
 
 func (t *StreamUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
-	if err := t.baseUnderlay.AddSession(s, remoteAddr); err != nil {
+	// Hold the lifecycle lock across the base attach AND the setup below, so a teardown either
+	// happens before this attach (the closed check refuses it) or after the session is fully
+	// started and visible in the map (Close then waits for its loops). Releasing the lock between
+	// the two would let Close observe a half-attached session and return before its goroutines
+	// exist.
+	t.closeMutex.Lock()
+	defer t.closeMutex.Unlock()
+	if err := t.baseUnderlay.addSessionLocked(s, remoteAddr); err != nil {
 		return err
 	}
 	s.conn = t // override base underlay

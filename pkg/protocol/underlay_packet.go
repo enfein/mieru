@@ -149,7 +149,11 @@ func (u *PacketUnderlay) RemoteAddr() net.Addr {
 }
 
 func (u *PacketUnderlay) AddSession(s *Session, remoteAddr net.Addr) error {
-	if err := u.baseUnderlay.AddSession(s, remoteAddr); err != nil {
+	// See StreamUnderlay.AddSession: the lifecycle lock must span the base attach and the setup,
+	// or a teardown can observe a half-attached session.
+	u.closeMutex.Lock()
+	defer u.closeMutex.Unlock()
+	if err := u.baseUnderlay.addSessionLocked(s, remoteAddr); err != nil {
 		return err
 	}
 	s.conn = u // override base underlay
