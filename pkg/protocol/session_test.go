@@ -17,6 +17,8 @@ package protocol
 
 import (
 	"bytes"
+	"context"
+	"io"
 	"net"
 	"testing"
 	"time"
@@ -395,7 +397,7 @@ func TestLowEntropyApplicationAccountingAndQuota(t *testing.T) {
 	if n, err := s.Read(readBuf); err != nil || n != len(request) || !bytes.Equal(readBuf, request) {
 		t.Fatalf("Read() = (%d, %v, %q), want (%d, nil, %q)", n, err, readBuf, len(request), request)
 	}
-	if got := s.uploadBytes.Load(); got != int64(len(request)) {
+	if got := (*s.uploadBytes.Load()).Load(); got != int64(len(request)) {
 		t.Fatalf("user upload bytes = %d, want %d application bytes", got, len(request))
 	}
 
@@ -409,14 +411,14 @@ func TestLowEntropyApplicationAccountingAndQuota(t *testing.T) {
 	if segments[0].Protocol() != dataServerToClientLowEntropy {
 		t.Fatalf("response protocol = %v, want %v", segments[0].Protocol(), dataServerToClientLowEntropy)
 	}
-	if got := s.downloadBytes.Load(); got != int64(len(response)) {
+	if got := (*s.downloadBytes.Load()).Load(); got != int64(len(response)) {
 		t.Fatalf("user download bytes = %d, want %d application bytes", got, len(response))
 	}
 
 	if ok, err := s.checkQuota(userName); err != nil || !ok {
 		t.Fatalf("checkQuota() before application limit = (%v, %v), want (true, nil)", ok, err)
 	}
-	s.uploadBytes.Add(1 << 20)
+	(*s.uploadBytes.Load()).Add(1 << 20)
 	if ok, err := s.checkQuota(userName); err != nil || ok {
 		t.Fatalf("checkQuota() after application limit = (%v, %v), want (false, nil)", ok, err)
 	}
@@ -717,5 +719,51 @@ func TestPacketRetransmissionDeadline(t *testing.T) {
 	}
 	if got, want := s.nextRetransmissionTime.Load(), second.txTime+second.txTimeout.Microseconds(); got != want {
 		t.Fatalf("nextRetransmissionTime after second send = %d, want %d", got, want)
+	}
+}
+
+// TestServerSessionWriteRightAfterAccept writes on server sessions as soon as
+// Accept returns them, while their input loops may still be handling the open
+// session request. Run with -race: the per user metrics a server session
+// registers in its input loop are read by Read and Write.
+func TestServerSessionWriteRightAfterAccept(t *testing.T) {
+	port, err := common.UnusedUDPPort()
+	if err != nil {
+		t.Fatalf("common.UnusedUDPPort() failed: %v", err)
+	}
+	address := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port}
+	server := NewMux(false).SetServerUsers(users).
+		SetEndpoints([]UnderlayProperties{NewUnderlayProperties(1400, common.PacketTransport, address, nil)})
+	if err := server.Start(); err != nil {
+		t.Fatalf("server.Start() failed: %v", err)
+	}
+	defer server.Close()
+	client := NewMux(true).
+		SetClientUserNamePassword("xiaochitang", cipher.HashPassword([]byte("kuiranbudong"), []byte("xiaochitang"))).
+		SetClientMultiplexFactor(0).
+		SetEndpoints([]UnderlayProperties{NewUnderlayProperties(1400, common.PacketTransport, nil, address)})
+	defer client.Close()
+	for i := 0; i < 20; i++ {
+		conn, err := client.DialContext(context.Background())
+		if err != nil {
+			t.Fatalf("DialContext() failed: %v", err)
+		}
+		if _, err := conn.Write([]byte("ping")); err != nil {
+			t.Fatalf("client Write() failed: %v", err)
+		}
+		accepted, err := server.Accept()
+		if err != nil {
+			t.Fatalf("Accept() failed: %v", err)
+		}
+		if _, err := accepted.Write([]byte("pong")); err != nil {
+			t.Fatalf("server Write() failed: %v", err)
+		}
+		reply := make([]byte, 4)
+		_ = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+		if _, err := io.ReadFull(conn, reply); err != nil || string(reply) != "pong" {
+			t.Fatalf("client read %q, %v", reply, err)
+		}
+		accepted.Close()
+		conn.Close()
 	}
 }
