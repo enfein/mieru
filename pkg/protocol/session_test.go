@@ -719,3 +719,43 @@ func TestPacketRetransmissionDeadline(t *testing.T) {
 		t.Fatalf("nextRetransmissionTime after second send = %d, want %d", got, want)
 	}
 }
+
+// newTestOpeningPacketSession returns a client packet session that has sent
+// its open session request and has not received the response.
+func newTestOpeningPacketSession(t *testing.T) *Session {
+	t.Helper()
+	s, _, _ := newTestPacketSession(t)
+	s.state.Store(int32(sessionAttached))
+	return s
+}
+
+func testServerDataSegment(seq uint32, payload []byte) *segment {
+	seg := testDataSegment(1, seq, payload, common.PacketTransport)
+	seg.metadata.(*dataAckStruct).protocol = uint8(dataServerToClient)
+	return seg
+}
+
+func TestClientPacketSessionOpensOnServerData(t *testing.T) {
+	s := newTestOpeningPacketSession(t)
+	if !s.isClientPacketSessionOpening() {
+		t.Fatalf("the session is not opening")
+	}
+	if err := s.input(testServerDataSegment(0, []byte("payload"))); err != nil {
+		t.Fatalf("input() failed: %v", err)
+	}
+	if !s.isState(sessionEstablished) {
+		t.Errorf("a client packet session that received the server's data is not established")
+	}
+}
+
+func TestClientPacketSessionDoesNotOpenOnServerAck(t *testing.T) {
+	s := newTestOpeningPacketSession(t)
+	ack := testServerDataSegment(0, nil)
+	ack.metadata.(*dataAckStruct).protocol = uint8(ackServerToClient)
+	if err := s.input(ack); err != nil {
+		t.Fatalf("input() failed: %v", err)
+	}
+	if s.isState(sessionEstablished) {
+		t.Errorf("a client packet session that received the server's ACK is established; only data opens it")
+	}
+}
