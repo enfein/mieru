@@ -546,6 +546,21 @@ func (s *Session) isClientPacketSessionOpenResponse(seg *segment) bool {
 	return s.isClientPacketSessionOpening() && seg.Protocol() == openSessionResponse
 }
 
+// isClientPacketSessionOpenedByData reports whether seg is data from the
+// server received by a client packet session that is still opening. A server
+// only sends data in a session it has established, so the data opens the
+// session just as the open session response does.
+//
+// Without this, the session can deadlock. The server hands the data carried by
+// the open session request to its application before it queues the open
+// session response. If the application writes at once, the response is queued
+// behind that data, and the server sends only what its initial window allows
+// before it waits for an acknowledgement. The client acknowledges nothing until
+// the response arrives, so neither side makes progress until a read times out.
+func (s *Session) isClientPacketSessionOpenedByData(seg *segment) bool {
+	return s.isClientPacketSessionOpening() && isDataProtocol(seg.Protocol())
+}
+
 // shouldDeferNextPacketData reports whether the next queued packet is data
 // that must wait for the server to acknowledge session establishment. This
 // can happen when open session request is sent by the client by not
@@ -1112,7 +1127,7 @@ func (s *Session) input(seg *segment) error {
 		if err := s.inputData(seg); err != nil {
 			return err
 		}
-		if s.isClientPacketSessionOpenResponse(seg) {
+		if s.isClientPacketSessionOpenResponse(seg) || s.isClientPacketSessionOpenedByData(seg) {
 			s.forwardStateTo(sessionEstablished)
 			s.wakePacketOutput()
 		}
