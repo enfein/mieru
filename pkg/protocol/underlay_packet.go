@@ -269,6 +269,16 @@ func (u *PacketUnderlay) onOpenSessionRequest(seg *segment, remoteAddr net.Addr)
 		return stderror.ErrInvalidOperation
 	}
 
+	// Serialize admission with other opens and Close. Consumers only remove
+	// ready sessions, so an available slot remains reserved until dispatch.
+	u.closeMutex.Lock()
+	defer u.closeMutex.Unlock()
+	select {
+	case <-u.done:
+		return io.ErrClosedPipe
+	default:
+	}
+
 	// Create a new session.
 	sessionID := seg.metadata.(*sessionStruct).sessionID
 	if sessionID == 0 {
@@ -279,6 +289,12 @@ func (u *PacketUnderlay) onOpenSessionRequest(seg *segment, remoteAddr net.Addr)
 	if found {
 		log.Debugf("%v received openSessionRequest, but session ID %d is already used", u, sessionID)
 		return nil
+	}
+	if len(u.readySessions) == cap(u.readySessions) {
+		// Do not register, acknowledge or authenticate an unadmitted session.
+		// The client can retransmit its open request after Accept frees space,
+		// while this shared receiver keeps processing existing sessions.
+		return fmt.Errorf("session accept backlog is full: %w", stderror.ErrNotReady)
 	}
 	session := newSessionWithServerUserPolicy(sessionID, false, u.MTU(), seg.serverUserPolicy, nil, u.trafficPattern)
 	if err := u.AddSession(session, remoteAddr); err != nil {
