@@ -185,6 +185,8 @@ func (u *PacketUnderlay) RunEventLoop(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
+			// Session shutdown still uses the packet socket to send Close.
+			u.Close()
 			u.cleanSessions()
 			return nil
 		case <-u.done:
