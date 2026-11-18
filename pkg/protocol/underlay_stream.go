@@ -187,7 +187,18 @@ func (t *StreamUnderlay) RunEventLoop(ctx context.Context) error {
 	if t.conn == nil {
 		return stderror.ErrNullPointer
 	}
-	defer t.conn.Close()
+	defer func() {
+		_ = t.conn.Close()
+		if username := t.serverUserPolicy.Name(); !t.isClient && username != "" && log.IsLevelEnabled(log.DebugLevel) {
+			if sourceIP, _, err := net.SplitHostPort(t.RemoteAddr().String()); err == nil {
+				// Wait for a write that completed just before socket closure to update its counter.
+				t.sendMutex.Lock()
+				download := t.OutBytes()
+				t.sendMutex.Unlock()
+				log.Debugf("TCP connection closed for user %q from %s, uploaded %d bytes, downloaded %d bytes", username, sourceIP, t.InBytes(), download)
+			}
+		}
+	}()
 
 	for {
 		select {
@@ -227,7 +238,7 @@ func (t *StreamUnderlay) RunEventLoop(ctx context.Context) error {
 				case stderror.PROTOCOL_ERROR:
 					reason = "invalid_handshake"
 				}
-				auditServerAuth("auth_failure", "", reason, t.LocalAddr(), t.RemoteAddr(), 0)
+				auditServerAuth("", reason, t.LocalAddr(), t.RemoteAddr(), 0)
 			}
 			if errType == stderror.CRYPTO_ERROR || errType == stderror.REPLAY_ERROR {
 				t.drainAfterError()
@@ -242,7 +253,7 @@ func (t *StreamUnderlay) RunEventLoop(ctx context.Context) error {
 		}
 		if seg.serverUserAuthentication.Valid() {
 			if err := validateNewServerSessionSegment(seg); err != nil {
-				auditServerAuth("auth_failure", "", "invalid_handshake", t.LocalAddr(), t.RemoteAddr(), 0)
+				auditServerAuth("", "invalid_handshake", t.LocalAddr(), t.RemoteAddr(), 0)
 				return stderror.WrapErrorWithType(err, stderror.PROTOCOL_ERROR)
 			}
 		}
@@ -339,7 +350,7 @@ func (t *StreamUnderlay) commitServerUserAuthentication(seg *segment) {
 	t.serverUserPolicy = seg.serverUserAuthentication.Policy()
 	seg.serverUserAuthentication.Record()
 	sessionID, _ := seg.SessionID()
-	auditServerAuth("auth_success", t.serverUserPolicy.Name(), "", t.LocalAddr(), t.RemoteAddr(), sessionID)
+	auditServerAuth(t.serverUserPolicy.Name(), "", t.LocalAddr(), t.RemoteAddr(), sessionID)
 }
 
 func (t *StreamUnderlay) onOpenSessionResponse(seg *segment) error {

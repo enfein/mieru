@@ -18,7 +18,6 @@ package protocol
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
@@ -42,6 +41,13 @@ func (c *auditTestConn) LocalAddr() net.Addr {
 	return &net.TCPAddr{IP: net.ParseIP("203.0.113.10"), Port: 2053}
 }
 
+func newAuditTestConnection(mux *Mux, sourcePort int) (*StreamUnderlay, net.Conn) {
+	reader, writer := net.Pipe()
+	remote := &net.TCPAddr{IP: net.ParseIP("198.51.100.20"), Port: sourcePort}
+	conn := &auditTestConn{&serverUserTestRemoteConn{Conn: reader, remoteAddr: remote}}
+	return mux.serverWrapTCPConn(conn, 1400, nil).(*StreamUnderlay), writer
+}
+
 func (b *auditTestBuffer) Write(p []byte) (int, error) {
 	b.Lock()
 	defer b.Unlock()
@@ -54,39 +60,34 @@ func (b *auditTestBuffer) String() string {
 	return b.Buffer.String()
 }
 
-func (b *auditTestBuffer) events(t *testing.T) []map[string]interface{} {
-	t.Helper()
-	b.Lock()
-	defer b.Unlock()
-	var result []map[string]interface{}
-	for _, line := range strings.Split(b.Buffer.String(), "\n") {
-		_, data, found := strings.Cut(line, "AUTH_AUDIT ")
-		if !found {
-			continue
+func (b *auditTestBuffer) events() []string {
+	var events []string
+	for _, line := range strings.Split(b.String(), "\n") {
+		if _, event, found := strings.Cut(line, "TCP authentication "); found {
+			events = append(events, event)
 		}
-		var event map[string]interface{}
-		if err := json.Unmarshal([]byte(data), &event); err != nil {
-			t.Fatalf("invalid audit JSON: %v", err)
-		}
-		result = append(result, event)
 	}
-	return result
+	return events
 }
 
 func captureAuthAudit(t *testing.T) *auditTestBuffer {
 	t.Helper()
 	buffer := &auditTestBuffer{}
 	logger := log.StandardLogger()
-	previousOutput, previousLevel := logger.Out, logger.GetLevel()
+	previousOutput, previousLevel, previousFormatter := logger.Out, logger.GetLevel(), logger.Formatter
 	log.SetOutput(buffer)
-	log.SetLevel("INFO")
-	t.Cleanup(func() { log.SetOutput(previousOutput); logger.SetLevel(previousLevel) })
+	log.SetFormatter(&log.DaemonFormatter{})
+	t.Cleanup(func() {
+		log.SetOutput(previousOutput)
+		logger.SetLevel(previousLevel)
+		log.SetFormatter(previousFormatter)
+	})
 	return buffer
 }
 
 func TestServerAuthAuditSharedPort(t *testing.T) {
-	t.Setenv("MITA_AUTH_AUDIT", "1")
 	buffer := captureAuthAudit(t)
+	log.SetLevel("DEBUG")
 
 	firstUser, secondUser := "alice", "bob\n\"quoted"
 	firstKey := cipher.HashPassword([]byte("first secret"), []byte(firstUser))
@@ -100,43 +101,34 @@ func TestServerAuthAuditSharedPort(t *testing.T) {
 		key        []byte
 		port       int
 		protocol   protocolType
-		success    bool
+		reason     string
 	}{
-		{"first_user", firstUser, firstKey, 12001, openSessionRequest, true},
-		{"second_user_same_ip", secondUser, secondKey, 12002, openSessionRequest, true},
-		{"wrong_password", firstUser, wrongKey, 12003, openSessionRequest, false},
-		{"invalid_role", firstUser, firstKey, 12004, openSessionResponse, false},
+		{"first_user", firstUser, firstKey, 12001, openSessionRequest, ""},
+		{"second_user_same_ip", secondUser, secondKey, 12002, openSessionRequest, ""},
+		{"wrong_password", firstUser, wrongKey, 12003, openSessionRequest, "invalid_credentials_or_corrupt_data"},
+		{"invalid_role", firstUser, firstKey, 12004, openSessionResponse, "invalid_handshake"},
 	}
 	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			before := len(buffer.events(t))
-			reader, writer := net.Pipe()
-			conn := &auditTestConn{&serverUserTestRemoteConn{Conn: reader, remoteAddr: &net.TCPAddr{IP: net.ParseIP("198.51.100.20"), Port: test.port}}}
-			server := mux.serverWrapTCPConn(conn, 1400, nil).(*StreamUnderlay)
+			before := len(buffer.events())
+			server, writer := newAuditTestConnection(mux, test.port)
 			wire := buildServerUserStreamWire(t, test.key, test.user, testSessionSegment(test.protocol, uint32(i+1000), common.StreamTransport), nil, nil)
 			go func() { _, _ = writer.Write(wire); _ = writer.Close() }()
 			_ = server.RunEventLoop(context.Background())
 			_ = server.Close()
-			events := buffer.events(t)[before:]
+			events := buffer.events()[before:]
 			if len(events) != 1 {
 				t.Fatalf("got %d auth events, want one", len(events))
 			}
-			event := events[0]
-			if event["source_ip"] != "198.51.100.20" {
-				t.Fatalf("wrong source IP: %v", event)
+			endpoints := fmt.Sprintf("from 198.51.100.20:%d to 203.0.113.10:2053", test.port)
+			var want string
+			if test.reason == "" {
+				want = fmt.Sprintf("succeeded for user %q %s, session %d", test.user, endpoints, i+1000)
+			} else {
+				want = fmt.Sprintf("failed %s (%s)", endpoints, test.reason)
 			}
-			if event["source_port"] != fmt.Sprint(test.port) || event["local_port"] != "2053" || event["protocol"] != "TCP" {
-				t.Fatalf("wrong transport endpoints: %v", event)
-			}
-			if _, err := time.Parse(time.RFC3339Nano, event["time_utc"].(string)); err != nil {
-				t.Fatal(err)
-			}
-			if test.success {
-				if event["event"] != "auth_success" || event["username"] != test.user {
-					t.Fatalf("wrong identity: %v", event)
-				}
-			} else if event["event"] != "auth_failure" || event["username"] != nil {
-				t.Fatalf("rejected handshake was assigned an identity: %v", event)
+			if events[0] != want {
+				t.Fatalf("got auth event %q, want %q", events[0], want)
 			}
 			if strings.Contains(buffer.String(), "first secret") || strings.Contains(buffer.String(), "second secret") {
 				t.Fatal("audit output contains a password")
@@ -145,42 +137,77 @@ func TestServerAuthAuditSharedPort(t *testing.T) {
 	}
 }
 
-func TestServerAuthAuditOptions(t *testing.T) {
+func TestServerAuthAuditReusedConnection(t *testing.T) {
 	buffer := captureAuthAudit(t)
-	local := &net.TCPAddr{IP: net.ParseIP("2001:db8::10"), Port: 2053}
-	remote := &net.TCPAddr{IP: net.ParseIP("2001:db8::20"), Port: 12001}
-	tests := []struct {
-		name, enabled, level string
-		local, remote        net.Addr
-		wantEvent            bool
-	}{
-		{"disabled", "", "INFO", local, remote, false},
-		{"other_value", "true", "INFO", local, remote, false},
-		{"warning_level", "1", "WARN", local, remote, false},
-		{"missing_local", "1", "INFO", nil, remote, false},
-		{"missing_remote", "1", "INFO", local, nil, false},
-		{"ipv6", "1", "INFO", local, remote, true},
+	log.SetLevel("DEBUG")
+	const user = "alice"
+	key := cipher.HashPassword([]byte(t.Name()), []byte(user))
+	block, err := cipher.BlockCipherFromPassword(key, false)
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Setenv("MITA_AUTH_AUDIT", test.enabled)
-			log.SetLevel(test.level)
-			before := len(buffer.events(t))
-			auditServerAuth("auth_success", "alice", "", test.local, test.remote, 123)
-			events := buffer.events(t)[before:]
-			if !test.wantEvent {
-				if len(events) != 0 {
-					t.Fatalf("unexpected audit event: %v", events)
-				}
-				return
+	block.SetBlockContext(cipher.BlockContext{UserName: user})
+	mux := NewMux(false).SetServerUsers(userMap(makeTestUser(user, key)))
+	t.Cleanup(func() { _ = mux.Close() })
+
+	server, writer := newAuditTestConnection(mux, 12001)
+	client := &StreamUnderlay{baseUnderlay: *newBaseUnderlay(true, 1400, nil), conn: writer, block: block}
+	loopDone := make(chan struct{})
+	go func() {
+		defer close(loopDone)
+		_ = server.RunEventLoop(context.Background())
+	}()
+	defer func() {
+		_ = writer.Close()
+		<-loopDone
+		_ = server.Close()
+	}()
+	if err := writer.SetWriteDeadline(time.Now().Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []uint32{1000, 1001} {
+		if err := client.writeOneSegment(testSessionSegment(openSessionRequest, id, common.StreamTransport)); err != nil {
+			t.Fatalf("write session %d: %v", id, err)
+		}
+	}
+	for _, id := range []uint32{1000, 1001} {
+		select {
+		case session := <-server.readySessions:
+			if session.id != id {
+				t.Fatalf("dispatched session %d, want %d", session.id, id)
 			}
-			if len(events) != 1 {
-				t.Fatalf("got %d audit events, want one", len(events))
-			}
-			event := events[0]
-			if event["source_ip"] != "2001:db8::20" || event["local_ip"] != "2001:db8::10" || event["session_id"] != float64(123) {
-				t.Fatalf("wrong IPv6 endpoints or session ID: %v", event)
-			}
-		})
+		case <-time.After(time.Second):
+			t.Fatalf("session %d was not dispatched", id)
+		}
+	}
+	writeDone := make(chan error, 1)
+	go func() {
+		writeDone <- server.writeOneSegment(testSessionSegment(openSessionResponse, 1002, common.StreamTransport))
+	}()
+	for {
+		response, err := client.readOneSegment()
+		if err != nil || response == nil {
+			t.Fatalf("read session response: segment=%v, err=%v", response, err)
+		}
+		if id, _ := response.SessionID(); id == 1002 {
+			break
+		}
+	}
+	if err := <-writeDone; err != nil {
+		t.Fatalf("write session response: %v", err)
+	}
+	_ = writer.Close()
+	<-loopDone
+	const want = `succeeded for user "alice" from 198.51.100.20:12001 to 203.0.113.10:2053, session 1000`
+	if events := buffer.events(); len(events) != 1 || events[0] != want {
+		t.Fatalf("got auth events %q, want only %q", events, want)
+	}
+	upload, download := client.OutBytes(), client.InBytes()
+	if upload == 0 || download == 0 {
+		t.Fatalf("expected both directions to carry traffic, got upload=%d download=%d", upload, download)
+	}
+	wantUsage := fmt.Sprintf(`TCP connection closed for user "alice" from 198.51.100.20, uploaded %d bytes, downloaded %d bytes`, upload, download)
+	if logs := buffer.String(); strings.Count(logs, "TCP connection closed for user ") != 1 || !strings.Contains(logs, wantUsage+"\n") {
+		t.Fatalf("want one connection usage log %q, got:\n%s", wantUsage, logs)
 	}
 }

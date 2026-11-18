@@ -16,10 +16,7 @@
 package protocol
 
 import (
-	"encoding/json"
 	"net"
-	"os"
-	"time"
 
 	"github.com/enfein/mieru/v3/pkg/log"
 )
@@ -27,40 +24,13 @@ import (
 // auditServerAuth writes identity only after the complete first segment has
 // been validated and dispatched. Rejections deliberately have no username:
 // an encrypted, unauthenticated user hint is not proof of identity.
-func auditServerAuth(event, username, reason string, local, remote net.Addr, sessionID uint32) {
-	if os.Getenv("MITA_AUTH_AUDIT") != "1" || !log.IsLevelEnabled(log.InfoLevel) {
+func auditServerAuth(username, reason string, local, remote net.Addr, sessionID uint32) {
+	if !log.IsLevelEnabled(log.DebugLevel) || local == nil || remote == nil {
 		return
-	}
-	if local == nil || remote == nil {
-		return
-	}
-	sourceIP, sourcePort, err := net.SplitHostPort(remote.String())
-	if err != nil {
-		return
-	}
-	if ip := net.ParseIP(sourceIP); ip != nil {
-		sourceIP = ip.String()
-	}
-	localIP, localPort, err := net.SplitHostPort(local.String())
-	if err != nil {
-		return
-	}
-	fields := map[string]interface{}{
-		"event": event, "time_utc": time.Now().UTC().Format(time.RFC3339Nano),
-		"protocol": "TCP", "source_ip": sourceIP, "source_port": sourcePort,
-		"local_ip": localIP, "local_port": localPort,
-	}
-	if username != "" {
-		fields["username"] = username
-	}
-	if sessionID != 0 {
-		fields["session_id"] = sessionID
 	}
 	if reason != "" {
-		fields["reason"] = reason
+		log.Debugf("TCP authentication failed from %s to %s (%s)", remote.String(), local.String(), reason)
+		return
 	}
-	encoded, err := json.Marshal(fields)
-	if err == nil {
-		log.Infof("AUTH_AUDIT %s", encoded)
-	}
+	log.Debugf("TCP authentication succeeded for user %q from %s to %s, session %d", username, remote.String(), local.String(), sessionID)
 }
