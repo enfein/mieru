@@ -189,15 +189,7 @@ func (t *StreamUnderlay) RunEventLoop(ctx context.Context) error {
 	}
 	defer func() {
 		_ = t.conn.Close()
-		if username := t.serverUserPolicy.Name(); !t.isClient && username != "" && log.IsLevelEnabled(log.DebugLevel) {
-			if sourceIP, _, err := net.SplitHostPort(t.RemoteAddr().String()); err == nil {
-				// Wait for a write that completed just before socket closure to update its counter.
-				t.sendMutex.Lock()
-				download := t.OutBytes()
-				t.sendMutex.Unlock()
-				log.Debugf("TCP connection closed for user %q from %s, uploaded %d bytes, downloaded %d bytes", username, sourceIP, t.InBytes(), download)
-			}
-		}
+		t.auditServerTraffic()
 	}()
 
 	for {

@@ -73,12 +73,19 @@ func TestIdleTrackingConnActivity(t *testing.T) {
 			var n int
 			var err error
 			if test.write {
-				n, err = conn.Write([]byte{1})
+				n, err = conn.Write(make([]byte, 2))
 			} else {
-				n, err = conn.Read(make([]byte, 1))
+				n, err = conn.Read(make([]byte, 2))
 			}
 			if n != test.n || !errors.Is(err, test.err) {
 				t.Fatalf("I/O = (%d, %v), want (%d, %v)", n, err, test.n, test.err)
+			}
+			wantRead, wantWritten := int64(test.n), int64(0)
+			if test.write {
+				wantRead, wantWritten = 0, int64(test.n)
+			}
+			if read, written := conn.ByteCounts(); read != wantRead || written != wantWritten {
+				t.Fatalf("ByteCounts() = (%d, %d), want (%d, %d)", read, written, wantRead, wantWritten)
 			}
 			wantActivity := created
 			if test.n > 0 {

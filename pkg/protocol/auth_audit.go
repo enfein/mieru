@@ -18,6 +18,7 @@ package protocol
 import (
 	"net"
 
+	"github.com/enfein/mieru/v3/pkg/common"
 	"github.com/enfein/mieru/v3/pkg/log"
 )
 
@@ -33,4 +34,25 @@ func auditServerAuth(username, reason string, local, remote net.Addr, sessionID 
 		return
 	}
 	log.Debugf("TCP authentication succeeded for user %q from %s to %s, session %d", username, remote.String(), local.String(), sessionID)
+}
+
+// auditServerTraffic records the final byte counts after the socket is closed.
+func (t *StreamUnderlay) auditServerTraffic() {
+	username := t.serverUserPolicy.Name()
+	if t.isClient || username == "" || !log.IsLevelEnabled(log.DebugLevel) {
+		return
+	}
+	conn, ok := t.conn.(*common.IdleTrackingConn)
+	if !ok {
+		return
+	}
+	sourceIP, _, err := net.SplitHostPort(conn.RemoteAddr().String())
+	if err != nil {
+		return
+	}
+	// Let any in-flight write record its last bytes before taking the snapshot.
+	t.sendMutex.Lock()
+	upload, download := conn.ByteCounts()
+	t.sendMutex.Unlock()
+	log.Debugf("TCP connection closed for user %q from %s, uploaded %d bytes, downloaded %d bytes", username, sourceIP, upload, download)
 }

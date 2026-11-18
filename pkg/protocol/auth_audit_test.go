@@ -170,31 +170,40 @@ func TestServerAuthAuditReusedConnection(t *testing.T) {
 			t.Fatalf("write session %d: %v", id, err)
 		}
 	}
+	var downstream *Session
 	for _, id := range []uint32{1000, 1001} {
 		select {
 		case session := <-server.readySessions:
 			if session.id != id {
 				t.Fatalf("dispatched session %d, want %d", session.id, id)
 			}
+			downstream = session
 		case <-time.After(time.Second):
 			t.Fatalf("session %d was not dispatched", id)
 		}
 	}
-	writeDone := make(chan error, 1)
-	go func() {
-		writeDone <- server.writeOneSegment(testSessionSegment(openSessionResponse, 1002, common.StreamTransport))
-	}()
-	for {
+	opened := make(map[uint32]bool)
+	for i := 0; i < 2; i++ {
 		response, err := client.readOneSegment()
-		if err != nil || response == nil {
-			t.Fatalf("read session response: segment=%v, err=%v", response, err)
+		if err != nil || response == nil || response.Protocol() != openSessionResponse {
+			t.Fatalf("read open session response: segment=%v, err=%v", response, err)
 		}
-		if id, _ := response.SessionID(); id == 1002 {
-			break
-		}
+		id, _ := response.SessionID()
+		opened[id] = true
 	}
-	if err := <-writeDone; err != nil {
-		t.Fatalf("write session response: %v", err)
+	if !opened[1000] || !opened[1001] {
+		t.Fatalf("expected both open session responses, got %v", opened)
+	}
+	const payload = "response from the second session"
+	if n, err := downstream.Write([]byte(payload)); err != nil || n != len(payload) {
+		t.Fatalf("write response payload: n=%d, err=%v", n, err)
+	}
+	response, err := client.readOneSegment()
+	if err != nil || response == nil {
+		t.Fatalf("read response payload: segment=%v, err=%v", response, err)
+	}
+	if id, _ := response.SessionID(); id != downstream.id || string(response.payload) != payload {
+		t.Fatalf("got session %d payload %q, want session %d payload %q", id, response.payload, downstream.id, payload)
 	}
 	_ = writer.Close()
 	<-loopDone
