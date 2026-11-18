@@ -671,7 +671,7 @@ func testPacketOpenFullQueueExit(t *testing.T, ownerClose bool) {
 			return true
 		})
 		u.Close()
-		backlogDone(t, "cancelled receiver final join", done, backlogProgressWait)
+		backlogDone(t, "canceled receiver final join", done, backlogProgressWait)
 	})
 	if err = sender.writeOneSegment(testSessionSegment(openSessionRequest, 503, common.PacketTransport), server.LocalAddr()); err != nil {
 		t.Fatal(err)
@@ -690,7 +690,7 @@ func testPacketOpenFullQueueExit(t *testing.T, ownerClose bool) {
 	} else {
 		cancel()
 		release()
-		backlogDone(t, "L: cancelled producer event loop", done, backlogProgressWait)
+		backlogDone(t, "L: canceled producer event loop", done, backlogProgressWait)
 	}
 }
 func TestPacketAcceptPreservesSlowConsumerBackpressure(t *testing.T) {
