@@ -16,6 +16,8 @@
 package protocol
 
 import (
+	"errors"
+	"io"
 	"net"
 
 	"github.com/enfein/mieru/v3/pkg/common"
@@ -39,20 +41,26 @@ func auditServerAuth(username, reason string, local, remote net.Addr, sessionID 
 // auditServerTraffic records the final byte counts after the socket is closed.
 func (t *StreamUnderlay) auditServerTraffic() {
 	username := t.serverUserPolicy.Name()
-	if t.isClient || username == "" || !log.IsLevelEnabled(log.DebugLevel) {
+	if t.isClient || username == "" || t.serverSourceIP == "" || !log.IsLevelEnabled(log.DebugLevel) {
 		return
 	}
 	conn, ok := t.conn.(*common.IdleTrackingConn)
 	if !ok {
 		return
 	}
-	sourceIP, _, err := net.SplitHostPort(conn.RemoteAddr().String())
-	if err != nil {
-		return
-	}
 	// Let any in-flight write record its last bytes before taking the snapshot.
 	t.sendMutex.Lock()
 	upload, download := conn.ByteCounts()
 	t.sendMutex.Unlock()
-	log.Debugf("TCP connection closed for user %q from %s, uploaded %d bytes, downloaded %d bytes", username, sourceIP, upload, download)
+	log.Debugf("TCP connection closed for user %q from %s, uploaded %d bytes, downloaded %d bytes", username, t.serverSourceIP, upload, download)
+}
+
+// isEmptyHandshakeEOF distinguishes a bare TCP probe from an interrupted handshake.
+func (t *StreamUnderlay) isEmptyHandshakeEOF(err error) bool {
+	conn, ok := t.conn.(*common.IdleTrackingConn)
+	if !ok || !errors.Is(err, io.EOF) {
+		return false
+	}
+	read, _ := conn.ByteCounts()
+	return read == 0
 }

@@ -22,6 +22,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -35,7 +36,22 @@ type auditTestBuffer struct {
 	bytes.Buffer
 }
 
-type auditTestConn struct{ *serverUserTestRemoteConn }
+type auditTestConn struct {
+	*serverUserTestRemoteConn
+	closed atomic.Bool
+}
+
+func (c *auditTestConn) Close() error {
+	c.closed.Store(true)
+	return c.Conn.Close()
+}
+
+func (c *auditTestConn) RemoteAddr() net.Addr {
+	if c.closed.Load() {
+		return nil
+	}
+	return c.serverUserTestRemoteConn.RemoteAddr()
+}
 
 func (c *auditTestConn) LocalAddr() net.Addr {
 	return &net.TCPAddr{IP: net.ParseIP("203.0.113.10"), Port: 2053}
@@ -44,7 +60,7 @@ func (c *auditTestConn) LocalAddr() net.Addr {
 func newAuditTestConnection(mux *Mux, sourcePort int) (*StreamUnderlay, net.Conn) {
 	reader, writer := net.Pipe()
 	remote := &net.TCPAddr{IP: net.ParseIP("198.51.100.20"), Port: sourcePort}
-	conn := &auditTestConn{&serverUserTestRemoteConn{Conn: reader, remoteAddr: remote}}
+	conn := &auditTestConn{serverUserTestRemoteConn: &serverUserTestRemoteConn{Conn: reader, remoteAddr: remote}}
 	return mux.serverWrapTCPConn(conn, 1400, nil).(*StreamUnderlay), writer
 }
 
@@ -218,5 +234,37 @@ func TestServerAuthAuditReusedConnection(t *testing.T) {
 	wantUsage := fmt.Sprintf(`TCP connection closed for user "alice" from 198.51.100.20, uploaded %d bytes, downloaded %d bytes`, upload, download)
 	if logs := buffer.String(); strings.Count(logs, "TCP connection closed for user ") != 1 || !strings.Contains(logs, wantUsage+"\n") {
 		t.Fatalf("want one connection usage log %q, got:\n%s", wantUsage, logs)
+	}
+}
+
+func TestServerAuthAuditInterruptedHandshake(t *testing.T) {
+	buffer := captureAuthAudit(t)
+	log.SetLevel("DEBUG")
+	mux := NewMux(false)
+	t.Cleanup(func() { _ = mux.Close() })
+	for _, test := range []struct {
+		name string
+		data []byte
+		want int
+	}{
+		{name: "empty EOF"},
+		{name: "partial handshake", data: []byte{1}, want: 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			before := len(buffer.events())
+			server, peer := newAuditTestConnection(mux, 12001)
+			defer server.Close()
+			go func() {
+				defer peer.Close()
+				if len(test.data) > 0 {
+					_, _ = peer.Write(test.data)
+				}
+			}()
+			_ = server.RunEventLoop(context.Background())
+			events := buffer.events()[before:]
+			if len(events) != test.want || (test.want == 1 && !strings.HasSuffix(events[0], "(incomplete_handshake)")) {
+				t.Fatalf("got auth events %q, want %d incomplete handshake events", events, test.want)
+			}
+		})
 	}
 }

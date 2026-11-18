@@ -60,6 +60,7 @@ type StreamUnderlay struct {
 	// ---- server fields ----
 	serverUsers      *serveruser.Registry
 	serverUserSource serveruser.Source
+	serverSourceIP   string
 	serverUserPolicy serveruser.Policy
 }
 
@@ -220,7 +221,7 @@ func (t *StreamUnderlay) RunEventLoop(ctx context.Context) error {
 			if errType == stderror.UNKNOWN_ERROR {
 				panic(fmt.Sprintf("%v got unexpected error type UNKNOWN_ERROR", t))
 			}
-			if !t.isClient && t.serverUserPolicy.Name() == "" {
+			if !t.isClient && t.serverUserPolicy.Name() == "" && !t.isEmptyHandshakeEOF(err) {
 				reason := "incomplete_handshake"
 				switch errType {
 				case stderror.CRYPTO_ERROR:
