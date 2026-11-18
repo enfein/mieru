@@ -130,6 +130,8 @@ func (u *PacketUnderlay) Close() error {
 	// Unblock any pending I/O before closing sessions.
 	u.conn.SetReadDeadline(time.Now())
 	u.baseUnderlay.Close()
+	// The receiver might have rearmed its idle deadline during session cleanup.
+	u.conn.SetReadDeadline(time.Now())
 	return nil
 }
 
@@ -367,6 +369,12 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 		// Use the largest possible value here to avoid error.
 		b := make([]byte, 1500)
 		common.SetReadTimeout(u.conn, readOneSegmentTimeout)
+		// Close may have finished while the idle deadline was being set.
+		select {
+		case <-u.done:
+			return nil, nil, io.ErrClosedPipe
+		default:
+		}
 		n, addr, err := u.conn.ReadFrom(b)
 		if err != nil {
 			if stderror.IsTimeout(err) {
