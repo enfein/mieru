@@ -44,6 +44,9 @@ VERSION="3.39.0"
 # .ONESHELL is supported in GNU Make version 3.82 and later.
 .ONESHELL:
 
+# Stop the recipe when a command fails.
+.SHELLFLAGS := -ec
+
 # Build binaries and installation packages.
 .PHONY: build
 build: bin deb rpm
@@ -84,7 +87,6 @@ bench:
 # Run fuzz tests.
 .PHONY: fuzz
 fuzz:
-	set -e
 	for pkg in ${FUZZ_PACKAGES}; do
 		fuzz_tests=$$(CGO_ENABLED=0 go test -list='^Fuzz' "$$pkg")
 		for fuzz_test in $$fuzz_tests; do
