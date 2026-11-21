@@ -665,24 +665,24 @@ func (m *Mux) acceptTCPUnderlay(rawListener net.Listener, properties UnderlayPro
 }
 
 func (m *Mux) serverWrapTCPConn(rawConn net.Conn, mtu int, trafficPattern *appctlpb.TrafficPattern) Underlay {
+	var remote net.Addr
 	var source serveruser.Source
-	var sourceIP string
 	if rawConn != nil {
-		remote := rawConn.RemoteAddr()
+		remote = rawConn.RemoteAddr()
 		source = serveruser.SourceFromAddr(remote)
-		if remote != nil {
-			sourceIP, _, _ = net.SplitHostPort(remote.String())
-		}
 		rawConn = common.NewIdleTrackingConn(rawConn)
 	}
-	return &StreamUnderlay{
+	underlay := &StreamUnderlay{
 		baseUnderlay:       *newBaseUnderlay(false, mtu, trafficPattern),
 		conn:               rawConn,
 		sessionCleanTicker: time.NewTicker(sessionCleanInterval),
 		serverUsers:        &m.serverUsers,
 		serverUserSource:   source,
-		serverSourceIP:     sourceIP,
 	}
+	if remote != nil {
+		underlay.clientAddrString = remote.String()
+	}
+	return underlay
 }
 
 // newUnderlay returns a new underlay.

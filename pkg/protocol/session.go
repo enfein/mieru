@@ -546,17 +546,6 @@ func (s *Session) isClientPacketSessionOpenResponse(seg *segment) bool {
 	return s.isClientPacketSessionOpening() && seg.Protocol() == openSessionResponse
 }
 
-// isClientPacketSessionOpenedByData reports whether seg is data from the
-// server received by a client packet session that is still opening. A server
-// only sends data in a session it has established, so the data opens the
-// session just as the open session response does.
-//
-// Without this, the session can deadlock. The server hands the data carried by
-// the open session request to its application before it queues the open
-// session response. If the application writes at once, the response is queued
-// behind that data, and the server sends only what its initial window allows
-// before it waits for an acknowledgement. The client acknowledges nothing until
-// the response arrives, so neither side makes progress until a read times out.
 func (s *Session) isClientPacketSessionOpenedByData(seg *segment) bool {
 	return s.isClientPacketSessionOpening() && isDataProtocol(seg.Protocol())
 }
@@ -1131,6 +1120,9 @@ func (s *Session) input(seg *segment) error {
 		if err := s.inputData(seg); err != nil {
 			return err
 		}
+		// In UDP transport, to relax packet sequence requirement, client considers session as established when
+		// 1. the server sends an explicit openSessionResponse, or
+		// 2. the server sends a data segment which implies the session is established at the server side
 		if s.isClientPacketSessionOpenResponse(seg) || s.isClientPacketSessionOpenedByData(seg) {
 			s.forwardStateTo(sessionEstablished)
 			s.wakePacketOutput()

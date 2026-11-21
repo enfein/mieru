@@ -27,6 +27,26 @@ const (
 	REPLAY_ERROR
 )
 
+// String returns the name of the error type.
+func (t ErrorType) String() string {
+	switch t {
+	case NO_ERROR:
+		return "NO_ERROR"
+	case UNKNOWN_ERROR:
+		return "UNKNOWN_ERROR"
+	case PROTOCOL_ERROR:
+		return "PROTOCOL_ERROR"
+	case NETWORK_ERROR:
+		return "NETWORK_ERROR"
+	case CRYPTO_ERROR:
+		return "CRYPTO_ERROR"
+	case REPLAY_ERROR:
+		return "REPLAY_ERROR"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 // TypedError annotates an error with a type.
 type TypedError struct {
 	err     error

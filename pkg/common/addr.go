@@ -17,23 +17,23 @@ package common
 
 import "net"
 
-// netAddr implements net.Addr interface.
-type netAddr struct {
+// NetAddr implements net.Addr using the supplied network and address strings.
+type NetAddr struct {
 	Net string
 	Str string
 }
 
-func (a netAddr) Network() string {
+func (a NetAddr) Network() string {
 	return a.Net
 }
 
-func (a netAddr) String() string {
+func (a NetAddr) String() string {
 	return a.Str
 }
 
 // NilNetAddr returns an empty network address.
 func NilNetAddr() net.Addr {
-	return netAddr{}
+	return NetAddr{}
 }
 
 // IsNilNetAddr returns true if the net.Addr is nil / empty.

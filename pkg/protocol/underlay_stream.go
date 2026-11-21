@@ -60,8 +60,8 @@ type StreamUnderlay struct {
 	// ---- server fields ----
 	serverUsers      *serveruser.Registry
 	serverUserSource serveruser.Source
-	serverSourceIP   string
 	serverUserPolicy serveruser.Policy
+	clientAddrString string
 }
 
 var _ Underlay = &StreamUnderlay{}
@@ -188,9 +188,28 @@ func (t *StreamUnderlay) RunEventLoop(ctx context.Context) error {
 	if t.conn == nil {
 		return stderror.ErrNullPointer
 	}
+	var serverAuthFailure string
+	var drain bool
 	defer func() {
+		if serverAuthFailure != "" {
+			local, remote := t.LocalAddr(), t.RemoteAddr()
+			logServerAuthResult("", serverAuthFailure, local, remote, 0)
+		}
+
+		if drain {
+			drained, drainErr := t.drainAfterError()
+			drainContext := t.String()
+			if drainContext != "" {
+				if drainErr != nil {
+					log.Debugf("%s read after stream error failed to complete: %v", drainContext, drainErr)
+				} else if drained > 0 {
+					log.Debugf("%s read at least %d bytes after stream error", drainContext, drained)
+				}
+			}
+		}
+
 		_ = t.conn.Close()
-		t.auditServerTraffic()
+		t.logServerTrafficSummaryAfterClose()
 	}()
 
 	for {
@@ -221,21 +240,8 @@ func (t *StreamUnderlay) RunEventLoop(ctx context.Context) error {
 			if errType == stderror.UNKNOWN_ERROR {
 				panic(fmt.Sprintf("%v got unexpected error type UNKNOWN_ERROR", t))
 			}
-			if !t.isClient && t.serverUserPolicy.Name() == "" && !t.isEmptyHandshakeEOF(err) {
-				reason := "incomplete_handshake"
-				switch errType {
-				case stderror.CRYPTO_ERROR:
-					reason = "invalid_credentials_or_corrupt_data"
-				case stderror.REPLAY_ERROR:
-					reason = "replay_rejected"
-				case stderror.PROTOCOL_ERROR:
-					reason = "invalid_handshake"
-				}
-				auditServerAuth("", reason, t.LocalAddr(), t.RemoteAddr(), 0)
-			}
-			if errType == stderror.CRYPTO_ERROR || errType == stderror.REPLAY_ERROR {
-				t.drainAfterError()
-			}
+			serverAuthFailure = t.serverAuthFailureReason(err, errType)
+			drain = errType == stderror.CRYPTO_ERROR || errType == stderror.REPLAY_ERROR
 			return fmt.Errorf("readOneSegment() failed: %w", err)
 		} else if seg == nil {
 			// Timeout reading the segment, will try again later.
@@ -246,7 +252,7 @@ func (t *StreamUnderlay) RunEventLoop(ctx context.Context) error {
 		}
 		if seg.serverUserAuthentication.Valid() {
 			if err := validateNewServerSessionSegment(seg); err != nil {
-				auditServerAuth("", "invalid_handshake", t.LocalAddr(), t.RemoteAddr(), 0)
+				serverAuthFailure = t.serverAuthFailureReason(err, stderror.PROTOCOL_ERROR)
 				return stderror.WrapErrorWithType(err, stderror.PROTOCOL_ERROR)
 			}
 		}
@@ -343,7 +349,72 @@ func (t *StreamUnderlay) commitServerUserAuthentication(seg *segment) {
 	t.serverUserPolicy = seg.serverUserAuthentication.Policy()
 	seg.serverUserAuthentication.Record()
 	sessionID, _ := seg.SessionID()
-	auditServerAuth(t.serverUserPolicy.Name(), "", t.LocalAddr(), t.RemoteAddr(), sessionID)
+	logServerAuthResult(t.serverUserPolicy.Name(), "", t.LocalAddr(), t.RemoteAddr(), sessionID)
+}
+
+func logServerAuthResult(username, failureReason string, local, remote net.Addr, sessionID uint32) {
+	if !log.IsLevelEnabled(log.DebugLevel) || local == nil || remote == nil {
+		return
+	}
+
+	if failureReason != "" {
+		log.WithFields(log.Fields{
+			"local":  local.String(),
+			"remote": remote.String(),
+			"reason": failureReason,
+		}).Debugf("TCP authentication failed.")
+		return
+	}
+
+	log.WithFields(log.Fields{
+		"user":    username,
+		"local":   local.String(),
+		"remote":  remote.String(),
+		"session": sessionID,
+	}).Debugf("TCP authentication succeeded.")
+}
+
+// logServerTrafficSummaryAfterClose records the final byte counts after the socket is closed.
+func (t *StreamUnderlay) logServerTrafficSummaryAfterClose() {
+	username := t.serverUserPolicy.Name()
+	if !log.IsLevelEnabled(log.DebugLevel) || t.isClient || username == "" || t.clientAddrString == "" {
+		return
+	}
+	conn, ok := t.conn.(*common.IdleTrackingConn)
+	if !ok {
+		return
+	}
+
+	// Let any in-flight write record its last bytes before taking the snapshot.
+	t.sendMutex.Lock()
+	upload, download := conn.ByteCounts()
+	t.sendMutex.Unlock()
+
+	log.WithFields(log.Fields{
+		"user":          username,
+		"remote":        t.clientAddrString,
+		"uploadBytes":   upload,
+		"downloadBytes": download,
+	}).Debugf("TCP connection closed.")
+}
+
+// serverAuthFailureReason returns an audit reason for a segment rejected by proxy server.
+func (t *StreamUnderlay) serverAuthFailureReason(err error, errType stderror.ErrorType) string {
+	if t.isClient || t.serverUserPolicy.Name() != "" || !log.IsLevelEnabled(log.DebugLevel) {
+		return ""
+	}
+	// Closing the transport can interrupt a read before the underlay is done.
+	if errors.Is(err, net.ErrClosed) || errors.Is(err, io.ErrClosedPipe) {
+		return ""
+	}
+	// A peer that disconnects without sending any data is a bare TCP probe.
+	conn, ok := t.conn.(*common.IdleTrackingConn)
+	if ok && errors.Is(err, io.EOF) {
+		if read, _ := conn.ByteCounts(); read == 0 {
+			return ""
+		}
+	}
+	return errType.String()
 }
 
 func (t *StreamUnderlay) onOpenSessionResponse(seg *segment) error {
@@ -862,7 +933,7 @@ func (t *StreamUnderlay) writeWithPossibleFragment(dataToSend []byte) error {
 
 // drainAfterError continues to read some data from the stream network connection
 // after an error happened to confuse possible attacks.
-func (t *StreamUnderlay) drainAfterError() {
+func (t *StreamUnderlay) drainAfterError() (int, error) {
 	// Set read deadline to avoid being blocked forever.
 	timeoutMillis := rng.IntRange(1000, 10000)
 	timeoutMillis += rng.FixedIntVH(50000) // Maximum 60 seconds.
@@ -879,13 +950,9 @@ func (t *StreamUnderlay) drainAfterError() {
 	minRead += rng.FixedIntVH(256)
 
 	if minRead > 0 {
-		n, err := io.ReadAtLeast(t.conn, buf, minRead)
-		if err != nil {
-			log.Debugf("%v read after stream error failed to complete: %v", t, err)
-		} else {
-			log.Debugf("%v read at least %d bytes after stream error", t, n)
-		}
+		return io.ReadAtLeast(t.conn, buf, minRead)
 	}
+	return 0, nil
 }
 
 func (t *StreamUnderlay) cleanSessions() {

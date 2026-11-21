@@ -61,13 +61,13 @@ type IdleTrackingConn struct {
 
 func (c *IdleTrackingConn) Read(b []byte) (int, error) {
 	n, err := c.Conn.Read(b)
-	c.recordActivity(n, &c.readBytes)
+	c.recordRead(n)
 	return n, err
 }
 
 func (c *IdleTrackingConn) Write(b []byte) (int, error) {
 	n, err := c.Conn.Write(b)
-	c.recordActivity(n, &c.writtenBytes)
+	c.recordWrite(n)
 	return n, err
 }
 
@@ -90,10 +90,19 @@ func (c *IdleTrackingConn) CloseIfIdle(timeout time.Duration) bool {
 	return true
 }
 
-func (c *IdleTrackingConn) recordActivity(n int, total *int64) {
+func (c *IdleTrackingConn) recordRead(n int) {
 	if n > 0 {
 		c.mu.Lock()
-		*total += int64(n)
+		c.readBytes += int64(n)
+		c.lastActivity = c.clock.Now()
+		c.mu.Unlock()
+	}
+}
+
+func (c *IdleTrackingConn) recordWrite(n int) {
+	if n > 0 {
+		c.mu.Lock()
+		c.writtenBytes += int64(n)
 		c.lastActivity = c.clock.Now()
 		c.mu.Unlock()
 	}

@@ -22,21 +22,8 @@ import (
 	"testing"
 
 	"github.com/enfein/mieru/v3/apis/constant"
+	"github.com/enfein/mieru/v3/pkg/common"
 )
-
-// netAddr implements net.Addr interface.
-type netAddr struct {
-	Net string
-	Str string
-}
-
-func (a netAddr) Network() string {
-	return a.Net
-}
-
-func (a netAddr) String() string {
-	return a.Str
-}
 
 func TestAddrSpecAddress(t *testing.T) {
 	testCases := []struct {
@@ -169,7 +156,7 @@ func TestNetAddrSpecFrom(t *testing.T) {
 				},
 				Net: "tcp",
 			},
-			addr: netAddr{
+			addr: common.NetAddr{
 				Net: "tcp",
 				Str: "example.com:8080",
 			},
