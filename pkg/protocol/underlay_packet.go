@@ -130,6 +130,8 @@ func (u *PacketUnderlay) Close() error {
 	// Unblock any pending I/O before closing sessions.
 	u.conn.SetReadDeadline(time.Now())
 	u.baseUnderlay.Close()
+	// The receiver might have rearmed its idle deadline during session cleanup.
+	u.conn.SetReadDeadline(time.Now())
 	return nil
 }
 
@@ -183,6 +185,8 @@ func (u *PacketUnderlay) RunEventLoop(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
+			// Session shutdown still uses the packet socket to send Close.
+			u.Close()
 			u.cleanSessions()
 			return nil
 		case <-u.done:
@@ -269,6 +273,16 @@ func (u *PacketUnderlay) onOpenSessionRequest(seg *segment, remoteAddr net.Addr)
 		return stderror.ErrInvalidOperation
 	}
 
+	// Serialize admission with other opens and Close. Consumers only remove
+	// ready sessions, so an available slot remains reserved until dispatch.
+	u.closeMutex.Lock()
+	defer u.closeMutex.Unlock()
+	select {
+	case <-u.done:
+		return io.ErrClosedPipe
+	default:
+	}
+
 	// Create a new session.
 	sessionID := seg.metadata.(*sessionStruct).sessionID
 	if sessionID == 0 {
@@ -279,6 +293,12 @@ func (u *PacketUnderlay) onOpenSessionRequest(seg *segment, remoteAddr net.Addr)
 	if found {
 		log.Debugf("%v received openSessionRequest, but session ID %d is already used", u, sessionID)
 		return nil
+	}
+	if len(u.readySessions) == cap(u.readySessions) {
+		// Do not register, acknowledge or authenticate an unadmitted session.
+		// The client can retransmit its open request after Accept frees space,
+		// while this shared receiver keeps processing existing sessions.
+		return fmt.Errorf("session accept backlog is full: %w", stderror.ErrNotReady)
 	}
 	session := newSessionWithServerUserPolicy(sessionID, false, u.MTU(), seg.serverUserPolicy, nil, u.trafficPattern)
 	if err := u.AddSession(session, remoteAddr); err != nil {
@@ -351,6 +371,12 @@ func (u *PacketUnderlay) readOneSegment() (*segment, net.Addr, error) {
 		// Use the largest possible value here to avoid error.
 		b := make([]byte, 1500)
 		common.SetReadTimeout(u.conn, readOneSegmentTimeout)
+		// Close may have finished while the idle deadline was being set.
+		select {
+		case <-u.done:
+			return nil, nil, io.ErrClosedPipe
+		default:
+		}
 		n, addr, err := u.conn.ReadFrom(b)
 		if err != nil {
 			if stderror.IsTimeout(err) {
