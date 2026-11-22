@@ -141,7 +141,7 @@ func TestStreamLowEntropySendReceive(t *testing.T) {
 			}
 			seg := &segment{metadata: das, payload: append([]byte(nil), payload...)}
 
-			password := cipher.HashPassword([]byte(fmt.Sprintf("%s-password", t.Name())), []byte("user"))
+			password := cipher.HashPassword(fmt.Appendf(nil, "%s-password", t.Name()), []byte("user"))
 			block, err := cipher.BlockCipherFromPassword(password, false)
 			if err != nil {
 				t.Fatalf("BlockCipherFromPassword() failed: %v", err)
@@ -786,7 +786,7 @@ func buildStreamLowEntropyWire(t *testing.T, payload []byte, prefixLen, suffixLe
 
 func buildStreamLowEntropyWireWithMetadataMutation(t *testing.T, payload []byte, prefixLen, suffixLen int, mutateMetadata func(*dataAckStruct)) ([]byte, cipher.BlockCipher, *dataAckStruct, int, int) {
 	t.Helper()
-	password := []byte(fmt.Sprintf("%s-stream", t.Name()))
+	password := fmt.Appendf(nil, "%s-stream", t.Name())
 	sendBlock, err := cipher.BlockCipherFromPassword(password, false)
 	if err != nil {
 		t.Fatalf("BlockCipherFromPassword() failed: %v", err)
@@ -828,7 +828,7 @@ func buildPacketLowEntropyWire(t *testing.T, payload []byte, prefixLen, suffixLe
 
 func buildPacketLowEntropyWireWithMetadataMutation(t *testing.T, payload []byte, prefixLen, suffixLen int, mutateMetadata func(*dataAckStruct)) ([]byte, cipher.BlockCipher, *dataAckStruct, int, int) {
 	t.Helper()
-	password := []byte(fmt.Sprintf("%s-packet", t.Name()))
+	password := fmt.Appendf(nil, "%s-packet", t.Name())
 	block, err := cipher.BlockCipherFromPassword(password, true)
 	if err != nil {
 		t.Fatalf("BlockCipherFromPassword() failed: %v", err)

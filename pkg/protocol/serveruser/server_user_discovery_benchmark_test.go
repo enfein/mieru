@@ -38,7 +38,7 @@ func newUserDiscoveryBench(b *testing.B, userCount int) *userDiscoveryBench {
 	usersByName := make(map[string]*appctlpb.User, userCount)
 	for i := 0; i < userCount; i++ {
 		name := fmt.Sprintf("benchmark-user-%05d", i)
-		credential := cipher.HashPassword([]byte(fmt.Sprintf("benchmark-password-%05d", i)), []byte(name))
+		credential := cipher.HashPassword(fmt.Appendf(nil, "benchmark-password-%05d", i), []byte(name))
 		fixture.users[i] = makeTestUser(name, credential)
 		credentials[i] = credential
 		usersByName[name] = fixture.users[i]

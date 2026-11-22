@@ -192,8 +192,7 @@ func (t *StreamUnderlay) RunEventLoop(ctx context.Context) error {
 	var drain bool
 	defer func() {
 		if serverAuthFailure != "" {
-			local, remote := t.LocalAddr(), t.RemoteAddr()
-			logServerAuthResult("", serverAuthFailure, local, remote, 0)
+			t.logServerAuthResult(serverAuthFailure, 0)
 		}
 
 		if drain {
@@ -339,84 +338,6 @@ func (t *StreamUnderlay) onOpenSessionRequest(seg *segment) error {
 	return nil
 }
 
-// commitServerUserAuthentication is the single TCP cache-recording point. The
-// caller invokes it only after the first segment has passed authentication,
-// replay, metadata, payload, padding, role, session-ID, and dispatch checks.
-func (t *StreamUnderlay) commitServerUserAuthentication(seg *segment) {
-	if seg == nil || !seg.serverUserAuthentication.Valid() {
-		return
-	}
-	t.serverUserPolicy = seg.serverUserAuthentication.Policy()
-	seg.serverUserAuthentication.Record()
-	sessionID, _ := seg.SessionID()
-	logServerAuthResult(t.serverUserPolicy.Name(), "", t.LocalAddr(), t.RemoteAddr(), sessionID)
-}
-
-func logServerAuthResult(username, failureReason string, local, remote net.Addr, sessionID uint32) {
-	if !log.IsLevelEnabled(log.DebugLevel) || local == nil || remote == nil {
-		return
-	}
-
-	if failureReason != "" {
-		log.WithFields(log.Fields{
-			"local":  local.String(),
-			"remote": remote.String(),
-			"reason": failureReason,
-		}).Debugf("TCP authentication failed.")
-		return
-	}
-
-	log.WithFields(log.Fields{
-		"user":    username,
-		"local":   local.String(),
-		"remote":  remote.String(),
-		"session": sessionID,
-	}).Debugf("TCP authentication succeeded.")
-}
-
-// logServerTrafficSummaryAfterClose records the final byte counts after the socket is closed.
-func (t *StreamUnderlay) logServerTrafficSummaryAfterClose() {
-	username := t.serverUserPolicy.Name()
-	if !log.IsLevelEnabled(log.DebugLevel) || t.isClient || username == "" || t.clientAddrString == "" {
-		return
-	}
-	conn, ok := t.conn.(*common.IdleTrackingConn)
-	if !ok {
-		return
-	}
-
-	// Let any in-flight write record its last bytes before taking the snapshot.
-	t.sendMutex.Lock()
-	upload, download := conn.ByteCounts()
-	t.sendMutex.Unlock()
-
-	log.WithFields(log.Fields{
-		"user":          username,
-		"remote":        t.clientAddrString,
-		"uploadBytes":   upload,
-		"downloadBytes": download,
-	}).Debugf("TCP connection closed.")
-}
-
-// serverAuthFailureReason returns an audit reason for a segment rejected by proxy server.
-func (t *StreamUnderlay) serverAuthFailureReason(err error, errType stderror.ErrorType) string {
-	if t.isClient || t.serverUserPolicy.Name() != "" || !log.IsLevelEnabled(log.DebugLevel) {
-		return ""
-	}
-	// Closing the transport can interrupt a read before the underlay is done.
-	if errors.Is(err, net.ErrClosed) || errors.Is(err, io.ErrClosedPipe) {
-		return ""
-	}
-	// A peer that disconnects without sending any data is a bare TCP probe.
-	conn, ok := t.conn.(*common.IdleTrackingConn)
-	if ok && errors.Is(err, io.EOF) {
-		if read, _ := conn.ByteCounts(); read == 0 {
-			return ""
-		}
-	}
-	return errType.String()
-}
-
 func (t *StreamUnderlay) onOpenSessionResponse(seg *segment) error {
 	if !t.isClient {
 		return stderror.ErrInvalidOperation
@@ -448,6 +369,84 @@ func (t *StreamUnderlay) onCloseSession(seg *segment) error {
 		log.Tracef("%v ignored closeSessionRequest or closeSessionResponse segment for closed session %d", t, sessionID)
 	}
 	return nil
+}
+
+// commitServerUserAuthentication is the single TCP cache-recording point. The
+// caller invokes it only after the first segment has passed authentication,
+// replay, metadata, payload, padding, role, session-ID, and dispatch checks.
+func (t *StreamUnderlay) commitServerUserAuthentication(seg *segment) {
+	if seg == nil || !seg.serverUserAuthentication.Valid() {
+		return
+	}
+	t.serverUserPolicy = seg.serverUserAuthentication.Policy()
+	seg.serverUserAuthentication.Record()
+	sessionID, _ := seg.SessionID()
+	t.logServerAuthResult("", sessionID)
+}
+
+func (t *StreamUnderlay) logServerAuthResult(failureReason string, sessionID uint32) {
+	if !log.IsLevelEnabled(log.DebugLevel) || t.LocalAddr() == nil || t.RemoteAddr() == nil {
+		return
+	}
+
+	if failureReason != "" {
+		log.WithFields(log.Fields{
+			"local":  t.LocalAddr().String(),
+			"remote": t.RemoteAddr().String(),
+			"reason": failureReason,
+		}).Debugf("TCP authentication failed.")
+		return
+	}
+
+	log.WithFields(log.Fields{
+		"user":    t.serverUserPolicy.Name(),
+		"local":   t.LocalAddr().String(),
+		"remote":  t.RemoteAddr().String(),
+		"session": sessionID,
+	}).Debugf("TCP authentication succeeded.")
+}
+
+// logServerTrafficSummaryAfterClose records the final byte counts after the socket is closed.
+func (t *StreamUnderlay) logServerTrafficSummaryAfterClose() {
+	username := t.serverUserPolicy.Name()
+	if !log.IsLevelEnabled(log.DebugLevel) || t.isClient || username == "" || t.clientAddrString == "" {
+		return
+	}
+	conn, ok := t.conn.(*common.IdleTrackingConn)
+	if !ok {
+		return
+	}
+
+	// Let any in-flight write record its last bytes before taking the snapshot.
+	t.sendMutex.Lock()
+	upload, download := conn.ByteCounts()
+	t.sendMutex.Unlock()
+
+	log.WithFields(log.Fields{
+		"user":          username,
+		"remote":        t.clientAddrString,
+		"uploadBytes":   upload,
+		"downloadBytes": download,
+	}).Debugf("TCP connection closed.")
+}
+
+// serverAuthFailureReason returns an audit reason for a segment rejected by proxy server.
+func (t *StreamUnderlay) serverAuthFailureReason(err error, errType stderror.ErrorType) string {
+	if !log.IsLevelEnabled(log.DebugLevel) || t.isClient || t.serverUserPolicy.Name() != "" {
+		return ""
+	}
+	// Closing the transport can interrupt a read before the underlay is done.
+	if errors.Is(err, net.ErrClosed) || errors.Is(err, io.ErrClosedPipe) {
+		return ""
+	}
+	// A peer that disconnects without sending any data is a bare TCP probe.
+	conn, ok := t.conn.(*common.IdleTrackingConn)
+	if ok && errors.Is(err, io.EOF) {
+		if read, _ := conn.ByteCounts(); read == 0 {
+			return ""
+		}
+	}
+	return errType.String()
 }
 
 func (t *StreamUnderlay) readOneSegment() (*segment, error) {

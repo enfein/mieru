@@ -526,19 +526,6 @@ func newTestPacketSession(t *testing.T) (*Session, net.PacketConn, cipher.BlockC
 	return s, receiverConn, block.Clone()
 }
 
-func decryptDataAckForTest(t *testing.T, block cipher.BlockCipher, wire []byte) *dataAckStruct {
-	t.Helper()
-	decrypted, err := block.Decrypt(wire[:packetNonHeaderPosition])
-	if err != nil {
-		t.Fatalf("Decrypt(metadata) failed: %v", err)
-	}
-	das := &dataAckStruct{}
-	if err := das.Unmarshal(decrypted); err != nil {
-		t.Fatalf("Unmarshal(metadata) failed: %v", err)
-	}
-	return das
-}
-
 func TestPacketOutputDelay(t *testing.T) {
 	tests := []struct {
 		name  string
