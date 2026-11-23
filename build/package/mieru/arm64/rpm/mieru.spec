@@ -3,7 +3,7 @@
 %global __strip /bin/true
 
 Name: mieru
-Version: 3.39.0
+Version: 3.40.0
 Release: 1%{?dist}
 Summary: Mieru proxy client
 License: GPLv3+
